@@ -48,3 +48,15 @@ Start with [`docs/AI_REPO_MAP.md`](docs/AI_REPO_MAP.md). Open only the topic not
 - [Build and tests](docs/AI_BUILD_NOTES.md)
 - [Legacy Tcl and experimental references](docs/AI_LEGACY_NOTES.md)
 - [Release audit](docs/AI_RELEASE_NOTES.md)
+
+## Streamline Cafe (this fork)
+
+This repository is Streamline Cafe, a fork of Streamline with its own main page. Read [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md) before changing it. Where that file and the rules above disagree, that file wins.
+
+- The skin id is `streamline-cafe.js`. Never build or publish under `streamline.js`: a skin installed under an id replaces the one already there. The storage namespaces stay Streamline's, on purpose.
+- Put new behaviour in new files under `src/cafe/`. Change Streamline's own files only through small hooks, and list each one, with any Streamline test you change, in `docs/cafe/UPSTREAM_EDITS.md`.
+- Keep the element ids Streamline's modules drive in `index.html`. Where a module needs an element the layout drops, keep a hidden stub instead of editing the module.
+- Load a recipe only through Streamline's `applyRecipe`. Never write Streamline's strip mode setting.
+- Write DYE2's recipe records only through the fork's one writer module.
+- Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.
+- Do not open issues or pull requests on `decentespresso` repositories from work on this fork.
