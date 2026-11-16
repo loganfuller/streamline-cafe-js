@@ -101,10 +101,10 @@ export function refreshStripSoon() {
  * Draw the strip and keep it in step with DYE2's records. Called once, when the
  * page starts. `onChange` is told the loaded recipe, or null, each time the
  * strip is drawn; `onBeforeLoad` resolves once edits made before a tap have been
- * written; `onApply` runs once a tap's load has been written, whether or not it
- * landed.
+ * written; `onLoading` is told when a load begins and ends; `onApply` runs once
+ * a tap's load has been written, whether or not it landed.
  */
-export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onApply = () => {} }) {
+export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onLoading = () => {}, onApply = () => {} }) {
     loader = createRecipeLoader({
         apply: applyRecipe,
         read: readDye2,
@@ -119,6 +119,7 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
             render();
             onChange(loaded);
         },
+        onLoading,
         onApplied: onApply,
         onError(error, recipe) {
             logger.error('Cafe: could not load the recipe', error);

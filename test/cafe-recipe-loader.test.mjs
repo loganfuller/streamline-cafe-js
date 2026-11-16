@@ -24,7 +24,7 @@ const idle = () => new Promise(resolve => setImmediate(resolve));
 function build({ rows = [A, B, C], selection = null } = {}) {
     const world = {
         rows, selection, written: [], applies: [], shown: [], errors: [], log: [],
-        applied: 0, reads: 0, readGates: [], settleGate: null,
+        applied: 0, reads: 0, readGates: [], settleGate: null, loading: [],
     };
     const loader = createRecipeLoader({
         apply(recipe) {
@@ -48,6 +48,7 @@ function build({ rows = [A, B, C], selection = null } = {}) {
             if (world.settleGate) await world.settleGate.promise;
         },
         show: (recipes, loaded) => world.shown.push(loaded ? loaded.id : null),
+        onLoading: loading => world.loading.push(loading),
         onApplied: () => { world.applied += 1; },
         onError: (error, recipe) => world.errors.push(recipe ? recipe.id : null),
     });
@@ -121,6 +122,44 @@ test('edits made before the tap are settled before the load is written', async (
     world.settleGate.resolve();
     await idle();
     assert.deepEqual(world.log, ['settle', 'apply a']);
+});
+
+test('a load that cannot settle is not made, and the recipe that was loaded still is', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
+    await loader.refresh();
+    world.settleGate = deferred();
+
+    loader.load(B);
+    await idle();
+    world.settleGate.reject(new Error('An earlier change has not reached the machine.'));
+    await idle();
+    assert.equal(world.applies.length, 0, 'nothing is loaded over an edit that is still in doubt');
+    assert.deepEqual(world.errors, ['b']);
+    assert.equal(world.last(), 'a');
+});
+
+test('the page is told while a load runs, from the tap to the last load finishing', async () => {
+    const { loader, world } = build();
+    await loader.refresh();
+    assert.deepEqual(world.loading, []);
+
+    loader.load(A);
+    assert.deepEqual(world.loading, [true], 'from the tap itself');
+    loader.load(B);
+    await idle();
+    world.applies[0].resolve();
+    await idle();
+    assert.deepEqual(world.loading, [true], 'still loading: a newer tap is waiting');
+    world.applies[1].resolve();
+    await idle();
+    assert.deepEqual(world.loading, [true, false]);
+
+    // A load that fails ends it too.
+    loader.load(C);
+    await idle();
+    world.applies[2].reject(new Error('Decaid did not answer'));
+    await idle();
+    assert.deepEqual(world.loading, [true, false, true, false]);
 });
 
 test('what is loaded is the record DYE2 holds now, not the one the card was drawn from', async () => {

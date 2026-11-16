@@ -21,11 +21,14 @@ import { loadedAfterRead } from './strip-model.js';
  *   read failed, and its selection, or undefined when it could not be asked.
  * - `show(recipes, loaded)` paints.
  * - `settle()` resolves once edits made before the tap have been written and
- *   saved.
+ *   saved, and rejects when they could not be: the load is then not made.
+ * - `onLoading(loading)` is told when a tap's load begins and when the last one
+ *   has finished, so the page can keep the dial-in still in between: an edit
+ *   made while a recipe loads belongs to neither recipe for certain.
  * - `onApplied()` runs after each load is written, landed or not.
  * - `onError(error, recipe)` is told of a load that failed.
  */
-export function createRecipeLoader({ apply, read, show, settle = async () => {}, onApplied = () => {}, onError = () => {} }) {
+export function createRecipeLoader({ apply, read, show, settle = async () => {}, onLoading = () => {}, onApplied = () => {}, onError = () => {} }) {
     let recipes = [];
     let loaded = null;     // what the strip shows as loaded: a tap moves it at once
     let confirmed = null;  // what DYE2, or the last load that landed, said is loaded
@@ -77,6 +80,7 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
         loading = false;
         loaded = confirmed; // a load that failed goes back to what was loaded
         paint();
+        onLoading(false);
         await refresh(); // DYE2's answer decides
     }, error => onError(error, null));
 
@@ -84,6 +88,7 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
         // The loaded card takes no tap, as on Streamline's strip: loading it again
         // would put the stored values back over a dial-in in progress.
         if (loaded && loaded.id === recipe.id) return;
+        if (!loading) onLoading(true);
         loading = true;
         loaded = recipe;
         paint();

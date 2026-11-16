@@ -18,7 +18,7 @@ import { cafeText, setText } from './text.js';
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
 const NAMES_GAP_MS = 300;
-const SETTLE_MAX_MS = 2000; // the longest a recipe load waits for an earlier edit to land
+const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier edit to land
 // Each stepper's − and + are `<name>-minus` and `<name>-plus`.
 const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'cafe-steam', 'hot-water-vol'];
 
@@ -137,15 +137,27 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Resolves once dial-in edits made before now have reached the Workflow. A
  * stepper writes a moment after its last tap; written after a recipe load
- * instead of before it, that edit would change the recipe just loaded.
+ * instead of before it, that edit would change the recipe just loaded. Rejects
+ * when a write is still on the wire after a few seconds: the load is then not
+ * made, because nothing says which recipe that write would land on.
  */
 export async function settleDialIn() {
     await steamFlow.flush();
     // Streamline's own steppers: wait out their debounce and any write on the wire.
     const giveUpAt = Date.now() + SETTLE_MAX_MS;
-    while ((msSinceTileInteraction() < WORKFLOW_EDIT_GUARD_MS || hasWorkflowWriteInFlight()) && Date.now() < giveUpAt) {
+    while (msSinceTileInteraction() < WORKFLOW_EDIT_GUARD_MS || hasWorkflowWriteInFlight()) {
+        if (Date.now() >= giveUpAt) throw new Error('An earlier change has not reached the machine yet.');
         await pause(50);
     }
+}
+
+/**
+ * A recipe is loading, or has finished. The dial-in rows take no taps in
+ * between (cafe.css): a step made while a recipe loads could be written before
+ * or after the load, and belongs to neither recipe for certain.
+ */
+export function showLoading(loading) {
+    el('main-page')?.classList.toggle('cafe-loading', loading);
 }
 
 // ── During a shot ────────────────────────────────────────────────────────────

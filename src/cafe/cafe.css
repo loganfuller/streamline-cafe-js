@@ -349,6 +349,14 @@ button.cafe-card {
     top: calc(50% - 51px);
 }
 
+/* While a recipe loads, the rows take no taps: a step made then could be written
+   before or after the load. A held − or + stops with them. */
+#main-page.cafe-loading .cafe-row {
+    pointer-events: none;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
 /* Streamline opens the profile list from #profile-name and DYE2's grinder page
    from #grind-label, and colours the first by id. Neither is a control here
    until its dialog arrives. */

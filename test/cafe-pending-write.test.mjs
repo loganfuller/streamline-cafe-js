@@ -14,8 +14,8 @@ function build({ write } = {}) {
         setTimer: fn => { timer = fn; return fn; },
         clearTimer: fn => { if (timer === fn) timer = null; },
     });
-    // The delay passing: the timer fires, if one is set.
-    const elapse = async () => { const fn = timer; timer = null; if (fn) await fn(); };
+    // The delay passing: the timer fires, if one is set, and its write runs.
+    const elapse = async () => { const fn = timer; timer = null; if (fn) fn(); await new Promise(resolve => setImmediate(resolve)); };
     return { pending, written, elapse, armed: () => timer !== null };
 }
 
@@ -76,13 +76,60 @@ test('a write that fails does not reject the flush, and leaves nothing waiting',
     assert.equal(pending.pending(), undefined);
 });
 
-test('a change made during a write is written after it', async () => {
-    const { pending, written, elapse } = build();
-    pending.set(1);
-    const first = pending.flush();
-    pending.set(2);
-    await first;
-    assert.deepEqual(written, [1]);
+test('flush waits for a write the timer already started', async () => {
+    // The case a recipe load depends on: the save began on its own, and the load
+    // must not go ahead until it has finished.
+    let finish;
+    const order = [];
+    const { pending, elapse } = build({
+        write: value => new Promise(resolve => { order.push(`began ${value}`); finish = () => { order.push(`wrote ${value}`); resolve(); }; }),
+    });
+    pending.set('A');
     await elapse();
-    assert.deepEqual(written, [1, 2]);
+    assert.deepEqual(order, ['began A']);
+    assert.equal(pending.pending(), undefined, 'nothing is waiting: it is being written');
+
+    const flushed = pending.flush().then(() => order.push('flushed'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(order, ['began A'], 'flush has not resolved while the write is under way');
+    finish();
+    await flushed;
+    assert.deepEqual(order, ['began A', 'wrote A', 'flushed']);
+});
+
+test('a change made during a write is written after it, and flush waits for both', async () => {
+    const finishers = [];
+    const order = [];
+    const { pending } = build({
+        write: value => new Promise(resolve => { order.push(`began ${value}`); finishers.push(() => { order.push(`wrote ${value}`); resolve(); }); }),
+    });
+    pending.set(1);
+    const flushed = pending.flush().then(() => order.push('flushed'));
+    await new Promise(resolve => setImmediate(resolve));
+    pending.set(2);
+    finishers[0]();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(order, ['began 1', 'wrote 1', 'began 2'], 'the second write begins only after the first');
+    finishers[1]();
+    await flushed;
+    assert.deepEqual(order, ['began 1', 'wrote 1', 'began 2', 'wrote 2', 'flushed']);
+});
+
+test('writes never overlap', async () => {
+    let under = 0;
+    let most = 0;
+    const finishers = [];
+    const { pending, elapse } = build({
+        write: () => new Promise(resolve => { under += 1; most = Math.max(most, under); finishers.push(() => { under -= 1; resolve(); }); }),
+    });
+    pending.set(1);
+    await elapse();
+    pending.set(2);
+    await elapse();
+    assert.equal(finishers.length, 1, 'the second waits for the first');
+    finishers[0]();
+    await new Promise(resolve => setImmediate(resolve));
+    finishers[1]();
+    await pending.flush();
+    assert.equal(most, 1);
 });
