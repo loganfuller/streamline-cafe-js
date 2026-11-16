@@ -54,6 +54,20 @@ export function dialInNames(workflow, batch) {
     };
 }
 
+// Steam flow, in ml/s, steps by a tenth between these, as Streamline's steam
+// tile steps it.
+export const STEAM_FLOW_MAX = 2.5;
+
+/**
+ * The steam flow one step up (+1) or down (-1) from `flow`. Rounded each step,
+ * so repeated tenths do not drift into 0.30000000000000004.
+ */
+export function stepSteamFlow(flow, direction) {
+    const from = Number.isFinite(flow) ? flow : 0;
+    const next = Math.round((from + direction * 0.1) * 10) / 10;
+    return Math.min(STEAM_FLOW_MAX, Math.max(0, next));
+}
+
 /**
  * The weight in the cup against its target while a shot runs: "24.3 / 36 g",
  * "24.3 g" with no target, and nothing with no scale reading.

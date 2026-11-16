@@ -4,26 +4,22 @@
 // The skin draws the cards and handles the tap. Loading the recipe is
 // Streamline's: `applyRecipe` writes the Workflow and tells DYE2 which recipe is
 // loaded, and which recipe is loaded is then read back from DYE2, as
-// Streamline's strip reads it.
+// Streamline's strip reads it. recipe-loader.js keeps the two in order.
 import { getDye2KvArray, callPluginEndpoint } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
-import { stripCards, loadedAfterRead, recipeName } from './strip-model.js';
+import { stripCards, recipeName } from './strip-model.js';
+import { createRecipeLoader } from './recipe-loader.js';
 import { cafeText } from './text.js';
 
 const RECIPES_KEY = 'recipes';
 const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive together
 
-let recipes = [];
-let loaded = null;
-let onLoaded = () => {};
-let onApplied = () => {};
-// Counts taps. A read that began before a tap is dropped, so it cannot move the
-// highlight off the card just tapped.
-let loadSeq = 0;
+let cards = stripCards([], null); // as last drawn
+let loader = null;
 let refreshTimer = null;
 
 // What DYE2 says is loaded, or undefined when it could not be asked.
@@ -35,10 +31,15 @@ async function readSelection() {
     }
 }
 
+async function readDye2() {
+    const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);
+    return { rows, selection };
+}
+
 function render() {
     const strip = document.getElementById('cafe-strip');
     if (!strip) return;
-    const cards = stripCards(recipes, loaded).map(card => {
+    strip.replaceChildren(...cards.map(card => {
         if (!card.recipe) {
             // An outline, not a control: holding it to add a recipe comes with the
             // long-press gestures.
@@ -60,70 +61,45 @@ function render() {
         bean.textContent = card.bean;
         button.append(name, bean);
         return button;
-    });
-    strip.replaceChildren(...cards);
+    }));
 }
 
-function show(recipe) {
-    loaded = recipe;
-    render();
-    onLoaded(loaded);
-}
-
-/** Read DYE2's records and its selection again, and redraw. */
-export async function refreshStrip() {
-    const seq = loadSeq;
-    const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);
-    if (seq !== loadSeq) return; // a tap landed meanwhile; its own read follows
-    // A failed read keeps what is on screen: an error is not an empty strip.
-    if (rows) recipes = rows;
-    show(loadedAfterRead(selection, recipes, loaded));
-}
-
-/** The same, a moment later, so a burst of reasons to look again costs one read. */
+/** Read DYE2 again, a moment later, so a burst of reasons to look costs one read. */
 export function refreshStripSoon() {
-    if (refreshTimer || document.hidden || isSubPage()) return;
+    if (!loader || refreshTimer || document.hidden || isSubPage()) return;
     refreshTimer = setTimeout(() => {
         refreshTimer = null;
-        refreshStrip().catch(error => logger.warn('Cafe: could not re-read the recipes', error));
+        loader.refresh().catch(error => logger.warn('Cafe: could not re-read the recipes', error));
     }, REFRESH_GAP_MS);
-}
-
-async function load(recipe) {
-    // The loaded card takes no tap, as on Streamline's strip: loading it again
-    // would put the stored values back over a dial-in in progress.
-    if (loaded && loaded.id === recipe.id) return;
-    const seq = ++loadSeq;
-    const before = loaded;
-    show(recipe); // at once; DYE2's answer below confirms it
-    try {
-        await applyRecipe(recipe);
-    } catch (error) {
-        logger.error('Cafe: could not load the recipe', error);
-        showToast(`${cafeText('Could not load')} ${recipeName(recipe)}`, 2400, 'error');
-        if (seq === loadSeq) show(before);
-    }
-    onApplied();
-    if (seq !== loadSeq) return; // a newer tap owns the strip
-    // DYE2's answer decides the highlight, whether the load landed or not.
-    await refreshStrip();
 }
 
 /**
  * Draw the strip and keep it in step with DYE2's records. Called once, when the
- * page starts. `onChange` is told
- * the loaded recipe, or null, each time it is read; `onApply` runs once a tap's
- * load has been written, whether or not it landed.
+ * page starts. `onChange` is told the loaded recipe, or null, each time the
+ * strip is drawn; `onApply` runs once a tap's load has been written, whether or
+ * not it landed.
  */
-export function initStrip({ onChange, onApply }) {
-    onLoaded = onChange || onLoaded;
-    onApplied = onApply || onApplied;
+export function initStrip({ onChange = () => {}, onApply = () => {} }) {
+    loader = createRecipeLoader({
+        apply: applyRecipe,
+        read: readDye2,
+        show(recipes, loaded) {
+            cards = stripCards(recipes, loaded);
+            render();
+            onChange(loaded);
+        },
+        onApplied: onApply,
+        onError(error, recipe) {
+            logger.error('Cafe: could not load the recipe', error);
+            if (recipe) showToast(`${cafeText('Could not load')} ${recipeName(recipe)}`, 2400, 'error');
+        },
+    });
     render();
     document.getElementById('cafe-strip')?.addEventListener('click', event => {
         const button = event.target.closest('button[data-slot]');
         if (!button) return;
-        const card = stripCards(recipes, loaded).find(c => c.slot === button.dataset.slot);
-        if (card?.recipe) load(card.recipe);
+        const card = cards.find(c => c.slot === button.dataset.slot);
+        if (card?.recipe) loader.load(card.recipe);
     });
     // DYE2's records have no push channel. Look again when the page comes back
     // into view, and when a plugin says the Workflow changed.
@@ -133,5 +109,5 @@ export function initStrip({ onChange, onApply }) {
     document.addEventListener('streamline:mainpagevisible', refreshStripSoon);
     document.addEventListener('streamline:workflow-refresh', refreshStripSoon);
     document.addEventListener('streamline:languagechange', render);
-    return refreshStrip();
+    return loader.refresh();
 }

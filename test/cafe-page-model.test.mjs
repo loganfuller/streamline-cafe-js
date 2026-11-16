@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pageHeading, dialInNames, roastDay, liveWeightText } from '../src/cafe/page-model.js';
+import { pageHeading, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
 
 test('with a recipe loaded, the title is its name, over its bean and profile', () => {
     const heading = pageHeading({ id: 'a', title: 'House espresso', beanName: 'Sample Blend' }, 'Sample Profile');
@@ -62,6 +62,22 @@ test('the roast day is the calendar day in the record, whatever the tablet\'s ti
     assert.equal(roastDay(''), null);
     assert.equal(roastDay(null), null);
     assert.equal(roastDay('28/02/2026'), null);
+});
+
+test('the steam flow steps by a tenth, without drifting', () => {
+    assert.equal(stepSteamFlow(1.5, 1), 1.6);
+    assert.equal(stepSteamFlow(1.5, -1), 1.4);
+    let flow = 0;
+    for (let i = 0; i < 3; i++) flow = stepSteamFlow(flow, 1);
+    assert.equal(flow, 0.3);
+});
+
+test('the steam flow stops at 0 and at its ceiling', () => {
+    assert.equal(stepSteamFlow(0, -1), 0);
+    assert.equal(stepSteamFlow(0.05, -1), 0);
+    assert.equal(stepSteamFlow(STEAM_FLOW_MAX, 1), STEAM_FLOW_MAX);
+    assert.equal(stepSteamFlow(2.45, 1), STEAM_FLOW_MAX);
+    assert.equal(stepSteamFlow(NaN, 1), 0.1, 'a tile that shows no number yet starts from 0');
 });
 
 test('during a shot the weight is shown against its target', () => {

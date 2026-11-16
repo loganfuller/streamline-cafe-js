@@ -33,14 +33,14 @@ Streamline bumps its version with each release, and the fork's version sits on t
 
 | File | Change |
 | --- | --- |
-| `index.html` | The main page's markup is the cafe layout. It keeps the ids Streamline's modules drive, and hidden stubs for the two history arrows, the fullscreen toggle, and the steam tile's duration and mode elements. `<head>` gains `src/cafe/cafe.css`. The inline module that started Streamline's strip is gone: `src/cafe/start.js` starts it once DYE2 is known to be there. |
+| `index.html` | The main page's markup is the cafe layout. It keeps the ids Streamline's modules drive, and hidden stubs for the two history arrows, the fullscreen toggle, and the steam tile's duration and mode elements. The steam row's − and + are the page's own, not Streamline's. `<head>` gains `src/cafe/cafe.css`. The inline module that started Streamline's strip is gone: `src/cafe/start.js` starts it once DYE2 is known to be there. |
 | `src/modules/app.js` | One import and one line at the top of `initMainPageOnce`: the main page starts only when `cafeMayStart()` in `src/cafe/start.js` says so. While it says no, `initMainPageOnce` returns `null` without starting, and the next call asks again. |
 | `src/css/app.css` | Rebuilt for the fork's page. See above. |
 | `.gitignore` | `test/cafe-smoke/out/`, the smoke run's screenshots. |
 
 Streamline's modules are otherwise unedited. Where the page needs one to behave differently, it does so from outside, in `src/cafe/` and `src/cafe/cafe.css`:
 
-- **Steam.** `ui.js` steps whichever of steam time and steam flow its tile mode names. `src/cafe/page.js` puts the mode back to flow at start-up and after each recipe load, through `setSteamTileModeIfSafe`.
+- **Steam.** `ui.js`'s steam − and + step whichever of time, flow and milk stop its tile's mode names, and the mode moves without the page. So the page has no `#steam-minus` or `#steam-plus`: its own two buttons step the flow from `src/cafe/page.js`, writing it as Streamline's numpad does. The tile's duration and mode elements stay as hidden stubs, because the tile does not paint without them.
 - **Taps Streamline wires that the page does not offer yet.** `app.js` opens the profile list from `#profile-name` and DYE2's grinder page from `#grind-label`. `cafe.css` takes pointer events off both.
 - **The help button.** `help-launcher.js` adds a "?" that explains Streamline's page. `cafe.css` hides it while the main page shows.
 - **The footer.** `main.css` reserves 242px under `<main>` for Streamline's footer cards; `cafe.css` gives it back to the graph.

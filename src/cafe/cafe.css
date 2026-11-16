@@ -441,11 +441,17 @@ button.cafe-card {
 }
 
 .cafe-value > .cafe-value-sub,
-.cafe-value > span.text-\[20px\] {
+.cafe-value > span.text-\[20px\]:not(#steam-flow-value) {
     font-size: 16px;
     font-weight: 500;
     line-height: 1.2;
     color: var(--data-card-title-text-color);
+}
+
+/* The steam row is the flow whatever mode Streamline's steam tile is in: the
+   tile shrinks the flow and reverses this column when its mode is not flow. */
+#steam-section .cafe-value {
+    flex-direction: column !important;
 }
 
 /* Settings and Sleep: at the bottom of the column, side by side. */

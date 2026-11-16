@@ -281,8 +281,21 @@ try {
     }
     await shot(page, 'page-no-recipe-light');
 
-    // 6. A tap loads a recipe, through Streamline's apply.
+    // 6. Two taps in quick succession: the machine ends on the second, which is
+    //    the one the page names.
     const stripModeBefore = await page.evaluate(() => localStorage.getItem('streamline.dyeStripMode'));
+    const [first, second] = [RECIPES[0], RECIPES[2]];
+    await cards.nth(first.slot - 1).click();
+    await cards.nth(second.slot - 1).click();
+    await page.waitForTimeout(6000);
+    const afterTwo = await decaid('GET', '/workflow');
+    check('two quick taps: the page names the second recipe', (await page.locator('#cafe-title').textContent()) === second.name, await page.locator('#cafe-title').textContent());
+    check('two quick taps: the Workflow holds the second recipe', afterTwo.context.coffeeName === second.bean && afterTwo.context.targetYield === second.yield,
+        `${afterTwo.context.coffeeName}, ${afterTwo.context.targetYield} g`);
+    check('two quick taps: only the second card is filled',
+        (await cards.nth(second.slot - 1).getAttribute('aria-pressed')) === 'true' && (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 1);
+
+    //    A tap loads a recipe, through Streamline's apply.
     const target = RECIPES[1];
     await cards.nth(target.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
@@ -327,11 +340,18 @@ try {
         && (await page.locator('#hot-water-vol-value').evaluate(e => getComputedStyle(e).fontSize)) === '16px');
     await page.locator('#hot-water-mode-toggle').click();
     await page.evaluate(() => { window._forceNumpadMobile = true; });
-    check('the steam row steps the flow, whatever mode the recipe was saved in', await (async () => {
-        const flow = parseFloat(await page.locator('#steam-flow-value').textContent());
-        await page.locator('#steam-plus').click();
-        return Math.abs(parseFloat(await page.locator('#steam-flow-value').textContent()) - (flow + 0.1)) < 0.001;
-    })());
+    // Streamline's steam tile put into time mode, as loading a recipe saved in
+    // that mode leaves it: the row is still the flow, and still steps it.
+    await page.evaluate(() => window.app.ui.setSteamTileModeIfSafe('time'));
+    const flowBefore = parseFloat(await page.locator('#steam-flow-value').textContent());
+    const timeBefore = (await decaid('GET', '/workflow')).steamSettings.duration;
+    await page.locator('#cafe-steam-plus').click();
+    const flowAfter = parseFloat(await page.locator('#steam-flow-value').textContent());
+    check('the steam row steps the flow, whatever mode Streamline\'s steam tile is in', Math.abs(flowAfter - (flowBefore + 0.1)) < 0.001, `${flowBefore} to ${flowAfter}`);
+    check('the steam row still shows the flow large', (await page.locator('#steam-flow-value').evaluate(e => getComputedStyle(e).fontSize)) === '26px');
+    await page.waitForTimeout(2500);
+    const steamNow = (await decaid('GET', '/workflow')).steamSettings;
+    check('the flow reaches the Workflow, and the steam time is untouched', Math.abs(steamNow.flow - flowAfter) < 0.001 && steamNow.duration === timeBefore, JSON.stringify(steamNow));
 
     // 8. A shot: the state, the time and the weight against its target, then the
     //    Shot in the graph and its time in the legend.

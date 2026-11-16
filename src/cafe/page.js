@@ -5,11 +5,12 @@
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
-import { getWorkflow, getBeanBatch, getScaleReading } from '../modules/api.js';
-import { setSteamTileModeIfSafe } from '../modules/ui.js';
+import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow } from '../modules/api.js';
+import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton } from '../modules/ui.js';
+import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { pageHeading, dialInNames, liveWeightText } from './page-model.js';
+import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { createHoldRepeat } from './hold-repeat.js';
 import { cafeText, setText } from './text.js';
 
@@ -17,7 +18,7 @@ const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
 const NAMES_GAP_MS = 300;
 // Each stepper's − and + are `<name>-minus` and `<name>-plus`.
-const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'steam', 'hot-water-vol'];
+const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'cafe-steam', 'hot-water-vol'];
 
 let recipe = null;
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
@@ -25,6 +26,8 @@ let batch = null;       // the Bean Batch last read, kept while the Workflow sti
 let namesSeq = 0;
 let namesTimer = null;
 let liveTimer = null;
+let steamFlowPending = null; // a flow stepped to and not yet written
+let steamFlowTimer = null;
 
 const el = id => document.getElementById(id);
 
@@ -100,19 +103,27 @@ function refreshNamesSoon() {
     namesTimer = setTimeout(() => { namesTimer = null; refreshNames(); }, NAMES_GAP_MS);
 }
 
-/** A recipe was just loaded from the strip. */
-export function afterRecipeLoad() {
-    pinSteamFlow();
-    refreshNames();
-}
+// ── Steam flow ───────────────────────────────────────────────────────────────
 
-// ── Steam ────────────────────────────────────────────────────────────────────
-
-// The page has one steam row, the flow. Streamline's tile steps whichever of
-// time and flow its mode names, and loading a recipe saved in time mode moves it
-// there, so the mode is put back to flow at start-up and after each load.
-function pinSteamFlow() {
-    setSteamTileModeIfSafe('flow');
+// The page has one steam row, the flow, and steps it itself. Streamline's own
+// steam − and + step whichever of time, flow and milk stop its tile's mode
+// names, and that mode moves without the page: a recipe saved in time mode, or a
+// milk probe unplugged and plugged back in. So those buttons are not on the
+// page, and these write the flow the way Streamline's numpad does, whatever the
+// mode.
+function stepSteam(direction, button) {
+    if (isAutoSteamMode()) return; // Streamline's pitcher mode owns the steam settings
+    flashPlusMinusButton(button);
+    const shown = parseFloat(el('steam-flow-value')?.textContent);
+    steamFlowPending = stepSteamFlow(steamFlowPending ?? shown, direction);
+    updateSteamDisplay({ targetSteamFlow: steamFlowPending });
+    clearTimeout(steamFlowTimer);
+    steamFlowTimer = setTimeout(() => {
+        const flow = steamFlowPending;
+        steamFlowPending = null;
+        pushSteamSetting('flow', setTargetSteamFlow(flow));
+        window.app?.saveContextToActiveProfile?.({ targetSteamFlow: flow });
+    }, API_DEBOUNCE_MS);
 }
 
 // ── During a shot ────────────────────────────────────────────────────────────
@@ -212,7 +223,6 @@ function wireHoldRepeat() {
 export function initPage({ onProfileChange = () => {} } = {}) {
     renderHeading();
     renderNames();
-    pinSteamFlow();
     placeSystemButtons();
     paintBattery();
     refreshNames();
@@ -225,6 +235,9 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     const machineButtons = el('ghc-controls');
     if (machineButtons) new MutationObserver(placeSystemButtons).observe(machineButtons, { attributes: true, attributeFilter: ['style'] });
 
+    for (const [id, direction] of [['cafe-steam-minus', -1], ['cafe-steam-plus', 1]]) {
+        el(id)?.addEventListener('click', event => stepSteam(direction, event.currentTarget));
+    }
     wireHoldRepeat();
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);
