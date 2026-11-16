@@ -1,0 +1,760 @@
+/* Streamline Cafe's main page (docs/cafe/DESIGN.md), at Streamline's 1920 by 1200
+   design size. Loaded after main.css and dark-mode.css: it uses their colour
+   tokens, so light and dark follow Streamline's, and it adjusts the few layout
+   rules of theirs that assumed Streamline's own page. */
+
+/* ── Start-up ─────────────────────────────────────────────────────────────── */
+
+/* Nothing shows until the DYE2 check has answered (src/cafe/start.js). */
+#main-page.cafe-pending > * {
+    display: none !important;
+}
+
+/* While the "DYE2 is needed" screen shows, it is the page: nothing is drawn
+   behind it. */
+#main-page.cafe-gated > :not(#cafe-gate) {
+    display: none !important;
+}
+
+#cafe-gate {
+    display: none;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    background: var(--bgmain-color);
+}
+
+#main-page.cafe-gated > #cafe-gate {
+    display: flex;
+}
+
+.cafe-gate-card {
+    width: 760px;
+    box-sizing: border-box;
+    padding: 48px 56px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 22px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+#cafe-gate-title {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+#cafe-gate-line {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--status-red-color);
+}
+
+#cafe-gate-hint {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.35;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-gate-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+}
+
+.cafe-gate-actions .cafe-btn {
+    flex: 1 1 0;
+    height: 64px;
+    font-size: 22px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+/* Streamline's outlined button: Settings, Sleep and the gate's actions. */
+.cafe-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 56px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--mimoja-blue-v2);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    color: var(--mimoja-blue-v2);
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cafe-btn-primary {
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+/* Dark: Streamline's header buttons lose their outline and take the primary
+   text colour (dark-mode.css does this for Settings and Sleep by id). */
+[data-theme="dark"] .cafe-btn {
+    border-color: #101117;
+    background: #101117;
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .cafe-btn-primary {
+    border-color: var(--button-primary-bg);
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+
+/* A stub: an element a Streamline module needs and the page does not show. */
+.cafe-stub {
+    display: none !important;
+}
+
+.cafe-eyebrow {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-body {
+    flex: 1 1 0;
+    display: flex;
+}
+
+/* main.css reserves 242px under <main> for Streamline's footer cards, which
+   this page does not have: the graph takes that space. */
+#main-page main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+    background: var(--bgmain-color);
+}
+
+#main-row {
+    display: flex;
+}
+
+#cafe-main {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 22px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+}
+
+/* ── Recipes ──────────────────────────────────────────────────────────────── */
+
+#cafe-header {
+    height: 168px;
+    box-sizing: border-box;
+    padding: 34px 36px;
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--box-color);
+}
+
+#cafe-strip {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.cafe-card {
+    height: 100px;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
+}
+
+button.cafe-card {
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-card-name {
+    max-width: 100%;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.15;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.cafe-card-bean {
+    max-width: 100%;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.75;
+}
+
+.cafe-card-bean:empty {
+    display: none;
+}
+
+/* The loaded recipe: filled with the accent colour, as Streamline's strip
+   marks its selected cell. */
+.cafe-card[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+/* An empty slot is an outline, and not a control. */
+.cafe-card-empty {
+    border-style: dashed;
+    border-color: var(--border-primary);
+    background: transparent;
+    color: var(--data-card-title-text-color);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* ── Dial-in column ───────────────────────────────────────────────────────── */
+
+/* 440 wide: the widest label, "Steam flow", beside a stepper whose value box
+   holds the widest value, "255ml". */
+#shot-settings {
+    width: 440px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-primary);
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+#cafe-dial-label {
+    flex: none;
+    padding-bottom: 8px;
+}
+
+/* Every row has the same type and the same size buttons. A row that says what
+   it is dialled for is taller, for that line. Rows share the column's height:
+   at the design size they sit at 128 and 98, and give some back on a shorter
+   screen, where the canvas has fewer rows. */
+.cafe-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.cafe-row-tall {
+    flex: 0 1 128px;
+    min-height: 100px;
+}
+
+.cafe-row-short {
+    flex: 0 1 98px;
+    min-height: 78px;
+}
+
+.cafe-row-label {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cafe-row-name {
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+/* A name longer than the room beside the stepper, as a translation can be,
+   wraps instead of running under the − button. */
+.cafe-row-short .cafe-row-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* A tall row is two lines: its name beside the stepper, and under both, across
+   the row's whole width, what it is dialled for: the bean and its roast date,
+   the basket, the grinder, the profile. */
+.cafe-row-tall .cafe-row-label {
+    gap: 8px;
+}
+
+.cafe-row-tall .cafe-row-name {
+    height: 58px;
+    line-height: 58px;
+}
+
+.cafe-row-desc {
+    height: 22px;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--data-card-title-text-color);
+}
+
+/* The stepper sits on the name's line: 15px above the row's middle, which is
+   where that line's middle is. */
+.cafe-row-tall .cafe-stepper {
+    position: absolute;
+    right: 0;
+    top: calc(50% - 51px);
+}
+
+/* While a recipe loads, the rows take no taps: a step made then could be written
+   before or after the load. Everything inside a row too, and over an inline
+   style: a plugin's mode buttons set their own pointer-events. */
+#main-page.cafe-loading .cafe-row,
+#main-page.cafe-loading .cafe-row * {
+    pointer-events: none !important;
+}
+
+#main-page.cafe-loading .cafe-row {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+/* Streamline opens the profile list from #profile-name and DYE2's grinder page
+   from #grind-label, and colours the first by id. Neither is a control here
+   until its dialog arrives. */
+#main-page #profile-name,
+#main-page #grind-label {
+    pointer-events: none;
+}
+
+[data-theme] #main-page #profile-name {
+    color: var(--data-card-title-text-color);
+}
+
+/* Flush, Steam flow and Hot water open their settings page, as on Streamline. */
+#flush-label,
+#steam-label,
+#hotwater-label {
+    cursor: pointer;
+}
+
+.cafe-mode-toggle {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    white-space: nowrap;
+    color: var(--low-contrast-white);
+    cursor: pointer;
+}
+
+/* 72px high, like Streamline's control row: a plugin's hint is placed against
+   that height (plugin-surfaces-ui.js). */
+.cafe-stepper {
+    position: relative;
+    flex: none;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cafe-stepper > button {
+    width: 58px;
+    height: 58px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: var(--button-grey);
+    color: var(--text-primary);
+    touch-action: manipulation;
+}
+
+.cafe-stepper > button > svg {
+    width: 34px;
+    height: 34px;
+}
+
+/* A value, with at most one smaller line under it. Streamline sets the size of
+   the steam and hot water values itself, and reverses this column to put the
+   one the buttons step on top. */
+.cafe-value {
+    width: 100px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-value > span:not(.cafe-value-sub) {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    border-radius: 8px;
+}
+
+.cafe-value > .cafe-value-sub,
+.cafe-value > span.text-\[20px\]:not(#steam-flow-value) {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--data-card-title-text-color);
+}
+
+/* The steam row is the flow whatever mode Streamline's steam tile is in: the
+   tile shrinks the flow and reverses this column when its mode is not flow. */
+#steam-section .cafe-value {
+    flex-direction: column !important;
+}
+
+/* Settings and Sleep: at the bottom of the column, side by side. */
+#shot-settings > #cafe-system {
+    margin-top: auto;
+    padding-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+/* ── Title, status and legend ─────────────────────────────────────────────── */
+
+.cafe-title-band {
+    flex: none;
+    height: 92px;
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+}
+
+.cafe-title-text {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#cafe-title {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#cafe-subtitle {
+    margin: 0;
+    min-height: 28px;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 28px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--data-card-title-text-color);
+}
+
+/* Streamline writes the machine's state here: "Ready", and during a shot the
+   stage and its seconds. */
+#machine-status {
+    flex: none;
+    padding-bottom: 4px;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 40px;
+}
+
+#cafe-live {
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+#cafe-live-weight {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-status-band {
+    flex: none;
+    height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+/* Streamline scales this row down when a long language overflows it, so it
+   sizes to its content, and stretches to the band so the scale sits right. */
+#telemetry-row {
+    flex: 1 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    font-size: 22px;
+    white-space: nowrap;
+}
+
+#telemetry-row p {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.cafe-tele-label {
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-tele-value {
+    font-family: 'NotoSansMono', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+#cupwarmer-info-container {
+    cursor: pointer;
+}
+
+#cupwarmer-info-container .cafe-tele-label,
+#cupwarmer-info-container .cafe-tele-value {
+    color: var(--mimoja-blue-v2);
+}
+
+/* app.js shows this with an empty or a "block" inline display. */
+#scale-info-container {
+    margin-left: auto;
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+}
+
+#scale-info-container[style*="none"] {
+    display: none !important;
+}
+
+/* Green while the scale is connected. app.js turns the label red while it is
+   away, and the dot follows the label. */
+.cafe-scale-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--status-green-color);
+}
+
+#weight-text.text-red-600 + .cafe-scale-dot {
+    background: var(--status-red-color);
+}
+
+#cafe-scale-battery:empty {
+    display: none;
+}
+
+/* The weight, which tares the scale on a tap. */
+.cafe-tare {
+    min-width: 96px;
+    height: 44px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-primary);
+    border-radius: 10px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'NotoSansMono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+#cafe-legend {
+    flex: none;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 18px;
+    white-space: nowrap;
+}
+
+.cafe-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cafe-legend-name {
+    font-weight: 600;
+}
+
+.cafe-legend-target {
+    opacity: 0.6;
+}
+
+/* The Shot's time follows its label, and with no Shot yet the label goes too.
+   The time is first in the markup so the label can follow it in a selector. */
+#history-date {
+    order: 3;
+    font-size: 17px;
+    color: var(--data-card-title-text-color);
+}
+
+#history-date:empty ~ * {
+    display: none;
+}
+
+/* While a shot runs the graph is that shot, not the one this names. */
+#main-page.cafe-shot-live #shot-history-info {
+    visibility: hidden;
+}
+
+/* ── Graph ────────────────────────────────────────────────────────────────── */
+
+/* The graph takes what the rows above leave, down to the bottom of the page. */
+#chart-wrap {
+    position: relative;
+}
+
+#main-page #plotly-chart {
+    width: 100%;
+    border-top: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
+}
+
+#expanded-chart {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+/* Full-screen chart: Streamline hides the dial-in column and the machine
+   buttons and gives the graph the width. The legend goes with them. */
+#main-page.chart-zoomed #cafe-legend {
+    display: none;
+}
+
+/* ── Machine buttons ──────────────────────────────────────────────────────── */
+
+/* Shown by ui.js with an inline display:flex, only when the machine has no
+   buttons of its own. Settings and Sleep sit at its top then. */
+#ghc-controls {
+    width: 168px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 20px 16px;
+    flex-direction: column;
+    gap: 10px;
+    border-left: 1px solid var(--border-primary);
+    background: var(--box-color);
+    font-family: 'Inter', sans-serif;
+}
+
+#ghc-controls > #cafe-system {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-ghc-rule {
+    flex: none;
+    height: 1px;
+    margin: 8px 0;
+    background: var(--border-primary);
+}
+
+#ghc-controls > button {
+    flex: 0 1 128px;
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    border: 2px solid var(--profile-button-outline-color);
+    color: var(--mimoja-blue-v2);
+    font-size: 22px;
+    font-weight: 600;
+}
+
+#ghc-controls > button > img {
+    width: 44px;
+    height: 44px;
+}
+
+#ghc-controls > #ghc-stop-btn {
+    margin-top: auto;
+    border-color: #da515e;
+    background: #da515e;
+    color: #fff;
+}
+
+/* dark-mode.css recolours every button in the column but Stop; Settings and
+   Sleep keep their own look there. */
+[data-theme="dark"] #ghc-controls #cafe-system > button {
+    background-color: #101117;
+}
+
+/* ── Streamline's own additions ───────────────────────────────────────────── */
+
+/* The "?" help button explains Streamline's page, part by part. It stays on the
+   settings and profile pages and is not shown over this one. */
+.cafe-main-shown #help-overlay-btn {
+    display: none !important;
+}

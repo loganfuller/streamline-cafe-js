@@ -12,14 +12,14 @@ Words such as Recipe, Recipe Slot, Reference Shot, Shot, Location, Machine, Work
 
 - Any cafe running Decent machines on Decaid. The repo carries no cafe's name, branding or data: sample data in docs, tests and the public preview is made up.
 - **DYE2 is required.** The skin shows recipes and nothing else in their place, so without DYE2 it shows a "DYE2 is needed" screen (see [Recipes and the strip](#recipes-and-the-strip)).
-- **Decent Sync is optional.** With it, the skin shows the Location's Shots and each Recipe's Reference Shot. Without it, on a Capture-only Machine, or while the server can't be reached, the skin falls back to this machine's own Shots and a reference kept on the tablet.
+- **Decent Sync is optional.** With it, the skin shows the Location's Shots and each Recipe's Reference Shot, and a dial-in change is saved onto the loaded Recipe. Without it, on a Capture-only Machine, or while the server can't be reached, the skin falls back to this machine's own Shots and a reference kept on the tablet. Without it or on a Capture-only Machine, a dial-in change is this machine's alone.
 
 ## What the screen shows
 
 The owner keeps the screen's working design as a mockup, which is not in this repo. This section summarises it and is updated with it.
 
 - **Recipes.** Nine fixed Recipe Slots in one row. An empty slot stays as an outline, so cards never move. A tap loads a recipe. A long-press opens it in DYE2's editor, or on an empty slot creates one there.
-- **Dial-in column.** Steppers for dose, yield, grind, brew temperature, flush, steam flow and hot water, each saved onto the loaded recipe. Hot water is one control with Streamline's Temp | Vol toggle.
+- **Dial-in column.** Steppers for dose, yield, grind, brew temperature, flush, steam flow and hot water, all with the same type and the same size buttons. Hot water is one control with Streamline's Temp | Vol toggle. With Decent Sync a change is saved onto the loaded recipe, and the column is labelled "Dial-in · saved to the recipe". Without it the change is this machine's alone, until another recipe loads, and the label reads "Dial-in · not saved to the recipe".
 - **Grinder, bean, basket and profile.** Dose names the bean and batch, Yield the basket, Grind the grinder and Brew the profile. A tap on one opens a dialog listing what the tablet offers.
 - **Graph.** Solid: this machine's latest Shot pulled with the loaded recipe. Dashed and faded: the recipe's Reference Shot. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets.
 - **Comparison row.** Under the graph: time, first drip, yield, ratio and peak pressure, each beside the reference's. While a shot runs, six live cards take its place.
@@ -27,7 +27,7 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **Shots list.** Every Shot at the Location with Decent Sync, otherwise this machine's own. A row opens that Shot in the graph.
 - **No recipe loaded.** The title reads "No recipe selected", the dial-in column says it is not saved to a recipe, and the steppers change this machine only.
 - **Gone from Streamline's page.** The P/F/R toggle, the favourite-profile buttons, the DYE button, the shot-history card, the phase table, every row of preset buttons, the steam time and the milk-pitcher steam mode. The settings that configure them stay in the settings page and do nothing here.
-- **Kept from Streamline.** A tap on a value opens the numpad, holding − or + repeats, a tap on the graph opens the full-screen chart, and the screensaver and the "tap to reload" notice work as they do there. The on-screen machine buttons show only when the machine has none of its own.
+- **Kept from Streamline.** A tap on a value opens the numpad, a tap on the graph opens the full-screen chart, and the screensaver and the "tap to reload" notice work as they do there. The on-screen machine buttons show only when the machine has none of its own. Flush, Steam flow and Hot water open their settings page from their label.
 - **Until a slice arrives, its part of the screen is left out.** Nothing on the page is a control that does nothing.
 
 The skin follows Streamline's design language: `DESIGN_SYSTEM.md`, Tailwind CSS, daisyUI and ECharts.
@@ -71,6 +71,11 @@ Streamline's modules keep running for the work that isn't drawing. Its history m
 - **Loading a recipe stays Streamline's.** The skin loads a recipe only by calling Streamline's `applyRecipe`, and reads which recipe is loaded through Streamline's selection helpers. DYE2 has no endpoint that applies a recipe: Streamline's apply writes the Workflow and tells DYE2 which recipe is loaded. A second implementation would be a second behaviour for Decent Sync to follow.
 - **Streamline's strip module still starts,** with nothing to draw into. It keeps telling DYE2 which recipe is loaded, restores the selection after a trip to DYE2's editor, and re-reads DYE2's records when the page regains focus.
 - **When the skin starts.** Only when the DYE2 plugin is installed, loaded and at least v0.1.40, and Streamline's shared "DYE2 on" setting is on. Otherwise a blocking screen says which is missing. For the setting it offers a button that turns it on. For the plugin it points to Decaid's Plugins screen, because installing a plugin from a skin needs a management token from Decaid v0.9.2. The screen is a centred card titled "Streamline Cafe needs DYE2", with one line for what is missing, and always a Reload button and a Settings button, so the settings page stays reachable.
+- **When Decaid's plugin list can't be read,** nothing is known to be missing, so the screen is not shown for the plugin and only the setting decides. The page then starts as Streamline does against a Decaid it can't reach, and recovers the same way. The check waits five seconds for the list at most.
+- **DYE2 switched off while the page runs.** On the way back from the settings page the skin reloads, which lands on the "DYE2 is needed" screen.
+- **What the cards and the names follow.** DYE2's records and the Workflow have no push channel. The skin reads them at start-up, after a tap loads a recipe, when the page comes back into view or back from a subpage, when a plugin announces a Workflow change, and when the active profile changes. There is no timer.
+- **Saving the dial-in is Decent Sync's.** DYE2 saves a change of the Workflow onto the loaded recipe only when asked: its `record` request, which Streamline sends when a barista picks "Save changes" in its strip's menu, and which Decent Sync's plugin sends after every change on a Machine it serves. The skin has no such menu and sends no such request, so on a tablet without Decent Sync nothing saves a dial-in change, and the page says so. A recipe is changed for good there in DYE2's editor. The skin learns whether Decent Sync saves from the plugin's Status request: a Machine it serves, yes; a Capture-only Machine, or no plugin, no; and while the server can't be asked, the last answer stands, because the plugin goes on saving on the tablet through an outage. The skin asks at start-up, when the page comes back into view, and after each recipe load; and while no answer has come either way, as when the skin loads before the plugin has connected, it asks again every half minute, slowing to every five.
+- **Before another recipe loads,** a change still on its way is written first, so it does not land on the recipe about to load, and the recipe tapped is read again from DYE2's records, so what loads is what DYE2 holds, not what the card showed when it was drawn. Loads run one at a time, in the order tapped. A load whose earlier change has not reached the machine after a few seconds is not made, and says so. While a recipe loads the dial-in rows take no taps: a step made then could be written before or after the load.
 - **Nine slots.** DYE2 keeps a `stripSlot` of 6 to 9 as written, though its own editor places recipes only in 1 to 5. The skin places recipes in 6 to 9 itself.
 - **Empty slots.** A long-press creates a recipe in DYE2's editor. The skin remembers the held slot and the recipe ids that exist, and on its next load places the one new recipe in that slot if the slot is still empty. With none or several new recipes it places nothing. There is no "choose an existing recipe" option yet; this may change.
 
@@ -99,7 +104,7 @@ Decaid's store has no conditional write, and DYE2 reads, waits and writes the wh
 Streamline lets a plugin add things to its page, such as a step size on a stepper or a strip during a shot.
 
 - Surfaces attached to parts the page keeps, the steppers and the screensaver, keep working, because that code is reused.
-- Surfaces attached to parts the page drops are left out until a plugin a cafe uses needs one. DYE2 and Decent Sync declare none.
+- Surfaces attached to parts the page drops are left out until a plugin a cafe uses needs one. DYE2 and Decent Sync declare none. A plugin's steam mode is one of them: it attaches to Streamline's steam mode toggle and its steam − and +, and the page has neither, because its steam row is the flow alone.
 - A cafe's own additions may come as plugins later, so this may change.
 
 ## Shots and the reference
@@ -134,7 +139,7 @@ The screen's new text covers the languages Streamline supports.
 ## Tests
 
 - Streamline's convention, in CI on every pull request: pure modules under `node:test`.
-- Before each release, a Playwright smoke run by hand against headless Decaid with a simulated machine, with screenshots on the pull request. It is not in CI yet.
+- Before each release, a Playwright smoke run by hand against headless Decaid with a simulated machine, with screenshots on the pull request. It is not in CI yet. `SMOKE.md` says how to set it up, and `test/cafe-smoke/` holds the run and its made-up data.
 
 ## Builds and installs
 
