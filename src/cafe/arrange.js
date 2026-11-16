@@ -23,7 +23,10 @@ const failed = text => showToast(text, 4000, 'error');
 // recipe is loaded is a marker in the Workflow, and DYE2's selection request
 // clears that marker alone, so what the machine is set to does not change.
 // Streamline's strip module is told first, so a request of its own that is
-// still retrying does not put the recipe back.
+// still retrying does not put the recipe back. Asking DYE2 before telling it is
+// sound while that request retries: Streamline's apply writes the marker with
+// the Workflow itself, and DYE2 reads the selection from the marker, so DYE2
+// names the recipe as loaded whether or not the request has landed.
 async function unloadIfLoaded(recipeId) {
     try {
         const selection = await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', null, 'GET');
