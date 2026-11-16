@@ -11,7 +11,6 @@ import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
-import { createHoldRepeat } from './hold-repeat.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, setText } from './text.js';
 
@@ -23,8 +22,6 @@ const NAMES_GAP_MS = 300;
 // Workflow first: the wait covers that read, which no counter announces.
 const SETTLE_QUIET_MS = 1000;
 const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier edit to land
-// Each stepper's − and + are `<name>-minus` and `<name>-plus`.
-const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'cafe-steam', 'hot-water-vol'];
 
 let recipe = null;
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
@@ -222,47 +219,6 @@ function placeSystemButtons() {
     else home.append(system);
 }
 
-// ── Holding − or + ───────────────────────────────────────────────────────────
-
-function wireHoldRepeat() {
-    for (const name of STEPPERS) {
-        for (const end of ['minus', 'plus']) {
-            const button = el(`${name}-${end}`);
-            if (!button) continue;
-            // A repeat's step is a click the page makes, which Streamline's lock on
-            // a row during a shot (pointer-events: none) would not stop: so each one
-            // checks the button can still be pressed, and the repeat ends when not.
-            const hold = createHoldRepeat({
-                fire() {
-                    if (button.disabled || getComputedStyle(button).pointerEvents === 'none') return false;
-                    button.click();
-                    return true;
-                },
-            });
-            // After a repeat, lifting the finger must not step once more.
-            let swallowTap = false;
-            const release = () => { if (hold.release()) swallowTap = true; };
-            button.addEventListener('pointerdown', event => {
-                if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
-                swallowTap = false;
-                hold.press();
-            });
-            for (const type of ['pointerup', 'pointercancel', 'pointerleave']) button.addEventListener(type, release);
-            // A long touch must not open the WebView's own menu.
-            button.addEventListener('contextmenu', event => event.preventDefault());
-            // On the parent, in the capture phase, so it runs before Streamline's own
-            // click handler on the button whichever was registered first. A repeat's
-            // step is a click the page made itself (isTrusted false) and passes.
-            button.parentElement.addEventListener('click', event => {
-                if (!swallowTap || !event.isTrusted || !button.contains(event.target)) return;
-                swallowTap = false;
-                event.stopPropagation();
-                event.preventDefault();
-            }, true);
-        }
-    }
-}
-
 // ── Start ────────────────────────────────────────────────────────────────────
 
 /**
@@ -288,7 +244,6 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     for (const [id, direction] of [['cafe-steam-minus', -1], ['cafe-steam-plus', 1]]) {
         el(id)?.addEventListener('click', event => stepSteam(direction, event.currentTarget));
     }
-    wireHoldRepeat();
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);

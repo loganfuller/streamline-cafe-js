@@ -335,7 +335,7 @@ try {
         (await page.evaluate(() => localStorage.getItem('streamline.dyeStripMode'))) === stripModeBefore);
     await shot(page, 'page-recipe-light');
 
-    // 7. Stepping a value, by tap and by hold, and typing one.
+    // 7. Stepping a value.
     await page.locator('#dose-in-plus').click();
     const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
     check('+ steps the dose once', stepped > held.dose && stepped <= held.dose + 1, `${held.dose}g to ${stepped}g`);
@@ -344,15 +344,6 @@ try {
     //    "Saved to the recipe": DYE2 saves a change only when asked, and the page asks.
     await page.waitForTimeout(3000);
     check('the step is saved onto the recipe in DYE2\'s records', (await recordOf(target)).dashboardVariables.dose === stepped, `record dose ${(await recordOf(target)).dashboardVariables.dose}`);
-    const flushBefore = parseFloat(await page.locator('#flush-value').textContent());
-    const plus = await page.locator('#flush-plus').boundingBox();
-    await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(1200);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    const flushAfter = parseFloat(await page.locator('#flush-value').textContent());
-    check('holding + repeats', flushAfter - flushBefore >= 4, `${flushBefore}s to ${flushAfter}s`);
     await page.locator('#hot-water-mode-toggle').click();
     check('Temp | Vol picks which of the two the buttons step',
         (await page.locator('#hot-water-temp-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px'

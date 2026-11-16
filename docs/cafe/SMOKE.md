@@ -73,7 +73,7 @@ In order, it:
 3. seeds the sample data, by setting the Workflow and asking DYE2 to save it as a recipe, so the records have the shape DYE2 writes;
 4. checks the nine cards, the page with no recipe loaded, and what is gone from Streamline's page;
 5. taps a card and checks the Workflow, DYE2's selection, the title and what each dial-in row names;
-6. steps a value by tap and by hold, flips Temp | Vol, and steps the steam flow;
+6. steps a value, flips Temp | Vol, and steps the steam flow;
 7. pulls a simulated shot and checks the state, the time and the weight against its target, then the Shot in the graph and its time in the legend;
 8. opens the full-screen chart and comes back, opens Settings and comes back, and switches DYE2 off to check the page returns to the "DYE2 is needed" screen;
 9. takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.

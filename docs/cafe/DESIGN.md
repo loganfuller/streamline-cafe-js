@@ -28,7 +28,6 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **No recipe loaded.** The title reads "No recipe selected", the dial-in column says it is not saved to a recipe, and the steppers change this machine only.
 - **Gone from Streamline's page.** The P/F/R toggle, the favourite-profile buttons, the DYE button, the shot-history card, the phase table, every row of preset buttons, the steam time and the milk-pitcher steam mode. The settings that configure them stay in the settings page and do nothing here.
 - **Kept from Streamline.** A tap on a value opens the numpad, a tap on the graph opens the full-screen chart, and the screensaver and the "tap to reload" notice work as they do there. The on-screen machine buttons show only when the machine has none of its own. Flush, Steam flow and Hot water open their settings page from their label.
-- **Holding − or + repeats.** Streamline's steppers step once per tap, so this is the fork's own: it fires the same step the tap fires.
 - **Until a slice arrives, its part of the screen is left out.** Nothing on the page is a control that does nothing.
 
 The skin follows Streamline's design language: `DESIGN_SYSTEM.md`, Tailwind CSS, daisyUI and ECharts.
