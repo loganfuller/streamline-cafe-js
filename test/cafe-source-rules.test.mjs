@@ -19,10 +19,30 @@ test('no module reaches Decaid\'s store, or anything else, around api.js', () =>
     assert.deepEqual(filesWith(/\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\b|\bsetValueInStore\b/), []);
 });
 
-test('no module writes Decaid\'s store by key', () => {
-    // Nothing on the page keeps state of its own yet. When something does, it
-    // goes in the streamlineCafe namespace, and this test names the module.
-    assert.deepEqual(filesWith(/\b(setKVValue|deleteKVValue)\b/), []);
+test('one module writes Decaid\'s store by key, in the streamlineCafe namespace', () => {
+    // The page's own state: the choice of reference and the graph's view.
+    assert.deepEqual(filesWith(/\b(setKVValue|deleteKVValue)\b/), ['cafe-store.js']);
+    const store = SOURCES.find(({ name }) => name === 'cafe-store.js').text;
+    assert.match(store, /const NAMESPACE = 'streamlineCafe';/);
+    assert.deepEqual([...store.matchAll(/\b[gs]etKVValue\(([^,)]*)/g)].map(match => match[1]), ['NAMESPACE', 'NAMESPACE'], 'and reads and writes no other namespace');
+});
+
+test('the page reads Shots and the choice of reference through the Shot seam only', () => {
+    assert.deepEqual(filesWith(/\bgetShots?\b|\bgetLatestShotSummary\b|\bgetShotIds\b/), ['shot-seam.js']);
+    assert.deepEqual(filesWith(/\bREFERENCES_KEY\b/), ['cafe-store.js', 'shot-seam.js']);
+    assert.deepEqual(filesWith(/from '\.\/tablet-shots\.js'/), ['shot-seam.js']);
+    assert.deepEqual(filesWith(/from '\.\.\/modules\/idb\.js'/), [], 'Streamline\'s shot cache is not a source');
+});
+
+test('the fork\'s hooks are still in Streamline\'s chart and api modules', () => {
+    const chart = readFileSync(new URL('../src/modules/chart.js', import.meta.url), 'utf8');
+    assert.match(chart, /export function setChartOverlay\(overlay\) \{/);
+    assert.match(chart, /export function setShotChooser\(chooser\) \{/);
+    assert.match(chart, /const drawn = traces === chartTraces \? withCafeOverlay\(traces, layout, mode\) : \{ traces, layout \};/, 'the overlay is on the chart\'s own lines only');
+    assert.match(chart, /const \{ traces, layout \} = withCafeOverlay\(own, expandedLayout\(currentTheme, own, expandedXRange\(mode, own\)\), mode\);/, 'and on the full-screen chart');
+    assert.match(chart, /export function plotHistoricalShot\(measurements, workflow = null\) \{\s*if \(cafeShotChooser && !cafeShotChooser\(measurements, workflow\)\) return;/);
+    const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
+    assert.match(api, /export async function getShot\(id\) \{/);
 });
 
 test('no module opens one of DYE2\'s pages', () => {
@@ -51,7 +71,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'reference-overlay.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

@@ -6,7 +6,7 @@ Everything the run writes is made up. The sample beans, grinder and recipes are 
 
 ## What it needs
 
-- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, makes recipes and moves them between slots from the page, changes the language, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
+- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, makes recipes and moves them between slots from the page, chooses reference Shots and clears the choices an earlier run left, changes the language, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
 - Network access to GitHub, where Decaid fetches DYE2's latest release from.
 - Node, and this repository's dependencies (`npm ci`). Once per machine: `npx playwright install chromium`.
 
@@ -83,19 +83,22 @@ In order, it:
 5. taps two cards in quick succession, then one, and checks the Workflow, DYE2's selection, the title, the dial-in column's label and what each dial-in row names;
 6. steps a value and checks it changes this machine only, flips Temp | Vol, steps the steam flow, and checks a change made just before another recipe is tapped does not land on that recipe;
 7. pulls a simulated shot and checks the state, the time and the weight against its target, then the Shot in the graph and its time in the legend;
-8. opens the full-screen chart and comes back, opens Settings and comes back, and switches DYE2 off to check the page returns to the "DYE2 is needed" screen;
-9. holds an empty slot and checks the menu's two items and the list that says there is nothing to choose; makes a new recipe in slot 8 and checks DYE2 named it, it is loaded, the machine is set as it was, and the skin placed it with one write;
-10. holds a filled card and checks its three items; takes recipes out of their slots, chooses one for an empty slot and one in place of another, and checks DYE2's records, the list's order and that nothing loads; removes the loaded recipe's card and checks it is unloaded with the machine set as it was; replaces the loaded card with a new recipe; checks no menu opens during a shot, and that the page never left for one of DYE2's pages;
-11. changes the language to German and to Arabic and checks the page's text, the roast date, that no label overflows its place or is shrunk below 14px, and that the layout stays left to right; then the menu and the list in German, the page with no recipe and the "DYE2 is needed" screen in German, and a change of language while that screen shows;
-12. with `--streamline=`, opens official Streamline on the same Decaid, sets its strip to R, loads a recipe and arranges the strip on the cafe page, and checks the strip mode is still R in Decaid's store and on Streamline's page;
-13. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
+8. checks the reference on the graph, with the recipe that shot was pulled with: the Reference view with no reference yet; Make reference choosing at once, the "This shot is the reference" badge and the choice in Decaid's store; a second shot with the reference dashed behind it, on the main graph and the full-screen chart, the time axis showing the whole reference, and frames appended instead of the chart drawn again in full; the new Shot as the latest against the reference at rest; Targets, and the view still there after a reload; the "Replace the reference?" dialog, cancelled and then confirmed; a two-second shot, which is Unfinished and does not become the latest; and a recipe with no Shot on this machine, whose reference is drawn alone with "Different profile", then a choice naming a Shot that is gone;
+9. opens the full-screen chart and comes back, opens Settings and comes back, and switches DYE2 off to check the page returns to the "DYE2 is needed" screen;
+10. holds an empty slot and checks the menu's two items and the list that says there is nothing to choose; makes a new recipe in slot 8 and checks DYE2 named it, it is loaded, the machine is set as it was, and the skin placed it with one write;
+11. holds a filled card and checks its three items; takes recipes out of their slots, chooses one for an empty slot and one in place of another, and checks DYE2's records, the list's order and that nothing loads; removes the loaded recipe's card and checks it is unloaded with the machine set as it was; replaces the loaded card with a new recipe; checks no menu opens during a shot, and that the page never left for one of DYE2's pages;
+12. changes the language to German and to Arabic and checks the page's text, the roast date, that no label overflows its place or is shrunk below 14px, and that the layout stays left to right; then the menu and the list in German, the page with no recipe and the "DYE2 is needed" screen in German, and a change of language while that screen shows;
+13. with `--streamline=`, opens official Streamline on the same Decaid, sets its strip to R, loads a recipe and arranges the strip on the cafe page, and checks the strip mode is still R in Decaid's store and on Streamline's page;
+14. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
 
 The run puts DYE2's records back as they were before it made and moved recipes, so it can be repeated on the same Decaid.
 
-Three things are not Decaid's own answers:
+Four things are not Decaid's own answers:
 
 - **A machine with buttons of its own.** The simulated machine always reports none, so for those screenshots the run rewrites that one field of `GET /api/v1/machine/info` in the browser.
 - **The recipes' names and the slots above 5.** DYE2 names a saved recipe after its bean and places only slots 1 to 5, so the run writes the names and slots 7 and 9 into DYE2's records itself. That is the fixture's write. The skin's own writer of those records is a separate module with its own guards.
+
+- **A reference for a recipe with no Shot.** The page chooses a reference from the Shot in the graph, so a recipe with no Shot on the machine has none. For that check the run writes the choice into Decaid's store itself, naming a Shot pulled on another profile, and then a Shot that does not exist. It puts the choices back afterwards.
 
 - **Decent Sync.** This Decaid has no Decent Sync plugin, and the plugin needs a server. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin not yet connected at the first ask. Nothing saves a dial-in in that check: it shows the label only.
 
@@ -111,4 +114,4 @@ A running Decaid keeps a CPU busy for as long as it is up.
 
 ## What it does not cover
 
-A real machine and scale, the tablet's own WebView, touch input (a long-press is made with the mouse), the languages other than German, Arabic and French, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.
+A real machine and scale (the simulated scale reads no weight, so no Shot in the run has a weight-flow line, and the run's Unfinished Shot is one that never poured), the tablet's own WebView, the skin installed under its other id, touch input (a long-press is made with the mouse), the languages other than German, Arabic and French, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.

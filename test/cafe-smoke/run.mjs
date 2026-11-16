@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { BEANS, GRINDER, RECIPES } from './sample-data.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
+import { isUnfinished, shotRecipeId } from '../../src/cafe/shot-model.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -37,6 +38,9 @@ const HEADED = args.includes('--headed');
 const API = `${DECAID}/api/v1`;
 const SETTING = `${API}/store/streamlineSettings/streamline.dye2Enabled`;
 const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
+// The cafe page's own state: the choice of reference, and the graph's view.
+const REFERENCES = '/store/streamlineCafe/references';
+const GRAPH_VIEW = '/store/streamlineCafe/graphView';
 const RECIPE_STORE = `/store/${DYE2_PLUGIN_ID}/recipes`;
 
 // ── Results ──────────────────────────────────────────────────────────────────
@@ -224,6 +228,39 @@ const overflowing = page => page.evaluate(() => [...document.querySelectorAll('#
 const smallestLabel = page => page.evaluate(() => Math.min(...[...document.querySelectorAll('#main-page [data-fit-text]')]
     .filter(el => el.offsetParent !== null).map(el => parseFloat(getComputedStyle(el).fontSize))));
 
+// The legend: the text of each part that shows, and null for one that does not.
+const legend = page => page.evaluate(() => {
+    const shown = id => {
+        const element = document.getElementById(id);
+        return element && element.offsetParent !== null ? element.textContent.trim() : null;
+    };
+    return {
+        label: shown('cafe-shot-label'), when: shown('cafe-shot-when'), make: shown('cafe-make-reference'),
+        reference: shown('cafe-legend-reference') === null ? null : shown('cafe-reference-when') || '',
+        flag: shown('cafe-different-profile'), badge: shown('cafe-reference-badge'), line: shown('cafe-legend-line'),
+        targets: shown('cafe-legend-targets'),
+        view: [...document.querySelectorAll('#cafe-view button')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.view).join(),
+    };
+});
+// What a chart holds: each line's name, how many points it has and whether it
+// carries an end label, and where the time axis ends.
+const chartLines = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+    if (!chart) return null;
+    const option = chart.getOption();
+    const lines = option.series.filter(series => series && String(series.id).startsWith('trace-'));
+    return {
+        end: option.xAxis[0].max,
+        names: lines.map(line => line.name),
+        points: lines.map(line => line.data.length),
+        labelled: lines.filter(line => line.markPoint).map(line => line.name),
+        referenceEnd: Math.max(0, ...lines.filter(line => /^Reference /.test(line.name)).map(line => (line.data.length ? line.data[line.data.length - 1][0] : 0))),
+    };
+}, id);
+const REFERENCE_LINES = ['Reference pressure', 'Reference flow', 'Reference weight'];
+// The newest of Decaid's Shots pulled with a recipe.
+const newestShotWith = async recipeId => ((await decaid('GET', '/shots?limit=100')).items || []).find(row => shotRecipeId(row.workflow) === String(recipeId)) || null;
 // The gate took the page's place: nothing behind it, no recipe read or loaded,
 // and no install asked of Decaid.
 async function checkGate(name, { page, seen }, line) {
@@ -314,6 +351,10 @@ try {
     //    starts.
     await seed();
     await unloadRecipe();
+    // No reference chosen, and the graph in its first view, whatever an earlier
+    // run left in Decaid's store.
+    await decaid('POST', REFERENCES, {});
+    await decaid('POST', GRAPH_VIEW, 'reference');
     for (const theme of ['dark', 'light']) {
         await setSetting(false);
         const view = await openPage({ theme });
@@ -457,12 +498,185 @@ try {
     check('during a shot the status line has the stage and its seconds', /\d+s/.test(await page.locator('#machine-status').textContent()), await page.locator('#machine-status').textContent());
     await shot(page, 'page-shot-running-light');
     await shotRun;
-    await page.locator('#history-date').filter({ hasText: /\d{4}\/\d{2}\/\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
+    await page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(4000);
     check('after the shot the status reads Ready', (await page.locator('#machine-status').textContent()).trim() === 'Ready', await page.locator('#machine-status').textContent());
     check('the weight readout goes when the shot ends', !(await page.locator('#cafe-live').isVisible()));
-    check('the legend shows the latest Shot\'s label and time', (await page.locator('#shot-history-info .cafe-legend-name').isVisible()) && /\d{2}:\d{2}$/.test(await page.locator('#history-date').textContent()));
+    check('the legend shows the latest Shot\'s label and time', (await page.locator('#cafe-shot-label').textContent()) === 'Latest' && /^Today \d{2}:\d{2}/.test(await page.locator('#cafe-shot-when').textContent()), JSON.stringify(await legend(page)));
     await shot(page, 'page-after-shot-light');
+
+    //    The reference (docs/cafe/DESIGN.md, "Shots and the reference"). The Shot
+    //    just pulled is the recipe's latest, and no reference is chosen yet.
+    {
+        const recipeId = (await recordOf(target)).id;
+        const first = await newestShotWith(recipeId);
+        let now = await legend(page);
+        let lines = await chartLines(page);
+        check('the graph starts in Reference, with the latest Shot and no reference', now.view === 'reference' && now.label === 'Latest' && now.reference === null && now.badge === null && now.line === null && now.targets === null, JSON.stringify(now));
+        check('in Reference the reference\'s three lines follow Streamline\'s seven, empty with no reference, and no target is drawn',
+            lines.names.length === 10 && JSON.stringify(lines.names.slice(7)) === JSON.stringify(REFERENCE_LINES) && lines.points.slice(7).every(n => n === 0)
+            && [2, 3, 5].every(i => lines.points[i] === 0) && lines.points[0] > 10, JSON.stringify(lines));
+        check('Make reference ends the latest Shot\'s row', now.make === 'Make reference');
+        await shot(page, 'graph-no-reference-light');
+
+        //    With no reference yet, Make reference chooses at once.
+        await page.locator('#cafe-make-reference').click();
+        await page.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        now = await legend(page);
+        check('Make reference with none chosen asks nothing', (await page.locator('#cafe-reference-dialog[open]').count()) === 0);
+        check('the latest Shot is now the reference: a badge, no reference row, no Make reference', now.badge === 'This shot is the reference' && now.reference === null && now.make === null, JSON.stringify(now));
+        check('and no dashed lines are drawn', (await chartLines(page)).points.slice(7).every(n => n === 0));
+        check('the choice is kept in Decaid\'s store, as recipe to Shot', (await storeValue(REFERENCES))?.[recipeId] === first.id, JSON.stringify(await storeValue(REFERENCES)));
+        await shot(page, 'graph-shot-is-reference-light');
+
+        //    A second shot, with the reference behind it.
+        const second = pullShot(14);
+        await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+        await page.waitForTimeout(6000);
+        now = await legend(page);
+        lines = await chartLines(page);
+        check('during a shot the row reads "Live shot", the reference has its own row, and nothing can be chosen', now.label === 'Live shot' && now.when === null && /^Today /.test(now.reference || '') && now.make === null && now.badge === null, JSON.stringify(now));
+        check('the reference is drawn behind the live shot', lines.points[7] > 10 && lines.points[0] > 5 && lines.names.length === 10, JSON.stringify(lines));
+        check('the time axis shows the whole reference from the start', Math.abs(lines.end - lines.referenceEnd / 0.93) < 0.01, `${lines.end} for a reference of ${lines.referenceEnd} s`);
+        check('no line is labelled during a shot', lines.labelled.length === 0);
+        //    Frames are appended: the chart is not drawn again in full for each.
+        const drawn = await page.evaluate(async () => {
+            const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+            const chart = echarts.getInstanceByDom(document.getElementById('plotly-chart'));
+            const counts = { appended: 0, full: 0 };
+            const { setOption, appendData } = chart;
+            chart.setOption = function (option, ...rest) { if (option.series?.some(series => series.data)) counts.full += 1; return setOption.call(this, option, ...rest); };
+            chart.appendData = function (...args) { if (args[0].seriesIndex === 0) counts.appended += 1; return appendData.apply(this, args); };
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            chart.setOption = setOption;
+            chart.appendData = appendData;
+            return counts;
+        });
+        check('a live shot still draws by appending frames, with the reference behind it', drawn.appended >= 10 && drawn.full <= 3, `${drawn.appended} frames appended, ${drawn.full} drawn in full, in 3 s`);
+        await shot(page, 'graph-live-reference-light');
+        await page.locator('#plotly-chart').click();
+        await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
+        await page.waitForTimeout(1500);
+        const zoomed = await chartLines(page, 'expanded-chart');
+        check('the full-screen chart draws the reference too, after its own lines', JSON.stringify(zoomed.names.slice(-3)) === JSON.stringify(REFERENCE_LINES) && zoomed.points[zoomed.points.length - 3] > 10, JSON.stringify(zoomed));
+        await shot(page, 'graph-live-full-screen-light');
+        await page.locator('#expanded-chart').click();
+        await second;
+        await page.locator('#cafe-make-reference').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+
+        //    At rest: the new Shot, solid, against the reference, dashed.
+        const latestShot = await newestShotWith(recipeId);
+        now = await legend(page);
+        lines = await chartLines(page);
+        check('when the shot ends it becomes the latest, once Decaid has it', latestShot.id !== first.id && now.label === 'Latest' && /^Today \d/.test(now.when || ''), JSON.stringify(now));
+        check('the reference keeps its row, with when it was pulled, and Make reference is back', /^Today \d/.test(now.reference || '') && now.make === 'Make reference' && now.badge === null && now.flag === null, JSON.stringify(now));
+        check('at rest the reference is drawn, and the end labels name the Shot\'s own lines only', lines.points[7] > 10 && lines.labelled.length > 0 && lines.labelled.every(name => !/^Reference /.test(name)), JSON.stringify(lines));
+        check('the time axis fits the longer of the two Shots', lines.end >= lines.referenceEnd, `${lines.end} for a reference of ${lines.referenceEnd} s`);
+        await shot(page, 'graph-overlay-light');
+        await paint(page, 'dark');
+        await page.waitForTimeout(800);
+        await shot(page, 'graph-overlay-dark');
+        await paint(page, 'light');
+        await page.locator('#plotly-chart').click();
+        await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
+        await page.waitForTimeout(1500);
+        await shot(page, 'graph-overlay-full-screen-light');
+        await page.locator('#expanded-chart').click();
+        await page.waitForTimeout(800);
+
+        //    Targets: Streamline's own chart, and nothing of the reference.
+        await page.locator('#cafe-view button[data-view="targets"]').click();
+        await page.waitForTimeout(1200);
+        now = await legend(page);
+        lines = await chartLines(page);
+        check('in Targets: the "Profile target" legend, no reference row, and Make reference stays', now.view === 'targets' && now.targets === 'Profile target' && now.reference === null && now.badge === null && now.line === null && now.make === 'Make reference', JSON.stringify(now));
+        check('in Targets the chart is Streamline\'s seven lines, with their targets', lines.names.length === 7 && lines.points[2] > 10, JSON.stringify(lines));
+        check('the view is kept in Decaid\'s store', (await storeValue(GRAPH_VIEW)) === 'targets');
+        await shot(page, 'graph-targets-light');
+        await page.reload();
+        await waitForPage(page);
+        await page.locator('#cafe-make-reference').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        now = await legend(page);
+        check('after a reload the graph is still in Targets, and the choice of reference is still there', now.view === 'targets' && (await storeValue(REFERENCES))?.[recipeId] === first.id, JSON.stringify(now));
+        await page.locator('#cafe-view button[data-view="reference"]').click();
+        await page.waitForTimeout(1200);
+        check('back in Reference the reference is drawn again', (await legend(page)).reference !== null && (await chartLines(page)).points[7] > 10 && (await storeValue(GRAPH_VIEW)) === 'reference');
+
+        //    Replacing a reference asks first.
+        await page.locator('#cafe-make-reference').click();
+        await page.locator('#cafe-reference-dialog[open]').waitFor({ timeout: 5000 });
+        await page.waitForTimeout(400);
+        const asked = {
+            title: await page.locator('#cafe-reference-dialog-title').textContent(),
+            recipe: await page.locator('#cafe-reference-dialog-recipe').textContent(),
+            shots: await page.locator('#cafe-reference-dialog dd').allTextContents(),
+        };
+        check('Make reference over a reference asks "Replace the reference?", naming the recipe, the new Shot and the one it replaces',
+            asked.title === 'Replace the reference?' && asked.recipe === target.name && asked.shots.length === 2 && asked.shots.every(text => /^Today \d/.test(text)), JSON.stringify(asked));
+        await shot(page, 'dialog-replace-reference-light');
+        await page.locator('#cafe-reference-dialog button', { hasText: 'Cancel' }).click();
+        await page.waitForTimeout(800);
+        check('Cancel leaves the reference as it was', (await storeValue(REFERENCES))?.[recipeId] === first.id && (await legend(page)).make === 'Make reference');
+        await page.locator('#cafe-make-reference').click();
+        await page.locator('#cafe-reference-dialog[open]').waitFor({ timeout: 5000 });
+        await page.locator('#cafe-reference-dialog-replace').click();
+        await page.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        check('Replace makes the latest Shot the reference', (await storeValue(REFERENCES))?.[recipeId] === latestShot.id && (await legend(page)).badge === 'This shot is the reference', JSON.stringify(await storeValue(REFERENCES)));
+
+        //    An Unfinished Shot never takes the latest Shot's place. The simulated
+        //    machine stopped after two seconds has not poured or put 1 g in the cup.
+        const before = await legend(page);
+        await pullShot(2.5);
+        await sleep(6000);
+        const short = await newestShotWith(recipeId);
+        if (short.id !== latestShot.id && isUnfinished(await decaid('GET', `/shots/${short.id}`))) {
+            await page.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+            await page.waitForTimeout(1000);
+            now = await legend(page);
+            check('an Unfinished Shot does not become the latest: the graph goes back to the Shot before it', now.label === 'Latest' && now.when === before.when && now.badge === before.badge, JSON.stringify(now));
+        } else {
+            note('Decaid did not record the two-second shot as an Unfinished Shot, so that check was skipped');
+        }
+
+        //    A recipe with no Shot on this machine. The run gives it a reference
+        //    itself, a Shot pulled on another profile: the page has no way to.
+        const withShots = new Set(((await decaid('GET', '/shots?limit=100')).items || []).map(row => shotRecipeId(row.workflow)));
+        const rows = await records();
+        const empty = RECIPES.map(recipe => ({ recipe, row: rows.find(r => r && r.name === recipe.name) }))
+            .find(({ recipe, row }) => row && !withShots.has(String(row.id)) && recipe.profile !== target.profile);
+        if (empty) {
+            const choices = await storeValue(REFERENCES);
+            await decaid('POST', REFERENCES, { ...choices, [empty.row.id]: first.id });
+            await cards.nth(empty.recipe.slot - 1).click();
+            await page.locator('#cafe-title').filter({ hasText: empty.recipe.name }).waitFor({ timeout: 20_000 });
+            await page.locator('#cafe-legend-line').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+            now = await legend(page);
+            lines = await chartLines(page);
+            check('a recipe with no Shot yet says so, and has no Make reference', now.line === 'No shot with this recipe on this machine yet' && now.label === null && now.make === null, JSON.stringify(now));
+            check('its reference is drawn alone, and flagged "Different profile"', now.reference !== null && now.flag === 'Different profile' && lines.points[0] === 0 && lines.points[7] > 10 && Math.abs(lines.end - lines.referenceEnd) < 0.01, `${JSON.stringify(now)} ${JSON.stringify(lines)}`);
+            await shot(page, 'graph-no-shot-yet-light');
+            //    A choice that names a Shot the tablet no longer has.
+            await decaid('POST', REFERENCES, { ...choices, [empty.row.id]: 'a-shot-that-is-gone' });
+            await page.reload();
+            await waitForPage(page);
+            await page.locator('#cafe-legend-line').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+            now = await legend(page);
+            check('a choice that names a Shot the tablet no longer has reads as no reference', now.reference === null && now.badge === null && now.line === 'No shot with this recipe on this machine yet' && (await chartLines(page)).points[7] === 0, JSON.stringify(now));
+            await decaid('POST', REFERENCES, choices);
+            //    Loading another recipe changes the graph to that recipe's Shots.
+            await cards.nth(target.slot - 1).click();
+            await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
+            await page.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+            now = await legend(page);
+            check('loading another recipe changes the graph to that recipe\'s latest Shot and reference', now.label === 'Latest' && now.badge === 'This shot is the reference' && now.line === null, JSON.stringify(now));
+        } else {
+            note('every sample recipe on another profile has a Shot on this Decaid, so "no Shot yet" and "Different profile" were skipped');
+        }
+    }
 
     // 9. The full-screen chart, and back.
     await page.locator('#plotly-chart').click();
@@ -679,8 +893,8 @@ try {
         await lp.waitForTimeout(3000);
         check('in English nothing overflows its place', (await overflowing(lp)).length === 0, (await overflowing(lp)).join(' | '));
         for (const [code, expected] of [
-            ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', roasted: /geröstet am 28\. Okt/ }],
-            ['ar', { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', roasted: /حمص في/ }],
+            ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', roasted: /geröstet am 28\. Okt/ }],
+            ['ar', { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', roasted: /حمص في/ }],
         ]) {
             await setLanguage(lp, code);
             await lp.waitForTimeout(2500);
@@ -692,7 +906,8 @@ try {
                 dose: (await lp.locator('#dose-label .cafe-row-name').textContent()).trim(),
                 yield: await lp.locator('#drink-label .cafe-row-name').textContent(),
                 settings: (await lp.locator('#settings-btn').textContent()).trim(),
-                latest: await lp.locator('#shot-history-info .cafe-legend-name').textContent(),
+                latest: await lp.locator('#cafe-shot-label').textContent(),
+                view: (await lp.locator('#cafe-view button').allTextContents()).join(' | '),
             };
             for (const [what, text] of Object.entries(got)) {
                 check(`${code}: ${what} reads "${expected[what]}"`, text === expected[what], text);
@@ -828,7 +1043,7 @@ try {
     ]) {
         const extra = await openPage(options);
         await waitForPage(extra.page, extra.seen.theme);
-        await extra.page.locator('#history-date').filter({ hasText: /\d/ }).waitFor({ timeout: 20_000 }).catch(() => {});
+        await extra.page.locator('#cafe-shot-when').filter({ hasText: /\d/ }).waitFor({ timeout: 20_000 }).catch(() => {});
         await extra.page.waitForTimeout(4000);
         if (options.machineButtons === false) {
             check(`${name}: no machine buttons, and Settings and Sleep at the bottom of the dial-in column`,
@@ -867,6 +1082,9 @@ try {
         await waitForPage(extra.page, 'dark');
         await extra.page.waitForTimeout(4000);
         check('page-no-recipe-dark: the title reads "No recipe selected"', (await extra.page.locator('#cafe-title').textContent()) === 'No recipe selected');
+        const none = await legend(extra.page);
+        check('with no recipe: the tablet\'s newest Shot as "Last shot", "Pick a recipe to compare", no reference and no Make reference',
+            none.label === 'Last shot' && /\d/.test(none.when || '') && none.line === 'Pick a recipe to compare' && none.reference === null && none.badge === null && none.make === null, JSON.stringify(none));
         await shot(extra.page, 'page-no-recipe-dark');
         await extra.close();
     }

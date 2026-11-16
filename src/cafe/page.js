@@ -243,8 +243,8 @@ function paintLiveWeight() {
     if (block.style.display !== display) block.style.display = display;
 }
 
-// While a shot runs the graph draws that shot, so the legend's "Latest" and its
-// time, which are the Shot before it, are hidden (cafe.css, .cafe-shot-live).
+// The legend's own change for a running shot is graph.js's. The class marks the
+// page for cafe.css and the smoke run.
 function shotStarted() {
     shotEnded();
     el('main-page')?.classList.add('cafe-shot-live');

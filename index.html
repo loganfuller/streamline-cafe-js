@@ -301,19 +301,33 @@
                         </div>
                     </div>
 
-                    <!-- Legend. #history-date is where Streamline's history module writes the
-                         time of the Shot in the graph; its other three lines are not shown. -->
+                    <!-- Legend (src/cafe/graph.js): the Shot in the graph, the recipe's reference,
+                         and the Reference | Targets toggle. Streamline's history module still
+                         writes the four lines of its own panel, into the stub at the end. -->
                     <div id="cafe-legend">
-                        <div id="shot-history-info" class="cafe-legend-item" aria-live="polite">
-                            <span id="history-date"></span>
+                        <div id="cafe-legend-shot" class="cafe-legend-item" aria-live="polite" style="display:none">
                             <svg class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-                            <span class="cafe-legend-name" data-cafe-text="Latest">Latest</span>
-                            <span class="cafe-stub"><span id="history-profile-name"></span><span id="history-dose-in"></span><span id="history-grind-size"></span></span>
+                            <span id="cafe-shot-label" class="cafe-legend-name"></span>
+                            <span id="cafe-shot-when" class="cafe-legend-when"></span>
+                            <button id="cafe-make-reference" type="button" class="cafe-legend-btn" data-cafe-text="Make reference" style="display:none">Make reference</button>
                         </div>
-                        <div class="cafe-legend-item">
+                        <div id="cafe-legend-reference" class="cafe-legend-item" style="display:none">
+                            <svg id="cafe-reference-swatch" class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="2" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="3" stroke-dasharray="7 6"/></svg>
+                            <span class="cafe-legend-name" data-cafe-text="Reference">Reference</span>
+                            <span id="cafe-reference-when" class="cafe-legend-when"></span>
+                            <span id="cafe-different-profile" class="cafe-legend-flag" data-cafe-text="Different profile" style="display:none">Different profile</span>
+                        </div>
+                        <span id="cafe-reference-badge" class="cafe-legend-flag" data-cafe-text="This shot is the reference" style="display:none">This shot is the reference</span>
+                        <span id="cafe-legend-line" class="cafe-legend-line" style="display:none"></span>
+                        <div id="cafe-legend-targets" class="cafe-legend-item" style="display:none">
                             <svg class="cafe-legend-swatch cafe-legend-target" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="2" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0.5 7"/></svg>
                             <span class="cafe-legend-name" data-cafe-text="Profile target">Profile target</span>
                         </div>
+                        <div id="cafe-view" role="group" aria-label="Graph view">
+                            <button type="button" data-view="reference" aria-pressed="true" data-cafe-text="Reference">Reference</button>
+                            <button type="button" data-view="targets" aria-pressed="false" data-cafe-text="Targets">Targets</button>
+                        </div>
+                        <div id="shot-history-info" class="cafe-stub" aria-live="polite"><span id="history-date"></span><span id="history-profile-name"></span><span id="history-dose-in"></span><span id="history-grind-size"></span></div>
                     </div>
 
                     <!-- Shot chart (tap to open the full-screen chart) -->
@@ -376,6 +390,27 @@
             <div class="modal-action">
                 <form method="dialog">
                     <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
+
+    <!-- Asked before Make reference replaces a recipe's reference (src/cafe/graph.js). -->
+    <dialog id="cafe-reference-dialog" class="modal" aria-labelledby="cafe-reference-dialog-title">
+        <div class="modal-box cafe-dialog">
+            <h3 id="cafe-reference-dialog-title" data-cafe-text="Replace the reference?">Replace the reference?</h3>
+            <p id="cafe-reference-dialog-recipe"></p>
+            <dl class="cafe-reference-dialog-shots">
+                <dt data-cafe-text="New reference">New reference</dt>
+                <dd id="cafe-reference-dialog-new"></dd>
+                <dt data-cafe-text="Current reference">Current reference</dt>
+                <dd id="cafe-reference-dialog-old"></dd>
+            </dl>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                    <button id="cafe-reference-dialog-replace" class="cafe-btn cafe-btn-primary" value="replace" data-cafe-text="Replace">Replace</button>
                 </form>
             </div>
         </div>

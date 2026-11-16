@@ -9,6 +9,7 @@ import { CAFE_TRANSLATIONS, cafeTranslation, fillIn, dateLocale } from '../src/c
 import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
 import { pageHeading } from '../src/cafe/page-model.js';
 import { slotMenu } from '../src/cafe/slot-menu.js';
+import { graphModel } from '../src/cafe/shot-model.js';
 
 // Streamline's own list says which languages are finished: it is not copied here.
 const FINISHED = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
@@ -80,6 +81,15 @@ function usedKeys() {
     for (const heading of [pageHeading(null, ''), pageHeading(recipe, 'Profile', true), pageHeading(recipe, 'Profile', false)]) {
         keys.add(heading.dialLabel);
         if (heading.translate) { keys.add(heading.title); keys.add(heading.subtitle); }
+    }
+    // The legend's row label and its line of text, in every state that has one.
+    const shot = { id: 'a' };
+    for (const state of [
+        { recipe, shot }, { recipe, shot: null }, { recipe, live: true }, { recipe: null, shot },
+    ]) {
+        const shown = graphModel({ view: 'reference', reference: null, ...state });
+        if (shown.row) keys.add(shown.row.label);
+        if (shown.line) keys.add(shown.line);
     }
     return keys;
 }

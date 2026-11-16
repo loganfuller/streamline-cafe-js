@@ -2607,6 +2607,15 @@ export async function getLatestShotSummary() {
     return response.json();
 }
 
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): one Shot whole, with its
+// measurements, or null when Decaid no longer has it. Any other failure throws.
+export async function getShot(id) {
+    const response = await fetch(`${API_BASE_URL}/shots/${encodeURIComponent(id)}`);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Failed to get shot ${id}: ${response.status}`);
+    return response.json();
+}
+
 export async function getShots(options = {}) {
     const { limit = 20, offset = 0, grinderId, grinderModel, beanBatchId, coffeeName, coffeeRoaster, profileTitle, ids, orderBy = 'timestamp', order = 'desc' } = options;
     
