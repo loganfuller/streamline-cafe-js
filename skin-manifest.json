@@ -1,6 +1,6 @@
 {
-  "id": "streamline.js",
-  "name": "Streamline.js",
-  "description": "Modern, feature-complete WebUI skin for Streamline-Bridge",
-  "version": "0.2.27"
+  "id": "streamline-cafe.js",
+  "name": "Streamline Cafe",
+  "description": "Recipe-first WebUI skin for cafes on Decaid, a fork of Streamline.js",
+  "version": "0.2.27-cafe.1"
 }

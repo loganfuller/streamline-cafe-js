@@ -41,7 +41,7 @@ import assert from 'node:assert/strict';
 import { SKIN_ID } from '../src/version.js';
 
 test('the skin id is the one reaprime keys the install dir on', () => {
-    assert.equal(SKIN_ID, 'streamline.js');
+    assert.equal(SKIN_ID, 'streamline-cafe.js');
 });
 ```
 

@@ -77,8 +77,11 @@ jobs:
         run: |
           set -euo pipefail
           base=$(jq -r '.version' dist/skin-manifest.json)
-          dev="${base}-dev.$(echo "${{ github.sha }}" | cut -c1-7).${{ github.run_number }}"
-          jq --arg v "$dev" '.id = "streamline.js-dist" | .name = "\(.name) Dev" | .version = $v' \
+          # Streamline Cafe: the base already has a prerelease part ("-cafe.1"), and the
+          # skin's version compare reads nothing past a second "-". So the stamp is
+          # joined with a dot, run number first, and two dist builds order by run number.
+          dev="${base}.dev.${{ github.run_number }}.$(echo "${{ github.sha }}" | cut -c1-7)"
+          jq --arg v "$dev" '.id = "streamline-cafe.js-dist" | .name = "\(.name) Dev" | .version = $v' \
             dist/skin-manifest.json > dist/skin-manifest.json.tmp
           mv dist/skin-manifest.json.tmp dist/skin-manifest.json
           # APP_VERSION is what the RUNNING bundle reports; the manifest is what
@@ -86,14 +89,18 @@ jobs:
           # so leaving this at the released number would make every dist load
           # look like a pending update.
           sed -i "s/^export const APP_VERSION = '.*';/export const APP_VERSION = '${dev}';/" dist/src/version.js
-          grep -n "APP_VERSION" dist/src/version.js
+          # Streamline Cafe: the running bundle looks itself up by SKIN_ID, so the dist
+          # build carries the dist id. Left as the release id, it would compare itself
+          # against the released skin and never see its own newer build on disk.
+          sed -i "s/^export const SKIN_ID = '.*';/export const SKIN_ID = 'streamline-cafe.js-dist';/" dist/src/version.js
+          grep -n "APP_VERSION\|SKIN_ID" dist/src/version.js
           cat dist/skin-manifest.json
 
       - name: Validate skin-manifest.json
         run: |
           set -euo pipefail
           test -f dist/skin-manifest.json
-          jq -e '.id == "streamline.js" or .id == "streamline.js-dist"' dist/skin-manifest.json > /dev/null
+          jq -e '.id == "streamline-cafe.js" or .id == "streamline-cafe.js-dist"' dist/skin-manifest.json > /dev/null
           jq -e '.version' dist/skin-manifest.json > /dev/null
 
 
@@ -122,11 +129,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cd dist
-          zip -r ../streamline.js-${{ github.ref_name }}.zip .
+          zip -r ../streamline-cafe.js-${{ github.ref_name }}.zip .
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: streamline.js-${{ github.ref_name }}.zip
+          files: streamline-cafe.js-${{ github.ref_name }}.zip
           generate_release_notes: true
