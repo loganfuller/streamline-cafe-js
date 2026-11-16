@@ -114,8 +114,10 @@ const browser = await chromium.launch({ headless: !HEADED });
 
 // A page with nothing in its own storage. With `machineButtons: false` the
 // machine reports buttons of its own, which the simulated machine never does, so
-// that one answer is rewritten on the way in.
-async function openPage({ theme = 'light', machineButtons = true } = {}) {
+// that one answer is rewritten on the way in. `decentSync` stands in for Decent
+// Sync's plugin, which this Decaid does not have: its entry in the plugin list
+// and its Status answer, `served` or a refusal's code.
+async function openPage({ theme = 'light', machineButtons = true, decentSync = null } = {}) {
     const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], theme };
@@ -126,6 +128,15 @@ async function openPage({ theme = 'light', machineButtons = true } = {}) {
             const response = await route.fetch();
             await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
         });
+    }
+    if (decentSync) {
+        await page.route('**/api/v1/plugins', async route => {
+            const response = await route.fetch();
+            await route.fulfill({ response, json: [...(await response.json()), { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, api: [] }] });
+        });
+        await page.route('**/api/v1/plugins/decent-sync.reaplugin/status', route => (decentSync === 'served'
+            ? route.fulfill({ status: 200, json: { connected: true, served: true, machine: { id: 'sample-machine', name: 'Sample Machine' }, location: { id: 'sample-location', name: 'Sample Cafe' } } })
+            : route.fulfill({ status: 409, json: { connected: true, served: false, machine: null, location: null, code: decentSync, message: 'Sample refusal.' } })));
     }
     await page.goto(`${BASE}/index.html`);
     return { page, seen, close: () => context.close() };
@@ -320,7 +331,7 @@ try {
     check('a tap loads the recipe: only one card is filled', (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 1);
     check('the title is the recipe, over its bean and profile',
         (await page.locator('#cafe-subtitle').textContent()) === `${target.bean} · ${target.profile}`, await page.locator('#cafe-subtitle').textContent());
-    check('the column is labelled "Dial-in · saved to the recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe');
+    check('with no Decent Sync the column is labelled "Dial-in · not saved to the recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to the recipe', await page.locator('#cafe-dial-label').textContent());
     const workflow = await decaid('GET', '/workflow');
     check('the Workflow holds the recipe', workflow.context.targetYield === held.drink && workflow.context.targetDoseWeight === held.dose && workflow.context.coffeeName === target.bean && workflow.profile.title === target.profile);
     const selection = await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
@@ -341,9 +352,10 @@ try {
     check('+ steps the dose once', stepped > held.dose && stepped <= held.dose + 1, `${held.dose}g to ${stepped}g`);
     await page.waitForTimeout(2500);
     check('the step reaches the Workflow', Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001);
-    //    "Saved to the recipe": DYE2 saves a change only when asked, and the page asks.
+    //    The skin saves nothing onto the recipe itself: that is Decent Sync's to do.
     await page.waitForTimeout(3000);
-    check('the step is saved onto the recipe in DYE2\'s records', (await recordOf(target)).dashboardVariables.dose === stepped, `record dose ${(await recordOf(target)).dashboardVariables.dose}`);
+    check('the step changes this machine only: DYE2\'s record of the recipe keeps its dose', (await recordOf(target)).dashboardVariables.dose === held.dose, `record dose ${(await recordOf(target)).dashboardVariables.dose}`);
+    check('the skin asks DYE2 to save nothing', !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$/.test(r)), seen.requests.filter(r => /dye2\.reaplugin\/(record|save-recipe)/.test(r)).join(', '));
     await page.locator('#hot-water-mode-toggle').click();
     check('Temp | Vol picks which of the two the buttons step',
         (await page.locator('#hot-water-temp-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px'
@@ -389,9 +401,9 @@ try {
     await page.waitForTimeout(800);
     check('a tap on it comes back', (await page.locator('#shot-settings').isVisible()) && (await page.locator('#plotly-chart').isVisible()));
 
-    //     A change made just before another recipe is tapped is written, and
-    //     saved onto the recipe it was made on, before that recipe loads. Then
-    //     back: the first recipe comes back with what was saved.
+    //     A change made just before another recipe is tapped is written before
+    //     that recipe loads, so it does not land on it. Then back: the first
+    //     recipe comes back with its own numbers.
     const other = RECIPES[3];
     const flowStart = parseFloat(await page.locator('#steam-flow-value').textContent());
     await page.locator(flowStart >= 2 ? '#cafe-steam-minus' : '#cafe-steam-plus').click();
@@ -401,16 +413,13 @@ try {
     await cards.nth(other.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: other.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(5000);
-    const left = (await recordOf(target)).dashboardVariables;
-    check('a change made just before another recipe is tapped is saved onto the recipe it was made on',
-        left.steamFlowMls === flowStepped && left.flushS === flushStepped, `steam flow ${left.steamFlowMls} (stepped to ${flowStepped}), flush ${left.flushS} (stepped to ${flushStepped})`);
-    check('and the recipe then loaded keeps its own flush', (await recordOf(other)).dashboardVariables.flushS === (await decaid('GET', '/workflow')).rinseData.duration,
-        `record ${(await recordOf(other)).dashboardVariables.flushS}, Workflow ${(await decaid('GET', '/workflow')).rinseData.duration}`);
+    check('a change made just before another recipe is tapped does not land on that recipe', (await recordOf(other)).dashboardVariables.flushS === (await decaid('GET', '/workflow')).rinseData.duration,
+        `stepped to ${flushStepped}s (and steam flow ${flowStepped}) on the recipe before; record ${(await recordOf(other)).dashboardVariables.flushS}, Workflow ${(await decaid('GET', '/workflow')).rinseData.duration}`);
     await cards.nth(target.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(5000);
-    check('coming back to a recipe brings back what was saved onto it',
-        parseFloat(await page.locator('#dose-in-value').textContent()) === stepped && parseFloat(await page.locator('#flush-value').textContent()) === flushStepped,
+    check('coming back to a recipe brings back the recipe\'s own numbers',
+        parseFloat(await page.locator('#dose-in-value').textContent()) === held.dose && parseFloat(await page.locator('#flush-value').textContent()) === held.flushS,
         `dose ${await page.locator('#dose-in-value').textContent()}, flush ${await page.locator('#flush-value').textContent()}`);
 
     // 10. Settings and back; the page is still there.
@@ -449,6 +458,17 @@ try {
         }
         check(`${name}: no page error`, extra.seen.errors.length === 0, extra.seen.errors.join(' | '));
         await shot(extra.page, name);
+        await extra.close();
+    }
+    //     Decent Sync saves a Machine's dial-in onto its loaded recipe, so the
+    //     column says "saved" only where its plugin says the Machine is served.
+    for (const [status, label] of [['served', 'Dial-in · saved to the recipe'], ['captureOnly', 'Dial-in · not saved to the recipe']]) {
+        const extra = await openPage({ decentSync: status });
+        await waitForPage(extra.page);
+        await extra.page.locator('#cafe-dial-label').filter({ hasText: label }).waitFor({ timeout: 20_000 }).catch(() => {});
+        await extra.page.waitForTimeout(2500);
+        check(`Decent Sync answering "${status}": the column is labelled "${label}"`, (await extra.page.locator('#cafe-dial-label').textContent()) === label, await extra.page.locator('#cafe-dial-label').textContent());
+        if (status === 'served') await shot(extra.page, 'page-recipe-decent-sync-light');
         await extra.close();
     }
     await unloadRecipe();

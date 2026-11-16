@@ -8,8 +8,12 @@ import { recipeName, recipeBean } from './strip-model.js';
  * With a recipe loaded the title and subtitle are the recipe's own words. With
  * none they are translation keys, as `dialLabel` always is, and `translate`
  * says which.
+ *
+ * `saved` is whether Decent Sync saves this Machine's dial-in onto its loaded
+ * recipe (`decentSyncSaves`). The skin saves nothing itself, so only then does
+ * the column say the dial-in is saved.
  */
-export function pageHeading(recipe, profileName) {
+export function pageHeading(recipe, profileName, saved = false) {
     if (!recipe) {
         return {
             translate: true,
@@ -22,8 +26,27 @@ export function pageHeading(recipe, profileName) {
         translate: false,
         title: recipeName(recipe),
         subtitle: [recipeBean(recipe), profileName].filter(Boolean).join(' · '),
-        dialLabel: 'Dial-in · saved to the recipe',
+        dialLabel: saved ? 'Dial-in · saved to the recipe' : 'Dial-in · not saved to the recipe',
     };
+}
+
+/**
+ * Does Decent Sync save this Machine's dial-in onto its loaded recipe? Its
+ * plugin does so on a Machine it serves: one at a Location, sharing, connected
+ * as itself. `answer` is what its Status request said:
+ *
+ * - `{ served: true }`: it does.
+ * - `{ code }` of `unreachable` or `serverTooOld`: the server could not be
+ *   asked. The plugin goes on saving on the tablet through an outage, and the
+ *   last answer stands. So does it when Decaid itself did not answer (`{}`).
+ * - any other refusal, as for a Capture-only Machine, or `null` for no Decent
+ *   Sync plugin loaded: it does not.
+ */
+export function decentSyncSaves(previous, answer) {
+    if (!answer) return false;
+    if (answer.served === true) return true;
+    if (answer.code === undefined || answer.code === 'unreachable' || answer.code === 'serverTooOld') return !!previous;
+    return false;
 }
 
 const text = value => (typeof value === 'string' ? value.trim() : '');

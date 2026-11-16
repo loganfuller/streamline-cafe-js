@@ -5,12 +5,12 @@
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
-import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight } from '../modules/api.js';
+import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight, getPlugins, callPluginEndpoint } from '../modules/api.js';
 import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { pageHeading, decentSyncSaves, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, setText } from './text.js';
 
@@ -23,7 +23,11 @@ const NAMES_GAP_MS = 300;
 const SETTLE_QUIET_MS = 1000;
 const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier edit to land
 
+const DECENT_SYNC_PLUGIN_ID = 'decent-sync.reaplugin';
+
 let recipe = null;
+let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
+let savedSeq = 0;
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
@@ -39,7 +43,7 @@ const el = id => document.getElementById(id);
 const profileName = () => (el('profile-name')?.textContent || '').trim();
 
 function renderHeading() {
-    const heading = pageHeading(recipe, profileName());
+    const heading = pageHeading(recipe, profileName(), saved);
     setText(el('cafe-title'), heading.title, { translate: heading.translate });
     setText(el('cafe-subtitle'), heading.subtitle, { translate: heading.translate });
     setText(el('cafe-dial-label'), heading.dialLabel, { translate: true });
@@ -48,6 +52,34 @@ function renderHeading() {
 /** The loaded recipe changed, or was read again: null when none is loaded. */
 export function showRecipe(next) {
     recipe = next;
+    renderHeading();
+}
+
+// ── Whether the dial-in is saved ─────────────────────────────────────────────
+
+// The skin saves nothing onto a recipe itself. Decent Sync's plugin does, after
+// every change on a Machine it serves, so the column says "saved to the recipe"
+// only there. This is its Status request, in the shape decentSyncSaves reads.
+async function readDecentSync() {
+    const plugins = await getPlugins();
+    if (!Array.isArray(plugins)) return {}; // Decaid did not answer
+    if (!plugins.some(plugin => plugin && plugin.id === DECENT_SYNC_PLUGIN_ID && plugin.loaded)) return null;
+    try {
+        return await callPluginEndpoint(DECENT_SYNC_PLUGIN_ID, 'status', null, 'GET');
+    } catch (error) {
+        if (error.code) return { code: error.code }; // a refusal, which says why
+        // Decaid answers 404 itself for a plugin too old to have a Status request.
+        return error.status === 404 ? null : {};
+    }
+}
+
+async function refreshSaved() {
+    const seq = ++savedSeq;
+    const answer = await readDecentSync();
+    if (seq !== savedSeq) return; // a newer read has begun
+    const next = decentSyncSaves(saved, answer);
+    if (next === saved) return;
+    saved = next;
     renderHeading();
 }
 
@@ -102,9 +134,15 @@ export async function refreshNames() {
     renderNames();
 }
 
-function refreshNamesSoon() {
+// The Workflow's names and Decent Sync's status, read again a moment later, so a
+// burst of reasons to look costs one read of each.
+function refreshSoon() {
     if (namesTimer || document.hidden || isSubPage()) return;
-    namesTimer = setTimeout(() => { namesTimer = null; refreshNames(); }, NAMES_GAP_MS);
+    namesTimer = setTimeout(() => {
+        namesTimer = null;
+        refreshNames();
+        refreshSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
+    }, NAMES_GAP_MS);
 }
 
 // ── Steam flow ───────────────────────────────────────────────────────────────
@@ -232,6 +270,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     placeSystemButtons();
     paintBattery();
     refreshNames();
+    refreshSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
 
     const profile = el('profile-name');
     if (profile) {
@@ -250,10 +289,10 @@ export function initPage({ onProfileChange = () => {} } = {}) {
 
     // The Workflow has no push channel either: look again when the page comes
     // back into view, and when a plugin says it changed.
-    window.addEventListener('focus', refreshNamesSoon);
-    window.addEventListener('pageshow', refreshNamesSoon);
-    document.addEventListener('visibilitychange', refreshNamesSoon);
-    document.addEventListener('streamline:mainpagevisible', refreshNamesSoon);
-    document.addEventListener('streamline:workflow-refresh', refreshNamesSoon);
+    window.addEventListener('focus', refreshSoon);
+    window.addEventListener('pageshow', refreshSoon);
+    document.addEventListener('visibilitychange', refreshSoon);
+    document.addEventListener('streamline:mainpagevisible', refreshSoon);
+    document.addEventListener('streamline:workflow-refresh', refreshSoon);
     document.addEventListener('streamline:languagechange', () => { renderHeading(); renderNames(); });
 }

@@ -72,16 +72,18 @@ In order, it:
 2. opens Settings from that screen and comes back to the check, runs the check again with Reload, and starts the page with "Turn DYE2 on";
 3. seeds the sample data, by setting the Workflow and asking DYE2 to save it as a recipe, so the records have the shape DYE2 writes;
 4. checks the nine cards, the page with no recipe loaded, and what is gone from Streamline's page;
-5. taps a card and checks the Workflow, DYE2's selection, the title and what each dial-in row names;
-6. steps a value, flips Temp | Vol, and steps the steam flow;
+5. taps two cards in quick succession, then one, and checks the Workflow, DYE2's selection, the title, the dial-in column's label and what each dial-in row names;
+6. steps a value and checks it changes this machine only, flips Temp | Vol, steps the steam flow, and checks a change made just before another recipe is tapped does not land on that recipe;
 7. pulls a simulated shot and checks the state, the time and the weight against its target, then the Shot in the graph and its time in the legend;
 8. opens the full-screen chart and comes back, opens Settings and comes back, and switches DYE2 off to check the page returns to the "DYE2 is needed" screen;
-9. takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
+9. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
 
-Two things are not Decaid's own answers:
+Three things are not Decaid's own answers:
 
 - **A machine with buttons of its own.** The simulated machine always reports none, so for those screenshots the run rewrites that one field of `GET /api/v1/machine/info` in the browser.
 - **The recipes' names and the slots above 5.** DYE2 names a saved recipe after its bean and places only slots 1 to 5, so the run writes the names and slots 7 and 9 into DYE2's records itself. That is the fixture's write. The skin's own writer of those records is a separate module with its own guards.
+
+- **Decent Sync.** This Decaid has no Decent Sync plugin, and the plugin needs a server. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there, once as a served Machine and once as a Capture-only one. Nothing saves a dial-in in that check: it shows the label only.
 
 The theme is painted in the page and never stored: a stored theme is carried to Decaid's settings store, which every later page then reads back.
 
@@ -95,4 +97,4 @@ A running Decaid keeps a CPU busy for as long as it is up.
 
 ## What it does not cover
 
-A real machine and scale, the tablet's own WebView, touch input, a second language, and a screen that is not 1920 by 1200. Say so on the pull request when a change needs one of them.
+A real machine and scale, the tablet's own WebView, touch input, a second language, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.

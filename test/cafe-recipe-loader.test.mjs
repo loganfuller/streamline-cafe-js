@@ -343,27 +343,3 @@ test('a recipe unloaded or removed elsewhere stops being shown as loaded', async
     await loader.refresh();
     assert.equal(world.last(), null);
 });
-
-test('a dial-in edit belongs to the loaded recipe, and a load\'s own write to none', async () => {
-    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
-    assert.equal(loader.editing(), null, 'nothing is known to be loaded before the first read');
-    await loader.refresh();
-    assert.equal(loader.editing().id, 'a');
-
-    world.settleGate = deferred();
-    loader.load(B);
-    await idle();
-    assert.equal(loader.editing().id, 'a', 'an edit still landing belongs to the recipe being left');
-    world.settleGate.resolve();
-    await idle();
-    assert.equal(loader.editing(), null, 'the load is being written: that write is not an edit');
-    world.applies[0].resolve();
-    await idle();
-    assert.equal(loader.editing().id, 'b');
-});
-
-test('with no recipe loaded, an edit belongs to none', async () => {
-    const { loader } = build();
-    await loader.refresh();
-    assert.equal(loader.editing(), null);
-});

@@ -6,11 +6,10 @@
 // that, two taps in quick succession could write the Workflow in the other
 // order, leaving the machine on the first recipe under the second one's name.
 //
-// Before a load is written, dial-in edits still on their way are let land, and
-// are saved onto the recipe being left: written after the load, they would
-// change the new recipe instead. And the recipe is read again from DYE2's
-// records, so what is loaded is what DYE2 holds now, not what the card showed
-// when it was last drawn.
+// Before a load is written, dial-in edits still on their way are let land:
+// written after the load, they would change the new recipe instead. And the
+// recipe is read again from DYE2's records, so what is loaded is what DYE2 holds
+// now, not what the card showed when it was last drawn.
 import { createLatestTaskRunner } from '../modules/latest-task-runner.js';
 import { loadedAfterRead } from './strip-model.js';
 
@@ -20,8 +19,8 @@ import { loadedAfterRead } from './strip-model.js';
  * - `read()` resolves `{ rows, selection }`: DYE2's records, or null when the
  *   read failed, and its selection, or undefined when it could not be asked.
  * - `show(recipes, loaded)` paints.
- * - `settle()` resolves once edits made before the tap have been written and
- *   saved, and rejects when they could not be: the load is then not made.
+ * - `settle()` resolves once edits made before the tap have been written, and
+ *   rejects when they could not be: the load is then not made.
  * - `onLoading(loading)` is told when a tap's load begins and when the last one
  *   has finished, so the page can keep the dial-in still in between: an edit
  *   made while a recipe loads belongs to neither recipe for certain.
@@ -35,7 +34,6 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
     let taps = 0;
     let reads = 0;
     let loading = false;   // a tap's load has not finished
-    let applying = false;  // the load itself is being written
 
     const paint = () => show(recipes, loaded);
 
@@ -65,12 +63,7 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
             const current = rows ? rows.find(r => r && r.id === recipe.id) : recipe;
             if (!current) throw new Error('The recipe is no longer in DYE2.');
             if (rows) recipes = rows;
-            applying = true;
-            try {
-                await apply(current);
-            } finally {
-                applying = false;
-            }
+            await apply(current);
             confirmed = current;
         } catch (error) {
             onError(error, recipe);
@@ -95,11 +88,5 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
         run({ recipe, seq: ++taps });
     }
 
-    /**
-     * The recipe a dial-in edit made now belongs to, or null: none is loaded, or
-     * the Workflow write under way is a load's own, not an edit.
-     */
-    const editing = () => (applying ? null : confirmed);
-
-    return { load, refresh, editing };
+    return { load, refresh };
 }

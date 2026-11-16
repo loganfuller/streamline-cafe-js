@@ -3,16 +3,49 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pageHeading, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
+import { pageHeading, decentSyncSaves, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
 
 test('with a recipe loaded, the title is its name, over its bean and profile', () => {
-    const heading = pageHeading({ id: 'a', title: 'House espresso', beanName: 'Sample Blend' }, 'Sample Profile');
+    const heading = pageHeading({ id: 'a', title: 'House espresso', beanName: 'Sample Blend' }, 'Sample Profile', true);
     assert.deepEqual(heading, {
         translate: false,
         title: 'House espresso',
         subtitle: 'Sample Blend · Sample Profile',
         dialLabel: 'Dial-in · saved to the recipe',
     });
+});
+
+test('the column says the dial-in is saved only where Decent Sync saves it', () => {
+    const recipe = { id: 'a', title: 'House espresso' };
+    assert.equal(pageHeading(recipe, '', true).dialLabel, 'Dial-in · saved to the recipe');
+    assert.equal(pageHeading(recipe, '', false).dialLabel, 'Dial-in · not saved to the recipe');
+    assert.equal(pageHeading(recipe, '').dialLabel, 'Dial-in · not saved to the recipe', 'not saved until it is known to be');
+    // With no recipe there is nothing to save onto, Decent Sync or not.
+    assert.equal(pageHeading(null, '', true).dialLabel, 'Dial-in · not saved to a recipe');
+});
+
+test('Decent Sync saves the dial-in on a Machine it serves', () => {
+    assert.equal(decentSyncSaves(false, { connected: true, served: true }), true);
+    assert.equal(decentSyncSaves(true, { connected: true, served: true }), true);
+});
+
+test('it saves nothing with no plugin, on a Capture-only Machine, or on the wrong hardware', () => {
+    assert.equal(decentSyncSaves(true, null), false, 'no Decent Sync plugin loaded');
+    assert.equal(decentSyncSaves(true, { served: false, code: 'captureOnly' }), false);
+    assert.equal(decentSyncSaves(true, { served: false, code: 'hardwareMismatch' }), false);
+    assert.equal(decentSyncSaves(true, { code: 'somethingNew' }), false, 'an unknown refusal is not a yes');
+});
+
+test('while the server cannot be asked, the last answer stands', () => {
+    // The plugin goes on saving on the tablet through an outage.
+    for (const code of ['unreachable', 'serverTooOld']) {
+        assert.equal(decentSyncSaves(true, { served: false, code }), true);
+        assert.equal(decentSyncSaves(false, { served: false, code }), false, 'and an outage alone never turns it on');
+    }
+    // Decaid itself did not answer.
+    assert.equal(decentSyncSaves(true, {}), true);
+    assert.equal(decentSyncSaves(false, {}), false);
+    assert.equal(decentSyncSaves(undefined, {}), false);
 });
 
 test('a recipe with no bean, or a profile not yet known, leaves no stray separator', () => {

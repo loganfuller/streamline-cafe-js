@@ -5,12 +5,7 @@
 // Streamline's: `applyRecipe` writes the Workflow and tells DYE2 which recipe is
 // loaded, and which recipe is loaded is then read back from DYE2, as
 // Streamline's strip reads it. recipe-loader.js keeps the two in order.
-//
-// A dial-in change is saved onto the loaded recipe by DYE2, and only when it is
-// asked: its `record` request, which Streamline sends from "Save changes" in
-// its strip's long-press menu. This page has no such menu and says the dial-in
-// is saved, so it asks, a moment after the last change.
-import { getDye2KvArray, callPluginEndpoint, onWorkflowUpdated } from '../modules/api.js';
+import { getDye2KvArray, callPluginEndpoint } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast } from '../modules/ui.js';
@@ -18,15 +13,11 @@ import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { stripCards, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
-import { createPendingWrite } from './pending-write.js';
 import { cafeText } from './text.js';
 
 const RECIPES_KEY = 'recipes';
 const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive together
-const SAVE_DELAY_MS = 1500; // after the last change, so a run of steps is one save
-// The longest a tap waits on earlier edits before its load is called off. A save
-// reads the machine's settings, which on a tablet can take several seconds.
-const SETTLE_MAX_MS = 8000;
+const SETTLE_MAX_MS = 5000; // the longest a tap waits on earlier edits before its load is called off
 
 let cards = stripCards([], null); // as last drawn
 let loader = null;
@@ -41,25 +32,6 @@ async function readSelection() {
     }
 }
 
-// Ask DYE2 to save the dial-in now on the machine. DYE2 saves each value the
-// Workflow holds otherwise than the record does, into the recipe the Workflow
-// names, and into none when it names none: Streamline's profile changes clear
-// that name in the same write, so a change of profile is never saved onto the
-// recipe it left. `recipe` is the one the change was made on, for the message.
-async function saveDialIn(recipe) {
-    try {
-        const answer = await callPluginEndpoint(DYE2_PLUGIN_ID, 'record', null, 'POST');
-        // The record changed: the cards' copy of it is now behind.
-        if (answer && answer.saved) refreshStripSoon();
-    } catch (error) {
-        // Said here, and left with the pending write to try again: at the next
-        // change, or once more before another recipe loads.
-        logger.warn('Cafe: could not save the dial-in onto the recipe', error);
-        showToast(`${cafeText('Could not save to')} ${recipeName(recipe)}`, 2400, 'error');
-        throw error;
-    }
-}
-
 // The promise, or a rejection once `ms` have passed, whichever is first.
 function within(ms, promise) {
     let timer;
@@ -68,7 +40,6 @@ function within(ms, promise) {
     });
     return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
-const pendingSave = createPendingWrite({ write: saveDialIn, delayMs: SAVE_DELAY_MS });
 
 async function readDye2() {
     const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);
@@ -124,15 +95,10 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
         apply: applyRecipe,
         read: readDye2,
         // Before another recipe is loaded: let an edit still on its way reach the
-        // Workflow, then save it onto the recipe being left. A request that stalls
-        // calls the load off instead of holding the page: whatever is still on the
-        // wire then lands on the recipe that stays loaded. A save that fails is
-        // tried once more here, and does not stop the load: it has said so, and a
-        // barista who cannot change recipe is worse off than one who lost a tweak.
-        settle: () => within(SETTLE_MAX_MS, (async () => {
-            await onBeforeLoad();
-            await pendingSave.flush();
-        })()),
+        // Workflow. A request that stalls calls the load off instead of holding
+        // the page: whatever is still on the wire then lands on the recipe that
+        // stays loaded.
+        settle: () => within(SETTLE_MAX_MS, onBeforeLoad()),
         show(recipes, loaded) {
             cards = stripCards(recipes, loaded);
             render();
@@ -146,12 +112,6 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
         },
     });
     render();
-    // Every Workflow write the skin makes while a recipe is loaded is a dial-in
-    // change to save, but for the load's own write.
-    onWorkflowUpdated(() => {
-        const recipe = loader.editing();
-        if (recipe) pendingSave.set(recipe);
-    });
     document.getElementById('cafe-strip')?.addEventListener('click', event => {
         const button = event.target.closest('button[data-slot]');
         if (!button) return;
