@@ -192,6 +192,9 @@ test('once a shot has ended and Decaid does not have it yet: its row names no ti
 
 test('a reference that can\'t be changed now offers no Make reference', () => {
     assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: shot('b'), canChange: false } }).makeReference, false);
+    const none = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false } });
+    assert.deepEqual([none.makeReference, none.reference, none.badge, none.lines], [false, null, false, false], 'with no reference yet, too');
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: true } }).makeReference, true);
 });
 
 test('the kept choice is recipe to Shot, and one recipe\'s choice leaves the others', () => {

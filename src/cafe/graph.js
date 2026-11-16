@@ -32,7 +32,7 @@ let settling = false;   // a shot has ended and Decaid does not have it yet
 let settleStep = 0;     // how many looks for that shot have been scheduled
 let settleFrom = null;  // the id of the Shot in the graph before that shot
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
-let reference = null;   // the recipe's reference: { shot, canChange, curves }
+let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves
 let drawing = null;     // the measurements this module is handing the chart itself
 let overlayKey;         // what the overlay was last set for
 let seq = 0;
@@ -105,9 +105,11 @@ async function refresh() {
         logger.warn('Cafe: could not read the Shots for the graph', error);
         if (mine !== seq || live) return;
         if (settling) settleNext();
-        // Decaid can't be asked. What is shown stays, unless it is another
-        // recipe's Shot, which would be shown as this one's.
-        else if (latest === undefined && !isSubPage()) clearChart();
+        // Decaid can't be asked. The graph is drawn again from what was last
+        // read: the page may have come back from another page with its chart
+        // cleared, and the legend must name the Shot that is drawn. With nothing
+        // read yet for this recipe that is an empty graph, never another recipe's Shot.
+        else draw();
         return;
     }
     if (mine !== seq || live) return;
@@ -118,7 +120,8 @@ async function refresh() {
         return;
     }
     latest = shot;
-    reference = chosen.shot ? { ...chosen, curves: shotCurves(chosen.shot.measurements) } : null;
+    // Kept with no Shot too: the seam's answer still says whether one can be chosen.
+    reference = recipe ? { ...chosen, curves: chosen.shot ? shotCurves(chosen.shot.measurements) : null } : null;
     settling = false;
     clearTimeout(settleTimer);
     draw();
@@ -269,7 +272,7 @@ async function onMakeReference() {
     try {
         const forRecipe = recipe;
         const shot = latest;
-        if (reference && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
+        if (reference && reference.shot && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
         // The dialog was open a while: the page may show something else by now.
         if (!recipe || recipe.id !== forRecipe.id || !latest || latest.id !== shot.id || live) return;
         try {

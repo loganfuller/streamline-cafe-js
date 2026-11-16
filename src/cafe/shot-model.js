@@ -176,7 +176,8 @@ export function viewFrom(stored) {
  *   have it yet, so the graph still holds its live lines.
  * - `shot`: the Shot in the graph: the recipe's latest, or with no recipe the
  *   tablet's newest. Undefined before it was read, null for none.
- * - `reference`: `{ shot, canChange }` for the recipe's reference, or null.
+ * - `reference`: the seam's answer for the recipe, `{ shot, canChange }`, whose
+ *   `shot` is null with no reference; or null before it was read.
  *
  * The answer: `row`, the Shot's row (`label`, a phrase, and `shot`, whose time
  * and barista follow it, or null); `line`, a phrase under no row, or null;
