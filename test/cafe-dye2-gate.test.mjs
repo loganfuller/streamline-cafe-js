@@ -45,11 +45,14 @@ test('a plugin list that could not be read names nothing as missing', () => {
 test('the screen says which is missing, and offers the way out that fits', () => {
     assert.equal(gateScreen('not-installed').line, "DYE2 isn't installed");
     assert.equal(gateScreen('not-loaded').line, 'DYE2 is installed but not loaded');
-    assert.equal(gateScreen('outdated').line, 'DYE2 is older than v0.1.40');
+    assert.equal(gateScreen('outdated').line, 'DYE2 is older than v{version}');
+    assert.deepEqual(gateScreen('outdated').vars, { version: '0.1.40' });
     assert.equal(gateScreen('setting-off').line, 'DYE2 is turned off in Settings');
 
     // The setting is the skin's to turn on. The plugin is Decaid's to install.
-    assert.deepEqual(gateScreen('setting-off'), { line: 'DYE2 is turned off in Settings', turnOn: true, hint: null });
+    assert.deepEqual(gateScreen('setting-off'), {
+        line: 'DYE2 is turned off in Settings', vars: { version: MIN_DYE2_VERSION }, turnOn: true, hint: null,
+    });
     for (const reason of ['not-installed', 'not-loaded', 'outdated']) {
         const screen = gateScreen(reason);
         assert.equal(screen.turnOn, false);
@@ -58,5 +61,7 @@ test('the screen says which is missing, and offers the way out that fits', () =>
 });
 
 test('the version in the line is the floor the check uses', () => {
-    assert.ok(gateScreen('outdated').line.endsWith(`v${MIN_DYE2_VERSION}`));
+    const { line, vars } = gateScreen('outdated');
+    assert.ok(line.endsWith('v{version}'));
+    assert.equal(vars.version, MIN_DYE2_VERSION);
 });

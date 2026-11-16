@@ -35,15 +35,18 @@ Streamline bumps its version with each release, and the fork's version sits on t
 | --- | --- |
 | `index.html` | The main page's markup is the cafe layout. It keeps the ids Streamline's modules drive, and hidden stubs for the two history arrows, the fullscreen toggle, and the steam tile's duration and mode elements. The steam row's − and + are the page's own, not Streamline's. `<head>` gains `src/cafe/cafe.css`. The inline module that started Streamline's strip is gone: `src/cafe/start.js` starts it once DYE2 is known to be there. |
 | `src/modules/app.js` | One import and one line at the top of `initMainPageOnce`: the main page starts only when `cafeMayStart()` in `src/cafe/start.js` says so. While it says no, `initMainPageOnce` returns `null` without starting, and the next call asks again. |
+| `src/modules/dyeStrip.js` | One added export, `forgetAppliedItem()`, placed just above the "DYE2 page navigation" section, with nothing else in the file changed. It bumps `applySeq`, clears `activeItemId`, `activeModified`, the active item and the parked selection, and sets `dye2Armed` to false, posting nothing. `src/cafe/arrange.js` calls it before DYE2's `save-recipe` and before clearing DYE2's selection, because the cafe page changes which recipe is loaded without an apply, and a selection request of this module's that is still retrying would otherwise put the old recipe back. At each adoption: keep the function, and check it still clears every variable the module keeps about the applied item (compare with `clearSelection`). `test/cafe-source-rules.test.mjs` fails if the export is gone. |
 | `src/css/app.css` | Rebuilt for the fork's page. See above. |
 | `.gitignore` | `test/cafe-smoke/out/`, the smoke run's screenshots. |
 
-Streamline's modules are otherwise unedited. Where the page needs one to behave differently, it does so from outside, in `src/cafe/` and `src/cafe/cafe.css`:
+Streamline's modules are otherwise unedited: the hook in `app.js` and the one in `dyeStrip.js` are the only two. Where the page needs one to behave differently, it does so from outside, in `src/cafe/` and `src/cafe/cafe.css`:
 
 - **Steam.** `ui.js`'s steam − and + step whichever of time, flow and milk stop its tile's mode names, and the mode moves without the page. So the page has no `#steam-minus` or `#steam-plus`: its own two buttons step the flow from `src/cafe/page.js`, writing it as Streamline's numpad does. The tile's duration and mode elements stay as hidden stubs, because the tile does not paint without them.
 - **Taps Streamline wires that the page does not offer yet.** `app.js` opens the profile list from `#profile-name` and DYE2's grinder page from `#grind-label`. `cafe.css` takes pointer events off both.
 - **The help button.** `help-launcher.js` adds a "?" that explains Streamline's page. `cafe.css` hides it while the main page shows.
 - **The footer.** `main.css` reserves 242px under `<main>` for Streamline's footer cards; `cafe.css` gives it back to the graph.
+- **Translations.** `i18n.js` translates every element with `data-i18n-key` from Streamline's file alone. The page's own text is keyed by `data-cafe-text` and translated by `src/cafe/text.js` from the fork's table first. `#machine-status`, `#sleep-button` and `#cupwarmer-text` keep `data-i18n-key`, because `ui.js` and `app.js` set that key on them. `data-fit-text` on the page's labels is `i18n.js`'s own fitting.
+- **The long-press.** `ui.js`'s `setupPressAndHold` and `context-menu.js`'s `openContextMenu` are called as exported, and the list of recipes is a daisyUI `<dialog>` like Streamline's profile list. Streamline's own cell menu, its `editRecipe` and `openPluginOverlay` are not used: the page opens none of DYE2's pages.
 
 ## Builds
 

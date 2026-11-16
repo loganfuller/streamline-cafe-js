@@ -57,7 +57,9 @@ This repository is Streamline Cafe, a fork of Streamline with its own main page.
 - Put new behaviour in new files under `src/cafe/`. Change Streamline's own files only through small hooks, and list each one, with any Streamline test you change, in `docs/cafe/UPSTREAM_EDITS.md`.
 - Keep the element ids Streamline's modules drive in `index.html`. Where a module needs an element the layout drops, keep a hidden stub instead of editing the module.
 - Load a recipe only through Streamline's `applyRecipe`. Never write Streamline's strip mode setting.
-- Write DYE2's recipe records only through the fork's one writer module.
+- Before changing which recipe is loaded any other way (DYE2's `save-recipe`, or clearing its selection), call `forgetAppliedItem()`, the fork's one hook in `src/modules/dyeStrip.js`. Never open one of DYE2's pages from the cafe page.
+- Write DYE2's recipe records only through the fork's one writer module, `src/cafe/recipe-writer.js`.
+- Key the cafe page's text with `data-cafe-text` or `cafeText()`, never `data-i18n-key`. A phrase Streamline's translation file lacks goes into `src/cafe/translations.js` in every language Streamline has finished, marked `machine: true` when a machine translated it.
 - For a change to the main page, do the smoke run in [`docs/cafe/SMOKE.md`](docs/cafe/SMOKE.md) and put its screenshots on the pull request. Sample data is made up: no cafe's names, beans or recipes.
 - Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.
 - Do not open issues or pull requests on `decentespresso` repositories from work on this fork.

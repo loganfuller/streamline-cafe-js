@@ -241,14 +241,27 @@ button.cafe-card {
     color: var(--button-primary-text);
 }
 
-/* An empty slot is an outline, and not a control. */
+/* An empty slot is an outline: "Slot N", and under it "Hold to add". A tap
+   does nothing; holding it makes a recipe there. */
 .cafe-card-empty {
     border-style: dashed;
     border-color: var(--border-primary);
     background: transparent;
     color: var(--data-card-title-text-color);
+}
+
+.cafe-card-empty .cafe-card-name {
     font-size: 16px;
-    font-weight: 600;
+}
+
+/* The hint is a phrase, and long in some languages: it wraps where a bean's
+   name is cut short. */
+.cafe-card-empty .cafe-card-bean {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 /* ── Dial-in column ───────────────────────────────────────────────────────── */
@@ -311,11 +324,13 @@ button.cafe-card {
     white-space: nowrap;
 }
 
-/* A name longer than the room beside the stepper, as a translation can be,
-   wraps instead of running under the − button. */
+/* A name longer than the room beside the stepper, as a translation can be, is
+   shrunk to fit by Streamline's own text fitting (data-fit-text in index.html),
+   as its header buttons are. That fitting keeps 8px of the box clear, for a
+   button's rounded corners. A row's name has none, so its box is 8px wider
+   than its room, and "Steam flow" keeps the size of the other names. */
 .cafe-row-short .cafe-row-name {
-    white-space: normal;
-    overflow-wrap: anywhere;
+    margin-right: -8px;
 }
 
 /* A tall row is two lines: its name beside the stepper, and under both, across
@@ -325,7 +340,10 @@ button.cafe-card {
     gap: 8px;
 }
 
+/* The name's box ends where the stepper begins: 232 of stepper and 10 of gap,
+   less the 8 the fitting keeps clear. */
 .cafe-row-tall .cafe-row-name {
+    width: calc(100% - 234px);
     height: 58px;
     line-height: 58px;
 }
@@ -757,4 +775,84 @@ button.cafe-card {
    settings and profile pages and is not shown over this one. */
 .cafe-main-shown #help-overlay-btn {
     display: none !important;
+}
+
+/* ── Choosing a recipe for a slot ─────────────────────────────────────────── */
+
+.cafe-dialog {
+    width: 640px;
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    border-radius: 20px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+.cafe-dialog h3 {
+    margin: 0 0 16px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+#cafe-recipe-dialog-empty {
+    margin: 8px 0;
+    font-size: 20px;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-recipe-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cafe-recipe-row {
+    flex: none;
+    min-height: 68px;
+    padding: 10px 16px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-recipe-row-name {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.75;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail:empty {
+    display: none;
+}
+
+.cafe-dialog .modal-action {
+    margin-top: 20px;
+}
+
+.cafe-dialog .modal-action .cafe-btn {
+    min-width: 160px;
 }

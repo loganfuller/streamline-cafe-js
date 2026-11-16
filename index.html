@@ -96,6 +96,11 @@
         <!-- Streamline Cafe's main page (docs/cafe/DESIGN.md). The ids Streamline's
              modules drive are kept; what the layout drops and a module still needs is
              a hidden stub at the end. Styled by src/cafe/cafe.css.
+             Text is keyed by data-cafe-text and translated by src/cafe/text.js;
+             data-fit-text is Streamline's, and shrinks a label a language makes too
+             long for its place. Only
+             the three elements a Streamline module re-labels itself keep
+             data-i18n-key: the machine status, Sleep and the cup warmer.
              cafe-pending: nothing shows until src/cafe/start.js has checked for DYE2. -->
         <div id="main-page" class="cafe-pending">
 
@@ -103,13 +108,13 @@
          shows, nothing else on the page is displayed (cafe.css, .cafe-gated). -->
     <section id="cafe-gate" aria-labelledby="cafe-gate-title">
         <div class="cafe-gate-card">
-            <h1 id="cafe-gate-title" data-i18n-key="Streamline Cafe needs DYE2">Streamline Cafe needs DYE2</h1>
+            <h1 id="cafe-gate-title" data-cafe-text="Streamline Cafe needs DYE2">Streamline Cafe needs DYE2</h1>
             <p id="cafe-gate-line"></p>
-            <p id="cafe-gate-hint" data-i18n-key="Install or update DYE2 in Decaid, under Plugins.">Install or update DYE2 in Decaid, under Plugins.</p>
+            <p id="cafe-gate-hint" data-cafe-text="Install or update DYE2 in Decaid, under Plugins.">Install or update DYE2 in Decaid, under Plugins.</p>
             <div class="cafe-gate-actions">
-                <button id="cafe-gate-turn-on" type="button" class="cafe-btn cafe-btn-primary" data-i18n-key="Turn DYE2 on">Turn DYE2 on</button>
-                <button id="cafe-gate-reload" type="button" class="cafe-btn" data-i18n-key="Reload">Reload</button>
-                <button id="cafe-gate-settings" type="button" class="cafe-btn" data-i18n-key="Settings">Settings</button>
+                <button id="cafe-gate-turn-on" type="button" class="cafe-btn cafe-btn-primary" data-fit-text data-cafe-text="Turn DYE2 on">Turn DYE2 on</button>
+                <button id="cafe-gate-reload" type="button" class="cafe-btn" data-fit-text data-cafe-text="Reload">Reload</button>
+                <button id="cafe-gate-settings" type="button" class="cafe-btn" data-fit-text data-cafe-text="Settings">Settings</button>
             </div>
         </div>
     </section>
@@ -123,11 +128,11 @@
         <!-- Dial-in column. Each row keeps Streamline's section, label, stepper and
              value ids, which its steppers, numpad and plugin surfaces look up. -->
         <aside id="shot-settings" aria-label="Dial-in">
-            <p id="cafe-dial-label" class="cafe-eyebrow" data-i18n-key="Dial-in · not saved to a recipe">Dial-in · not saved to a recipe</p>
+            <p id="cafe-dial-label" class="cafe-eyebrow" data-fit-text data-cafe-text="Dial-in · not saved to a recipe">Dial-in · not saved to a recipe</p>
 
             <div id="dose-section" class="cafe-row cafe-row-tall">
                 <div id="dose-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-i18n-key="Dose">Dose</span>
+                    <span class="cafe-row-name" data-fit-text data-cafe-text="Dose">Dose</span>
                     <span id="cafe-dose-desc" class="cafe-row-desc"></span>
                 </div>
                 <div class="cafe-stepper">
@@ -141,7 +146,7 @@
 
             <div id="drink-section" class="cafe-row cafe-row-tall">
                 <div id="drink-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-i18n-key="Yield">Yield</span>
+                    <span class="cafe-row-name" data-fit-text data-cafe-text="Yield">Yield</span>
                     <span id="cafe-yield-desc" class="cafe-row-desc"></span>
                 </div>
                 <div class="cafe-stepper">
@@ -158,7 +163,7 @@
                  takes no taps until the grinder dialog arrives (cafe.css). -->
             <div id="grind-section" class="cafe-row cafe-row-tall">
                 <div id="grind-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-i18n-key="Grind">Grind</span>
+                    <span class="cafe-row-name" data-fit-text data-cafe-text="Grind">Grind</span>
                     <span id="cafe-grind-desc" class="cafe-row-desc"></span>
                 </div>
                 <div class="cafe-stepper">
@@ -175,7 +180,7 @@
                  takes no taps until the profile dialog arrives (cafe.css). -->
             <div id="brew-section" class="cafe-row cafe-row-tall">
                 <div id="brew-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-i18n-key="Brew">Brew</span>
+                    <span class="cafe-row-name" data-fit-text data-cafe-text="Brew">Brew</span>
                     <span id="profile-name" class="cafe-row-desc" aria-live="polite"> </span>
                 </div>
                 <div class="cafe-stepper">
@@ -189,7 +194,7 @@
 
             <div id="flush-section" class="cafe-row cafe-row-short">
                 <div class="cafe-row-label">
-                    <span id="flush-label" class="cafe-row-name" role="button" tabindex="0" aria-label="Open flush settings" data-i18n-key="Flush">Flush</span>
+                    <span id="flush-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open flush settings" data-cafe-text="Flush">Flush</span>
                 </div>
                 <div class="cafe-stepper">
                     <button id="flush-minus" type="button" aria-label="Decrease Flush Duration"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -207,7 +212,7 @@
                  here: these two are the page's, and step the flow (src/cafe/page.js). -->
             <div id="steam-section" class="cafe-row cafe-row-short">
                 <div class="cafe-row-label">
-                    <span id="steam-label" class="cafe-row-name" role="button" tabindex="0" aria-label="Open steam settings" data-i18n-key="Steam flow">Steam flow</span>
+                    <span id="steam-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open steam settings" data-cafe-text="Steam flow">Steam flow</span>
                 </div>
                 <div class="cafe-stepper">
                     <button id="cafe-steam-minus" type="button" aria-label="Decrease Steam Flow"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -225,9 +230,9 @@
                  shows the other small under it. -->
             <div id="hotwater-section" class="cafe-row cafe-row-short">
                 <div class="cafe-row-label">
-                    <span id="hotwater-label" class="cafe-row-name" role="button" tabindex="0" aria-label="Open hot water settings" data-i18n-key="Hot water">Hot water</span>
+                    <span id="hotwater-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open hot water settings" data-cafe-text="Hot water">Hot water</span>
                     <span id="hot-water-mode-toggle" class="cafe-mode-toggle" role="button" tabindex="0" aria-label="Toggle Hot Water Mode">
-                        <span id="hot-water-mode-temp" data-i18n-key="Temp">Temp</span> | <span id="hot-water-mode-vol" data-i18n-key="Vol">Vol</span>
+                        <span id="hot-water-mode-temp" data-cafe-text="Temp">Temp</span> | <span id="hot-water-mode-vol" data-cafe-text="Vol">Vol</span>
                     </span>
                 </div>
                 <div class="cafe-stepper">
@@ -243,8 +248,8 @@
             <!-- Settings and Sleep. src/cafe/page.js moves this block to the top of the
                  machine-button column when that column shows. -->
             <div id="cafe-system">
-                <button id="settings-btn" type="button" class="cafe-btn" data-i18n-key="Settings">Settings</button>
-                <button id="sleep-button" type="button" class="cafe-btn" data-i18n-key="Sleep">Sleep</button>
+                <button id="settings-btn" type="button" class="cafe-btn" data-fit-text data-cafe-text="Settings">Settings</button>
+                <button id="sleep-button" type="button" class="cafe-btn" data-fit-text data-i18n-key="Sleep">Sleep</button>
             </div>
         </aside>
 
@@ -261,7 +266,7 @@
                         <div id="machine-status" data-i18n-key="Connecting" aria-live="assertive">Connecting</div>
                         <!-- The weight against its target, while a shot runs (src/cafe/page.js). -->
                         <div id="cafe-live" style="display:none">
-                            <span class="cafe-eyebrow" data-i18n-key="Weight">Weight</span>
+                            <span class="cafe-eyebrow" data-cafe-text="Weight">Weight</span>
                             <span id="cafe-live-weight"></span>
                         </div>
                     </div>
@@ -271,15 +276,15 @@
 
                     <div class="cafe-status-band">
                         <div id="telemetry-row" aria-label="Machine Telemetry">
-                            <p id="mix-info-container"><span class="cafe-tele-label" data-i18n-key="Mix">Mix</span><span id="data-mix-temp" class="cafe-tele-value">°c</span></p>
-                            <p><span class="cafe-tele-label" data-i18n-key="Group">Group</span><span id="data-group-temp" class="cafe-tele-value">°c</span></p>
-                            <p><span class="cafe-tele-label" data-i18n-key="Steam">Steam</span><span id="data-steam-temp" class="cafe-tele-value">°c</span></p>
-                            <p><span class="cafe-tele-label" data-i18n-key="Tank">Tank</span><span id="data-tank-vol" class="cafe-tele-value">ml</span></p>
-                            <p><span class="cafe-tele-label" data-i18n-key="Clock">Clock</span><span id="data-clock" class="cafe-tele-value">--:--</span></p>
+                            <p id="mix-info-container"><span class="cafe-tele-label" data-cafe-text="Mix">Mix</span><span id="data-mix-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Group">Group</span><span id="data-group-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Steam">Steam</span><span id="data-steam-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Tank">Tank</span><span id="data-tank-vol" class="cafe-tele-value">ml</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Clock">Clock</span><span id="data-clock" class="cafe-tele-value">--:--</span></p>
                             <!-- Bengle only, as on Streamline: the milk probe's reading, and the
                                  cup warmer, which a tap switches on and off. -->
                             <div id="milk-info-container" style="display: none;">
-                                <p><span class="cafe-tele-label" data-i18n-key="Milk">Milk</span><span id="data-milk-temp" class="cafe-tele-value">°c</span></p>
+                                <p><span class="cafe-tele-label" data-cafe-text="Milk">Milk</span><span id="data-milk-temp" class="cafe-tele-value">°c</span></p>
                             </div>
                             <div id="cupwarmer-info-container" style="display: none;" role="button" tabindex="0" aria-pressed="false" aria-label="Toggle Cup Warmer">
                                 <p><span id="cupwarmer-text" class="cafe-tele-label no-select" data-i18n-key="Cups">Cups</span><span id="data-cupwarmer-temp" class="cafe-tele-value no-select">--</span></p>
@@ -288,7 +293,7 @@
                                  battery, and the weight, which tares on a tap. Hidden until a scale
                                  is known, by app.js. -->
                             <div id="scale-info-container" style="display: none;">
-                                <span id="weight-text" class="cafe-tele-label no-select" data-i18n-key="Scale">Scale</span>
+                                <span id="weight-text" class="cafe-tele-label no-select" data-cafe-text="Scale">Scale</span>
                                 <span class="cafe-scale-dot" aria-hidden="true"></span>
                                 <span id="cafe-scale-battery" class="cafe-tele-value" aria-label="Scale battery"></span>
                                 <button id="data-weight" type="button" class="cafe-tare no-select" aria-label="Tare scale"> </button>
@@ -302,12 +307,12 @@
                         <div id="shot-history-info" class="cafe-legend-item" aria-live="polite">
                             <span id="history-date"></span>
                             <svg class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-                            <span class="cafe-legend-name" data-i18n-key="Latest">Latest</span>
+                            <span class="cafe-legend-name" data-cafe-text="Latest">Latest</span>
                             <span class="cafe-stub"><span id="history-profile-name"></span><span id="history-dose-in"></span><span id="history-grind-size"></span></span>
                         </div>
                         <div class="cafe-legend-item">
                             <svg class="cafe-legend-swatch cafe-legend-target" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="2" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0.5 7"/></svg>
-                            <span class="cafe-legend-name" data-i18n-key="Profile target">Profile target</span>
+                            <span class="cafe-legend-name" data-cafe-text="Profile target">Profile target</span>
                         </div>
                     </div>
 
@@ -325,23 +330,23 @@
                     <div class="cafe-ghc-rule" role="separator"></div>
                     <button id="ghc-coffee-btn" type="button" aria-label="Start Coffee">
                         <img src="src/ui/icons/icon_coffee.svg" alt="" aria-hidden="true">
-                        <span data-i18n-key="Coffee">Coffee</span>
+                        <span data-cafe-text="Coffee">Coffee</span>
                     </button>
                     <button id="ghc-water-btn" type="button" aria-label="Dispense Hot Water">
                         <img src="src/ui/icons/icon_water.svg" alt="" aria-hidden="true">
-                        <span data-i18n-key="Water">Water</span>
+                        <span data-cafe-text="Water">Water</span>
                     </button>
                     <button id="ghc-steam-btn" type="button" aria-label="Start Steam">
                         <img src="src/ui/icons/icon_steam.svg" alt="" aria-hidden="true">
-                        <span data-i18n-key="Steam">Steam</span>
+                        <span data-cafe-text="Steam">Steam</span>
                     </button>
                     <button id="ghc-flush-btn" type="button" aria-label="Flush">
                         <img src="src/ui/icons/icon_flush.svg" alt="" aria-hidden="true">
-                        <span data-i18n-key="Flush">Flush</span>
+                        <span data-cafe-text="Flush">Flush</span>
                     </button>
                     <button id="ghc-stop-btn" type="button" class="opacity-20" aria-label="Stop Machine">
                         <img src="src/ui/icons/icon_stop.svg" alt="" aria-hidden="true">
-                        <span data-i18n-key="Stop">Stop</span>
+                        <span data-cafe-text="Stop">Stop</span>
                     </button>
                 </aside>
             </div>
@@ -361,6 +366,21 @@
 
         </div>
     </div>
+
+    <!-- The recipes in no slot, to choose one for a slot (src/cafe/recipe-dialog.js). -->
+    <dialog id="cafe-recipe-dialog" class="modal" aria-labelledby="cafe-recipe-dialog-title">
+        <div class="modal-box cafe-dialog">
+            <h3 id="cafe-recipe-dialog-title"></h3>
+            <p id="cafe-recipe-dialog-empty" data-cafe-text="No recipes without a slot">No recipes without a slot</p>
+            <div id="cafe-recipe-list"></div>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
 
     <dialog id="profile_modal" class="modal">
         <div class="modal-box">

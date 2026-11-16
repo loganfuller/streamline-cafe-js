@@ -26,6 +26,9 @@ import { loadedAfterRead } from './strip-model.js';
  *   made while a recipe loads belongs to neither recipe for certain.
  * - `onApplied()` runs after each load is written, landed or not.
  * - `onError(error, recipe)` is told of a load that failed.
+ *
+ * Returns `load(recipe)`, `refresh()` and `busy()`, which is true from a tap
+ * until its load has finished.
  */
 export function createRecipeLoader({ apply, read, show, settle = async () => {}, onLoading = () => {}, onApplied = () => {}, onError = () => {} }) {
     let recipes = [];
@@ -88,5 +91,5 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
         run({ recipe, seq: ++taps });
     }
 
-    return { load, refresh };
+    return { load, refresh, busy: () => loading };
 }

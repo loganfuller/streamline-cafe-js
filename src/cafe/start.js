@@ -13,7 +13,7 @@ import { logger } from '../modules/logger.js';
 import { dye2Gate } from './dye2-gate.js';
 import { showGate, hideGate, checkAgain } from './gate-screen.js';
 import { initStrip, refreshStripSoon } from './strip.js';
-import { initPage, showRecipe, afterRecipeLoad, settleDialIn, showLoading } from './page.js';
+import { initPage, showRecipe, afterRecipeLoad, settleDialIn, showLoading, shotRunning } from './page.js';
 
 // A Decaid that does not answer must not hold a blank page for as long as the
 // request takes to fail.
@@ -60,7 +60,7 @@ function startPage() {
     // editor, and re-reads DYE2's records when the page regains focus.
     initDyeStrip().catch(error => logger.warn('Cafe: Streamline\'s strip module failed to start', error));
     initPage({ onProfileChange: refreshStripSoon });
-    initStrip({ onChange: showRecipe, onBeforeLoad: settleDialIn, onLoading: showLoading, onApply: afterRecipeLoad })
+    initStrip({ onChange: showRecipe, onBeforeLoad: settleDialIn, onLoading: showLoading, onApply: afterRecipeLoad, isShotRunning: shotRunning })
         .catch(error => logger.warn('Cafe: could not read the recipes', error));
     // The graph was laid out while the page was hidden.
     window.dispatchEvent(new Event('resize'));
