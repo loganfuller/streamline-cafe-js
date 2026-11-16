@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SLOT_COUNT, stripCards, loadedRecipe, loadedAfterRead, recipeName, recipeBean } from '../src/cafe/strip-model.js';
+import { SLOT_COUNT, stripCards, loadedRecipe, loadedAfterRead, stillLoaded, recipeName, recipeBean } from '../src/cafe/strip-model.js';
 
 const recipe = (id, stripSlot, over = {}) => ({
     id, stripSlot, name: `Recipe ${id}`, title: `Recipe ${id}`, beanName: `Bean ${id}`, ...over,
@@ -82,6 +82,20 @@ test('when DYE2 could not be asked, the loaded recipe stays while it is still in
     assert.equal(loadedAfterRead(undefined, rows, { id: 'gone' }), null);
     assert.equal(loadedAfterRead(undefined, rows, null), null);
     assert.equal(loadedAfterRead(undefined, null, { id: 'a' }), null);
+});
+
+test('a dial-in change is saved only onto the recipe DYE2 still has loaded', () => {
+    const a = recipe('a', 1);
+    assert.equal(stillLoaded({ kind: 'recipe', id: 'a' }, a), true);
+    assert.equal(stillLoaded({ kind: 'recipe', id: 7 }, recipe('7', 1)), true);
+    // Another recipe was loaded meanwhile, or this one was unloaded, as DYE2 does
+    // a moment after the profile changes: its save would go to the wrong place.
+    assert.equal(stillLoaded({ kind: 'recipe', id: 'b' }, a), false);
+    assert.equal(stillLoaded(null, a), false);
+    assert.equal(stillLoaded({}, a), false);
+    assert.equal(stillLoaded({ kind: 'favourite', id: 'a' }, a), false);
+    // DYE2 could not be asked: it answers for itself when the save is tried.
+    assert.equal(stillLoaded(undefined, a), true);
 });
 
 test('a card is named as Streamline\'s strip names a recipe', () => {

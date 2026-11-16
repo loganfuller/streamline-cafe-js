@@ -308,8 +308,11 @@ try {
     check('two quick taps: only the second card is filled',
         (await cards.nth(second.slot - 1).getAttribute('aria-pressed')) === 'true' && (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 1);
 
-    //    A tap loads a recipe, through Streamline's apply.
+    //    A tap loads a recipe, through Streamline's apply. Its numbers are the
+    //    ones DYE2 holds, which an earlier run's steps may have changed.
     const target = RECIPES[1];
+    const recordOf = async recipe => (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)).find(row => row.name === recipe.name);
+    const held = (await recordOf(target)).dashboardVariables;
     await cards.nth(target.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(3000);
@@ -319,7 +322,7 @@ try {
         (await page.locator('#cafe-subtitle').textContent()) === `${target.bean} · ${target.profile}`, await page.locator('#cafe-subtitle').textContent());
     check('the column is labelled "Dial-in · saved to the recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe');
     const workflow = await decaid('GET', '/workflow');
-    check('the Workflow holds the recipe', workflow.context.targetYield === target.yield && workflow.context.coffeeName === target.bean && workflow.profile.title === target.profile);
+    check('the Workflow holds the recipe', workflow.context.targetYield === held.drink && workflow.context.targetDoseWeight === held.dose && workflow.context.coffeeName === target.bean && workflow.profile.title === target.profile);
     const selection = await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
     check('DYE2 says the recipe is loaded', selection?.kind === 'recipe');
     check('Dose names the bean and its roast date', /^Sample Single Origin · roasted .*28/.test(await page.locator('#cafe-dose-desc').textContent()), await page.locator('#cafe-dose-desc').textContent());
@@ -327,7 +330,7 @@ try {
     check('Grind names the grinder', (await page.locator('#cafe-grind-desc').textContent()) === GRINDER.model);
     check('Brew names the profile', (await page.locator('#profile-name').textContent()).trim() === target.profile);
     check('the steppers show the recipe\'s numbers',
-        (await page.locator('#dose-in-value').textContent()) === `${target.dose}g` && (await page.locator('#drink-out-value').textContent()) === `${target.yield}g` && (await page.locator('#grind-value').textContent()) === target.grind);
+        (await page.locator('#dose-in-value').textContent()) === `${held.dose}g` && (await page.locator('#drink-out-value').textContent()) === `${held.drink}g` && parseFloat(await page.locator('#grind-value').textContent()) === held.grind);
     check('the skin never wrote Streamline\'s strip mode to anything else',
         (await page.evaluate(() => localStorage.getItem('streamline.dyeStripMode'))) === stripModeBefore);
     await shot(page, 'page-recipe-light');
@@ -335,9 +338,12 @@ try {
     // 7. Stepping a value, by tap and by hold, and typing one.
     await page.locator('#dose-in-plus').click();
     const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
-    check('+ steps the dose once', stepped > target.dose && stepped <= target.dose + 1, `${target.dose}g to ${stepped}g`);
+    check('+ steps the dose once', stepped > held.dose && stepped <= held.dose + 1, `${held.dose}g to ${stepped}g`);
     await page.waitForTimeout(2500);
     check('the step reaches the Workflow', Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001);
+    //    "Saved to the recipe": DYE2 saves a change only when asked, and the page asks.
+    await page.waitForTimeout(3000);
+    check('the step is saved onto the recipe in DYE2\'s records', (await recordOf(target)).dashboardVariables.dose === stepped, `record dose ${(await recordOf(target)).dashboardVariables.dose}`);
     const flushBefore = parseFloat(await page.locator('#flush-value').textContent());
     const plus = await page.locator('#flush-plus').boundingBox();
     await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
@@ -391,6 +397,30 @@ try {
     await page.locator('#expanded-chart').click();
     await page.waitForTimeout(800);
     check('a tap on it comes back', (await page.locator('#shot-settings').isVisible()) && (await page.locator('#plotly-chart').isVisible()));
+
+    //     A change made just before another recipe is tapped is written, and
+    //     saved onto the recipe it was made on, before that recipe loads. Then
+    //     back: the first recipe comes back with what was saved.
+    const other = RECIPES[3];
+    const flowStart = parseFloat(await page.locator('#steam-flow-value').textContent());
+    await page.locator(flowStart >= 2 ? '#cafe-steam-minus' : '#cafe-steam-plus').click();
+    const flowStepped = parseFloat(await page.locator('#steam-flow-value').textContent());
+    await page.locator('#flush-plus').click();
+    const flushStepped = parseFloat(await page.locator('#flush-value').textContent());
+    await cards.nth(other.slot - 1).click();
+    await page.locator('#cafe-title').filter({ hasText: other.name }).waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(5000);
+    const left = (await recordOf(target)).dashboardVariables;
+    check('a change made just before another recipe is tapped is saved onto the recipe it was made on',
+        left.steamFlowMls === flowStepped && left.flushS === flushStepped, `steam flow ${left.steamFlowMls} (stepped to ${flowStepped}), flush ${left.flushS} (stepped to ${flushStepped})`);
+    check('and the recipe then loaded keeps its own flush', (await recordOf(other)).dashboardVariables.flushS === (await decaid('GET', '/workflow')).rinseData.duration,
+        `record ${(await recordOf(other)).dashboardVariables.flushS}, Workflow ${(await decaid('GET', '/workflow')).rinseData.duration}`);
+    await cards.nth(target.slot - 1).click();
+    await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(5000);
+    check('coming back to a recipe brings back what was saved onto it',
+        parseFloat(await page.locator('#dose-in-value').textContent()) === stepped && parseFloat(await page.locator('#flush-value').textContent()) === flushStepped,
+        `dose ${await page.locator('#dose-in-value').textContent()}, flush ${await page.locator('#flush-value').textContent()}`);
 
     // 10. Settings and back; the page is still there.
     await page.locator('#settings-btn').click();

@@ -75,6 +75,8 @@ Streamline's modules keep running for the work that isn't drawing. Its history m
 - **When Decaid's plugin list can't be read,** nothing is known to be missing, so the screen is not shown for the plugin and only the setting decides. The page then starts as Streamline does against a Decaid it can't reach, and recovers the same way. The check waits five seconds for the list at most.
 - **DYE2 switched off while the page runs.** On the way back from the settings page the skin reloads, which lands on the "DYE2 is needed" screen.
 - **What the cards and the names follow.** DYE2's records and the Workflow have no push channel. The skin reads them at start-up, after a tap loads a recipe, when the page comes back into view or back from a subpage, when a plugin announces a Workflow change, and when the active profile changes. There is no timer.
+- **Saving the dial-in.** DYE2 saves a change of the Workflow onto the loaded recipe only when asked: its `record` request, which Streamline sends when a barista picks "Save changes" in its strip's menu. This page has no such menu, and every change on it is saved, so the skin asks, a moment after the last change. DYE2 then saves each value the Workflow holds otherwise than the record does, which can include a setting carried over from the recipe loaded before. Decent Sync's plugin asks the same after every change on a Machine with a Recipe loaded, so there the skin's request finds nothing left to save. The skin asks only while DYE2 still has that recipe loaded: DYE2 unloads a recipe a moment after its profile changes, and a save in between would go astray.
+- **Before another recipe loads,** a change still on its way is written and saved onto the recipe being left, and the recipe tapped is read again from DYE2's records, so what loads is what DYE2 holds, not what the card showed when it was drawn. Loads run one at a time, in the order tapped.
 - **Nine slots.** DYE2 keeps a `stripSlot` of 6 to 9 as written, though its own editor places recipes only in 1 to 5. The skin places recipes in 6 to 9 itself.
 - **Empty slots.** A long-press creates a recipe in DYE2's editor. The skin remembers the held slot and the recipe ids that exist, and on its next load places the one new recipe in that slot if the slot is still empty. With none or several new recipes it places nothing. There is no "choose an existing recipe" option yet; this may change.
 
@@ -103,7 +105,7 @@ Decaid's store has no conditional write, and DYE2 reads, waits and writes the wh
 Streamline lets a plugin add things to its page, such as a step size on a stepper or a strip during a shot.
 
 - Surfaces attached to parts the page keeps, the steppers and the screensaver, keep working, because that code is reused.
-- Surfaces attached to parts the page drops are left out until a plugin a cafe uses needs one. DYE2 and Decent Sync declare none.
+- Surfaces attached to parts the page drops are left out until a plugin a cafe uses needs one. DYE2 and Decent Sync declare none. A plugin's steam mode is one of them: it attaches to Streamline's steam mode toggle and its steam − and +, and the page has neither, because its steam row is the flow alone.
 - A cafe's own additions may come as plugins later, so this may change.
 
 ## Shots and the reference

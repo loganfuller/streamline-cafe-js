@@ -5,18 +5,20 @@
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
-import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow } from '../modules/api.js';
-import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton } from '../modules/ui.js';
-import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
+import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight } from '../modules/api.js';
+import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
+import { API_DEBOUNCE_MS, WORKFLOW_EDIT_GUARD_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { createHoldRepeat } from './hold-repeat.js';
+import { createPendingWrite } from './pending-write.js';
 import { cafeText, setText } from './text.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
 const NAMES_GAP_MS = 300;
+const SETTLE_MAX_MS = 2000; // the longest a recipe load waits for an earlier edit to land
 // Each stepper's − and + are `<name>-minus` and `<name>-plus`.
 const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'cafe-steam', 'hot-water-vol'];
 
@@ -26,8 +28,6 @@ let batch = null;       // the Bean Batch last read, kept while the Workflow sti
 let namesSeq = 0;
 let namesTimer = null;
 let liveTimer = null;
-let steamFlowPending = null; // a flow stepped to and not yet written
-let steamFlowTimer = null;
 
 const el = id => document.getElementById(id);
 
@@ -111,19 +111,41 @@ function refreshNamesSoon() {
 // milk probe unplugged and plugged back in. So those buttons are not on the
 // page, and these write the flow the way Streamline's numpad does, whatever the
 // mode.
+const steamFlow = createPendingWrite({
+    delayMs: API_DEBOUNCE_MS,
+    write(flow) {
+        window.app?.saveContextToActiveProfile?.({ targetSteamFlow: flow });
+        return pushSteamSetting('flow', setTargetSteamFlow(flow)); // reports its own failure
+    },
+});
+
 function stepSteam(direction, button) {
     if (isAutoSteamMode()) return; // Streamline's pitcher mode owns the steam settings
     flashPlusMinusButton(button);
+    // From the flow stepped to and not yet written, when there is one: a re-read
+    // of the Workflow may have painted the older value back meanwhile.
     const shown = parseFloat(el('steam-flow-value')?.textContent);
-    steamFlowPending = stepSteamFlow(steamFlowPending ?? shown, direction);
-    updateSteamDisplay({ targetSteamFlow: steamFlowPending });
-    clearTimeout(steamFlowTimer);
-    steamFlowTimer = setTimeout(() => {
-        const flow = steamFlowPending;
-        steamFlowPending = null;
-        pushSteamSetting('flow', setTargetSteamFlow(flow));
-        window.app?.saveContextToActiveProfile?.({ targetSteamFlow: flow });
-    }, API_DEBOUNCE_MS);
+    const flow = stepSteamFlow(steamFlow.pending() ?? shown, direction);
+    updateSteamDisplay({ targetSteamFlow: flow });
+    steamFlow.set(flow);
+}
+
+// ── Before another recipe is loaded ──────────────────────────────────────────
+
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Resolves once dial-in edits made before now have reached the Workflow. A
+ * stepper writes a moment after its last tap; written after a recipe load
+ * instead of before it, that edit would change the recipe just loaded.
+ */
+export async function settleDialIn() {
+    await steamFlow.flush();
+    // Streamline's own steppers: wait out their debounce and any write on the wire.
+    const giveUpAt = Date.now() + SETTLE_MAX_MS;
+    while ((msSinceTileInteraction() < WORKFLOW_EDIT_GUARD_MS || hasWorkflowWriteInFlight()) && Date.now() < giveUpAt) {
+        await pause(50);
+    }
 }
 
 // ── During a shot ────────────────────────────────────────────────────────────
@@ -188,7 +210,16 @@ function wireHoldRepeat() {
         for (const end of ['minus', 'plus']) {
             const button = el(`${name}-${end}`);
             if (!button) continue;
-            const hold = createHoldRepeat({ fire: () => { if (!button.disabled) button.click(); } });
+            // A repeat's step is a click the page makes, which Streamline's lock on
+            // a row during a shot (pointer-events: none) would not stop: so each one
+            // checks the button can still be pressed, and the repeat ends when not.
+            const hold = createHoldRepeat({
+                fire() {
+                    if (button.disabled || getComputedStyle(button).pointerEvents === 'none') return false;
+                    button.click();
+                    return true;
+                },
+            });
             // After a repeat, lifting the finger must not step once more.
             let swallowTap = false;
             const release = () => { if (hold.release()) swallowTap = true; };

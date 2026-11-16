@@ -5,18 +5,25 @@
 // Streamline's: `applyRecipe` writes the Workflow and tells DYE2 which recipe is
 // loaded, and which recipe is loaded is then read back from DYE2, as
 // Streamline's strip reads it. recipe-loader.js keeps the two in order.
-import { getDye2KvArray, callPluginEndpoint } from '../modules/api.js';
+//
+// A dial-in change is saved onto the loaded recipe by DYE2, and only when it is
+// asked: its `record` request, which Streamline sends from "Save changes" in
+// its strip's long-press menu. This page has no such menu and says the dial-in
+// is saved, so it asks, a moment after the last change.
+import { getDye2KvArray, callPluginEndpoint, onWorkflowUpdated } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
-import { stripCards, recipeName } from './strip-model.js';
+import { stripCards, stillLoaded, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
+import { createPendingWrite } from './pending-write.js';
 import { cafeText } from './text.js';
 
 const RECIPES_KEY = 'recipes';
 const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive together
+const SAVE_DELAY_MS = 1500; // after the last change, so a run of steps is one save
 
 let cards = stripCards([], null); // as last drawn
 let loader = null;
@@ -30,6 +37,23 @@ async function readSelection() {
         return undefined;
     }
 }
+
+// Ask DYE2 to save the dial-in now on the machine onto the recipe it has loaded.
+// DYE2 saves each value the Workflow holds otherwise than the record does, into
+// whichever recipe it has loaded when asked, so the skin first checks that is
+// still the recipe the change was made on.
+async function saveDialIn(recipe) {
+    try {
+        if (!stillLoaded(await readSelection(), recipe)) return;
+        const answer = await callPluginEndpoint(DYE2_PLUGIN_ID, 'record', null, 'POST');
+        // The record changed: the cards' copy of it is now behind.
+        if (answer && answer.saved) refreshStripSoon();
+    } catch (error) {
+        logger.warn('Cafe: could not save the dial-in onto the recipe', error);
+        showToast(`${cafeText('Could not save to')} ${recipeName(recipe)}`, 2400, 'error');
+    }
+}
+const pendingSave = createPendingWrite({ write: saveDialIn, delayMs: SAVE_DELAY_MS });
 
 async function readDye2() {
     const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);
@@ -76,13 +100,20 @@ export function refreshStripSoon() {
 /**
  * Draw the strip and keep it in step with DYE2's records. Called once, when the
  * page starts. `onChange` is told the loaded recipe, or null, each time the
- * strip is drawn; `onApply` runs once a tap's load has been written, whether or
- * not it landed.
+ * strip is drawn; `onBeforeLoad` resolves once edits made before a tap have been
+ * written; `onApply` runs once a tap's load has been written, whether or not it
+ * landed.
  */
-export function initStrip({ onChange = () => {}, onApply = () => {} }) {
+export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onApply = () => {} }) {
     loader = createRecipeLoader({
         apply: applyRecipe,
         read: readDye2,
+        // Before another recipe is loaded: let an edit still on its way reach the
+        // Workflow, then save it onto the recipe being left.
+        async settle() {
+            await onBeforeLoad();
+            await pendingSave.flush();
+        },
         show(recipes, loaded) {
             cards = stripCards(recipes, loaded);
             render();
@@ -95,6 +126,12 @@ export function initStrip({ onChange = () => {}, onApply = () => {} }) {
         },
     });
     render();
+    // Every Workflow write the skin makes while a recipe is loaded is a dial-in
+    // change to save, but for the load's own write.
+    onWorkflowUpdated(() => {
+        const recipe = loader.editing();
+        if (recipe) pendingSave.set(recipe);
+    });
     document.getElementById('cafe-strip')?.addEventListener('click', event => {
         const button = event.target.closest('button[data-slot]');
         if (!button) return;

@@ -10,7 +10,8 @@ export const HOLD_EVERY_MS = 110;
 /**
  * One press at a time. `press()` starts the wait, `release()` ends it and
  * answers whether any repeat fired, which is when the caller must swallow the
- * tap's own step.
+ * tap's own step. `fire()` answering false ends the repeat: the control it
+ * steps is no longer available.
  */
 export function createHoldRepeat({ fire, setTimer = setTimeout, clearTimer = clearTimeout,
     delayMs = HOLD_DELAY_MS, everyMs = HOLD_EVERY_MS }) {
@@ -18,8 +19,9 @@ export function createHoldRepeat({ fire, setTimer = setTimeout, clearTimer = cle
     let repeated = false;
 
     const tick = () => {
+        timer = null;
+        if (fire() === false) return;
         repeated = true;
-        fire();
         timer = setTimer(tick, everyMs);
     };
 

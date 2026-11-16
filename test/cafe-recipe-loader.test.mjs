@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 
 import { createRecipeLoader } from '../src/cafe/recipe-loader.js';
 
-const A = { id: 'a', stripSlot: 1, title: 'A' };
-const B = { id: 'b', stripSlot: 2, title: 'B' };
-const C = { id: 'c', stripSlot: 3, title: 'C' };
+const A = { id: 'a', stripSlot: 1, title: 'A', dose: 18 };
+const B = { id: 'b', stripSlot: 2, title: 'B', dose: 20 };
+const C = { id: 'c', stripSlot: 3, title: 'C', dose: 16 };
 
 // A promise the test settles by hand.
 function deferred() {
@@ -16,16 +16,21 @@ function deferred() {
     const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
     return { promise, resolve, reject };
 }
-const settle = () => new Promise(resolve => setImmediate(resolve));
+// Let everything that can run, run.
+const idle = () => new Promise(resolve => setImmediate(resolve));
 
 // A stand-in for Streamline's apply and for DYE2: an apply writes the Workflow
 // when the test lets it finish, and DYE2 then says that recipe is loaded.
 function build({ rows = [A, B, C], selection = null } = {}) {
-    const world = { rows, selection, written: [], applies: [], shown: [], errors: [], applied: 0, reads: 0, readGate: null };
+    const world = {
+        rows, selection, written: [], applies: [], shown: [], errors: [], log: [],
+        applied: 0, reads: 0, readGates: [], settleGate: null,
+    };
     const loader = createRecipeLoader({
         apply(recipe) {
             const gate = deferred();
             world.applies.push({ recipe, ...gate });
+            world.log.push(`apply ${recipe.id}`);
             return gate.promise.then(() => {
                 world.written.push(recipe.id);
                 world.selection = { kind: 'recipe', id: recipe.id };
@@ -34,8 +39,13 @@ function build({ rows = [A, B, C], selection = null } = {}) {
         async read() {
             world.reads += 1;
             const answer = { rows: world.rows, selection: world.selection };
-            if (world.readGate) await world.readGate.promise;
+            const gate = world.readGates.shift();
+            if (gate) await gate.promise;
             return answer;
+        },
+        async settle() {
+            world.log.push('settle');
+            if (world.settleGate) await world.settleGate.promise;
         },
         show: (recipes, loaded) => world.shown.push(loaded ? loaded.id : null),
         onApplied: () => { world.applied += 1; },
@@ -52,9 +62,10 @@ test('a tap shows the recipe at once and loads it through the apply', async () =
 
     loader.load(A);
     assert.equal(world.last(), 'a', 'shown before the apply finishes');
+    await idle();
     assert.equal(world.applies.length, 1);
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.deepEqual(world.written, ['a']);
     assert.equal(world.last(), 'a');
     assert.equal(world.applied, 1);
@@ -66,15 +77,16 @@ test('two taps in quick succession are written in tap order, and the last one wi
 
     loader.load(A);
     loader.load(B);
+    await idle();
     assert.equal(world.applies.length, 1, 'B waits for A: the two applies never overlap');
     assert.equal(world.last(), 'b');
 
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.equal(world.applies.length, 2);
     assert.equal(world.last(), 'b', 'A finishing does not move the highlight back');
     world.applies[1].resolve();
-    await settle();
+    await idle();
 
     assert.deepEqual(world.written, ['a', 'b'], 'the machine ends on the recipe the page names');
     assert.equal(world.selection.id, 'b');
@@ -88,13 +100,64 @@ test('a tap that is overtaken while waiting is never written', async () => {
     loader.load(A);
     loader.load(B);
     loader.load(C);
+    await idle();
     world.applies[0].resolve();
-    await settle();
+    await idle();
     world.applies[1].resolve();
-    await settle();
+    await idle();
 
     assert.deepEqual(world.written, ['a', 'c']);
     assert.equal(world.last(), 'c');
+});
+
+test('edits made before the tap are settled before the load is written', async () => {
+    const { loader, world } = build();
+    await loader.refresh();
+    world.settleGate = deferred();
+
+    loader.load(A);
+    await idle();
+    assert.deepEqual(world.log, ['settle'], 'nothing is applied while an earlier edit is still on its way');
+    world.settleGate.resolve();
+    await idle();
+    assert.deepEqual(world.log, ['settle', 'apply a']);
+});
+
+test('what is loaded is the record DYE2 holds now, not the one the card was drawn from', async () => {
+    const { loader, world } = build();
+    await loader.refresh();
+
+    // The recipe was edited elsewhere after the cards were drawn.
+    const edited = { ...A, dose: 19 };
+    world.rows = [edited, B, C];
+    loader.load(A);
+    await idle();
+    assert.equal(world.applies[0].recipe, edited);
+    world.applies[0].resolve();
+    await idle();
+    assert.equal(world.last(), 'a');
+});
+
+test('a recipe that has gone from DYE2 is not loaded', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'b' } });
+    await loader.refresh();
+
+    world.rows = [B, C];
+    loader.load(A);
+    await idle();
+    assert.equal(world.applies.length, 0);
+    assert.deepEqual(world.errors, ['a']);
+    assert.equal(world.last(), 'b', 'the recipe that was loaded still is');
+});
+
+test('with DYE2\'s records unreadable, the card\'s own copy is loaded', async () => {
+    const { loader, world } = build();
+    await loader.refresh();
+    world.rows = null;
+
+    loader.load(A);
+    await idle();
+    assert.equal(world.applies[0].recipe, A);
 });
 
 test('the loaded card takes no tap', async () => {
@@ -103,6 +166,7 @@ test('the loaded card takes no tap', async () => {
     assert.equal(world.last(), 'a');
 
     loader.load(A);
+    await idle();
     assert.equal(world.applies.length, 0);
 });
 
@@ -112,8 +176,9 @@ test('a load that fails goes back to the recipe that was loaded, and says so', a
 
     loader.load(B);
     assert.equal(world.last(), 'b');
+    await idle();
     world.applies[0].reject(new Error('Decaid did not answer'));
-    await settle();
+    await idle();
 
     assert.deepEqual(world.errors, ['b']);
     assert.deepEqual(world.written, []);
@@ -128,8 +193,9 @@ test('a load that fails with DYE2 unreachable still goes back', async () => {
     world.rows = null;
 
     loader.load(B);
+    await idle();
     world.applies[0].reject(new Error('Decaid did not answer'));
-    await settle();
+    await idle();
     assert.equal(world.last(), 'a');
 });
 
@@ -138,9 +204,10 @@ test('a load that lands stays shown when DYE2 cannot be asked afterwards', async
     await loader.refresh();
 
     loader.load(B);
+    await idle();
     world.applies[0].promise.then(() => { world.selection = undefined; });
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.equal(world.last(), 'b');
 });
 
@@ -149,10 +216,11 @@ test('DYE2\'s answer decides after a load, even when it disagrees', async () => 
     await loader.refresh();
 
     loader.load(B);
+    await idle();
     // The apply wrote the Workflow, but DYE2 did not take the recipe as loaded.
     world.applies[0].promise.then(() => { world.selection = null; });
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.equal(world.last(), null);
 });
 
@@ -160,30 +228,57 @@ test('a read begun before a tap cannot move the highlight off the tapped card', 
     const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
     await loader.refresh();
 
-    world.readGate = deferred();
+    const gate = deferred();
+    world.readGates.push(gate);
     const stale = loader.refresh(); // answers "a is loaded"
     loader.load(B);
-    world.readGate.resolve();
-    world.readGate = null;
+    gate.resolve();
     await stale;
     assert.equal(world.last(), 'b');
 
+    await idle();
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.equal(world.last(), 'b');
 });
 
-test('no read is made while a load runs', async () => {
+test('a refresh asked for while a load runs is dropped', async () => {
     const { loader, world } = build();
     await loader.refresh();
-    const reads = world.reads;
 
     loader.load(A);
+    await idle(); // the load has settled and read; its apply is under way
+    const reads = world.reads;
     await loader.refresh();
     assert.equal(world.reads, reads, 'the load\'s own read follows it');
     world.applies[0].resolve();
-    await settle();
+    await idle();
     assert.equal(world.reads, reads + 1);
+    assert.equal(world.last(), 'a');
+});
+
+test('a slow answer never paints over a newer one', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
+    await loader.refresh();
+
+    const slow = deferred();
+    world.readGates.push(slow);
+    const first = loader.refresh(); // captures "a is loaded", then stalls
+    world.selection = { kind: 'recipe', id: 'b' }; // changed elsewhere
+    await loader.refresh(); // a later read, which answers at once
+    assert.equal(world.last(), 'b');
+
+    slow.resolve();
+    await first;
+    assert.equal(world.last(), 'b', 'the stale answer is dropped');
+
+    // The recipe that really is loaded still takes no tap, and the other one does.
+    loader.load(B);
+    await idle();
+    assert.equal(world.applies.length, 0);
+    loader.load(A);
+    await idle();
+    assert.equal(world.applies.length, 1);
 });
 
 test('a failed read keeps the cards and the loaded recipe', async () => {
@@ -208,4 +303,28 @@ test('a recipe unloaded or removed elsewhere stops being shown as loaded', async
     world.rows = [A, C];
     await loader.refresh();
     assert.equal(world.last(), null);
+});
+
+test('a dial-in edit belongs to the loaded recipe, and a load\'s own write to none', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
+    assert.equal(loader.editing(), null, 'nothing is known to be loaded before the first read');
+    await loader.refresh();
+    assert.equal(loader.editing().id, 'a');
+
+    world.settleGate = deferred();
+    loader.load(B);
+    await idle();
+    assert.equal(loader.editing().id, 'a', 'an edit still landing belongs to the recipe being left');
+    world.settleGate.resolve();
+    await idle();
+    assert.equal(loader.editing(), null, 'the load is being written: that write is not an edit');
+    world.applies[0].resolve();
+    await idle();
+    assert.equal(loader.editing().id, 'b');
+});
+
+test('with no recipe loaded, an edit belongs to none', async () => {
+    const { loader } = build();
+    await loader.refresh();
+    assert.equal(loader.editing(), null);
 });

@@ -81,6 +81,32 @@ test('a second press without a release does not double the repeat', () => {
     assert.equal(clock.pending(), 0);
 });
 
+test('the repeat ends when the control stops being available', () => {
+    const clock = fakeClock();
+    let fired = 0;
+    let available = true;
+    const hold = createHoldRepeat({
+        fire: () => { if (!available) return false; fired += 1; return true; },
+        setTimer: clock.setTimer, clearTimer: clock.clearTimer, delayMs: 400, everyMs: 100,
+    });
+    hold.press();
+    clock.advance(600);
+    assert.equal(fired, 3);
+    available = false; // a shot started: Streamline locked the row
+    clock.advance(1000);
+    assert.equal(fired, 3);
+    assert.equal(clock.pending(), 0, 'no timer is left running');
+    assert.equal(hold.release(), true, 'the steps that did fire still swallow the release\'s tap');
+});
+
+test('a control unavailable from the start never repeats', () => {
+    const clock = fakeClock();
+    const hold = createHoldRepeat({ fire: () => false, setTimer: clock.setTimer, clearTimer: clock.clearTimer, delayMs: 400, everyMs: 100 });
+    hold.press();
+    clock.advance(1000);
+    assert.equal(hold.release(), false);
+});
+
 test('a release with no press is harmless', () => {
     const { hold } = build();
     assert.equal(hold.release(), false);
