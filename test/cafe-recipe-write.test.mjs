@@ -203,6 +203,29 @@ test('a hidden recipe naming the slot does not hold it', async () => {
     assert.equal(world.get('a').stripSlot, null);
 });
 
+test('a recipe chosen from the list, and put in a slot by someone else meanwhile, is not moved', async () => {
+    const world = store([row('a', null), row('b', 9)]);
+    assert.deepEqual(await world.writer.placeInSlot('b', 1, { holder: null, unplaced: true }), { ok: false, reason: 'placed' });
+    assert.equal(world.writes.length, 0);
+    assert.equal(world.get('b').stripSlot, 9);
+});
+
+test('a recipe hidden from the strip, or naming no slot, counts as in no slot', async () => {
+    const world = store([row('a', 9, { showOnStreamlineDashboard: false }), row('b', null)]);
+    assert.equal((await world.writer.placeInSlot('a', 1, { holder: null, unplaced: true })).ok, true);
+    assert.equal((await world.writer.placeInSlot('b', 2, { holder: null, unplaced: true })).ok, true);
+    assert.equal(world.get('a').stripSlot, 1);
+    assert.equal(world.get('b').stripSlot, 2);
+});
+
+test('a chosen recipe whose first write landed is confirmed on the retry, not refused as placed', async () => {
+    // The confirming read fails, so the writer looks again and finds its own write.
+    const world = store([row('a', null)], { failRead: n => n === 2 });
+    const result = await world.writer.placeInSlot('a', 6, { holder: null, unplaced: true });
+    assert.equal(result.ok, true);
+    assert.equal(world.writes.length, 1);
+});
+
 test('a recipe is taken out of its slot, and nothing else about it changes', async () => {
     const world = store([row('a', 7, { decentSyncId: 'ds-a', dashboardVariables: { dose: 18 } }), row('b', 2)]);
     const result = await world.writer.removeFromSlot('a');

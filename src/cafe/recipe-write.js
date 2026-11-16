@@ -52,6 +52,7 @@ function holdsFields(rows, id, fields) {
  * - `unreadable`: the records could not be read, so nothing was written;
  * - `gone`: the recipe is no longer in DYE2;
  * - `taken`: the slot holds another recipe than the caller expected;
+ * - `placed`: the recipe is in another slot by now (`placeInSlot` with `unplaced`);
  * - `unconfirmed`: written twice, and the change was not there either time.
  */
 export function createRecipeWriter({ read, write }) {
@@ -81,16 +82,19 @@ export function createRecipeWriter({ read, write }) {
 
     /**
      * Put a recipe in a Recipe Slot, shown on the strip. Whatever recipe was in
-     * the slot loses it. `holder` is the recipe the caller saw there, by id, or
-     * null for an empty slot: when given, a slot that holds another recipe by
-     * the time of the write is left alone.
+     * the slot loses it. Both options are judged on the records as just read:
+     *
+     * - `holder` is the recipe the caller saw in the slot, by id, or null for an
+     *   empty slot. A slot that holds another recipe by now is left alone.
+     * - `unplaced` says the caller saw the recipe in no slot. One that is in
+     *   another slot by now is left there, and not moved out of it unseen.
      */
-    function placeInSlot(id, slot, { holder } = {}) {
-        const other = rows => rows.find(r => !sameId(r, id) && holdsSlot(r, slot));
+    function placeInSlot(id, slot, { holder, unplaced = false } = {}) {
         return setFields(id, { stripSlot: slot, showOnStreamlineDashboard: true }, {
-            unless(rows) {
+            unless(rows, row) {
+                if (unplaced && row.stripSlot != null && row.stripSlot !== slot && row.showOnStreamlineDashboard !== false) return 'placed';
                 if (holder === undefined) return null;
-                const now = other(rows);
+                const now = rows.find(r => !sameId(r, id) && holdsSlot(r, slot));
                 return now && (holder === null || !sameId(now, holder)) ? 'taken' : null;
             },
         });

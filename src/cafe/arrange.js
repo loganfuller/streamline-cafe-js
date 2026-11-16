@@ -54,9 +54,12 @@ export async function makeRecipeIn(slot, holderId) {
     failed(cafeText('Could not place {name} in slot {n}', { name: made.name || String(made.id), n: slot }));
 }
 
-/** Put a recipe that is in no slot into `slot`. Nothing is loaded. */
+/**
+ * Put a recipe that is in no slot into `slot`. Nothing is loaded. One that
+ * another tablet has put in a slot since the list was drawn is left there.
+ */
 export async function chooseRecipeFor(slot, recipe, holderId) {
-    const result = await placeInSlot(recipe.id, slot, { holder: holderId });
+    const result = await placeInSlot(recipe.id, slot, { holder: holderId, unplaced: true });
     if (!result.ok) {
         logger.warn(`Cafe: the recipe was not placed in slot ${slot} (${result.reason})`);
         failed(cafeText('Could not place {name} in slot {n}', { name: recipeName(recipe), n: slot }));

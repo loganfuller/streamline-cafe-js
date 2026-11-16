@@ -55,11 +55,15 @@ async function readDye2() {
 
 // The strip is arranged one action at a time, and not while a recipe loads or a
 // shot runs: making a recipe writes the Workflow, and the Workflow is left
-// alone during a shot.
+// alone during a shot. While an action runs no card loads and the dial-in rows
+// take no taps, as while a recipe loads: a load or a step made then could land
+// before or after what DYE2 reads to make a recipe, or to say which is loaded.
 let arranging = false;
 let shotRunning = () => false;
 let afterArranging = () => {};
-const mayArrange = () => !arranging && !loader.busy() && !shotRunning();
+let keepStill = () => {};
+const clear = () => !loader.busy() && !shotRunning();
+const mayArrange = () => !arranging && clear();
 
 function openMenu(button, card) {
     if (!mayArrange()) return;
@@ -72,18 +76,20 @@ function openMenu(button, card) {
 async function arrange(action, card) {
     if (!mayArrange()) return;
     arranging = true;
+    keepStill(true);
     const slot = Number(card.slot);
     const holderId = card.recipe ? card.recipe.id : null;
     try {
         if (action === 'new') {
-            // A dial-in change still on its way belongs in the new recipe.
+            // A dial-in change still on its way belongs in the new recipe. A shot
+            // may have started while it was written: nothing is made then.
             const settled = await settleEdits().then(() => true, () => false);
-            if (settled) await makeRecipeIn(slot, holderId);
-            else showToast(cafeText('Could not make a new recipe'), 4000, 'error');
+            if (!settled) showToast(cafeText('Could not make a new recipe'), 4000, 'error');
+            else if (clear()) await makeRecipeIn(slot, holderId);
         } else if (action === 'choose') {
             const { rows } = await readDye2();
             const recipe = await chooseRecipe(slot, rows || []);
-            if (recipe && !loader.busy() && !shotRunning()) await chooseRecipeFor(slot, recipe, holderId);
+            if (recipe && clear()) await chooseRecipeFor(slot, recipe, holderId);
         } else if (action === 'remove') {
             await removeRecipe(card.recipe);
         }
@@ -91,6 +97,7 @@ async function arrange(action, card) {
         logger.error('Cafe: could not arrange the strip', error);
     } finally {
         arranging = false;
+        keepStill(false);
     }
     // DYE2's records, and which recipe it says is loaded, decide what is drawn.
     afterArranging();
@@ -125,7 +132,7 @@ function render() {
         button.className = 'cafe-card no-select has-context-menu';
         button.setAttribute('aria-pressed', String(card.loaded));
         button.append(line('cafe-card-name', card.name), line('cafe-card-bean', card.bean));
-        setupPressAndHold(button, () => loader.load(card.recipe), () => openMenu(button, card));
+        setupPressAndHold(button, () => { if (!arranging) loader.load(card.recipe); }, () => openMenu(button, card));
         return button;
     }));
 }
@@ -154,6 +161,7 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
     settleEdits = () => within(SETTLE_MAX_MS, onBeforeLoad());
     shotRunning = isShotRunning;
     afterArranging = onApply;
+    keepStill = onLoading;
     loader = createRecipeLoader({
         apply: applyRecipe,
         read: readDye2,
