@@ -1,3 +1,5 @@
+> **Streamline Cafe** is a fork of [Streamline.js](https://github.com/decentespresso/streamline-js) with a recipe-first main page for cafes. Its design is in [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md). The manual below is Streamline's, and everything in it but the main page applies here. Changed from Streamline since 2026-11-15, under the same GPL-3.0 licence.
+
 # Decaid and Streamline.js — User Manual
 
 **Applies to:** Decaid (the app formerly called decent.app) and the Streamline.js skin, v0.2.27

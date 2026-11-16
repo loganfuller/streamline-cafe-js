@@ -1873,7 +1873,7 @@ export function renderQuickstartGuideSettings() {
                         <div class="flex flex-col font-['Inter:Bold',sans-serif] font-bold justify-center leading-[0] not-italic relative text-[var(--mimoja-blue-v2)] text-[30px]">
                             <p class="leading-[1.2]" data-i18n-key="Streamline User Manual">Streamline User Manual</p>
                         </div>
-                        <a href="https://github.com/decentespresso/streamline-js/blob/main/README.md" class="bg-[var(--button-primary-bg)] h-[72px] px-[48px] rounded-[72px] text-white text-[24px] font-bold flex items-center justify-center">
+                        <a href="https://github.com/loganfuller/streamline-cafe-js/blob/main/README.md" class="bg-[var(--button-primary-bg)] h-[72px] px-[48px] rounded-[72px] text-white text-[24px] font-bold flex items-center justify-center">
                             View
                         </a>
                     </div>
@@ -6291,7 +6291,7 @@ export function renderSensorCalSettings() {
 function skinRepoSlug(s) {
     const m = (s?.reaMetadata?.sourceUrl || '').match(/github_release:([^@\s]+)/i);
     if (m) return m[1];
-    if (s?.id === SKIN_ID) return 'decentespresso/streamline-js';
+    if (s?.id === SKIN_ID) return 'loganfuller/streamline-cafe-js';
     return null;
 }
 

@@ -31,13 +31,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # Streamline Cafe: publish the built skin only, the files a release ships,
+      # not the whole repository.
+      - name: Stage the skin
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -r index.html skin-manifest.json src _site/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: './_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
