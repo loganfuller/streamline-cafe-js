@@ -133,8 +133,10 @@ function refreshSoon() {
 function settleNext() {
     clearTimeout(settleTimer);
     if (settleStep >= SETTLE_GAPS_MS.length) {
+        // The last look failed too. The graph goes back to the Shot the legend
+        // names, so Make reference never acts on a Shot that is not the one drawn.
         settling = false;
-        paint();
+        draw();
         return;
     }
     settleTimer = setTimeout(() => refresh(), SETTLE_GAPS_MS[settleStep]);

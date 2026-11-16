@@ -49,7 +49,11 @@ test('an Unfinished Shot never reached pouring and never read 1 g', () => {
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion'), sample(3, 'pouring')] }), false, 'it poured');
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: 1 })] }), false, 'stopped on weight inside preinfusion: it ran whole');
     assert.equal(isUnfinished({ measurements: [sample(0, 'preparingForShot', { weight: 30 }), sample(1, 'preinfusion', { weight: 0.2 })] }), true, 'a cup on the scale during Preheat is not a first drip');
-    assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 5 } }] }), false, 'a sample with no machine reading ends the Preheat');
+    // As Decent Sync reads a record: a sample with no machine reading ends the
+    // Preheat, and its own weight is not counted, having no time on the machine's clock.
+    assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 5 } }] }), true, 'a weight on a sample the machine did not time is no reading');
+    assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 0 } }, sample(3, 'preparingForShot', { weight: 5 })] }), false, 'a sample with no machine reading ends the Preheat');
+    assert.equal(isUnfinished({ measurements: [...preheat, { machine: { state: { substate: 'preinfusion' } }, scale: { weight: 5 } }] }), true, 'nor is one whose machine reading has no time');
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: '12' })] }), true, 'a weight that is not a number is no reading');
 });
 

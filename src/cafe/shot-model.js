@@ -36,6 +36,11 @@ export function shotsWithRecipe(rows, recipeId) {
  * Preheat, the leading samples in `preparingForShot`, has a weight of 1 g or
  * more. Both are needed: a shot stopped on weight inside a long preinfusion
  * never reports pouring, though it ran whole.
+ *
+ * The details are Decent Sync's too (`timedSamples` in its protocol package),
+ * so a tablet and its server call the same Shots Unfinished: the Preheat ends
+ * at the first sample whose machine reading is in another substate, or has
+ * none, and a weight counts only on a sample the machine timed.
  */
 export function isUnfinished(shot) {
     const samples = Array.isArray(shot?.measurements) ? shot.measurements : [];
@@ -44,8 +49,9 @@ export function isUnfinished(shot) {
         const substate = sample?.machine?.state?.substate;
         if (preheat && substate !== 'preparingForShot') preheat = false;
         if (substate === 'pouring') return false;
+        if (preheat || Number.isNaN(new Date(sample?.machine?.timestamp).getTime())) continue;
         const weight = sample?.scale?.weight;
-        if (!preheat && typeof weight === 'number' && weight >= FIRST_DRIP_GRAMS) return false;
+        if (typeof weight === 'number' && weight >= FIRST_DRIP_GRAMS) return false;
     }
     return true;
 }
