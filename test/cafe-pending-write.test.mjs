@@ -69,10 +69,59 @@ test('a falsy value is still a value', async () => {
     assert.deepEqual(written, [0]);
 });
 
-test('a write that fails does not reject the flush, and leaves nothing waiting', async () => {
-    const { pending } = build({ write: () => Promise.reject(new Error('Decaid did not answer')) });
+test('a write that fails does not reject the flush, and its value stays waiting', async () => {
+    let tries = 0;
+    const { pending } = build({ write: () => { tries += 1; return Promise.reject(new Error('Decaid did not answer')); } });
     pending.set(1);
     await pending.flush();
+    assert.equal(tries, 1, 'a value that fails during a flush is not tried again in it');
+    assert.equal(pending.pending(), 1, 'it waits for the next try');
+});
+
+test('a value whose write failed on the timer is tried again by the next flush', async () => {
+    const outcomes = [false, true];
+    const tried = [];
+    const { pending, elapse, armed } = build({
+        write: value => { tried.push(value); return outcomes.shift() ? Promise.resolve() : Promise.reject(new Error('503')); },
+    });
+    pending.set('A');
+    await elapse();
+    assert.deepEqual(tried, ['A']);
+    assert.equal(pending.pending(), 'A');
+    assert.equal(armed(), false, 'no timer hammers a request that is failing');
+
+    await pending.flush(); // as before a recipe load
+    assert.deepEqual(tried, ['A', 'A']);
+    assert.equal(pending.pending(), undefined, 'written at the second try');
+});
+
+test('a newer value replaces one whose write failed', async () => {
+    const tried = [];
+    const { pending, elapse } = build({ write: value => { tried.push(value); return value === 1 ? Promise.reject(new Error('503')) : Promise.resolve(); } });
+    pending.set(1);
+    await elapse();
+    pending.set(2);
+    assert.equal(pending.pending(), 2);
+    await elapse();
+    assert.deepEqual(tried, [1, 2]);
+    assert.equal(pending.pending(), undefined);
+});
+
+test('a change made during a write that fails is still written', async () => {
+    const finishers = [];
+    const tried = [];
+    const { pending } = build({
+        write: value => new Promise((resolve, reject) => { tried.push(value); finishers.push(value === 1 ? () => reject(new Error('503')) : resolve); }),
+    });
+    pending.set(1);
+    const flushed = pending.flush();
+    await new Promise(resolve => setImmediate(resolve));
+    pending.set(2);
+    finishers[0]();
+    await new Promise(resolve => setImmediate(resolve));
+    finishers[1]();
+    await flushed;
+    assert.deepEqual(tried, [1, 2], 'the newer value is written; the failed one it replaced is not retried');
     assert.equal(pending.pending(), undefined);
 });
 

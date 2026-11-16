@@ -24,6 +24,7 @@ import { cafeText } from './text.js';
 const RECIPES_KEY = 'recipes';
 const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive together
 const SAVE_DELAY_MS = 1500; // after the last change, so a run of steps is one save
+const SETTLE_MAX_MS = 5000; // the longest a tap waits on earlier edits before its load is called off
 
 let cards = stripCards([], null); // as last drawn
 let loader = null;
@@ -49,9 +50,21 @@ async function saveDialIn(recipe) {
         // The record changed: the cards' copy of it is now behind.
         if (answer && answer.saved) refreshStripSoon();
     } catch (error) {
+        // Said here, and left with the pending write to try again: at the next
+        // change, or once more before another recipe loads.
         logger.warn('Cafe: could not save the dial-in onto the recipe', error);
         showToast(`${cafeText('Could not save to')} ${recipeName(recipe)}`, 2400, 'error');
+        throw error;
     }
+}
+
+// The promise, or a rejection once `ms` have passed, whichever is first.
+function within(ms, promise) {
+    let timer;
+    const late = new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('An earlier change has not reached the machine yet.')), ms);
+    });
+    return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 const pendingSave = createPendingWrite({ write: saveDialIn, delayMs: SAVE_DELAY_MS });
 
@@ -109,11 +122,15 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
         apply: applyRecipe,
         read: readDye2,
         // Before another recipe is loaded: let an edit still on its way reach the
-        // Workflow, then save it onto the recipe being left.
-        async settle() {
+        // Workflow, then save it onto the recipe being left. A request that stalls
+        // calls the load off instead of holding the page: whatever is still on the
+        // wire then lands on the recipe that stays loaded. A save that fails is
+        // tried once more here, and does not stop the load: it has said so, and a
+        // barista who cannot change recipe is worse off than one who lost a tweak.
+        settle: () => within(SETTLE_MAX_MS, (async () => {
             await onBeforeLoad();
             await pendingSave.flush();
-        },
+        })()),
         show(recipes, loaded) {
             cards = stripCards(recipes, loaded);
             render();

@@ -350,9 +350,15 @@ button.cafe-card {
 }
 
 /* While a recipe loads, the rows take no taps: a step made then could be written
-   before or after the load. A held − or + stops with them. */
+   before or after the load. A held − or + stops with them. Everything inside a
+   row too, and over an inline style: a plugin's mode buttons set their own
+   pointer-events. */
+#main-page.cafe-loading .cafe-row,
+#main-page.cafe-loading .cafe-row * {
+    pointer-events: none !important;
+}
+
 #main-page.cafe-loading .cafe-row {
-    pointer-events: none;
     opacity: 0.6;
     transition: opacity 0.15s ease;
 }

@@ -7,7 +7,7 @@
 // what it needs from where they already write it.
 import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight } from '../modules/api.js';
 import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
-import { API_DEBOUNCE_MS, WORKFLOW_EDIT_GUARD_MS } from '../modules/workflow-watch.js';
+import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
@@ -18,6 +18,10 @@ import { cafeText, setText } from './text.js';
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
 const NAMES_GAP_MS = 300;
+// Before a recipe loads, Streamline's steppers must have gone quiet for this
+// long. One writes 300 ms after its last tap, and the Brew stepper reads the
+// Workflow first: the wait covers that read, which no counter announces.
+const SETTLE_QUIET_MS = 1000;
 const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier edit to land
 // Each stepper's − and + are `<name>-minus` and `<name>-plus`.
 const STEPPERS = ['dose-in', 'drink-out', 'grind', 'temp', 'flush', 'cafe-steam', 'hot-water-vol'];
@@ -145,7 +149,7 @@ export async function settleDialIn() {
     await steamFlow.flush();
     // Streamline's own steppers: wait out their debounce and any write on the wire.
     const giveUpAt = Date.now() + SETTLE_MAX_MS;
-    while (msSinceTileInteraction() < WORKFLOW_EDIT_GUARD_MS || hasWorkflowWriteInFlight()) {
+    while (msSinceTileInteraction() < SETTLE_QUIET_MS || hasWorkflowWriteInFlight()) {
         if (Date.now() >= giveUpAt) throw new Error('An earlier change has not reached the machine yet.');
         await pause(50);
     }
