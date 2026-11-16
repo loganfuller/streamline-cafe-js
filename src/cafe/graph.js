@@ -63,8 +63,8 @@ function applyOverlay() {
 }
 
 // Streamline's history module asks to draw a finished Shot: the tablet's
-// newest, at start-up, once a shot has been saved, and on the way back from
-// another page. Which Shot the graph shows is this module's choice, so the
+// newest, at start-up, on the way back from another page and, in a Streamline
+// where that works, once a shot has been saved. Which Shot the graph shows is this module's choice, so the
 // request is turned down and taken as a cue to look again. Until DYE2 has said
 // which recipe is loaded it is let through, so the graph is not empty meanwhile.
 function chooseShot(measurements) {
