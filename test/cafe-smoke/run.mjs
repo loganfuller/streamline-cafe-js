@@ -274,6 +274,19 @@ try {
     check('no recipe: the line under it says to tap a recipe', (await page.locator('#cafe-subtitle').textContent()) === 'Tap a recipe to load it');
     check('no recipe: the column is labelled "Dial-in · not saved to a recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe');
     check('no recipe: no card is filled', (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 0);
+    const column = await page.evaluate(() => {
+        const style = (el, ...props) => props.map(p => getComputedStyle(el)[p]).join(' ');
+        const all = selector => [...document.querySelectorAll(`#shot-settings ${selector}`)];
+        return {
+            names: all('.cafe-row-name').map(el => style(el, 'fontSize', 'fontWeight')),
+            values: ['dose-in-value', 'drink-out-value', 'grind-value', 'temp-value', 'flush-value', 'steam-flow-value', 'hot-water-vol-value']
+                .map(id => style(document.getElementById(id), 'fontSize', 'fontWeight')),
+            buttons: all('.cafe-stepper > button').map(el => style(el, 'width', 'height')),
+        };
+    });
+    check('the dial-in column: seven rows, each label the same size and weight', column.names.length === 7 && new Set(column.names).size === 1, [...new Set(column.names)].join(' | '));
+    check('the dial-in column: each value the same size and weight', new Set(column.values).size === 1, [...new Set(column.values)].join(' | '));
+    check('the dial-in column: fourteen − and + buttons, all the same size', column.buttons.length === 14 && new Set(column.buttons).size === 1, [...new Set(column.buttons)].join(' | '));
     check('the machine buttons show, with Settings and Sleep above them',
         (await page.locator('#ghc-controls').isVisible()) && (await page.locator('#ghc-controls #settings-btn').isVisible()) && (await page.locator('#ghc-controls #sleep-button').isVisible()));
     for (const gone of ['#dye-strip-toggle', '#profile-fav-nav', '#dye-open-btn', '#shot-history-panel', '#shot-data-panel', '#temp-presets', '#steam-mode-toggle']) {
@@ -336,7 +349,7 @@ try {
     check('holding + repeats', flushAfter - flushBefore >= 4, `${flushBefore}s to ${flushAfter}s`);
     await page.locator('#hot-water-mode-toggle').click();
     check('Temp | Vol picks which of the two the buttons step',
-        (await page.locator('#hot-water-temp-value').evaluate(e => getComputedStyle(e).fontSize)) === '26px'
+        (await page.locator('#hot-water-temp-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px'
         && (await page.locator('#hot-water-vol-value').evaluate(e => getComputedStyle(e).fontSize)) === '16px');
     await page.locator('#hot-water-mode-toggle').click();
     await page.evaluate(() => { window._forceNumpadMobile = true; });
@@ -348,7 +361,7 @@ try {
     await page.locator('#cafe-steam-plus').click();
     const flowAfter = parseFloat(await page.locator('#steam-flow-value').textContent());
     check('the steam row steps the flow, whatever mode Streamline\'s steam tile is in', Math.abs(flowAfter - (flowBefore + 0.1)) < 0.001, `${flowBefore} to ${flowAfter}`);
-    check('the steam row still shows the flow large', (await page.locator('#steam-flow-value').evaluate(e => getComputedStyle(e).fontSize)) === '26px');
+    check('the steam row still shows the flow large', (await page.locator('#steam-flow-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px');
     await page.waitForTimeout(2500);
     const steamNow = (await decaid('GET', '/workflow')).steamSettings;
     check('the flow reaches the Workflow, and the steam time is untouched', Math.abs(steamNow.flow - flowAfter) < 0.001 && steamNow.duration === timeBefore, JSON.stringify(steamNow));

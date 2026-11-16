@@ -253,8 +253,10 @@ button.cafe-card {
 
 /* ── Dial-in column ───────────────────────────────────────────────────────── */
 
+/* 440 wide: the widest label, "Steam flow", beside a stepper whose value box
+   holds the widest value, "255ml". */
 #shot-settings {
-    width: 420px;
+    width: 440px;
     flex: none;
     box-sizing: border-box;
     padding: 24px 26px;
@@ -271,8 +273,10 @@ button.cafe-card {
     padding-bottom: 8px;
 }
 
-/* Rows share the column's height: at the design size they sit at 128 and 98,
-   and give some back on a shorter screen, where the canvas has fewer rows. */
+/* Every row has the same type and the same size buttons. A row that says what
+   it is dialled for is taller, for that line. Rows share the column's height:
+   at the design size they sit at 128 and 98, and give some back on a shorter
+   screen, where the canvas has fewer rows. */
 .cafe-row {
     position: relative;
     display: flex;
@@ -311,8 +315,11 @@ button.cafe-card {
     white-space: nowrap;
 }
 
+/* A name longer than the room beside the stepper, as a translation can be,
+   wraps instead of running under the − button. */
 .cafe-row-short .cafe-row-name {
-    font-size: 22px;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 /* A tall row is two lines: its name beside the stepper, and under both, across
@@ -382,7 +389,7 @@ button.cafe-card {
     height: 72px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .cafe-stepper > button {
@@ -403,22 +410,11 @@ button.cafe-card {
     height: 34px;
 }
 
-.cafe-row-short .cafe-stepper > button {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-}
-
-.cafe-row-short .cafe-stepper > button > svg {
-    width: 28px;
-    height: 28px;
-}
-
 /* A value, with at most one smaller line under it. Streamline sets the size of
    the steam and hot water values itself, and reverses this column to put the
    one the buttons step on top. */
 .cafe-value {
-    width: 112px;
+    width: 100px;
     flex: none;
     display: flex;
     flex-direction: column;
@@ -430,14 +426,10 @@ button.cafe-card {
 }
 
 .cafe-value > span:not(.cafe-value-sub) {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 700;
     line-height: 1.15;
     border-radius: 8px;
-}
-
-.cafe-row-tall .cafe-value > span:not(.cafe-value-sub) {
-    font-size: 30px;
 }
 
 .cafe-value > .cafe-value-sub,
