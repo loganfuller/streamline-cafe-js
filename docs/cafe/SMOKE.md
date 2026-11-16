@@ -83,7 +83,7 @@ Three things are not Decaid's own answers:
 - **A machine with buttons of its own.** The simulated machine always reports none, so for those screenshots the run rewrites that one field of `GET /api/v1/machine/info` in the browser.
 - **The recipes' names and the slots above 5.** DYE2 names a saved recipe after its bean and places only slots 1 to 5, so the run writes the names and slots 7 and 9 into DYE2's records itself. That is the fixture's write. The skin's own writer of those records is a separate module with its own guards.
 
-- **Decent Sync.** This Decaid has no Decent Sync plugin, and the plugin needs a server. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there, once as a served Machine and once as a Capture-only one. Nothing saves a dial-in in that check: it shows the label only.
+- **Decent Sync.** This Decaid has no Decent Sync plugin, and the plugin needs a server. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin not yet connected at the first ask. Nothing saves a dial-in in that check: it shows the label only.
 
 The theme is painted in the page and never stored: a stored theme is carried to Decaid's settings store, which every later page then reads back.
 

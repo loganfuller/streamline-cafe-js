@@ -134,9 +134,16 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
             const response = await route.fetch();
             await route.fulfill({ response, json: [...(await response.json()), { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, api: [] }] });
         });
-        await page.route('**/api/v1/plugins/decent-sync.reaplugin/status', route => (decentSync === 'served'
-            ? route.fulfill({ status: 200, json: { connected: true, served: true, machine: { id: 'sample-machine', name: 'Sample Machine' }, location: { id: 'sample-location', name: 'Sample Cafe' } } })
-            : route.fulfill({ status: 409, json: { connected: true, served: false, machine: null, location: null, code: decentSync, message: 'Sample refusal.' } })));
+        // 'coldStart': not connected yet at the first ask, served from the second.
+        let asked = 0;
+        const served = { status: 200, json: { connected: true, served: true, machine: { id: 'sample-machine', name: 'Sample Machine' }, location: { id: 'sample-location', name: 'Sample Cafe' } } };
+        const refused = code => ({ status: code === 'unreachable' ? 503 : 409, json: { connected: code !== 'unreachable', served: false, machine: null, location: null, code, message: 'Sample refusal.' } });
+        await page.route('**/api/v1/plugins/decent-sync.reaplugin/status', route => {
+            asked += 1;
+            if (decentSync === 'served') return route.fulfill(served);
+            if (decentSync === 'coldStart') return route.fulfill(asked === 1 ? refused('unreachable') : served);
+            return route.fulfill(refused(decentSync));
+        });
     }
     await page.goto(`${BASE}/index.html`);
     return { page, seen, close: () => context.close() };
@@ -468,7 +475,19 @@ try {
         await extra.page.locator('#cafe-dial-label').filter({ hasText: label }).waitFor({ timeout: 20_000 }).catch(() => {});
         await extra.page.waitForTimeout(2500);
         check(`Decent Sync answering "${status}": the column is labelled "${label}"`, (await extra.page.locator('#cafe-dial-label').textContent()) === label, await extra.page.locator('#cafe-dial-label').textContent());
+        check(`Decent Sync answering "${status}": its Status was asked`, extra.seen.requests.some(r => r === 'GET /api/v1/plugins/decent-sync.reaplugin/status'));
         if (status === 'served') await shot(extra.page, 'page-recipe-decent-sync-light');
+        await extra.close();
+    }
+    //     The skin loaded before the plugin had connected: the first answer says
+    //     nothing either way, and the page asks again without waiting for focus.
+    {
+        const extra = await openPage({ decentSync: 'coldStart' });
+        await waitForPage(extra.page);
+        await extra.page.waitForTimeout(3000);
+        check('Decent Sync not connected yet: the column reads "not saved" until an answer comes', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to the recipe');
+        await extra.page.locator('#cafe-dial-label').filter({ hasText: 'Dial-in · saved to the recipe' }).waitFor({ timeout: 45_000 }).catch(() => {});
+        check('and the page asks again by itself: the column then reads "saved to the recipe"', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe', await extra.page.locator('#cafe-dial-label').textContent());
         await extra.close();
     }
     await unloadRecipe();

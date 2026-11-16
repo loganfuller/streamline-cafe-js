@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pageHeading, decentSyncSaves, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
+import { pageHeading, decentSyncSaves, statusUnknown, statusRetryMs, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
 
 test('with a recipe loaded, the title is its name, over its bean and profile', () => {
     const heading = pageHeading({ id: 'a', title: 'House espresso', beanName: 'Sample Blend' }, 'Sample Profile', true);
@@ -61,6 +61,22 @@ test('with no recipe loaded, the page says so and what to do', () => {
         subtitle: 'Tap a recipe to load it',
         dialLabel: 'Dial-in · not saved to a recipe',
     });
+});
+
+test('only an answer that says nothing either way is asked for again', () => {
+    assert.equal(statusUnknown({ served: false, code: 'unreachable' }), true);
+    assert.equal(statusUnknown({ served: false, code: 'serverTooOld' }), true);
+    assert.equal(statusUnknown({}), true, 'Decaid itself did not answer');
+    // Definite answers, either way.
+    assert.equal(statusUnknown({ connected: true, served: true }), false);
+    assert.equal(statusUnknown({ served: false, code: 'captureOnly' }), false);
+    assert.equal(statusUnknown({ served: false, code: 'hardwareMismatch' }), false);
+    assert.equal(statusUnknown(null), false, 'no Decent Sync plugin: nothing to wait for');
+});
+
+test('asking again starts at half a minute and slows to five', () => {
+    assert.deepEqual([1, 2, 3, 4, 5, 6, 20].map(statusRetryMs), [30_000, 60_000, 120_000, 240_000, 300_000, 300_000, 300_000]);
+    assert.equal(statusRetryMs(0), 30_000);
 });
 
 test('Dose, Yield and Grind name the bean, the basket and the grinder from the Workflow', () => {

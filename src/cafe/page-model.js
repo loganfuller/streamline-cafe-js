@@ -45,8 +45,26 @@ export function pageHeading(recipe, profileName, saved = false) {
 export function decentSyncSaves(previous, answer) {
     if (!answer) return false;
     if (answer.served === true) return true;
-    if (answer.code === undefined || answer.code === 'unreachable' || answer.code === 'serverTooOld') return !!previous;
-    return false;
+    return statusUnknown(answer) ? !!previous : false;
+}
+
+/**
+ * Did the Status request say nothing either way? The server could not be asked,
+ * or Decaid itself did not answer. The page then asks again shortly: at
+ * start-up the skin can load before the plugin has connected, and the label
+ * must not wait for the page to regain focus to be right.
+ */
+export function statusUnknown(answer) {
+    if (!answer || answer.served === true) return false;
+    return answer.code === undefined || answer.code === 'unreachable' || answer.code === 'serverTooOld';
+}
+
+// How long to wait before asking again, having asked `tries` times with no
+// answer either way: 30 s, then twice as long each time, to 5 minutes. A plugin
+// that never connects, as one installed and never set up, is not asked for ever
+// at the first pace.
+export function statusRetryMs(tries) {
+    return Math.min(300_000, 30_000 * 2 ** Math.max(0, tries - 1));
 }
 
 const text = value => (typeof value === 'string' ? value.trim() : '');

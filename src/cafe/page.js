@@ -10,7 +10,7 @@ import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusBu
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { pageHeading, decentSyncSaves, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { pageHeading, decentSyncSaves, statusUnknown, statusRetryMs, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, setText } from './text.js';
 
@@ -28,6 +28,8 @@ const DECENT_SYNC_PLUGIN_ID = 'decent-sync.reaplugin';
 let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
 let savedSeq = 0;
+let savedRetry = null;  // the timer to ask again, while no answer has come either way
+let savedTries = 0;
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
@@ -73,14 +75,30 @@ async function readDecentSync() {
     }
 }
 
-async function refreshSaved() {
+async function readSaved() {
+    clearTimeout(savedRetry);
+    savedRetry = null;
     const seq = ++savedSeq;
     const answer = await readDecentSync();
     if (seq !== savedSeq) return; // a newer read has begun
+    // No answer either way, as when the skin loads before the plugin has
+    // connected: ask again shortly, and more slowly each time, until one comes.
+    // A tablet that stays on this page fires none of the events below.
+    if (statusUnknown(answer)) {
+        savedTries += 1;
+        savedRetry = setTimeout(refreshSaved, statusRetryMs(savedTries));
+    } else {
+        savedTries = 0;
+    }
     const next = decentSyncSaves(saved, answer);
     if (next === saved) return;
     saved = next;
     renderHeading();
+}
+
+/** Ask Decent Sync again whether it saves this Machine's dial-in. */
+export function refreshSaved() {
+    readSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
 }
 
 // ── What the dial-in rows name ───────────────────────────────────────────────
@@ -141,8 +159,18 @@ function refreshSoon() {
     namesTimer = setTimeout(() => {
         namesTimer = null;
         refreshNames();
-        refreshSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
+        refreshSaved();
     }, NAMES_GAP_MS);
+}
+
+/**
+ * A recipe was just loaded from the strip. Its names are read, and Decent Sync
+ * is asked again: sharing turned off since the last answer would otherwise
+ * leave "saved to the recipe" standing until the page next regained focus.
+ */
+export function afterRecipeLoad() {
+    refreshNames();
+    refreshSaved();
 }
 
 // ── Steam flow ───────────────────────────────────────────────────────────────
@@ -270,7 +298,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     placeSystemButtons();
     paintBattery();
     refreshNames();
-    refreshSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
+    refreshSaved();
 
     const profile = el('profile-name');
     if (profile) {
