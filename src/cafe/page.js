@@ -90,13 +90,16 @@ export async function refreshNames() {
         batch = null;
         names = dialInNames(workflow, null);
         renderNames();
+        let read = null;
         try {
-            const read = await getBeanBatch(batchId);
-            if (seq !== namesSeq) return;
-            batch = read;
+            read = await getBeanBatch(batchId);
         } catch (error) {
             logger.info(`Cafe: no roast date for batch ${batchId}: ${error.message}`);
         }
+        // A newer read has begun, whether this one's batch arrived or failed:
+        // its names are the ones to show.
+        if (seq !== namesSeq) return;
+        batch = read;
     }
     names = dialInNames(workflow, batch);
     renderNames();
