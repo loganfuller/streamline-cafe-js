@@ -12,7 +12,7 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { pageHeading, decentSyncSaves, statusUnknown, statusRetryMs, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { createPendingWrite } from './pending-write.js';
-import { cafeText, setText } from './text.js';
+import { cafeText, cafeDateLocale, setText } from './text.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -103,18 +103,18 @@ export function refreshSaved() {
 
 // ── What the dial-in rows name ───────────────────────────────────────────────
 
-// "28 Oct", in the tablet's own language. The day is a calendar day, so it is
+// "28 Oct", in the page's language. The day is a calendar day, so it is
 // formatted in UTC, where roastDay() read it.
 function formatRoastDay(day) {
     try {
-        return new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+        return new Date(`${day}T00:00:00Z`).toLocaleDateString(cafeDateLocale(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
     } catch (error) {
         return day;
     }
 }
 
 function renderNames() {
-    const roasted = names.roastDay ? `${cafeText('roasted')} ${formatRoastDay(names.roastDay)}` : '';
+    const roasted = names.roastDay ? cafeText('roasted {date}', { date: formatRoastDay(names.roastDay) }) : '';
     setText(el('cafe-dose-desc'), [names.bean, roasted].filter(Boolean).join(' · '));
     setText(el('cafe-yield-desc'), names.basket);
     setText(el('cafe-grind-desc'), names.grinder);
@@ -322,5 +322,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     document.addEventListener('visibilitychange', refreshSoon);
     document.addEventListener('streamline:mainpagevisible', refreshSoon);
     document.addEventListener('streamline:workflow-refresh', refreshSoon);
-    document.addEventListener('streamline:languagechange', () => { renderHeading(); renderNames(); });
+    // Keyed text follows the language by itself (text.js). The roast date is put
+    // together here, so it is drawn again.
+    document.addEventListener('streamline:languagechange', renderNames);
 }

@@ -34,8 +34,8 @@ export function showGate(reason) {
     const page = document.getElementById('main-page');
     if (!page) return;
     wire();
-    const { line, turnOn, hint } = gateScreen(reason);
-    setText(document.getElementById('cafe-gate-line'), line, { translate: true });
+    const { line, vars, turnOn, hint } = gateScreen(reason);
+    setText(document.getElementById('cafe-gate-line'), line, { translate: true, vars });
     const hintEl = document.getElementById('cafe-gate-hint');
     if (hintEl) {
         hintEl.style.display = hint ? '' : 'none';

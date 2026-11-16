@@ -6,7 +6,7 @@ Everything the run writes is made up. The sample beans, grinder and recipes are 
 
 ## What it needs
 
-- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
+- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, edits and makes recipes in DYE2's editor, changes the language, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
 - Network access to GitHub, where Decaid fetches DYE2's latest release from.
 - Node, and this repository's dependencies (`npm ci`). Once per machine: `npx playwright install chromium`.
 
@@ -58,13 +58,21 @@ Serve the repository's root. Any static server does; run it from outside the dir
 python3 -m http.server --bind 127.0.0.1 --directory /path/to/streamline-cafe-js 13999
 ```
 
+For the switch to Streamline and back, serve the Streamline release the skin is built on beside it, from a copy outside this repository. The tag is in a clone that has fetched Streamline's tags:
+
+```sh
+mkdir /path/to/streamline-release
+git archive v0.2.27 | tar -x -C /path/to/streamline-release
+python3 -m http.server --bind 127.0.0.1 --directory /path/to/streamline-release 13998
+```
+
 ## The run
 
 ```sh
-node test/cafe-smoke/run.mjs --token=$TOKEN
+node test/cafe-smoke/run.mjs --token=$TOKEN --streamline=http://127.0.0.1:13998
 ```
 
-It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere.
+It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere. Without `--streamline=` the switch to Streamline and back is skipped, and the run says so.
 
 In order, it:
 
@@ -76,7 +84,13 @@ In order, it:
 6. steps a value and checks it changes this machine only, flips Temp | Vol, steps the steam flow, and checks a change made just before another recipe is tapped does not land on that recipe;
 7. pulls a simulated shot and checks the state, the time and the weight against its target, then the Shot in the graph and its time in the legend;
 8. opens the full-screen chart and comes back, opens Settings and comes back, and switches DYE2 off to check the page returns to the "DYE2 is needed" screen;
-9. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
+9. long-presses a card and checks DYE2's editor opens on that recipe and nothing loads; renames it there and checks the card shows the edit with the same recipe loaded as before; edits the loaded recipe and checks it is still loaded, with its new dose;
+10. holds empty slot 8, then slot 4, saves a new recipe in the editor each time, and checks it is on that card and in DYE2's records, placed by one write; then leaves the editor without saving, fills the held slot meanwhile, and makes a second new recipe meanwhile, and checks nothing is placed each time and no hold is left in the store;
+11. changes the language to German and to Arabic and checks the page's text, the roast date, that no label overflows its place or is shrunk below 14px, and that the layout stays left to right; then the page with no recipe and the "DYE2 is needed" screen in German, and a change of language while that screen shows;
+12. with `--streamline=`, opens official Streamline on the same Decaid, sets its strip to R, uses the cafe page, and checks the strip mode is still R in Decaid's store and on Streamline's page;
+13. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
+
+DYE2's editor rewrites a recipe it saves, so the run puts the sample recipes back as they were and removes the recipes it made. It can be repeated on the same Decaid.
 
 Three things are not Decaid's own answers:
 
@@ -97,4 +111,4 @@ A running Decaid keeps a CPU busy for as long as it is up.
 
 ## What it does not cover
 
-A real machine and scale, the tablet's own WebView, touch input, a second language, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.
+A real machine and scale, the tablet's own WebView, touch input (a long-press is made with the mouse), the way back from DYE2 through Decaid's own skin server, the languages other than German, Arabic and French, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.

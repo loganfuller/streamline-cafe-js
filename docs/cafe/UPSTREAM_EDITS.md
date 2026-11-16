@@ -44,6 +44,8 @@ Streamline's modules are otherwise unedited. Where the page needs one to behave 
 - **Taps Streamline wires that the page does not offer yet.** `app.js` opens the profile list from `#profile-name` and DYE2's grinder page from `#grind-label`. `cafe.css` takes pointer events off both.
 - **The help button.** `help-launcher.js` adds a "?" that explains Streamline's page. `cafe.css` hides it while the main page shows.
 - **The footer.** `main.css` reserves 242px under `<main>` for Streamline's footer cards; `cafe.css` gives it back to the graph.
+- **Translations.** `i18n.js` translates every element with `data-i18n-key` from Streamline's file alone. The page's own text is keyed by `data-cafe-text` and translated by `src/cafe/text.js` from the fork's table first. `#machine-status`, `#sleep-button` and `#cupwarmer-text` keep `data-i18n-key`, because `ui.js` and `app.js` set that key on them. `data-fit-text` on the page's labels is `i18n.js`'s own fitting.
+- **The long-press.** `dyeStrip.js`'s `openPluginOverlay` is called as exported, for DYE2's `recipe-edit` page, and `ui.js`'s `setupPressAndHold` for the hold. Streamline's own cell menu and its `editRecipe` are private and unused.
 
 ## Builds
 

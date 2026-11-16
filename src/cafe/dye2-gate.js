@@ -34,19 +34,23 @@ export function dye2Gate({ plugins, enabled }) {
 const LINES = {
     'not-installed': "DYE2 isn't installed",
     'not-loaded': 'DYE2 is installed but not loaded',
-    'outdated': `DYE2 is older than v${MIN_DYE2_VERSION}`,
+    'outdated': 'DYE2 is older than v{version}',
     'setting-off': 'DYE2 is turned off in Settings',
 };
 
+/** Every reason `dye2Gate` can give. */
+export const GATE_REASONS = Object.keys(LINES);
+
 /**
- * What the screen shows for a reason: its line, and which of the two ways out
- * it offers. The setting is the skin's to turn on. The plugin is not: installing
+ * What the screen shows for a reason: its line, with what fills the line's
+ * `{version}`, and which of the two ways out it offers. The setting is the skin's to turn on. The plugin is not: installing
  * one from a skin needs a management token, so the screen points to Decaid.
  */
 export function gateScreen(reason) {
     const turnOn = reason === 'setting-off';
     return {
         line: LINES[reason],
+        vars: { version: MIN_DYE2_VERSION },
         turnOn,
         hint: turnOn ? null : 'Install or update DYE2 in Decaid, under Plugins.',
     };

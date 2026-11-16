@@ -18,7 +18,7 @@ Words such as Recipe, Recipe Slot, Reference Shot, Shot, Location, Machine, Work
 
 The owner keeps the screen's working design as a mockup, which is not in this repo. This section summarises it and is updated with it.
 
-- **Recipes.** Nine fixed Recipe Slots in one row. An empty slot stays as an outline, so cards never move. A tap loads a recipe. A long-press opens it in DYE2's editor, or on an empty slot creates one there.
+- **Recipes.** Nine fixed Recipe Slots in one row. An empty slot stays as an outline reading "Slot N" and "Hold to add", so cards never move. A tap loads a recipe. A long-press opens it in DYE2's editor, or on an empty slot creates one there.
 - **Dial-in column.** Steppers for dose, yield, grind, brew temperature, flush, steam flow and hot water, all with the same type and the same size buttons. Hot water is one control with Streamline's Temp | Vol toggle. With Decent Sync a change is saved onto the loaded recipe, and the column is labelled "Dial-in · saved to the recipe". Without it the change is this machine's alone, until another recipe loads, and the label reads "Dial-in · not saved to the recipe".
 - **Grinder, bean, basket and profile.** Dose names the bean and batch, Yield the basket, Grind the grinder and Brew the profile. A tap on one opens a dialog listing what the tablet offers.
 - **Graph.** Solid: this machine's latest Shot pulled with the loaded recipe. Dashed and faded: the recipe's Reference Shot. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets.
@@ -77,19 +77,27 @@ Streamline's modules keep running for the work that isn't drawing. Its history m
 - **Saving the dial-in is Decent Sync's.** DYE2 saves a change of the Workflow onto the loaded recipe only when asked: its `record` request, which Streamline sends when a barista picks "Save changes" in its strip's menu, and which Decent Sync's plugin sends after every change on a Machine it serves. The skin has no such menu and sends no such request, so on a tablet without Decent Sync nothing saves a dial-in change, and the page says so. A recipe is changed for good there in DYE2's editor. The skin learns whether Decent Sync saves from the plugin's Status request: a Machine it serves, yes; a Capture-only Machine, or no plugin, no; and while the server can't be asked, the last answer stands, because the plugin goes on saving on the tablet through an outage. The skin asks at start-up, when the page comes back into view, and after each recipe load; and while no answer has come either way, as when the skin loads before the plugin has connected, it asks again every half minute, slowing to every five.
 - **Before another recipe loads,** a change still on its way is written first, so it does not land on the recipe about to load, and the recipe tapped is read again from DYE2's records, so what loads is what DYE2 holds, not what the card showed when it was drawn. Loads run one at a time, in the order tapped. A load whose earlier change has not reached the machine after a few seconds is not made, and says so. While a recipe loads the dial-in rows take no taps: a step made then could be written before or after the load.
 - **Nine slots.** DYE2 keeps a `stripSlot` of 6 to 9 as written, though its own editor places recipes only in 1 to 5. The skin places recipes in 6 to 9 itself.
+- **A long-press never loads a recipe.** On a filled card it opens that recipe in DYE2's editor. DYE2's pages are on another origin, so the page is left, and loaded again on the way back: the card then shows the edit, and the recipe that was loaded still is, because DYE2 holds which one that is. A long-press is ignored while a recipe is loading.
 - **Empty slots.** A long-press creates a recipe in DYE2's editor. The skin remembers the held slot and the recipe ids that exist, and on its next load places the one new recipe in that slot if the slot is still empty. With none or several new recipes it places nothing. There is no "choose an existing recipe" option yet; this may change.
+- **The skin places the new recipe itself, for every slot.** DYE2's editor can be told a slot from 1 to 5 and no other, so it is told none, and one path serves all nine.
+- **What the barista chose in the editor stands.** A new recipe they gave a slot there, or switched off the strip there, is left as they saved it.
+- **How long a remembered hold lasts.** Until the page is next shown: that load uses it or drops it, whether or not anything was placed. So a recipe that appears later, from DYE2 or from Decent Sync, is never placed by an old hold. It is kept in the `streamlineCafe` namespace of Decaid's store, not in the browser, because the way back from DYE2 can arrive on another port, where the browser's storage is another origin's.
+- **When a placement can't be confirmed,** one of Streamline's toasts says the recipe could not be placed, and it stays in DYE2 without a slot. When the hold itself can't be remembered, the editor is not opened and a toast says so: the recipe made there would have no way into a slot above 5.
 
 ## Writing DYE2's records
 
 DYE2 has no endpoint for a slot above 5, or for saving a grinder, bean, batch or profile onto an existing recipe. Its `record` endpoint saves only the dial-in numbers, and `save-recipe` always creates a new recipe. DYE2's contract asks skins not to write its records, but Streamline and Decent Sync's plugin both do.
 
-One module in the fork is the only writer. Each write:
+One module in the fork is the only writer, `src/cafe/recipe-writer.js`, and a test fails if another module under `src/cafe/` writes them. Each write:
 
-- reads the records again first;
-- changes only the named fields of one row, and keeps every field it doesn't know;
+- reads the records again first, and writes nothing when they can't be read;
+- changes only the named fields of one row, and keeps every field and every row it doesn't know;
+- gives a slot one holder: a recipe placed in a slot takes it from any other row that names it, as DYE2's own save does;
 - writes, reads again to confirm, and retries once.
 
-Decaid's store has no conditional write, and DYE2 reads, waits and writes the whole list, sometimes over several seconds. A write that lands inside that window is lost, which is why each one is confirmed.
+Decaid's store has no conditional write, and DYE2 reads, waits and writes the whole list, sometimes over several seconds. A write that lands inside that window is lost, which is why each one is confirmed. The confirming read follows the write at once, so it catches a write the store refused and a change already written over. A copy DYE2 writes back later than that is not caught.
+
+The writer places a recipe in a slot today. The dialogs for the grinder, bean, basket and profile add their fields through the same module. The writes Streamline's own strip module makes are Streamline's, and are left as they are.
 
 ## Settings
 
@@ -130,11 +138,14 @@ Streamline unloads the recipe on every profile switch, and DYE2 unloads a recipe
 
 The screen's new text covers the languages Streamline supports.
 
-- New strings live in the fork's own table, with Streamline's language codes. A lookup tries that table, then Streamline's translation file, then English. Streamline's file is not edited: it is overwritten from a spreadsheet upstream.
-- Where Streamline already has the same English text, its translation is used.
-- New phrases are machine-translated and marked so. Corrections are welcome as pull requests.
-- Arabic and Hebrew are translated, and the layout stays left to right. Streamline has no right-to-left layout, and mirroring one page would make it the only screen that flips.
-- A test fails when a string lacks any of Streamline's finished languages. Languages Streamline marks unfinished fall back to English where a phrase is missing.
+- New strings live in the fork's own table, `src/cafe/translations.js`, with Streamline's language codes. A lookup tries that table, then Streamline's translation file, then English. Streamline's file is not edited: it is overwritten from a spreadsheet upstream.
+- Where Streamline already has the same English text, its translation is used, and the table holds only what Streamline's file lacks.
+- New phrases are machine-translated and marked so, entry by entry. Corrections are welcome as pull requests.
+- Arabic and Hebrew are translated, and the layout stays left to right. Streamline has no right-to-left layout, and mirroring one page would make it the only screen that flips. Streamline also carries each of the two a second time, `arb` and `heb`, with the letters in the order a renderer with no right-to-left support draws them. The table follows it, so those two read the same across the page.
+- A test fails when a string the page shows lacks any of Streamline's finished languages, read from Streamline's own list. Languages Streamline marks unfinished fall back to English where a phrase is missing.
+- The page's own text is keyed by `data-cafe-text`, not Streamline's `data-i18n-key`. Streamline's page translation knows only its own file, and runs on every visit to a subpage, so it would put a phrase from the fork's table back into English. Three elements keep Streamline's key, because a Streamline module re-labels them itself: the machine status, Sleep and the cup warmer.
+- A label a language makes too long for its place is shrunk to fit by Streamline's own text fitting, as its header buttons are.
+- A date is written in the page's language too.
 
 ## Tests
 
