@@ -19,14 +19,16 @@ test('no module reaches Decaid\'s store, or anything else, around api.js', () =>
     assert.deepEqual(filesWith(/\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\b|\bsetValueInStore\b/), []);
 });
 
-test('cafe-only state is written to the streamlineCafe namespace, and only there', () => {
-    const writers = SOURCES.filter(({ text }) => /\b(setKVValue|deleteKVValue)\b/.test(text));
-    assert.deepEqual(writers.map(({ name }) => name), ['editor.js']);
-    const [{ text }] = writers;
-    assert.match(text, /const CAFE_NAMESPACE = 'streamlineCafe';/);
-    const calls = [...text.matchAll(/\b(?:setKVValue|deleteKVValue)\(\s*([^,)]*)/g)].map(match => match[1].trim());
-    assert.ok(calls.length >= 2);
-    assert.deepEqual([...new Set(calls)], ['CAFE_NAMESPACE']);
+test('no module writes Decaid\'s store by key', () => {
+    // Nothing on the page keeps state of its own yet. When something does, it
+    // goes in the streamlineCafe namespace, and this test names the module.
+    assert.deepEqual(filesWith(/\b(setKVValue|deleteKVValue)\b/), []);
+});
+
+test('no module opens one of DYE2\'s pages', () => {
+    // The page never leaves for DYE2's editor: recipes are made, chosen and
+    // taken out of a slot here.
+    assert.deepEqual(filesWith(/\bopenPluginOverlay\b|recipe-edit/), []);
 });
 
 test('no module writes Streamline\'s strip mode', () => {
@@ -36,7 +38,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-hold.js', 'translations.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

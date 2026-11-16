@@ -9,8 +9,8 @@
 //
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
 // switches Streamline's "DYE2 on" setting, writes made-up beans, a grinder and
-// recipes, edits and makes recipes in DYE2's editor, and pulls simulated shots.
-// Point it at a throwaway Decaid only.
+// recipes, makes recipes and moves them between slots from the page, changes
+// the language, and pulls simulated shots. Point it at a throwaway Decaid only.
 
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
@@ -37,10 +37,7 @@ const HEADED = args.includes('--headed');
 const API = `${DECAID}/api/v1`;
 const SETTING = `${API}/store/streamlineSettings/streamline.dye2Enabled`;
 const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
-const HOLD = '/store/streamlineCafe/slotHold';
 const RECIPE_STORE = `/store/${DYE2_PLUGIN_ID}/recipes`;
-// Recipes the run makes in DYE2's editor, and removes again when it ends.
-const MADE = ['Made in slot 8', 'Made in slot 4', 'Made while slot 6 filled', 'Made beside another', 'Spare', 'Another new one'];
 
 // ── Results ──────────────────────────────────────────────────────────────────
 
@@ -113,9 +110,6 @@ async function seed() {
 const unloadRecipe = () => decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/selection`, {});
 const records = async () => (await decaid('GET', RECIPE_STORE)) || [];
 const recordNamed = async name => (await records()).find(row => row && row.name === name);
-// The fixture's own changes to DYE2's records: setting up a case, and tidying up.
-const rewriteRecords = async change => decaid('POST', RECIPE_STORE, change(await records()));
-const removeMade = () => rewriteRecords(rows => rows.filter(row => !(row && MADE.includes(row.name))));
 const storeValue = path => decaid('GET', path).catch(() => null);
 
 async function pullShot(seconds) {
@@ -188,23 +182,21 @@ async function longPress(page, locator) {
     await page.waitForTimeout(900);
     await page.mouse.up().catch(() => {});
 }
-// DYE2's editor, once it has read its records and drawn the recipe.
-async function waitForEditor(page) {
-    await page.waitForURL(/dye2\.reaplugin\/recipe-edit/, { timeout: 20_000 });
-    await page.locator('#re-save-btn').waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(2500);
+// The menu a long-press opens on a card, and the list a recipe is chosen from.
+const menu = page => page.locator('#app-context-menu.context-menu--open');
+const menuItems = page => menu(page).locator('.context-menu__item').allTextContents();
+async function openMenu(page, slot) {
+    await longPress(page, page.locator('#cafe-strip .cafe-card').nth(slot - 1));
+    await menu(page).waitFor({ timeout: 5000 });
+    await page.waitForTimeout(400);
 }
-// Leave the editor by one of its own buttons, and wait for the cafe page.
-// `seen` is the page's request log: the answer is where in it the cafe page's
-// own requests begin, after whatever DYE2 wrote on the way out.
-async function leaveEditor(page, button, seen = null) {
-    await page.locator(button).click();
-    await page.waitForURL(url => url.href.startsWith(BASE), { timeout: 30_000 });
-    const mark = seen ? seen.requests.length : 0;
-    await waitForPage(page);
-    await page.waitForTimeout(4000);
-    return mark;
+// Pick a menu item by its place, and let the page write and read again.
+async function pick(page, index) {
+    await menu(page).locator('.context-menu__item').nth(index).click();
+    await page.waitForTimeout(3500);
 }
+const dialog = page => page.locator('#cafe-recipe-dialog[open]');
+const dialogRows = page => page.locator('#cafe-recipe-list .cafe-recipe-row-name').allTextContents();
 const cardName = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1).locator('.cafe-card-name').textContent();
 // The Settings page's language list calls this same function.
 const setLanguage = (page, language) => page.evaluate(async code => {
@@ -524,132 +516,154 @@ try {
     await setSetting(true);
 
 
-    // 11. The long-press. It opens DYE2's editor, which is on Decaid's origin, so
-    //     the page is left and loaded again on the way back.
-    await removeMade();
-    await decaid('DELETE', HOLD).catch(() => {});
+    // 11. The long-press: a menu on the card. Nothing here opens DYE2's editor,
+    //     and the page is never left.
     const modeBefore = await storeValue(STRIP_MODE);
-    // DYE2's editor rewrites a recipe it saves. The sample recipes are put back
-    // as they were afterwards, so the run can be repeated on the same Decaid.
-    const sampleRows = (await records()).filter(row => row && RECIPES.some(r => r.name === row.name));
-    const restoreSamples = () => rewriteRecords(rows => rows.map(row => sampleRows.find(sample => row && sample.id === row.id) || row));
+    // The run makes recipes and moves them between slots. DYE2's records are put
+    // back as they were afterwards, so the run can be repeated on the same Decaid.
+    const recordsBefore = await records();
+    const restoreRecords = () => decaid('POST', RECIPE_STORE, recordsBefore);
     {
         const trip = await openPage();
         const tp = trip.page;
         await waitForPage(tp);
         await tp.waitForTimeout(2500);
         const tcards = tp.locator('#cafe-strip .cafe-card');
-        const loaded = RECIPES[1];
-        const edited = RECIPES[2];
-        if ((await tp.locator('#cafe-title').textContent()) !== loaded.name) {
-            await tcards.nth(loaded.slot - 1).click();
-            await tp.locator('#cafe-title').filter({ hasText: loaded.name }).waitFor({ timeout: 20_000 });
-            await tp.waitForTimeout(3000);
-        }
-        const workflowBefore = await decaid('GET', '/workflow');
-
-        //     A filled card: the editor opens on that recipe, and nothing loads.
-        await longPress(tp, tcards.nth(edited.slot - 1));
-        await waitForEditor(tp);
-        check('a long-press on a filled card opens that recipe in DYE2\'s editor', (await tp.locator('#re-name-input').inputValue()) === edited.name, tp.url());
-        const workflowInEditor = await decaid('GET', '/workflow');
-        check('a long-press never loads the recipe: the Workflow is as it was',
-            workflowInEditor.context.coffeeName === workflowBefore.context.coffeeName && workflowInEditor.context.targetYield === workflowBefore.context.targetYield);
-        check('a long-press never loads the recipe: DYE2 still says the other one is loaded',
-            String((await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`))?.id) === String((await recordNamed(loaded.name)).id));
-        await shot(tp, 'editor-recipe');
-        await tp.locator('#re-name-input').fill('Decaf, renamed');
-        await leaveEditor(tp, '#re-save-btn');
-        check('back from the editor: the card shows the edit', (await cardName(tp, edited.slot)) === 'Decaf, renamed', await cardName(tp, edited.slot));
-        check('back from the editor: the same recipe is loaded as before',
-            (await tp.locator('#cafe-title').textContent()) === loaded.name && (await tcards.nth(loaded.slot - 1).getAttribute('aria-pressed')) === 'true',
-            await tp.locator('#cafe-title').textContent());
-        await restoreSamples();
-
-        //     The loaded recipe, edited: it is still loaded, with the new dose.
-        const doseBefore = (await recordNamed(loaded.name)).dashboardVariables.dose;
-        await longPress(tp, tcards.nth(loaded.slot - 1));
-        await waitForEditor(tp);
-        await tp.locator('#re-dose-plus').click();
-        await leaveEditor(tp, '#re-save-btn');
-        const doseAfter = (await recordNamed(loaded.name)).dashboardVariables.dose;
-        check('the loaded recipe edited in DYE2: it is still loaded, and the page shows its new dose',
-            doseAfter !== doseBefore && (await tp.locator('#cafe-title').textContent()) === loaded.name && parseFloat(await tp.locator('#dose-in-value').textContent()) === doseAfter,
-            `dose ${doseBefore} to ${doseAfter}, page ${await tp.locator('#dose-in-value').textContent()}`);
-        await restoreSamples();
-
-        //     An empty slot above 5: the new recipe is placed there by the skin.
-        const make = async (slot, name, { between = async () => {}, leave = '#re-save-btn' } = {}) => {
-            await longPress(tp, tcards.nth(slot - 1));
-            await waitForEditor(tp);
-            const remembered = await storeValue(HOLD);
-            await tp.locator('#re-name-input').fill(name);
-            await between();
-            const mark = await leaveEditor(tp, leave, trip.seen);
-            return { remembered, after: trip.seen.requests.slice(mark) };
+        const [house, single, decaf, long] = RECIPES;
+        const title = () => tp.locator('#cafe-title').textContent();
+        const selectionId = async () => (await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`))?.id ?? null;
+        // What the machine is set to, without the marker that says which recipe is loaded.
+        const settings = async () => {
+            const wf = await decaid('GET', '/workflow');
+            const { extras, ...context } = wf.context;
+            const { dye, ...rest } = extras || {};
+            return JSON.stringify({ profile: wf.profile.title, context, rest, steam: wf.steamSettings, water: wf.hotWaterData, rinse: wf.rinseData });
         };
-        const writes = requests => requests.filter(r => r === `POST /api/v1${RECIPE_STORE}`).length;
-        const eight = await make(8, 'Made in slot 8');
-        check('holding an empty slot opens DYE2\'s editor on a new recipe, and the held slot is remembered as cafe-only state',
-            eight.remembered?.slot === 8 && Array.isArray(eight.remembered.known) && eight.remembered.known.length >= RECIPES.length, JSON.stringify(eight.remembered).slice(0, 120));
-        check('a recipe made from held slot 8 is on its card on return', (await cardName(tp, 8)) === 'Made in slot 8', await cardName(tp, 8));
-        check('the skin placed it with one write of DYE2\'s records', writes(eight.after) === 1, `${writes(eight.after)} writes`);
-        const madeEight = await recordNamed('Made in slot 8');
-        check('and DYE2\'s record holds slot 8, with every other field as DYE2 wrote it',
-            madeEight?.stripSlot === 8 && madeEight.showOnStreamlineDashboard !== false && typeof madeEight.id === 'string', JSON.stringify(madeEight).slice(0, 160));
-        check('the remembered hold is used up', (await storeValue(HOLD)) == null);
-        check('placing it did not load it', (await tp.locator('#cafe-title').textContent()) === loaded.name);
-        await shot(tp, 'page-placed-slot-8-light');
+        const skinWrites = from => trip.seen.requests.slice(from).filter(r => r === `POST /api/v1${RECIPE_STORE}`).length;
+        const load = async recipe => {
+            await tcards.nth(recipe.slot - 1).click();
+            await tp.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+            await tp.waitForTimeout(3000);
+        };
+        if ((await title()) !== single.name) await load(single);
 
-        //     And one from 1 to 5.
-        await make(4, 'Made in slot 4');
-        check('a recipe made from held slot 4 is on its card on return',
-            (await cardName(tp, 4)) === 'Made in slot 4' && (await recordNamed('Made in slot 4'))?.stripSlot === 4, await cardName(tp, 4));
+        //     Nothing to choose yet: every sample recipe is in a slot.
+        await openMenu(tp, 4);
+        check('holding an empty slot opens a menu on the card with two items',
+            JSON.stringify(await menuItems(tp)) === JSON.stringify(['New recipe from current settings', 'Choose a recipe…']), (await menuItems(tp)).join(' | '));
+        await shot(tp, 'menu-empty-slot-light');
+        await pick(tp, 1);
+        await dialog(tp).waitFor({ timeout: 5000 });
+        check('with every recipe in a slot, the list says there is nothing to choose',
+            (await tp.locator('#cafe-recipe-dialog-title').textContent()) === 'Choose a recipe for slot 4'
+            && (await tp.locator('#cafe-recipe-dialog-empty').isVisible()) && (await dialogRows(tp)).length === 0);
+        await tp.locator('#cafe-recipe-dialog .modal-action button').click();
+        await tp.waitForTimeout(800);
+        check('Cancel closes the list, and nothing changed', !(await dialog(tp).isVisible()) && (await cardName(tp, 4)) === 'Slot 4');
 
-        //     The editor left without saving: nothing is placed, and the hold is dropped.
-        const cancelled = await make(6, 'Never saved', { leave: '#re-cancel-btn' });
-        check('the editor left without saving: nothing is placed',
-            cancelled.remembered?.slot === 6 && (await cardName(tp, 6)) === 'Slot 6' && !(await recordNamed('Never saved')) && writes(cancelled.after) === 0);
-        check('the editor left without saving: the hold is dropped', (await storeValue(HOLD)) == null);
+        //     A new recipe from what the machine is set to, in a slot above 5.
+        const settingsBefore = await settings();
+        let mark = trip.seen.requests.length;
+        await openMenu(tp, 8);
+        await pick(tp, 0);
+        const made = (await records()).find(row => row && !recordsBefore.some(old => old && old.id === row.id));
+        check('"New recipe from current settings" makes a recipe and puts it in held slot 8',
+            !!made && made.stripSlot === 8 && (await cardName(tp, 8)) === made.name, `${made?.name}, slot ${made?.stripSlot}, card "${await cardName(tp, 8)}"`);
+        check('DYE2 named it, from the profile and the bean', /Sample Single Origin/.test(made?.name || ''), made?.name);
+        check('the new recipe is the loaded one', (await title()) === made?.name && (await selectionId()) === made?.id && (await tcards.nth(7).getAttribute('aria-pressed')) === 'true', await title());
+        check('what the machine is set to did not change', (await settings()) === settingsBefore);
+        check('the skin placed it with one write of DYE2\'s records', skinWrites(mark) === 1, `${skinWrites(mark)} writes`);
+        await shot(tp, 'page-new-recipe-slot-8-light');
 
-        //     The held slot filled meanwhile, as by another tablet through Decent
-        //     Sync: the new recipe is saved, and is not put in the slot.
-        const spare = await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/save-recipe`, {});
-        await rewriteRecords(rows => rows.map(row => (row && row.id === spare.id ? { ...row, name: 'Spare', title: 'Spare' } : row)));
-        await tp.reload();
-        await waitForPage(tp);
-        await tp.waitForTimeout(2500);
-        const taken = await make(6, 'Made while slot 6 filled', {
-            between: () => rewriteRecords(rows => rows.map(row => (row && row.name === 'Spare' ? { ...row, stripSlot: 6, showOnStreamlineDashboard: true } : row))),
-        });
-        check('the held slot was filled meanwhile: it keeps its recipe, and the new one is not placed',
-            (await cardName(tp, 6)) === 'Spare' && (await recordNamed('Made while slot 6 filled'))?.stripSlot == null && writes(taken.after) === 0,
-            `${await cardName(tp, 6)}; new recipe's slot ${(await recordNamed('Made while slot 6 filled'))?.stripSlot}`);
-        await rewriteRecords(rows => rows.map(row => (row && row.name === 'Spare' ? { ...row, stripSlot: null } : row)));
+        //     A tap still loads.
+        await load(single);
+        check('a tap still loads a recipe', (await selectionId()) === (await recordNamed(single.name)).id);
 
-        //     More than one new recipe: none is known to be the one made here.
-        await tp.reload();
-        await waitForPage(tp);
-        await tp.waitForTimeout(2500);
-        const several = await make(6, 'Made beside another', {
-            between: async () => {
-                const other = await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/save-recipe`, {});
-                await rewriteRecords(rows => rows.map(row => (row && row.id === other.id ? { ...row, name: 'Another new one', title: 'Another new one' } : row)));
-            },
-        });
-        check('more than one new recipe: nothing is placed',
-            (await cardName(tp, 6)) === 'Slot 6' && (await recordNamed('Made beside another'))?.stripSlot == null && writes(several.after) === 0, await cardName(tp, 6));
+        //     A filled card: three items. Taking a recipe out leaves it in DYE2.
+        await openMenu(tp, decaf.slot);
+        check('holding a filled card opens a menu with three items, and loads nothing',
+            JSON.stringify(await menuItems(tp)) === JSON.stringify(['Replace with a new recipe', 'Replace with another recipe…', 'Remove from slot'])
+            && (await title()) === single.name, (await menuItems(tp)).join(' | '));
+        await shot(tp, 'menu-filled-card-light');
+        await paint(tp, 'dark');
+        await tp.waitForTimeout(500);
+        await shot(tp, 'menu-filled-card-dark');
+        await paint(tp, 'light');
+        await pick(tp, 2);
+        check('"Remove from slot" empties the card, and the recipe stays in DYE2 with no slot',
+            (await cardName(tp, decaf.slot)) === `Slot ${decaf.slot}` && (await recordNamed(decaf.name))?.stripSlot === null, JSON.stringify((await recordNamed(decaf.name))?.stripSlot));
+        check('removing a recipe that is not loaded leaves the loaded one loaded', (await title()) === single.name && (await selectionId()) === (await recordNamed(single.name)).id);
+        await openMenu(tp, long.slot);
+        await pick(tp, 2);
 
-        //     A hold is used by the next load or dropped by it. One left behind,
-        //     as by an editor never come back from, places nothing later.
-        check('no hold is left in the store', (await storeValue(HOLD)) == null);
-        check('the skin never wrote Streamline\'s strip mode on the way out or back', (await storeValue(STRIP_MODE)) === modeBefore, `${modeBefore} then ${await storeValue(STRIP_MODE)}`);
-        const stray = trip.seen.requests.filter(r => /^(POST|DELETE) .*\/store\/streamlineCafe\//.test(r) && !r.endsWith('/slotHold'));
-        check('cafe-only state is one key in the streamlineCafe namespace', stray.length === 0, stray.join(', '));
-        check('no page error across the trips to the editor', trip.seen.errors.length === 0, trip.seen.errors.join(' | '));
+        //     Choosing: the list holds the recipes in no slot, sorted by name.
+        await openMenu(tp, 4);
+        await pick(tp, 1);
+        await dialog(tp).waitFor({ timeout: 5000 });
+        check('the list holds the recipes in no slot, sorted by name', JSON.stringify(await dialogRows(tp)) === JSON.stringify([decaf.name, long.name]), (await dialogRows(tp)).join(' | '));
+        check('a row shows the bean and the profile under the name',
+            (await tp.locator('#cafe-recipe-list .cafe-recipe-row-detail').first().textContent()) === `${decaf.bean} · ${decaf.profile}`,
+            await tp.locator('#cafe-recipe-list .cafe-recipe-row-detail').first().textContent());
+        await shot(tp, 'dialog-choose-light');
+        await paint(tp, 'dark');
+        await tp.waitForTimeout(500);
+        await shot(tp, 'dialog-choose-dark');
+        await paint(tp, 'light');
+        await tp.locator('#cafe-recipe-list .cafe-recipe-row').first().click();
+        await tp.waitForTimeout(3500);
+        check('choosing a recipe puts it in the slot from 1 to 5 that was held',
+            (await cardName(tp, 4)) === decaf.name && (await recordNamed(decaf.name))?.stripSlot === 4, await cardName(tp, 4));
+        check('choosing loads nothing', (await title()) === single.name && (await selectionId()) === (await recordNamed(single.name)).id);
+
+        //     Replacing a card's recipe with another: the one replaced keeps no slot.
+        await openMenu(tp, house.slot);
+        await pick(tp, 1);
+        await dialog(tp).waitFor({ timeout: 5000 });
+        await tp.locator('#cafe-recipe-list .cafe-recipe-row').filter({ hasText: long.name }).click();
+        await tp.waitForTimeout(3500);
+        check('"Replace with another recipe" puts the chosen one on the card, and the one replaced stays in DYE2 with no slot',
+            (await cardName(tp, house.slot)) === long.name && (await recordNamed(long.name))?.stripSlot === house.slot && (await recordNamed(house.name))?.stripSlot === null,
+            `${await cardName(tp, house.slot)}; replaced recipe's slot ${(await recordNamed(house.name))?.stripSlot}`);
+
+        //     The loaded recipe's card removed: it is unloaded, and the machine is
+        //     set as it was.
+        const beforeUnload = await settings();
+        const doseShown = await tp.locator('#dose-in-value').textContent();
+        await openMenu(tp, single.slot);
+        await pick(tp, 2);
+        check('removing the loaded recipe\'s card unloads it: the page reads "No recipe selected"',
+            (await title()) === 'No recipe selected' && (await selectionId()) === null && (await tp.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe',
+            `${await title()}, selection ${await selectionId()}`);
+        check('and what the machine is set to did not change', (await settings()) === beforeUnload && (await tp.locator('#dose-in-value').textContent()) === doseShown);
+
+        //     The loaded recipe's card replaced by a new recipe: the new one is loaded.
+        await tcards.nth(3).click();
+        await tp.locator('#cafe-title').filter({ hasText: decaf.name }).waitFor({ timeout: 20_000 });
+        await tp.waitForTimeout(3000);
+        const known = (await records()).map(row => row && row.id);
+        await openMenu(tp, 4);
+        await pick(tp, 0);
+        const second = (await records()).find(row => row && !known.includes(row.id));
+        check('"Replace with a new recipe" on the loaded card: the new recipe takes the card and is loaded, and the one replaced keeps no slot',
+            !!second && second.stripSlot === 4 && (await title()) === second.name && (await selectionId()) === second.id && (await recordNamed(decaf.name))?.stripSlot === null,
+            `${second?.name}, slot ${second?.stripSlot}, title "${await title()}"`);
+
+        //     While a shot runs the menu does not open.
+        const running = pullShot(8);
+        await tp.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+        await longPress(tp, tcards.nth(5));
+        await tp.waitForTimeout(600);
+        check('while a shot runs a long-press opens no menu', (await tp.locator('#main-page.cafe-shot-live').count()) === 1 && !(await menu(tp).isVisible()));
+        await running;
+        await tp.waitForTimeout(4000);
+
+        check('the page never left for one of DYE2\'s pages', tp.url().startsWith(BASE) && !trip.seen.requests.some(r => /dye2\.reaplugin\/(recipe-edit|dashboard|select-recipe)/.test(r)));
+        check('the skin never wrote Streamline\'s strip mode', (await storeValue(STRIP_MODE)) === modeBefore, `${modeBefore} then ${await storeValue(STRIP_MODE)}`);
+        check('the skin kept no state of its own in Decaid\'s store', !trip.seen.requests.some(r => /^(POST|DELETE) .*\/store\/streamlineCafe\//.test(r)));
+        check('no page error while arranging the strip', trip.seen.errors.length === 0, trip.seen.errors.join(' | '));
         await trip.close();
-        await removeMade();
-        await restoreSamples();
+        await unloadRecipe();
+        await restoreRecords();
     }
 
     // 12. Languages. German has the longest text; Arabic is translated and the
@@ -696,8 +710,26 @@ try {
             }
             await paint(lp, 'light');
         }
-        //     No recipe loaded, and the "DYE2 is needed" screen, in German.
+        //     The menu and the list, in German.
         await setLanguage(lp, 'de');
+        await lp.waitForTimeout(1500);
+        await openMenu(lp, 4);
+        check('de: the menu is translated', JSON.stringify(await menuItems(lp)) === JSON.stringify(['Neues Rezept aus den aktuellen Einstellungen', 'Rezept auswählen…']), (await menuItems(lp)).join(' | '));
+        const menuBox = await menu(lp).boundingBox();
+        check('de: the menu is inside the page', menuBox.x >= 0 && menuBox.x + menuBox.width <= 1920, JSON.stringify(menuBox));
+        await shot(lp, 'menu-empty-slot-de');
+        await pick(lp, 1);
+        await dialog(lp).waitFor({ timeout: 5000 });
+        check('de: the list is translated',
+            (await lp.locator('#cafe-recipe-dialog-title').textContent()) === 'Rezept für Platz 4 auswählen'
+            && (await lp.locator('#cafe-recipe-dialog-empty').textContent()) === 'Keine Rezepte ohne Platz'
+            && (await lp.locator('#cafe-recipe-dialog .modal-action button').textContent()).trim() === 'Abbrechen',
+            await lp.locator('#cafe-recipe-dialog-title').textContent());
+        await shot(lp, 'dialog-choose-de');
+        await lp.locator('#cafe-recipe-dialog .modal-action button').click();
+        await lp.waitForTimeout(600);
+
+        //     No recipe loaded, and the "DYE2 is needed" screen, in German.
         await unloadRecipe();
         await lp.reload();
         await waitForPage(lp);
@@ -750,10 +782,15 @@ try {
         const bcards = back.page.locator('#cafe-strip .cafe-card');
         await bcards.nth(RECIPES[0].slot - 1).click();
         await back.page.locator('#cafe-title').filter({ hasText: RECIPES[0].name }).waitFor({ timeout: 20_000 });
-        await longPress(back.page, bcards.nth(RECIPES[0].slot - 1));
-        await waitForEditor(back.page);
-        await leaveEditor(back.page, '#re-cancel-btn');
-        await restoreSamples();
+        //     Arrange the strip too: take a recipe out of its slot and choose it back.
+        await openMenu(back.page, RECIPES[2].slot);
+        await pick(back.page, 2);
+        await openMenu(back.page, RECIPES[2].slot);
+        await pick(back.page, 1);
+        await dialog(back.page).waitFor({ timeout: 5000 });
+        await back.page.locator('#cafe-recipe-list .cafe-recipe-row').filter({ hasText: RECIPES[2].name }).click();
+        await back.page.waitForTimeout(3500);
+        check('the cafe page arranged its strip', (await cardName(back.page, RECIPES[2].slot)) === RECIPES[2].name);
         check('the cafe page, used after it, leaves the strip mode at R', (await storeValue(STRIP_MODE)) === 'R', String(await storeValue(STRIP_MODE)));
         check('the cafe page still finds DYE2 on', (await (await fetch(SETTING)).json()) === 'true');
         await back.close();

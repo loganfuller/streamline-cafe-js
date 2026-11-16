@@ -8,6 +8,7 @@ import { SUPPORTED_LANGUAGES, parseTranslationColumn } from '../src/modules/i18n
 import { CAFE_TRANSLATIONS, cafeTranslation, fillIn, dateLocale } from '../src/cafe/translations.js';
 import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
 import { pageHeading } from '../src/cafe/page-model.js';
+import { slotMenu } from '../src/cafe/slot-menu.js';
 
 // Streamline's own list says which languages are finished: it is not copied here.
 const FINISHED = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
@@ -60,9 +61,12 @@ const streamlineCells = (() => {
 // modules look up by name, and the ones its models hand to the page.
 function usedKeys() {
     const keys = new Set();
-    for (const match of MAIN_PAGE.matchAll(/data-cafe-text="([^"]*)"/g)) keys.add(match[1]);
+    // The whole document: the page, and the dialog it opens.
+    for (const match of INDEX.matchAll(/data-cafe-text="([^"]*)"/g)) keys.add(match[1]);
     for (const { text } of SOURCES) {
         for (const match of text.matchAll(/\bcafeText\(\s*'((?:[^'\\]|\\.)*)'/g)) keys.add(match[1].replace(/\\'/g, "'"));
+        // A phrase written onto an element by name, to follow the language.
+        for (const match of text.matchAll(/\bsetText\([^;]*?,\s*'((?:[^'\\]|\\.)*)',\s*\{\s*translate:\s*true/g)) keys.add(match[1].replace(/\\'/g, "'"));
     }
     for (const reason of GATE_REASONS) {
         const screen = gateScreen(reason);
@@ -70,6 +74,9 @@ function usedKeys() {
         if (screen.hint) keys.add(screen.hint);
     }
     const recipe = { id: 'r', title: 'Sample', beanName: 'Sample Blend' };
+    for (const card of [{ slot: '1', recipe: null }, { slot: '1', recipe }]) {
+        for (const item of slotMenu(card)) keys.add(item.label);
+    }
     for (const heading of [pageHeading(null, ''), pageHeading(recipe, 'Profile', true), pageHeading(recipe, 'Profile', false)]) {
         keys.add(heading.dialLabel);
         if (heading.translate) { keys.add(heading.title); keys.add(heading.subtitle); }
@@ -105,11 +112,13 @@ test('every phrase the cafe page shows has every finished language', () => {
 });
 
 test('a phrase a module looks up is named in the call, so the scan sees it', () => {
+    // The one lookup by a variable is the card menu's, whose labels the scan
+    // takes from slotMenu() itself.
+    const byVariable = { 'strip.js': ['cafeText(item.label)'] };
     for (const { name, text } of SOURCES) {
         if (name === 'text.js') continue; // where the lookup is defined
-        const calls = [...text.matchAll(/\bcafeText\(/g)].length;
-        const named = [...text.matchAll(/\bcafeText\(\s*'/g)].length;
-        assert.equal(named, calls, `${name}: cafeText() takes its phrase as a quoted string`);
+        const unnamed = [...text.matchAll(/\bcafeText\((?!\s*')[^)]*\)/g)].map(match => match[0]);
+        assert.deepEqual(unnamed, byVariable[name] || [], `${name}: cafeText() takes its phrase as a quoted string`);
     }
 });
 
@@ -119,7 +128,7 @@ test('the page\'s markup is keyed for the cafe\'s lookup, bar what Streamline re
     assert.deepEqual(streamlineKeyed.sort(), ['cupwarmer-text', 'machine-status', 'sleep-button']);
     // Text in the markup is what the key says, so the page reads right before
     // the lookup has run.
-    for (const match of MAIN_PAGE.matchAll(/data-cafe-text="([^"]*)"[^>]*>([^<]*)</g)) {
+    for (const match of INDEX.matchAll(/data-cafe-text="([^"]*)"[^>]*>([^<]*)</g)) {
         assert.equal(match[2], match[1]);
     }
 });

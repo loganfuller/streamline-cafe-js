@@ -51,7 +51,7 @@ function holdsFields(rows, id, fields) {
  *
  * - `unreadable`: the records could not be read, so nothing was written;
  * - `gone`: the recipe is no longer in DYE2;
- * - `taken`: the slot has a holder (`placeInSlot` with `onlyIfEmpty`);
+ * - `taken`: the slot holds another recipe than the caller expected;
  * - `unconfirmed`: written twice, and the change was not there either time.
  */
 export function createRecipeWriter({ read, write }) {
@@ -80,14 +80,26 @@ export function createRecipeWriter({ read, write }) {
     }
 
     /**
-     * Put a recipe in a Recipe Slot, shown on the strip. With `onlyIfEmpty` the
-     * slot is left alone when another recipe is in it by the time of the write.
+     * Put a recipe in a Recipe Slot, shown on the strip. Whatever recipe was in
+     * the slot loses it. `holder` is the recipe the caller saw there, by id, or
+     * null for an empty slot: when given, a slot that holds another recipe by
+     * the time of the write is left alone.
      */
-    function placeInSlot(id, slot, { onlyIfEmpty = false } = {}) {
+    function placeInSlot(id, slot, { holder } = {}) {
+        const other = rows => rows.find(r => !sameId(r, id) && holdsSlot(r, slot));
         return setFields(id, { stripSlot: slot, showOnStreamlineDashboard: true }, {
-            unless: rows => (onlyIfEmpty && rows.some(r => !sameId(r, id) && holdsSlot(r, slot)) ? 'taken' : null),
+            unless(rows) {
+                if (holder === undefined) return null;
+                const now = other(rows);
+                return now && (holder === null || !sameId(now, holder)) ? 'taken' : null;
+            },
         });
     }
 
-    return { setFields, placeInSlot };
+    /** Take a recipe out of its slot. It stays in DYE2's records, in no slot. */
+    function removeFromSlot(id) {
+        return setFields(id, { stripSlot: null });
+    }
+
+    return { setFields, placeInSlot, removeFromSlot };
 }

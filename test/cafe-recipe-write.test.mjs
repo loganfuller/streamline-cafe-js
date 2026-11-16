@@ -157,9 +157,9 @@ test('a recipe deleted between the write and the retry is not put back', async (
     assert.deepEqual(world.rows, [row('a', 1)]);
 });
 
-test('a slot taken meanwhile is left to its holder when only an empty slot is wanted', async () => {
+test('an empty slot filled meanwhile is left to its holder', async () => {
     const world = store([row('a', 7), row('b', null)]);
-    assert.deepEqual(await world.writer.placeInSlot('b', 7, { onlyIfEmpty: true }), { ok: false, reason: 'taken' });
+    assert.deepEqual(await world.writer.placeInSlot('b', 7, { holder: null }), { ok: false, reason: 'taken' });
     assert.equal(world.writes.length, 0);
     assert.equal(world.get('a').stripSlot, 7);
 });
@@ -168,22 +168,64 @@ test('a slot taken between the write and the retry is left to its holder', async
     const world = store([row('a', null), row('b', null)], {
         onWrite(n, w) { if (n === 1) w.rows = [row('a', 7), row('b', null)]; },
     });
-    assert.deepEqual(await world.writer.placeInSlot('b', 7, { onlyIfEmpty: true }), { ok: false, reason: 'taken' });
+    assert.deepEqual(await world.writer.placeInSlot('b', 7, { holder: null }), { ok: false, reason: 'taken' });
     assert.equal(world.writes.length, 1);
     assert.equal(world.get('a').stripSlot, 7);
 });
 
+test('the recipe the card showed is replaced, and stays in DYE2 with no slot', async () => {
+    const world = store([row('a', 7, { decentSyncId: 'ds-a' }), row('b', null)]);
+    const result = await world.writer.placeInSlot('b', 7, { holder: 'a' });
+    assert.equal(result.ok, true);
+    assert.equal(world.get('b').stripSlot, 7);
+    assert.deepEqual(world.get('a'), row('a', null, { decentSyncId: 'ds-a' }));
+});
+
+test('a slot that holds another recipe than the card showed is left alone', async () => {
+    const world = store([row('a', null), row('b', null), row('c', 7)]);
+    assert.deepEqual(await world.writer.placeInSlot('b', 7, { holder: 'a' }), { ok: false, reason: 'taken' });
+    assert.equal(world.writes.length, 0);
+    assert.equal(world.get('c').stripSlot, 7);
+});
+
+test('a slot the card\'s recipe has left meanwhile takes the new one', async () => {
+    const world = store([row('a', null), row('b', null)]);
+    const result = await world.writer.placeInSlot('b', 7, { holder: 'a' });
+    assert.equal(result.ok, true);
+    assert.equal(world.get('b').stripSlot, 7);
+});
+
 test('a hidden recipe naming the slot does not hold it', async () => {
     const world = store([row('a', 7, { showOnStreamlineDashboard: false }), row('b', null)]);
-    const result = await world.writer.placeInSlot('b', 7, { onlyIfEmpty: true });
+    const result = await world.writer.placeInSlot('b', 7, { holder: null });
     assert.equal(result.ok, true);
     assert.equal(world.get('b').stripSlot, 7);
     assert.equal(world.get('a').stripSlot, null);
 });
 
+test('a recipe is taken out of its slot, and nothing else about it changes', async () => {
+    const world = store([row('a', 7, { decentSyncId: 'ds-a', dashboardVariables: { dose: 18 } }), row('b', 2)]);
+    const result = await world.writer.removeFromSlot('a');
+    assert.equal(result.ok, true);
+    assert.deepEqual(world.get('a'), row('a', null, { decentSyncId: 'ds-a', dashboardVariables: { dose: 18 } }));
+    assert.deepEqual(world.get('b'), row('b', 2));
+    assert.equal(world.writes.length, 1);
+});
+
+test('taking out a recipe that is in no slot writes nothing', async () => {
+    const world = store([row('a', null)]);
+    assert.equal((await world.writer.removeFromSlot('a')).ok, true);
+    assert.equal(world.writes.length, 0);
+});
+
+test('taking out a recipe DYE2 has deleted answers that it is gone', async () => {
+    const world = store([row('a', 1)]);
+    assert.deepEqual(await world.writer.removeFromSlot('b'), { ok: false, reason: 'gone' });
+});
+
 test('a change that is already there is not written', async () => {
     const world = store([row('a', 7)]);
-    const result = await world.writer.placeInSlot('a', 7, { onlyIfEmpty: true });
+    const result = await world.writer.placeInSlot('a', 7, { holder: null });
     assert.equal(result.ok, true);
     assert.equal(world.writes.length, 0);
 });

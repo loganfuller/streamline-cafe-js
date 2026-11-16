@@ -776,3 +776,83 @@ button.cafe-card {
 .cafe-main-shown #help-overlay-btn {
     display: none !important;
 }
+
+/* ── Choosing a recipe for a slot ─────────────────────────────────────────── */
+
+.cafe-dialog {
+    width: 640px;
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    border-radius: 20px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+.cafe-dialog h3 {
+    margin: 0 0 16px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+#cafe-recipe-dialog-empty {
+    margin: 8px 0;
+    font-size: 20px;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-recipe-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cafe-recipe-row {
+    flex: none;
+    min-height: 68px;
+    padding: 10px 16px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-recipe-row-name {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.75;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail:empty {
+    display: none;
+}
+
+.cafe-dialog .modal-action {
+    margin-top: 20px;
+}
+
+.cafe-dialog .modal-action .cafe-btn {
+    min-width: 160px;
+}

@@ -5,16 +5,20 @@
 // recipe is Streamline's: `applyRecipe` writes the Workflow and tells DYE2 which
 // recipe is loaded, and which recipe is loaded is then read back from DYE2, as
 // Streamline's strip reads it. recipe-loader.js keeps the two in order. A
-// long-press never loads: it opens DYE2's editor (editor.js).
+// long-press never loads, and never leaves the page: it opens a menu on the
+// card (slot-menu.js), whose actions are in arrange.js.
 import { getDye2KvArray, callPluginEndpoint } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast, setupPressAndHold } from '../modules/ui.js';
+import { openContextMenu } from '../modules/context-menu.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { stripCards, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
-import { editRecipe, createRecipeIn, placeHeldRecipe, onEditorReturn } from './editor.js';
+import { slotMenu } from './slot-menu.js';
+import { makeRecipeIn, chooseRecipeFor, removeRecipe } from './arrange.js';
+import { chooseRecipe } from './recipe-dialog.js';
 import { cafeText } from './text.js';
 
 const RECIPES_KEY = 'recipes';
@@ -49,21 +53,48 @@ async function readDye2() {
     return { rows, selection };
 }
 
-// A long-press opens DYE2's editor, which leaves this page. A dial-in change
-// still on its way is given the chance to be written first, and the editor
-// opens whether or not it was: nothing is loaded here, so nothing can land on
-// the wrong recipe. Ignored while a recipe loads, and while an earlier
-// long-press is still on its way out.
-let leaving = false;
-async function openEditor(open) {
-    if (leaving || loader.busy()) return;
-    leaving = true;
+// The strip is arranged one action at a time, and not while a recipe loads or a
+// shot runs: making a recipe writes the Workflow, and the Workflow is left
+// alone during a shot.
+let arranging = false;
+let shotRunning = () => false;
+let afterArranging = () => {};
+const mayArrange = () => !arranging && !loader.busy() && !shotRunning();
+
+function openMenu(button, card) {
+    if (!mayArrange()) return;
+    openContextMenu(button, slotMenu(card).map(item => ({
+        label: cafeText(item.label),
+        onSelect: () => arrange(item.action, card),
+    })));
+}
+
+async function arrange(action, card) {
+    if (!mayArrange()) return;
+    arranging = true;
+    const slot = Number(card.slot);
+    const holderId = card.recipe ? card.recipe.id : null;
     try {
-        await settleEdits().catch(() => {});
-        await open();
+        if (action === 'new') {
+            // A dial-in change still on its way belongs in the new recipe.
+            const settled = await settleEdits().then(() => true, () => false);
+            if (settled) await makeRecipeIn(slot, holderId);
+            else showToast(cafeText('Could not make a new recipe'), 4000, 'error');
+        } else if (action === 'choose') {
+            const { rows } = await readDye2();
+            const recipe = await chooseRecipe(slot, rows || []);
+            if (recipe && !loader.busy() && !shotRunning()) await chooseRecipeFor(slot, recipe, holderId);
+        } else if (action === 'remove') {
+            await removeRecipe(card.recipe);
+        }
+    } catch (error) {
+        logger.error('Cafe: could not arrange the strip', error);
     } finally {
-        leaving = false;
+        arranging = false;
     }
+    // DYE2's records, and which recipe it says is loaded, decide what is drawn.
+    afterArranging();
+    await loader.refresh().catch(error => logger.warn('Cafe: could not re-read the recipes', error));
 }
 
 const line = (className, text) => {
@@ -82,29 +113,21 @@ function render() {
         button.type = 'button';
         button.dataset.slot = card.slot;
         if (!card.recipe) {
-            // An empty slot: a tap does nothing, and holding it makes a recipe there.
+            // An empty slot: a tap does nothing, and holding it opens the menu.
             button.className = 'cafe-card cafe-card-empty no-select has-context-menu';
             button.append(
                 line('cafe-card-name', cafeText('Slot {n}', { n: card.slot })),
                 line('cafe-card-bean', cafeText('Hold to add')),
             );
-            setupPressAndHold(button, () => {}, () => openEditor(() => createRecipeIn(card.slot)));
+            setupPressAndHold(button, () => {}, () => openMenu(button, card));
             return button;
         }
         button.className = 'cafe-card no-select has-context-menu';
         button.setAttribute('aria-pressed', String(card.loaded));
         button.append(line('cafe-card-name', card.name), line('cafe-card-bean', card.bean));
-        setupPressAndHold(button, () => loader.load(card.recipe), () => openEditor(() => editRecipe(card.recipe)));
+        setupPressAndHold(button, () => loader.load(card.recipe), () => openMenu(button, card));
         return button;
     }));
-}
-
-// Back from DYE2's editor: place the recipe made from a held empty slot, and
-// draw the strip again when that changed DYE2's records.
-function afterEditor() {
-    placeHeldRecipe()
-        .then(placed => (placed ? loader.refresh() : null))
-        .catch(error => logger.warn('Cafe: could not place the new recipe', error));
 }
 
 /** Read DYE2 again, a moment later, so a burst of reasons to look costs one read. */
@@ -121,13 +144,16 @@ export function refreshStripSoon() {
  * page starts. `onChange` is told the loaded recipe, or null, each time the
  * strip is drawn; `onBeforeLoad` resolves once edits made before a tap have been
  * written; `onLoading` is told when a load begins and ends; `onApply` runs once
- * a tap's load has been written, whether or not it landed.
+ * a tap's load has been written, whether or not it landed, and after the strip
+ * was arranged; `isShotRunning` says whether a shot is running.
  */
-export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onLoading = () => {}, onApply = () => {} }) {
-    // Before another recipe is loaded, or the page is left for DYE2's editor: let
+export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onLoading = () => {}, onApply = () => {}, isShotRunning = () => false }) {
+    // Before another recipe is loaded, or a recipe is made from the Workflow: let
     // an edit still on its way reach the Workflow. A request that stalls is not
     // waited for past a few seconds.
     settleEdits = () => within(SETTLE_MAX_MS, onBeforeLoad());
+    shotRunning = isShotRunning;
+    afterArranging = onApply;
     loader = createRecipeLoader({
         apply: applyRecipe,
         read: readDye2,
@@ -150,18 +176,10 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
     // DYE2's records have no push channel. Look again when the page comes back
     // into view, and when a plugin says the Workflow changed.
     window.addEventListener('focus', refreshStripSoon);
-    window.addEventListener('pageshow', event => {
-        // Back from the editor by the browser's own Back, with this page kept as
-        // it was left: no load follows, so the held slot is settled here.
-        if (event.persisted) afterEditor();
-        refreshStripSoon();
-    });
+    window.addEventListener('pageshow', refreshStripSoon);
     document.addEventListener('visibilitychange', refreshStripSoon);
     document.addEventListener('streamline:mainpagevisible', refreshStripSoon);
     document.addEventListener('streamline:workflow-refresh', refreshStripSoon);
     document.addEventListener('streamline:languagechange', render);
-    onEditorReturn(afterEditor);
-    // This load may be the return from the editor.
-    afterEditor();
     return loader.refresh();
 }

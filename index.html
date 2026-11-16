@@ -367,6 +367,21 @@
         </div>
     </div>
 
+    <!-- The recipes in no slot, to choose one for a slot (src/cafe/recipe-dialog.js). -->
+    <dialog id="cafe-recipe-dialog" class="modal" aria-labelledby="cafe-recipe-dialog-title">
+        <div class="modal-box cafe-dialog">
+            <h3 id="cafe-recipe-dialog-title"></h3>
+            <p id="cafe-recipe-dialog-empty" data-cafe-text="No recipes without a slot">No recipes without a slot</p>
+            <div id="cafe-recipe-list"></div>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
+
     <dialog id="profile_modal" class="modal">
         <div class="modal-box">
             <h3 class="font-bold text-lg" data-i18n-key="Choose a Profile">Choose a Profile</h3>

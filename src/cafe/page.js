@@ -260,6 +260,11 @@ function shotEnded() {
     if (block) block.style.display = 'none';
 }
 
+/** Is a shot running? The strip is not arranged during one. */
+export function shotRunning() {
+    return liveTimer !== null;
+}
+
 // ── Scale battery ────────────────────────────────────────────────────────────
 
 // app.js keeps the level the scale last reported; nothing announces a change.

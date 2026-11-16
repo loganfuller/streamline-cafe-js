@@ -16,3 +16,6 @@ const writer = createRecipeWriter({
 
 /** Put a recipe in a Recipe Slot, 1 to 9. See recipe-write.js for the answer. */
 export const placeInSlot = writer.placeInSlot;
+
+/** Take a recipe out of its slot. */
+export const removeFromSlot = writer.removeFromSlot;
