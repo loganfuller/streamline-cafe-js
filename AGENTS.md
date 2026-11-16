@@ -58,5 +58,6 @@ This repository is Streamline Cafe, a fork of Streamline with its own main page.
 - Keep the element ids Streamline's modules drive in `index.html`. Where a module needs an element the layout drops, keep a hidden stub instead of editing the module.
 - Load a recipe only through Streamline's `applyRecipe`. Never write Streamline's strip mode setting.
 - Write DYE2's recipe records only through the fork's one writer module.
+- For a change to the main page, do the smoke run in [`docs/cafe/SMOKE.md`](docs/cafe/SMOKE.md) and put its screenshots on the pull request. Sample data is made up: no cafe's names, beans or recipes.
 - Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.
 - Do not open issues or pull requests on `decentespresso` repositories from work on this fork.

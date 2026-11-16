@@ -13,6 +13,8 @@ Streamline bumps its version with each release, and the fork's version sits on t
 - `package.json`: `version`
 - `package-lock.json`: `version`, twice
 
+`src/css/app.css` is Tailwind's output for the page's markup and scripts, and the fork's page is not Streamline's. Don't merge it by hand: take either side, run `npm run build:css` and commit the result. CI fails when the committed file is not what the build writes.
+
 ## Identity
 
 | File | Change |
@@ -24,6 +26,24 @@ Streamline bumps its version with each release, and the fork's version sits on t
 | `src/settings/settings.js` | The manual button links to this repository's README. `skinRepoSlug` falls back to `loganfuller/streamline-cafe-js`. |
 | `README.md` | One paragraph above Streamline's manual saying what this fork is. |
 | `AGENTS.md` | A section for this fork, appended at the end. |
+
+## The main page
+
+`index.html` is the fork's own (`DESIGN.md`, "How the code is shaped"), so a change Streamline makes to its page is read and carried over by hand, never merged in. What to look for in Streamline's `index.html` at each adoption: a new or renamed element id that a module reads, a new script or stylesheet in `<head>`, and a change to the two inline scripts there.
+
+| File | Change |
+| --- | --- |
+| `index.html` | The main page's markup is the cafe layout. It keeps the ids Streamline's modules drive, and hidden stubs for the two history arrows, the fullscreen toggle, and the steam tile's duration and mode elements. `<head>` gains `src/cafe/cafe.css`. The inline module that started Streamline's strip is gone: `src/cafe/start.js` starts it once DYE2 is known to be there. |
+| `src/modules/app.js` | One import and one line at the top of `initMainPageOnce`: the main page starts only when `cafeMayStart()` in `src/cafe/start.js` says so. While it says no, `initMainPageOnce` returns `null` without starting, and the next call asks again. |
+| `src/css/app.css` | Rebuilt for the fork's page. See above. |
+| `.gitignore` | `test/cafe-smoke/out/`, the smoke run's screenshots. |
+
+Streamline's modules are otherwise unedited. Where the page needs one to behave differently, it does so from outside, in `src/cafe/` and `src/cafe/cafe.css`:
+
+- **Steam.** `ui.js` steps whichever of steam time and steam flow its tile mode names. `src/cafe/page.js` puts the mode back to flow at start-up and after each recipe load, through `setSteamTileModeIfSafe`.
+- **Taps Streamline wires that the page does not offer yet.** `app.js` opens the profile list from `#profile-name` and DYE2's grinder page from `#grind-label`. `cafe.css` takes pointer events off both.
+- **The help button.** `help-launcher.js` adds a "?" that explains Streamline's page. `cafe.css` hides it while the main page shows.
+- **The footer.** `main.css` reserves 242px under `<main>` for Streamline's footer cards; `cafe.css` gives it back to the graph.
 
 ## Builds
 

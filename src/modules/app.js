@@ -40,6 +40,8 @@ import { sleepProfileMark, shouldApplyWakeProfile, createSleepMarkStore } from '
 import { legacyKeysToPurge, LEGACY_VISUALIZER_PURGED_FLAG } from './legacy-credentials-purge.js';
 import { shouldPromptReload } from './skin-version.js';
 import { APP_VERSION, SKIN_ID } from '../version.js';
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): the main page starts only when DYE2 is there.
+import { cafeMayStart } from '../cafe/start.js';
 
 window.app = { api, ui, chart };
 
@@ -2357,6 +2359,9 @@ async function initMainPageOnce() {
     if (mainPageInitialized) return;
     if (mainPageInitPromise) return mainPageInitPromise;
     mainPageInitPromise = (async () => {
+        // Streamline Cafe: nothing below runs while the "DYE2 is needed" screen
+        // shows. Not started is not a failure: the next call asks again.
+        if (!(await cafeMayStart())) { mainPageInitPromise = null; return null; }
         logger.info('initMainPageOnce: starting.');
         const historyInit = history.initHistory().then(resolveHistoryReady);
         await Promise.all([historyInit, profileManager.init()]);
