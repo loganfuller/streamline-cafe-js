@@ -30,7 +30,7 @@ let view = 'reference';
 let live = false;
 let settling = false;   // a shot has ended and Decaid does not have it yet
 let settleStep = 0;     // how many looks for that shot have been scheduled
-let settleFrom = null;  // the id of the Shot in the graph before that shot
+let settleFrom = null;  // the id of the Shot in the graph before that shot; undefined when none had been read
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
 let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves
 let drawing = null;     // the measurements this module is handing the chart itself
@@ -115,9 +115,15 @@ async function refresh() {
     if (mine !== seq || live) return;
     // A shot has just ended and Decaid does not have it yet: the graph keeps
     // its live lines, and the next look is a little later.
-    if (settling && settleStep < SETTLE_GAPS_MS.length && (shot ? shot.id : null) === settleFrom) {
-        settleNext();
-        return;
+    if (settling && settleStep < SETTLE_GAPS_MS.length) {
+        const id = shot ? shot.id : null;
+        // Nothing had been read for this recipe when the shot started, so this
+        // look's answer is the Shot to tell the finished one from.
+        if (settleFrom === undefined) settleFrom = id;
+        if (id === settleFrom) {
+            settleNext();
+            return;
+        }
     }
     latest = shot;
     // Kept with no Shot too: the seam's answer still says whether one can be chosen.
@@ -196,7 +202,7 @@ function shotEnded() {
     if (getTotalTime() > 0) {
         settling = true;
         settleStep = 0;
-        settleFrom = latest ? latest.id : null;
+        settleFrom = latest === undefined ? undefined : latest ? latest.id : null;
         applyOverlay();
         paint();
         settleNext();

@@ -171,7 +171,7 @@ test('in Targets: no reference row, badge, lines or lines of text; the target le
     assert.equal(graphModel({ recipe, view: 'targets', shot: shot('a'), reference: ref('a') }).badge, false);
     assert.equal(graphModel({ recipe, view: 'targets', shot: shot('a'), reference: ref('a') }).makeReference, false, 'the Shot is the reference already');
     assert.equal(graphModel({ recipe: null, view: 'targets', shot: shot('n') }).line, null);
-    assert.equal(graphModel({ recipe, view: 'targets', shot: null, reference: null }).line, null);
+    assert.equal(graphModel({ recipe, view: 'targets', shot: null, reference: null }).line, 'No shot with this recipe on this machine yet', 'that line is about the Shot, so an empty graph still says why');
 });
 
 test('while a shot runs: "Live shot", the reference behind it, no Make reference', () => {

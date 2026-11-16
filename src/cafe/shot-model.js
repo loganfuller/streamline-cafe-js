@@ -199,7 +199,7 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
 
     let line = null;
     if (inReference && recipe === null) line = 'Pick a recipe to compare';
-    else if (inReference && recipe && atRest && shot === null) line = 'No shot with this recipe on this machine yet';
+    else if (recipe && atRest && shot === null) line = 'No shot with this recipe on this machine yet';
 
     const showsReference = inReference && !!referenceShot && !isReference;
     return {
