@@ -90,10 +90,12 @@ async function arrange(action, card) {
             // A shot may start while the records are read, or while the list is
             // open: the list is not put over a running shot, and nothing is placed.
             const { rows } = await readDye2();
-            const recipe = clear() ? await chooseRecipe(slot, rows || []) : null;
+            // Records that could not be read are not an empty list.
+            if (!rows) showToast(cafeText('Could not read the recipes'), 4000, 'error');
+            const recipe = rows && clear() ? await chooseRecipe(slot, rows) : null;
             if (recipe && clear()) await chooseRecipeFor(slot, recipe, holderId);
         } else if (action === 'remove') {
-            await removeRecipe(card.recipe);
+            await removeRecipe(card.recipe, slot);
         }
     } catch (error) {
         logger.error('Cafe: could not arrange the strip', error);

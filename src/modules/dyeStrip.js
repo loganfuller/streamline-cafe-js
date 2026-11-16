@@ -763,6 +763,21 @@ async function refreshAfterApply(modeHints) {
     }
 }
 
+// Streamline Cafe's one hook in this file (docs/cafe/UPSTREAM_EDITS.md). The cafe page changes
+// which recipe is loaded without an apply: DYE2's save-recipe loads the recipe it makes, and a
+// recipe that leaves its slot is unloaded by clearing DYE2's selection. This drops what this
+// module holds about the item it last applied and stops an arm still retrying in the
+// background, so a retry cannot put the old selection back afterwards. It posts nothing: the
+// caller tells DYE2 itself.
+export function forgetAppliedItem() {
+    applySeq++;
+    activeItemId = null;
+    activeModified = false;
+    clearActiveItem();
+    forgetParkedSelection();
+    dye2Armed = false;
+}
+
 // ─── DYE2 page navigation ─────────────────────────────────────────────────────
 //
 // Where the skin and the plugin share an origin, a DYE2 page loads in an <iframe>

@@ -12,6 +12,9 @@
 // - gives a slot one holder: the row placed in it takes it from any other;
 // - reads again to confirm, and tries once more when the change is not there.
 
+import { recipeStripCells } from '../modules/dye-selection.js';
+import { SLOT_COUNT } from './strip-model.js';
+
 const sameId = (row, id) => !!row && typeof row === 'object' && String(row.id) === String(id);
 
 // Stored values are JSON, and a field this module wrote reads back in the order
@@ -52,7 +55,8 @@ function holdsFields(rows, id, fields) {
  * - `unreadable`: the records could not be read, so nothing was written;
  * - `gone`: the recipe is no longer in DYE2;
  * - `taken`: the slot holds another recipe than the caller expected;
- * - `placed`: the recipe is in another slot by now (`placeInSlot` with `unplaced`);
+ * - `placed`: the recipe is on another card by now (`placeInSlot` with `unplaced`);
+ * - `moved`: the recipe is not in the slot the caller saw it in (`removeFromSlot`);
  * - `legacy`: no record names a slot at all, as an older DYE2 left them. The
  *   strip then places recipes by their ids, and one record given a slot would
  *   end that for all of them, emptying every other card;
@@ -92,13 +96,19 @@ export function createRecipeWriter({ read, write }) {
      *
      * - `holder` is the recipe the caller saw in the slot, by id, or null for an
      *   empty slot. A slot that holds another recipe by now is left alone.
-     * - `unplaced` says the caller saw the recipe in no slot. One that is in
-     *   another slot by now is left there, and not moved out of it unseen.
+     * - `unplaced` says the caller saw the recipe on no card. One that is on
+     *   another card by now is left there, and not moved off it unseen. "On a
+     *   card" is the strip's own reading, the one the list of recipes to choose
+     *   from is built by: a second row naming a slot another row holds, or one
+     *   naming a slot that does not exist, is on none.
      */
     function placeInSlot(id, slot, { holder, unplaced = false } = {}) {
         return setFields(id, { stripSlot: slot, showOnStreamlineDashboard: true }, {
             unless(rows, row) {
-                if (unplaced && row.stripSlot != null && row.stripSlot !== slot && row.showOnStreamlineDashboard !== false) return 'placed';
+                if (unplaced) {
+                    const cell = recipeStripCells(rows, SLOT_COUNT).find(c => c.recipe === row);
+                    if (cell && Number(cell.slot) !== slot) return 'placed';
+                }
                 if (holder === undefined) return null;
                 const now = rows.find(r => !sameId(r, id) && holdsSlot(r, slot));
                 return now && (holder === null || !sameId(now, holder)) ? 'taken' : null;
@@ -106,9 +116,15 @@ export function createRecipeWriter({ read, write }) {
         });
     }
 
-    /** Take a recipe out of its slot. It stays in DYE2's records, in no slot. */
-    function removeFromSlot(id) {
-        return setFields(id, { stripSlot: null });
+    /**
+     * Take a recipe out of its slot. It stays in DYE2's records, in no slot.
+     * `slot` is the slot the caller saw it in: a recipe that is somewhere else
+     * by now is left where it is.
+     */
+    function removeFromSlot(id, { slot } = {}) {
+        return setFields(id, { stripSlot: null }, {
+            unless: (rows, row) => (slot !== undefined && row.stripSlot != null && !holdsSlot(row, slot) ? 'moved' : null),
+        });
     }
 
     return { setFields, placeInSlot, removeFromSlot };

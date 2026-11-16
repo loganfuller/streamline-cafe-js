@@ -238,6 +238,31 @@ test('records an older DYE2 left, with no slot named on any, are not given one',
     assert.equal((await world.writer.setFields('2', { grinderId: 'g1' })).ok, true);
 });
 
+test('a recipe the list offers is one the writer places: a second row naming a held slot, or a slot that does not exist', async () => {
+    // The strip shows `a` in slot 3, so `b` is on no card, and neither is `c`.
+    const world = store([row('a', 3), row('b', 3), row('c', 12)]);
+    assert.equal((await world.writer.placeInSlot('b', 5, { holder: null, unplaced: true })).ok, true);
+    assert.equal((await world.writer.placeInSlot('c', 6, { holder: null, unplaced: true })).ok, true);
+    assert.equal(world.get('b').stripSlot, 5);
+    assert.equal(world.get('c').stripSlot, 6);
+    assert.equal(world.get('a').stripSlot, 3);
+});
+
+test('a recipe moved to another slot meanwhile is not taken out of it', async () => {
+    const world = store([row('a', 5)]);
+    assert.deepEqual(await world.writer.removeFromSlot('a', { slot: 3 }), { ok: false, reason: 'moved' });
+    assert.equal(world.writes.length, 0);
+    assert.equal(world.get('a').stripSlot, 5);
+});
+
+test('a recipe taken out of the slot its card showed, and one already out of it', async () => {
+    const world = store([row('a', 3), row('b', null)]);
+    assert.equal((await world.writer.removeFromSlot('a', { slot: 3 })).ok, true);
+    assert.equal(world.get('a').stripSlot, null);
+    assert.equal((await world.writer.removeFromSlot('b', { slot: 4 })).ok, true);
+    assert.equal(world.writes.length, 1);
+});
+
 test('a recipe is taken out of its slot, and nothing else about it changes', async () => {
     const world = store([row('a', 7, { decentSyncId: 'ds-a', dashboardVariables: { dose: 18 } }), row('b', 2)]);
     const result = await world.writer.removeFromSlot('a');

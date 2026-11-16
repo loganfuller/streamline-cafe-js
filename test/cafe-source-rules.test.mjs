@@ -31,6 +31,19 @@ test('no module opens one of DYE2\'s pages', () => {
     assert.deepEqual(filesWith(/\bopenPluginOverlay\b|recipe-edit/), []);
 });
 
+test('Streamline\'s strip module is asked for three things only', () => {
+    // Its apply, its start, and the one hook the fork added to it.
+    const names = new Set();
+    for (const { text } of SOURCES) {
+        for (const match of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\.\/modules\/dyeStrip\.js'/g)) {
+            for (const name of match[1].split(',')) names.add(name.trim());
+        }
+    }
+    assert.deepEqual([...names].sort(), ['applyRecipe', 'forgetAppliedItem', 'initDyeStrip']);
+    const strip = readFileSync(new URL('../src/modules/dyeStrip.js', import.meta.url), 'utf8');
+    assert.match(strip, /export function forgetAppliedItem\(\) \{\s*applySeq\+\+;/, 'the hook is still in dyeStrip.js after a merge of Streamline');
+});
+
 test('no module writes Streamline\'s strip mode', () => {
     assert.deepEqual(filesWith(/\bsetStripMode\b|dyeStripMode/), []);
 });

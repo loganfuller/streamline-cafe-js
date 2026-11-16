@@ -6,12 +6,14 @@
 // request, which builds it from the Workflow and marks it as the loaded one.
 // Slots are written by recipe-writer.js. A recipe that leaves its slot stays in
 // DYE2 with none, and can be chosen again.
-import { callPluginEndpoint } from '../modules/api.js';
+import { callPluginEndpoint, getDye2KvArray } from '../modules/api.js';
+import { forgetAppliedItem } from '../modules/dyeStrip.js';
+import { recipeStripCells } from '../modules/dye-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { placeInSlot, removeFromSlot } from './recipe-writer.js';
-import { recipeName } from './strip-model.js';
+import { recipeName, SLOT_COUNT } from './strip-model.js';
 import { cafeText } from './text.js';
 
 const failed = text => showToast(text, 4000, 'error');
@@ -20,15 +22,28 @@ const failed = text => showToast(text, 4000, 'error');
 // on the machine must not go on being saved onto a recipe with no card. Which
 // recipe is loaded is a marker in the Workflow, and DYE2's selection request
 // clears that marker alone, so what the machine is set to does not change.
+// Streamline's strip module is told first, so a request of its own that is
+// still retrying does not put the recipe back.
 async function unloadIfLoaded(recipeId) {
     try {
         const selection = await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', null, 'GET');
         if (!selection || selection.kind !== 'recipe' || String(selection.id) !== String(recipeId)) return;
+        forgetAppliedItem();
         await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', {});
     } catch (error) {
         // The page goes on naming the recipe as loaded, which is then still true.
         logger.warn('Cafe: could not unload the recipe that left its slot', error);
     }
+}
+
+// The recipe a card showed, after another was put in its slot: unloaded only if
+// DYE2's records, read again, show it on no card. It may have been moved to
+// another slot before the write, and is then still on the strip.
+async function unloadIfOffTheStrip(recipeId) {
+    const rows = await getDye2KvArray('recipes');
+    if (!rows) return;
+    const onACard = recipeStripCells(rows, SLOT_COUNT).some(cell => cell.recipe && String(cell.recipe.id) === String(recipeId));
+    if (!onACard) await unloadIfLoaded(recipeId);
 }
 
 /**
@@ -40,6 +55,9 @@ async function unloadIfLoaded(recipeId) {
 export async function makeRecipeIn(slot, holderId) {
     let made;
     try {
+        // DYE2 marks the recipe it makes as loaded: Streamline's strip module
+        // must not go on arming the one it applied last.
+        forgetAppliedItem();
         made = await callPluginEndpoint(DYE2_PLUGIN_ID, 'save-recipe', {});
         if (!made || made.id == null) throw new Error('DYE2 answered without a recipe');
     } catch (error) {
@@ -63,14 +81,17 @@ export async function chooseRecipeFor(slot, recipe, holderId) {
     if (!result.ok) {
         logger.warn(`Cafe: the recipe was not placed in slot ${slot} (${result.reason})`);
         failed(cafeText('Could not place {name} in slot {n}', { name: recipeName(recipe), n: slot }));
-        return;
     }
-    if (holderId != null) await unloadIfLoaded(holderId);
+    // Placed or not: a write that could not be confirmed may still have landed.
+    if (holderId != null) await unloadIfOffTheStrip(holderId);
 }
 
-/** Take a recipe out of its slot. It stays in DYE2, in no slot. */
-export async function removeRecipe(recipe) {
-    const result = await removeFromSlot(recipe.id);
+/**
+ * Take a recipe out of the slot its card showed. It stays in DYE2, in no slot.
+ * One that another tablet has moved meanwhile is left where it is.
+ */
+export async function removeRecipe(recipe, slot) {
+    const result = await removeFromSlot(recipe.id, { slot });
     if (!result.ok) {
         logger.warn(`Cafe: the recipe was not taken out of its slot (${result.reason})`);
         failed(cafeText('Could not remove {name} from its slot', { name: recipeName(recipe) }));

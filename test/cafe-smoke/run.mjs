@@ -770,7 +770,7 @@ try {
         const sp = await sl.newPage();
         await sp.goto(`${STREAMLINE}/index.html`);
         await sp.locator('#dye-toggle-R').waitFor({ state: 'visible', timeout: 30_000 });
-        check('Streamline, on the same Decaid, finds DYE2 on: the setting is shared', true);
+        check('Streamline, on the same Decaid, finds DYE2 on: the setting is shared', (await sp.locator('#dye-toggle-R').isVisible()) && (await (await fetch(SETTING)).json()) === 'true');
         await sp.locator('#dye-toggle-R').click();
         await sp.waitForTimeout(3000);
         check('Streamline\'s strip mode, set to R there, is in Decaid\'s store', (await storeValue(STRIP_MODE)) === 'R', String(await storeValue(STRIP_MODE)));
