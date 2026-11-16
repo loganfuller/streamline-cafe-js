@@ -13,21 +13,24 @@ export function createPendingWrite({ write, delayMs, setTimer = setTimeout, clea
     let waiting = false;
     let value;
     let failed = false;             // what is waiting is a value whose write just failed
+    let taken = 0;                  // counts values taken to be written
     let active = Promise.resolve(); // the write under way, or the last one finished
 
     // Begin writing what is waiting, after any write under way. `write` reports
     // its own failure and rejects; the value is then put back, unless a newer one
-    // has taken its place.
+    // is waiting or has been taken to be written since: an older value must
+    // never be written after a newer one.
     function start() {
         clearTimer(timer);
         timer = null;
         if (!waiting) return;
         const sending = value;
+        const mine = ++taken;
         waiting = false;
         failed = false;
         value = undefined;
         active = active.then(() => write(sending)).then(() => {}, () => {
-            if (waiting) return;
+            if (waiting || taken !== mine) return;
             value = sending;
             waiting = true;
             failed = true;

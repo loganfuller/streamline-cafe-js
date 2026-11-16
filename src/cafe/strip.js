@@ -16,7 +16,7 @@ import { isSubPage } from '../modules/router.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
-import { stripCards, stillLoaded, recipeName } from './strip-model.js';
+import { stripCards, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText } from './text.js';
@@ -24,7 +24,9 @@ import { cafeText } from './text.js';
 const RECIPES_KEY = 'recipes';
 const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive together
 const SAVE_DELAY_MS = 1500; // after the last change, so a run of steps is one save
-const SETTLE_MAX_MS = 5000; // the longest a tap waits on earlier edits before its load is called off
+// The longest a tap waits on earlier edits before its load is called off. A save
+// reads the machine's settings, which on a tablet can take several seconds.
+const SETTLE_MAX_MS = 8000;
 
 let cards = stripCards([], null); // as last drawn
 let loader = null;
@@ -39,13 +41,13 @@ async function readSelection() {
     }
 }
 
-// Ask DYE2 to save the dial-in now on the machine onto the recipe it has loaded.
-// DYE2 saves each value the Workflow holds otherwise than the record does, into
-// whichever recipe it has loaded when asked, so the skin first checks that is
-// still the recipe the change was made on.
+// Ask DYE2 to save the dial-in now on the machine. DYE2 saves each value the
+// Workflow holds otherwise than the record does, into the recipe the Workflow
+// names, and into none when it names none: Streamline's profile changes clear
+// that name in the same write, so a change of profile is never saved onto the
+// recipe it left. `recipe` is the one the change was made on, for the message.
 async function saveDialIn(recipe) {
     try {
-        if (!stillLoaded(await readSelection(), recipe)) return;
         const answer = await callPluginEndpoint(DYE2_PLUGIN_ID, 'record', null, 'POST');
         // The record changed: the cards' copy of it is now behind.
         if (answer && answer.saved) refreshStripSoon();

@@ -107,6 +107,26 @@ test('a newer value replaces one whose write failed', async () => {
     assert.equal(pending.pending(), undefined);
 });
 
+test('a value that fails is not written after a newer one that was already taken', async () => {
+    const finishers = [];
+    const tried = [];
+    const { pending } = build({
+        write: value => new Promise((resolve, reject) => { tried.push(value); finishers.push(value === 1 ? () => reject(new Error('503')) : resolve); }),
+    });
+    pending.set(1);
+    const first = pending.flush(); // 1 is being written
+    await new Promise(resolve => setImmediate(resolve));
+    pending.set(2);
+    const second = pending.flush(); // 2 is taken, to follow it
+    finishers[0](); // 1 fails
+    await new Promise(resolve => setImmediate(resolve));
+    finishers[1]();
+    await Promise.all([first, second]);
+    assert.equal(pending.pending(), undefined, 'the older value is not brought back');
+    await pending.flush();
+    assert.deepEqual(tried, [1, 2]);
+});
+
 test('a change made during a write that fails is still written', async () => {
     const finishers = [];
     const tried = [];

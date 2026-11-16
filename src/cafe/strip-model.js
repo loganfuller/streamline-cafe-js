@@ -38,18 +38,6 @@ export function loadedAfterRead(selection, recipes, previous) {
 }
 
 /**
- * May a dial-in change made on `recipe` be saved onto it now? DYE2's save goes
- * into whichever recipe it has loaded at that moment, so not when it has moved
- * to another, or unloaded this one, as it does a moment after the profile
- * changes. A selection that could not be read does not stop the save: DYE2
- * then answers for itself.
- */
-export function stillLoaded(selection, recipe) {
-    if (selection === undefined) return true;
-    return !!selection && selection.kind === 'recipe' && String(selection.id) === String(recipe.id);
-}
-
-/**
  * One card per Recipe Slot, 1 to 9, in order. An empty slot has no recipe, and
  * stays where it is so cards never move.
  */
