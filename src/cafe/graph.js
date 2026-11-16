@@ -38,6 +38,7 @@ let overlayKey;         // what the overlay was last set for
 let seq = 0;
 let refreshTimer = null;
 let settleTimer = null;
+let lateTimer = null;     // the one look left after a recipe change stopped the others
 let busy = false;       // a reference is being chosen
 
 const el = id => document.getElementById(id);
@@ -159,7 +160,10 @@ export function showGraphRecipe(next) {
     // A shot had just ended and Decaid may not have it yet. The graph is this
     // recipe's now, so the looks for that shot stop, bar one once Decaid must
     // have it: the recipe it was pulled with may be loaded again by then.
-    if (settling) settleTimer = setTimeout(() => refresh(), SETTLE_LAST_MS);
+    if (settling) {
+        clearTimeout(lateTimer);
+        lateTimer = setTimeout(() => refresh(), SETTLE_LAST_MS);
+    }
     settling = false;
     applyOverlay();
     paint();
@@ -173,6 +177,7 @@ function shotStarted() {
     settling = false;
     seq += 1;
     clearTimeout(settleTimer);
+    clearTimeout(lateTimer);
     clearTimeout(refreshTimer);
     refreshTimer = null;
     el('cafe-reference-dialog')?.close();
