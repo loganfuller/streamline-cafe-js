@@ -34,8 +34,8 @@ test('the reference\'s three lines follow Streamline\'s seven, which keep their 
     assert.strictEqual(drawn[8].y, reference.flow.y);
     assert.strictEqual(drawn[9].x, reference.weight.x);
     for (const trace of drawn.slice(7)) {
-        assert.deepEqual(trace.line.dash, [7, 6], 'dashed');
-        assert.match(trace.line.color, /^rgba\(/, 'faded');
+        assert.equal('dash' in trace.line, false, 'solid: the dotted lines are the profile\'s targets');
+        assert.match(trace.line.color, /^rgba\(\d+, \d+, \d+, 0\.\d+\)$/, 'faded');
         assert.equal(trace.hoverinfo, 'skip');
     }
 });

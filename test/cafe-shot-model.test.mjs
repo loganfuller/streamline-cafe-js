@@ -133,7 +133,7 @@ test('"Different profile" shows when the reference was pulled on another profile
     assert.equal(graphModel({ recipe: { id: 'r1' }, view: 'reference', shot: shot('a'), reference: ref('b', 'Adaptive v3') }).flag, false, 'the recipe names no profile');
 });
 
-test('when the latest Shot is the reference: a badge, no dashed lines, no Make reference', () => {
+test('when the latest Shot is the reference: a badge, no reference lines, no Make reference', () => {
     const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('a') });
     assert.deepEqual([shown.badge, shown.reference, shown.lines, shown.makeReference], [true, null, false, false]);
     assert.equal(shown.row.label, 'Latest');

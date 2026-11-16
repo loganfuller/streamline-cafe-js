@@ -176,7 +176,7 @@ export function viewFrom(stored) {
  * `reference`, the Shot the reference row names, or null; `flag`, whether that
  * row says "Different profile"; `badge`, "This shot is the reference";
  * `targets`, the "Profile target" legend; `makeReference`; and `lines`, whether
- * the reference's dashed lines are drawn.
+ * the reference's lines are drawn.
  */
 export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null }) {
     const inReference = view !== 'targets';

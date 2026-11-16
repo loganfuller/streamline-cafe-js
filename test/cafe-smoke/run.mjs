@@ -525,7 +525,7 @@ try {
         now = await legend(page);
         check('Make reference with none chosen asks nothing', (await page.locator('#cafe-reference-dialog[open]').count()) === 0);
         check('the latest Shot is now the reference: a badge, no reference row, no Make reference', now.badge === 'This shot is the reference' && now.reference === null && now.make === null, JSON.stringify(now));
-        check('and no dashed lines are drawn', (await chartLines(page)).points.slice(7).every(n => n === 0));
+        check('and the reference\'s lines are not drawn', (await chartLines(page)).points.slice(7).every(n => n === 0));
         check('the choice is kept in Decaid\'s store, as recipe to Shot', (await storeValue(REFERENCES))?.[recipeId] === first.id, JSON.stringify(await storeValue(REFERENCES)));
         await shot(page, 'graph-shot-is-reference-light');
 
@@ -565,7 +565,7 @@ try {
         await page.locator('#cafe-make-reference').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
         await page.waitForTimeout(1500);
 
-        //    At rest: the new Shot, solid, against the reference, dashed.
+        //    At rest: the new Shot against the reference, which is faded.
         const latestShot = await newestShotWith(recipeId);
         now = await legend(page);
         lines = await chartLines(page);

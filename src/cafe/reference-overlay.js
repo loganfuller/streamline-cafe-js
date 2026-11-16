@@ -1,4 +1,4 @@
-// The Reference view of the graph: the reference's lines behind the Shot's own,
+// The Reference view of the graph: the reference's lines, faded, with the Shot's own,
 // and no targets (docs/cafe/DESIGN.md, "Shots and the reference"). No browser
 // global is touched.
 //
@@ -22,13 +22,14 @@
 // A live shot's time axis ends here as a share of its width, as in chart.js.
 const LIVE_X_DATA_FRACTION = 0.93;
 
-// Dashed, in the Shot's own hues at part strength: `rgba` is how a line is
-// faded, since a line's style carries colour, width and dash only.
+// Solid, in the Shot's own hues at part strength. The profile's targets are the
+// dotted lines, in Targets, so a faded solid line is always the reference.
+// `rgba` is how a line is faded: a line's style carries colour, width and dash
+// only.
 const COLORS = {
     light: { pressure: 'rgba(23, 194, 154, 0.5)', flow: 'rgba(3, 88, 207, 0.45)', weight: 'rgba(160, 112, 78, 0.5)' },
     dark: { pressure: 'rgba(0, 176, 135, 0.55)', flow: 'rgba(72, 140, 255, 0.55)', weight: 'rgba(190, 165, 145, 0.5)' },
 };
-const DASH = [7, 6];
 // The full-screen chart draws the Shot's lines wide; the reference's stay thinner.
 const REFERENCE_MAX_WIDTH = 3;
 const NAMES = { pressure: 'Reference pressure', flow: 'Reference flow', weight: 'Reference weight' };
@@ -85,7 +86,7 @@ export function referenceOverlay(traces, layout, mode, { curves = null, dark = f
             name: NAMES[key],
             type: 'scatter',
             mode: 'lines',
-            line: { color: referenceColor(key, dark), dash: DASH, ...(width ? { width: Math.min(width, REFERENCE_MAX_WIDTH) } : {}) },
+            line: { color: referenceColor(key, dark), ...(width ? { width: Math.min(width, REFERENCE_MAX_WIDTH) } : {}) },
             hoverinfo: 'skip',
         });
     }

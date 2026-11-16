@@ -298,8 +298,8 @@ export function initGraph() {
     // Streamline's history module asks to draw then too, which is the same cue.
     document.addEventListener('streamline:mainpagevisible', refreshSoon);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSoon(); });
-    // A time is written in the page's language, and the dashed swatch in the
-    // theme's colour.
+    // A time is written in the page's language, and the reference's swatch in
+    // the theme's colour.
     document.addEventListener('streamline:languagechange', paint);
     new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
