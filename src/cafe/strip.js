@@ -87,8 +87,10 @@ async function arrange(action, card) {
             if (!settled) showToast(cafeText('Could not make a new recipe'), 4000, 'error');
             else if (clear()) await makeRecipeIn(slot, holderId);
         } else if (action === 'choose') {
+            // A shot may start while the records are read, or while the list is
+            // open: the list is not put over a running shot, and nothing is placed.
             const { rows } = await readDye2();
-            const recipe = await chooseRecipe(slot, rows || []);
+            const recipe = clear() ? await chooseRecipe(slot, rows || []) : null;
             if (recipe && clear()) await chooseRecipeFor(slot, recipe, holderId);
         } else if (action === 'remove') {
             await removeRecipe(card.recipe);

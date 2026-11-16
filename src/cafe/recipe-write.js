@@ -53,6 +53,9 @@ function holdsFields(rows, id, fields) {
  * - `gone`: the recipe is no longer in DYE2;
  * - `taken`: the slot holds another recipe than the caller expected;
  * - `placed`: the recipe is in another slot by now (`placeInSlot` with `unplaced`);
+ * - `legacy`: no record names a slot at all, as an older DYE2 left them. The
+ *   strip then places recipes by their ids, and one record given a slot would
+ *   end that for all of them, emptying every other card;
  * - `unconfirmed`: written twice, and the change was not there either time.
  */
 export function createRecipeWriter({ read, write }) {
@@ -66,6 +69,9 @@ export function createRecipeWriter({ read, write }) {
             if (!rows) return { ok: false, reason: 'unreadable' };
             const row = rows.find(r => sameId(r, id));
             if (!row) return { ok: false, reason: 'gone' };
+            if ('stripSlot' in fields && !rows.some(r => r && typeof r === 'object' && r.stripSlot !== undefined)) {
+                return { ok: false, reason: 'legacy' };
+            }
             const reason = unless(rows, row);
             if (reason) return { ok: false, reason };
             if (holdsFields(rows, id, fields)) return { ok: true, rows };

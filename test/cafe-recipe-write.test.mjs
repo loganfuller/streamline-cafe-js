@@ -226,6 +226,18 @@ test('a chosen recipe whose first write landed is confirmed on the retry, not re
     assert.equal(world.writes.length, 1);
 });
 
+test('records an older DYE2 left, with no slot named on any, are not given one', async () => {
+    // The strip places these by id. A slot written on one would empty the others' cards.
+    const legacy = [{ id: '1', name: 'One' }, { id: '2', name: 'Two' }, { id: '3', name: 'Three' }];
+    const world = store(legacy);
+    assert.deepEqual(await world.writer.removeFromSlot('2'), { ok: false, reason: 'legacy' });
+    assert.deepEqual(await world.writer.placeInSlot('3', 7), { ok: false, reason: 'legacy' });
+    assert.equal(world.writes.length, 0);
+    assert.deepEqual(world.rows, legacy);
+    // Another field of such a record can still be set.
+    assert.equal((await world.writer.setFields('2', { grinderId: 'g1' })).ok, true);
+});
+
 test('a recipe is taken out of its slot, and nothing else about it changes', async () => {
     const world = store([row('a', 7, { decentSyncId: 'ds-a', dashboardVariables: { dose: 18 } }), row('b', 2)]);
     const result = await world.writer.removeFromSlot('a');
