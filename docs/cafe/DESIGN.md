@@ -2,6 +2,8 @@
 
 Streamline Cafe is a recipe-first skin for [Decaid](https://github.com/decentespresso/decaid), made for cafes. It is a fork of [Streamline](https://github.com/decentespresso/streamline-js) that replaces Streamline's main page and keeps everything else.
 
+**Status: in development.** The skin is not meant for a working cafe until its screen matches the design in full. Until then its builds are for development.
+
 This file records what was decided and why. The code is the authority on how it works today. The fork's changes to Streamline's own files are listed in `UPSTREAM_EDITS.md`, which the first change that makes one adds beside this file.
 
 Words such as Recipe, Recipe Slot, Reference Shot, Shot, Location, Machine, Workflow and Capture-only are used as [Decent Sync's glossary](https://github.com/loganfuller/decent-sync/blob/main/GLOSSARY.md) defines them.
@@ -23,7 +25,10 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **Comparison row.** Under the graph: time, first drip, yield, ratio and peak pressure, each beside the reference's. While a shot runs, six live cards take its place.
 - **Rating and notes.** Stars and a note for the Shot in the graph.
 - **Shots list.** Every Shot at the Location with Decent Sync, otherwise this machine's own. A row opens that Shot in the graph.
-- **Gone from Streamline's page.** The P/F/R toggle, the favourite-profile buttons, the DYE button, the shot-history card and the phase table. The on-screen machine buttons show only when the machine has none of its own, as in Streamline.
+- **No recipe loaded.** The title reads "No recipe selected", the dial-in column says it is not saved to a recipe, and the steppers change this machine only.
+- **Gone from Streamline's page.** The P/F/R toggle, the favourite-profile buttons, the DYE button, the shot-history card, the phase table, every row of preset buttons, the steam time and the milk-pitcher steam mode. The settings that configure them stay in the settings page and do nothing here.
+- **Kept from Streamline.** A tap on a value opens the numpad, holding − or + repeats, a tap on the graph opens the full-screen chart, and the screensaver and the "tap to reload" notice work as they do there. The on-screen machine buttons show only when the machine has none of its own.
+- **Until a slice arrives, its part of the screen is left out.** Nothing on the page is a control that does nothing.
 
 The skin follows Streamline's design language: `DESIGN_SYSTEM.md`, Tailwind CSS, daisyUI and ECharts.
 
@@ -65,7 +70,7 @@ Streamline's modules keep running for the work that isn't drawing. Its history m
 - **The skin owns the strip.** Its own module draws the nine cards and handles taps, long-presses, the loaded highlight and slot placement.
 - **Loading a recipe stays Streamline's.** The skin loads a recipe only by calling Streamline's `applyRecipe`, and reads which recipe is loaded through Streamline's selection helpers. DYE2 has no endpoint that applies a recipe: Streamline's apply writes the Workflow and tells DYE2 which recipe is loaded. A second implementation would be a second behaviour for Decent Sync to follow.
 - **Streamline's strip module still starts,** with nothing to draw into. It keeps telling DYE2 which recipe is loaded, restores the selection after a trip to DYE2's editor, and re-reads DYE2's records when the page regains focus.
-- **When the skin starts.** Only when the DYE2 plugin is installed, loaded and at least v0.1.40, and Streamline's shared "DYE2 on" setting is on. Otherwise a blocking screen says which is missing. For the setting it offers a button that turns it on. For the plugin it points to Decaid's Plugins screen, because installing a plugin from a skin needs a management token from Decaid v0.9.2.
+- **When the skin starts.** Only when the DYE2 plugin is installed, loaded and at least v0.1.40, and Streamline's shared "DYE2 on" setting is on. Otherwise a blocking screen says which is missing. For the setting it offers a button that turns it on. For the plugin it points to Decaid's Plugins screen, because installing a plugin from a skin needs a management token from Decaid v0.9.2. The screen is a centred card titled "Streamline Cafe needs DYE2", with one line for what is missing, and always a Reload button and a Settings button, so the settings page stays reachable.
 - **Nine slots.** DYE2 keeps a `stripSlot` of 6 to 9 as written, though its own editor places recipes only in 1 to 5. The skin places recipes in 6 to 9 itself.
 - **Empty slots.** A long-press creates a recipe in DYE2's editor. The skin remembers the held slot and the recipe ids that exist, and on its next load places the one new recipe in that slot if the slot is still empty. With none or several new recipes it places nothing. There is no "choose an existing recipe" option yet; this may change.
 
@@ -88,6 +93,14 @@ Decaid's store has no conditional write, and DYE2 reads, waits and writes the wh
 - **The skin never writes Streamline's strip mode** (P/F/R), so switching back to Streamline finds it as it was left.
 - **Cafe-only state** goes in a `streamlineCafe` namespace. There is no "Cafe" settings category until a setting needs one.
 - **Settings kept only in the browser don't carry over,** because each skin id is served from its own origin: the remembered scale, the cached theme, the auto-steam session and screensaver images. They are set once more in this skin. There is no migration.
+
+## Plugin surfaces
+
+Streamline lets a plugin add things to its page, such as a step size on a stepper or a strip during a shot.
+
+- Surfaces attached to parts the page keeps, the steppers and the screensaver, keep working, because that code is reused.
+- Surfaces attached to parts the page drops are left out until a plugin a cafe uses needs one. DYE2 and Decent Sync declare none.
+- A cafe's own additions may come as plugins later, so this may change.
 
 ## Shots and the reference
 
@@ -115,6 +128,7 @@ The screen's new text covers the languages Streamline supports.
 - New strings live in the fork's own table, with Streamline's language codes. A lookup tries that table, then Streamline's translation file, then English. Streamline's file is not edited: it is overwritten from a spreadsheet upstream.
 - Where Streamline already has the same English text, its translation is used.
 - New phrases are machine-translated and marked so. Corrections are welcome as pull requests.
+- Arabic and Hebrew are translated, and the layout stays left to right. Streamline has no right-to-left layout, and mirroring one page would make it the only screen that flips.
 - A test fails when a string lacks any of Streamline's finished languages. Languages Streamline marks unfinished fall back to English where a phrase is missing.
 
 ## Tests
@@ -148,5 +162,4 @@ Open points known when this was written:
 - whether the graph's time axis stretches to the reference's length during a live shot (slice 3);
 - how first drip is worked out for the comparison row (slice 3);
 - how the skin decides a Shot is Unfinished without Decent Sync (slices 3 and 5);
-- what the screen shows in languages that read right to left (slice 2);
 - what the sample data and its pretend machine do in the public preview (slice 8).
