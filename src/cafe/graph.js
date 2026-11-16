@@ -23,6 +23,7 @@ const REFRESH_GAP_MS = 300;
 // a second, then 2, 4, 7, 11 and 15 seconds after the end. Decaid saves a shot
 // once its last drops have been weighed, a few seconds after the pump stops.
 const SETTLE_GAPS_MS = [500, 1500, 2000, 3000, 4000, 4000];
+const SETTLE_LAST_MS = 15_000;
 
 let recipe;             // the loaded recipe; null for none; undefined until DYE2 was read
 let view = 'reference';
@@ -154,8 +155,12 @@ export function showGraphRecipe(next) {
     seq += 1; // a read for the recipe before is no longer wanted
     latest = undefined;
     reference = null;
-    settling = false;
     clearTimeout(settleTimer);
+    // A shot had just ended and Decaid may not have it yet. The graph is this
+    // recipe's now, so the looks for that shot stop, bar one once Decaid must
+    // have it: the recipe it was pulled with may be loaded again by then.
+    if (settling) settleTimer = setTimeout(() => refresh(), SETTLE_LAST_MS);
+    settling = false;
     applyOverlay();
     paint();
     refresh();

@@ -40,7 +40,7 @@ export function shotsWithRecipe(rows, recipeId) {
  * The details are Decent Sync's too (`timedSamples` in its protocol package),
  * so a tablet and its server call the same Shots Unfinished: the Preheat ends
  * at the first sample whose machine reading is in another substate, or has
- * none, and a weight counts only on a sample the machine timed.
+ * none, and only a sample the machine timed counts, for pouring or for weight.
  */
 export function isUnfinished(shot) {
     const samples = Array.isArray(shot?.measurements) ? shot.measurements : [];
@@ -48,10 +48,11 @@ export function isUnfinished(shot) {
     for (const sample of samples) {
         const substate = sample?.machine?.state?.substate;
         if (preheat && substate !== 'preparingForShot') preheat = false;
+        // A sample the machine did not time is no sample, past ending the Preheat.
+        if (Number.isNaN(new Date(sample?.machine?.timestamp).getTime())) continue;
         if (substate === 'pouring') return false;
-        if (preheat || Number.isNaN(new Date(sample?.machine?.timestamp).getTime())) continue;
         const weight = sample?.scale?.weight;
-        if (typeof weight === 'number' && weight >= FIRST_DRIP_GRAMS) return false;
+        if (!preheat && typeof weight === 'number' && weight >= FIRST_DRIP_GRAMS) return false;
     }
     return true;
 }
