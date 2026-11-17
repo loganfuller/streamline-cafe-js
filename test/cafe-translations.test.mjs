@@ -10,6 +10,7 @@ import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
 import { pageHeading } from '../src/cafe/page-model.js';
 import { slotMenu } from '../src/cafe/slot-menu.js';
 import { graphModel } from '../src/cafe/shot-model.js';
+import { PHRASES } from '../src/cafe/comparison.js';
 
 // Streamline's own list says which languages are finished: it is not copied here.
 const FINISHED = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
@@ -91,6 +92,8 @@ function usedKeys() {
         if (shown.row) keys.add(shown.row.label);
         if (shown.line) keys.add(shown.line);
     }
+    // The comparison row's titles and what each card says beside its number.
+    for (const phrase of Object.values(PHRASES)) keys.add(phrase);
     return keys;
 }
 
@@ -122,9 +125,10 @@ test('every phrase the cafe page shows has every finished language', () => {
 });
 
 test('a phrase a module looks up is named in the call, so the scan sees it', () => {
-    // The one lookup by a variable is the card menu's, whose labels the scan
-    // takes from slotMenu() itself.
-    const byVariable = { 'strip.js': ['cafeText(item.label)'] };
+    // The lookups by a variable are the card menu's, whose labels the scan
+    // takes from slotMenu() itself, and the comparison row's, whose phrases it
+    // takes from PHRASES.
+    const byVariable = { 'strip.js': ['cafeText(item.label)'], 'compare-row.js': ['cafeText(part.phrase, vars)'] };
     for (const { name, text } of SOURCES) {
         if (name === 'text.js') continue; // where the lookup is defined
         const unnamed = [...text.matchAll(/\bcafeText\((?!\s*')[^)]*\)/g)].map(match => match[0]);

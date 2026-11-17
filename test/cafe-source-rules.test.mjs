@@ -34,12 +34,16 @@ test('the page reads Shots and the choice of reference through the Shot seam onl
     assert.deepEqual(filesWith(/from '\.\.\/modules\/idb\.js'/), [], 'Streamline\'s shot cache is not a source');
 });
 
-test('the fork\'s hooks are still in Streamline\'s chart and api modules', () => {
+test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modules', () => {
     const chart = readFileSync(new URL('../src/modules/chart.js', import.meta.url), 'utf8');
     assert.match(chart, /export function setChartOverlay\(overlay\) \{/);
     assert.match(chart, /export function setShotChooser\(chooser\) \{/);
-    assert.match(chart, /const drawn = traces === chartTraces \? withCafeOverlay\(traces, layout, mode\) : \{ traces, layout \};/, 'the overlay is on the chart\'s own lines only');
-    assert.match(chart, /const \{ traces, layout \} = withCafeOverlay\(own, expandedLayout\(currentTheme, own, expandedXRange\(mode, own\)\), mode\);/, 'and on the full-screen chart');
+    assert.match(chart, /const drawn = traces === chartTraces \? withCafeOverlay\(traces, layout, mode, 'main'\) : \{ traces, layout \};/, 'the overlay is on the chart\'s own lines only');
+    assert.match(chart, /const \{ traces, layout \} = withCafeOverlay\(own, expandedLayout\(currentTheme, own, expandedXRange\(mode, own\)\), mode, 'expanded'\);/, 'and on the full-screen chart');
+    assert.match(chart, /yref: 'paper',\s*name: stepName,/, 'a stage line keeps its step\'s name');
+    const renderer = readFileSync(new URL('../src/modules/echarts-renderer.js', import.meta.url), 'utf8');
+    assert.match(renderer, /function cafeShapeLabel\(shape\) \{/);
+    assert.match(renderer, /\.\.\.cafeShapeLabel\(shape\)/, 'and the renderer writes a stage line\'s name');
     assert.match(chart, /export function plotHistoricalShot\(measurements, workflow = null\) \{\s*if \(cafeShotChooser && !cafeShotChooser\(measurements, workflow\)\) return;/);
     const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
     assert.match(api, /export async function getShot\(id\) \{/);
@@ -71,7 +75,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'reference-overlay.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

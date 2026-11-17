@@ -21,8 +21,8 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **Recipes.** Nine fixed Recipe Slots in one row. An empty slot stays as an outline reading "Slot N" and "Hold to add", so cards never move. A tap loads a recipe. A long-press opens a menu on the card: make a new recipe from what the machine is set to, choose a recipe that is in no slot, or take the card's recipe out of its slot. Nothing on the page opens DYE2's editor.
 - **Dial-in column.** Steppers for dose, yield, grind, brew temperature, flush, steam flow and hot water, all with the same type and the same size buttons. Hot water is one control with Streamline's Temp | Vol toggle. With Decent Sync a change is saved onto the loaded recipe, and the column is labelled "Dial-in · saved to the recipe". Without it the change is this machine's alone, until another recipe loads, and the label reads "Dial-in · not saved to the recipe".
 - **Grinder, bean, basket and profile.** Dose names the bean and batch, Yield the basket, Grind the grinder and Brew the profile. A tap on one opens a dialog listing what the tablet offers.
-- **Graph.** At full strength: this machine's latest Shot pulled with the loaded recipe. Faded: the recipe's Reference Shot. Both are solid lines; the dotted lines are the profile's targets. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets. The legend says when each Shot was pulled and by whom, and ends the latest Shot's row with Make reference.
-- **Comparison row.** Under the graph: time, first drip, yield, ratio and peak pressure, each beside the reference's. While a shot runs, six live cards take its place.
+- **Graph.** At full strength: this machine's latest Shot pulled with the loaded recipe. Faded: the recipe's Reference Shot. Both are solid lines; the dotted lines are the profile's targets. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets. The legend says when each Shot was pulled and by whom, and ends the latest Shot's row with Make reference. Each profile stage the Shot reached is named at its line.
+- **Comparison row.** Under the graph, five cards. In Reference: time, first drip, yield, ratio and peak pressure, each beside the reference's with the difference. In Targets: time with first drip, then dose, yield and ratio against what was set, and peak pressure alone. While a shot runs, six live cards take its place: time, weight, weight flow, water flow, pressure and temperature, beside the reference at the same second or beside what the profile asks for.
 - **Rating and notes.** Stars and a note for the Shot in the graph.
 - **Shots list.** Every Shot at the Location with Decent Sync, otherwise this machine's own. A row opens that Shot in the graph.
 - **No recipe loaded.** The title reads "No recipe selected", the dial-in column says it is not saved to a recipe, and the steppers change this machine only.
@@ -167,6 +167,55 @@ One module, `src/cafe/shot-seam.js`, is asked for three things: a recipe's lates
 - **Nothing on the page clears a reference.**
 - A choice that names a Shot the tablet no longer has reads as no reference.
 
+### The comparison row
+
+A row of five cards under the graph, for the Shot in the graph. The graph gives up the row's height. A card is a title, the Shot's number, and under it what the number is compared with; a difference follows the number. There is no colour and no score: a difference is a number, not a verdict.
+
+- **One module works out every number,** `src/cafe/comparison.js`, which touches no browser global. `src/cafe/compare-row.js` only writes the text.
+- **A Shot is timed and measured as Decent Sync does it,** so a tablet and its server give one Shot the same numbers. The Preheat is the Shot's leading samples in `preparingForShot`. The profile starts at the first sample after them, and nothing in the Preheat counts.
+  - **Time** runs from the start of the profile to the Shot's last sample.
+  - **First drip** is Decent Sync's time to first drip: from the start of the profile to the scale's first reading of 1 g or more. A Shot with no scale has none.
+  - **Peak pressure** is the highest pressure after the Preheat, so a heater test before the profile is not the peak.
+  - **Yield** is the yield the Shot kept. Where it kept none, it is the scale's last reading.
+  - **Dose** is the one the Shot weighed, or where it weighed none, the dose its Workflow set, which is the recipe's dose as the Shot was pulled. **Ratio** is the yield over that dose, written `1:2.02`, and its card names the dose: "Ratio · 18.0 g dose".
+- **In Reference** each card gives the Shot's value, the reference's as "Ref 27.9 s", and the difference.
+  - With no reference chosen each reads "No reference", with no difference. So does the row with no recipe loaded, which shows the last Shot's numbers.
+  - When the Shot is the reference each reads "Ref = this shot".
+  - With no Shot for the recipe yet the values are "—" and the cards give the reference's numbers.
+- **In Targets** the cards are Time, with first drip beside it; Dose against the dose set; Yield against its target; Ratio against the ratio set; and Peak pressure.
+  - **Peak pressure has no target.** The card shows the Shot's own peak with nothing beside it: a target for it does not hold for every profile.
+  - The yield's target is the Workflow's, or the profile's own target weight where the Workflow sets none. Where nothing was set a card reads "No target".
+  - The Dose card shows only a dose the Shot weighed.
+  - With no Shot for the recipe yet each card reads "No shot yet".
+- **A value the Shot did not record is "—",** with no difference. A difference is the difference of the two numbers as they are shown, so 28.4 s beside 27.9 s is +0.5 s.
+- **With no recipe loaded** the Shot is the one Streamline's history module hands the chart, which comes without the Shot's own record. So its yield is the scale's last reading and its dose is its Workflow's.
+- **Temperatures** follow the page's °C or °F. Numbers are written with a point in every language, as on the rest of the page.
+
+### The live cards
+
+While a shot runs, six cards take the row's place: Time, Weight, Weight flow, Water flow, Pressure and Temperature. The five return when the finished Shot is in the graph, so they stay through the few seconds Decaid takes to save it.
+
+- **In Reference** each sits beside the reference at the same second of its own run, with the difference. Time's card says how long the reference ran.
+  - **"The same second"** is seconds from the start of each Shot's profile, its Preheat left out, taking the reference's value between its two nearest samples.
+  - With no reference the cards read "No reference". Once the shot runs past the reference's last second they read "Ref ended". Neither shows a difference, and the page does not switch to Targets by itself.
+- **In Targets** each sits beside what the profile asks for at that moment: Time names the stage, Weight the weight the shot stops at, and Water flow, Pressure and Temperature their targets.
+  - Where the profile sets no target for a card at that step it says "No target this step", which holds for any profile. A target of zero is a step that sets none.
+  - No profile sets a weight flow, so that card reads "No profile target".
+- **The toggle switches the cards** between the two during a shot.
+- **The cards are written when the chart draws a live frame, and at no other time,** so they are repainted exactly as often as the chart is. The chart calls the page's overlay just before it draws, and the page reads the running shot's numbers off the lines the chart is about to draw. A card never says more than the graph shows, and writing the cards asks the chart for nothing. The scale's weight is not one of the chart's lines, and is read from Streamline's shot-data module.
+- **The weight in the title band stays,** as the layout slice left it.
+
+### Stage names
+
+Streamline draws a line where each profile stage begins and gives it no name. The graph names each stage the Shot reached, by its step's name in the Shot's own profile, in both views.
+
+- **On the main graph only.** The full-screen chart stays as it is.
+- **Inside the plot, at the top of the stage's line and to its right.** A name is left out where its stage is too narrow to hold it: narrower than the name from its line to the next stage's, or to the end of the time axis. Of several steps skipped at one second, only the last, the one that ran, can have room.
+- **At rest and during a shot,** each as its stage is reached. During a shot the time axis grows, so a name may give way as its stage narrows.
+- **With no Shot for the recipe yet,** in Reference, the stage lines and names are the reference's, drawn with its lines.
+- **What keeps a live shot from a full redraw on each frame.** The chart sends its stage lines again only when they change. A name is part of its line, so it is sent when a stage is reached and when a name stops or starts fitting, and at no other frame.
+- **Two hooks carry it.** The chart keeps each step's name on the stage line it adds, and the renderer writes the name of a line that carries a label. Which lines carry one is worked out in `src/cafe/stage-names.js`.
+
 ## Changing the profile from the dialog
 
 This is the riskiest behaviour in the design, so it is built last and behind a trial.
@@ -218,5 +267,4 @@ Each slice is released on its own, and starts by settling its own open points.
 
 Open points known when this was written:
 
-- how first drip is worked out for the comparison row (slice 3);
 - what the sample data and its pretend machine do in the public preview (slice 8).
