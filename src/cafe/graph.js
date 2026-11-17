@@ -644,9 +644,12 @@ function followChoice(forRecipe, chosen) {
 
 // ── Rating and notes ─────────────────────────────────────────────────────────
 
-// A Shot's rating and note as an edit, or a read after one, left them. The
-// Shot is named by its id: the graph may show another by now, and then nothing
-// on screen changes. When it is the reference too, that row follows.
+// What an edit, or a read after one, left of a Shot's rating or its note: only
+// the one the edit was of, since an answer also carries the other as it stood
+// when the edit was made, which a later edit of that one may have changed
+// since. The Shot is named by its id: the graph may show another by now, and
+// then nothing on screen changes. When it is the reference too, that row
+// follows.
 function followEdit(shotId, now) {
     if (remarks && remarks.id === shotId) remarks = { ...remarks, ...now };
     if (reference && reference.shot && reference.shot.id === shotId) reference = { ...reference, ...now };
@@ -665,10 +668,10 @@ async function onStar(star) {
     edits += 1;
     followEdit(target.id, { rating: ratingOf(next) });
     try {
-        followEdit(target.id, await editShot(target.id, { rating: next }));
+        followEdit(target.id, { rating: (await editShot(target.id, { rating: next })).rating });
     } catch (error) {
         logger.warn('Cafe: could not save the rating', error);
-        followEdit(target.id, error.remarks || { rating: before });
+        followEdit(target.id, { rating: error.remarks ? error.remarks.rating : before });
         // Decent Sync's refusal says why, in its own words.
         showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
     } finally {
@@ -693,10 +696,10 @@ function onNote() {
             if (note === (target.note || '')) return;
             edits += 1;
             try {
-                followEdit(target.id, await editShot(target.id, { note }));
+                followEdit(target.id, { note: (await editShot(target.id, { note })).note });
             } catch (error) {
                 logger.warn('Cafe: could not save the note', error);
-                if (error.remarks) followEdit(target.id, error.remarks);
+                if (error.remarks) followEdit(target.id, { note: error.remarks.note });
                 throw new Error(error.refusal || cafeText('The note could not be saved'));
             } finally {
                 edits += 1;

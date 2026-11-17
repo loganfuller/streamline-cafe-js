@@ -307,8 +307,21 @@ async function ratingAndNotes(page, latest, reference) {
     check('with a keyboard up the dialog sits in what is left above it, its text box giving up the height, with the box and both buttons in view; and it goes back after',
         lifted.box.top >= 0 && lifted.box.bottom <= 400 && lifted.boxHeight >= 72 && lifted.boxHeight < settled.boxHeight && settled.box.bottom > 400 && settled.box.bottom - settled.box.top > lifted.box.bottom - lifted.box.top,
         `${JSON.stringify(lifted.box)} box ${lifted.boxHeight}px, then ${JSON.stringify(settled.box)} box ${settled.boxHeight}px`);
+    //    A save that takes a while: nothing can be typed into the box meanwhile,
+    //    since only the text as it stood at the tap is saved.
+    const slow = async route => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        await sleep(1500);
+        return route.fallback();
+    };
+    await page.route(SHOT_EDIT, slow);
     await page.locator('#cafe-note-save').click();
+    await page.waitForTimeout(400);
+    const during = await page.evaluate(() => ({ open: document.getElementById('cafe-note-dialog').open, locked: document.getElementById('cafe-note-text').readOnly, save: document.getElementById('cafe-note-save').disabled, cancel: document.getElementById('cafe-note-cancel').disabled }));
+    check('while a note is being saved the dialog stays, and its box and buttons take nothing', during.open && during.locked && during.save && during.cancel, JSON.stringify(during));
     check('"Save note" closes the dialog', await closed(page));
+    await page.unroute(SHOT_EDIT, slow);
+    check('and the box can be typed in again the next time', (await page.evaluate(() => document.getElementById('cafe-note-text').readOnly)) === false);
     saved = await record(latest.id);
     check('the note is saved trimmed, sent alone, and the rating is untouched', saved.annotations.espressoNotes === NOTE && saved.annotations.enjoyment === 8 && edits.length === 1 && edits[0] === JSON.stringify({ annotations: { espressoNotes: NOTE } }) && others(saved.annotations) === others(before.annotations), edits.join(' | '));
     check('the Shot\'s note icon is a page now, not a plus', (await remarks(page)).note === 'note', JSON.stringify(await remarks(page)));

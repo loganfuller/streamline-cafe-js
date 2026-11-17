@@ -40,6 +40,9 @@ async function save() {
     saving = true;
     el('cafe-note-save').disabled = true;
     el('cafe-note-cancel').disabled = true;
+    // What is saved is the text as it stood at the tap: nothing typed while
+    // the save is on its way could be kept, so nothing can be typed then.
+    el('cafe-note-text').readOnly = true;
     failed('');
     try {
         await run(el('cafe-note-text').value);
@@ -50,6 +53,7 @@ async function save() {
         saving = false;
         el('cafe-note-save').disabled = false;
         el('cafe-note-cancel').disabled = false;
+        el('cafe-note-text').readOnly = false;
     }
 }
 

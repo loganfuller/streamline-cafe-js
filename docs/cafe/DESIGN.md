@@ -227,6 +227,7 @@ The note:
 - **The fork's own dialog, with a plain text box,** not Streamline's notes editor. That one is a full-screen Markdown editor, and DYE2 and the management interface show a note as plain text, so its marks would show raw.
 - It names the Shot as its row does, with when it was pulled and by whom, and has a box labelled "Note", Cancel and "Save note".
 - **The text is trimmed, and an emptied note clears it,** as in DYE2. The box takes at most 40,000 characters, the plugin's limit. A note saved as it was sends nothing.
+- **While a note is being saved the box takes no typing,** and Cancel and Escape do nothing: what is saved is the text as it stood at the tap.
 - **A note that could not be saved is not lost.** The dialog stays open with its text, and a line in the dialog says why. It is not a toast: the dialog is drawn over everything else on the page, a toast included.
 - **A shot that starts leaves the dialog open,** unlike the page's other dialogs: the note is of a Shot already saved, named by its id, and the text typed so far is not thrown away. Only the taps outside the box that would close it are left out, for the same reason.
 - **A note is text, never markup.** It is written into the page as text.
@@ -250,7 +251,7 @@ Which Shot, and when:
 
 - **"Last shot", with no recipe loaded, is rated and noted too.** Streamline's history module hands the chart that Shot's measurements and Workflow and no record. So the page asks the seam for the tablet's newest Shot, whole, and takes its id, rating and note only if its first sample is the one the chart was handed. Until that read answers, and where the newest Shot is another, the row has no stars: they never act on a Shot other than the one drawn. No hook is added to Streamline's files for it.
 - **An edit made elsewhere shows at the page's next read:** a recipe load, the page coming back into view, or a shot ending. That covers DYE2 on the same tablet and the management interface. Nothing is pushed for a Shot's edit, and there is no timer.
-- **After the page's own edit** the row shows what the edit answered. A read that began before the edit is older than it, and does not put the old rating back.
+- **After the page's own edit** the row shows what the edit answered, for the rating or the note it was of. The answer's other half is left: a rating still on its way when a note is saved would otherwise put the note back as it was. A read that began before the edit is older than it, and does not put the old rating back.
 - **A change of rating or note never draws the graph again.** Only the legend's rows are written.
 
 ### The comparison row
