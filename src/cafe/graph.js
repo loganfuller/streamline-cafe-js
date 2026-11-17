@@ -82,7 +82,10 @@ function chooseShot(measurements, workflow) {
         heldBack = true;
         return false;
     }
-    if (recipe === undefined) return true;
+    if (recipe === undefined) {
+        latest = handed; // no row names it until the recipe is known
+        return true;
+    }
     if (recipe === null) {
         latest = handed;
         settling = false;
@@ -247,9 +250,9 @@ function shotEnded() {
         settling = true;
         // With no recipe the history module draws the shot once Decaid has saved
         // it, and the legend then names it. Until then the row names no time.
-        // Decaid saves no cleaning or calibration run, so if nothing has been
-        // drawn by the last look a recipe's shot would get, the graph goes back
-        // to the Shot before, as it does with a recipe.
+        // A run Decaid never saves is never drawn, so if nothing has been drawn
+        // by the last look a recipe's shot would get, the graph goes back to
+        // the Shot before, as it does with a recipe.
         if (!recipe) {
             heldBack = false;
             clearTimeout(settleTimer);
