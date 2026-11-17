@@ -73,6 +73,33 @@ async function disposeECharts(element) {
     }
 }
 
+// ── Streamline Cafe's two hooks (docs/cafe/UPSTREAM_EDITS.md) ────────────────
+// The overlay: a function the cafe page gives, called with the chart's own lines
+// and layout just before they are drawn, on the main chart and the full-screen
+// one. It answers the lines and layout to draw in their place. It is never
+// called for a profile preview, which is drawn from a copy of the lines.
+let cafeOverlay = null;
+
+function withCafeOverlay(traces, layout, mode) {
+    return cafeOverlay ? cafeOverlay(traces, layout, mode) : { traces, layout };
+}
+
+/** Set, change or (with null) remove the overlay, and draw again with it. */
+export function setChartOverlay(overlay) {
+    cafeOverlay = overlay;
+    if (latestMainRender) renderMain(latestMainRender.traces, latestMainRender.layout, latestMainRender.mode);
+    if (expandedOpen) renderExpandedCharts(isLiveShot ? 'live' : 'full');
+}
+
+// The chooser: asked before a finished Shot is drawn, with what
+// plotHistoricalShot was given. When it answers false the Shot is not drawn:
+// the cafe page draws the loaded recipe's latest Shot in its place.
+let cafeShotChooser = null;
+
+export function setShotChooser(chooser) {
+    cafeShotChooser = chooser;
+}
+
 function renderMain(traces, layout, mode = 'full') {
     latestMainRender = { traces, layout, mode };
     if (expandedOpen) {
@@ -84,7 +111,8 @@ function renderMain(traces, layout, mode = 'full') {
         mainRenderDirty = true;
         return;
     }
-    renderECharts(element, traces, layout, mode);
+    const drawn = traces === chartTraces ? withCafeOverlay(traces, layout, mode) : { traces, layout };
+    renderECharts(element, drawn.traces, drawn.layout, mode);
     mainRenderDirty = false;
 }
 
@@ -727,8 +755,8 @@ function renderExpandedCharts(mode = 'full') {
     if (!expandedOpen) return;
     const element = document.getElementById('expanded-chart');
     if (!element) return;
-    const traces = expandedTraces();
-    const layout = expandedLayout(currentTheme, traces, expandedXRange(mode, traces));
+    const own = expandedTraces();
+    const { traces, layout } = withCafeOverlay(own, expandedLayout(currentTheme, own, expandedXRange(mode, own)), mode);
     renderECharts(element, traces, layout, mode);
 }
 
@@ -983,6 +1011,7 @@ export function clearChart() {
 }
 
 export function plotHistoricalShot(measurements, workflow = null) {
+    if (cafeShotChooser && !cafeShotChooser(measurements, workflow)) return;
     if (!measurements || measurements.length === 0) {
         clearChart();
         return;

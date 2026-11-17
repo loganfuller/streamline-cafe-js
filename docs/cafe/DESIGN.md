@@ -21,7 +21,7 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **Recipes.** Nine fixed Recipe Slots in one row. An empty slot stays as an outline reading "Slot N" and "Hold to add", so cards never move. A tap loads a recipe. A long-press opens a menu on the card: make a new recipe from what the machine is set to, choose a recipe that is in no slot, or take the card's recipe out of its slot. Nothing on the page opens DYE2's editor.
 - **Dial-in column.** Steppers for dose, yield, grind, brew temperature, flush, steam flow and hot water, all with the same type and the same size buttons. Hot water is one control with Streamline's Temp | Vol toggle. With Decent Sync a change is saved onto the loaded recipe, and the column is labelled "Dial-in · saved to the recipe". Without it the change is this machine's alone, until another recipe loads, and the label reads "Dial-in · not saved to the recipe".
 - **Grinder, bean, basket and profile.** Dose names the bean and batch, Yield the basket, Grind the grinder and Brew the profile. A tap on one opens a dialog listing what the tablet offers.
-- **Graph.** Solid: this machine's latest Shot pulled with the loaded recipe. Dashed and faded: the recipe's Reference Shot. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets.
+- **Graph.** At full strength: this machine's latest Shot pulled with the loaded recipe. Faded: the recipe's Reference Shot. Both are solid lines; the dotted lines are the profile's targets. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets. The legend says when each Shot was pulled and by whom, and ends the latest Shot's row with Make reference.
 - **Comparison row.** Under the graph: time, first drip, yield, ratio and peak pressure, each beside the reference's. While a shot runs, six live cards take its place.
 - **Rating and notes.** Stars and a note for the Shot in the graph.
 - **Shots list.** Every Shot at the Location with Decent Sync, otherwise this machine's own. A row opens that Shot in the graph.
@@ -63,7 +63,7 @@ Three rules keep merges cheap.
 2. **`index.html` is the fork's own.** It keeps the element ids Streamline's modules drive. Where a module needs an element the layout drops, the page keeps a hidden stub instead of editing the module.
 3. **Streamline's files get only small hooks.** Each hook, and each Streamline test the fork changes, is listed in `UPSTREAM_EDITS.md`, so a merge has a checklist.
 
-Streamline's modules keep running for the work that isn't drawing. Its history module loads a finished Shot into the graph, and its shot-data module feeds the stop notice and the shot timer, so both stay even though their panels are gone.
+Streamline's modules keep running for the work that isn't drawing. Its shot-data module feeds the stop notice and the shot timer, and its history module still reads the tablet's Shots, so both stay even though their panels are gone. Which finished Shot the graph draws is the page's choice (see [Shots and the reference](#shots-and-the-reference)).
 
 ## Recipes and the strip
 
@@ -111,7 +111,7 @@ The writer puts a recipe in a slot and takes one out today. The dialogs for the 
 - **The same settings as Streamline.** The skin uses Streamline's namespaces in Decaid's store, so a tablet can switch between the two skins and keep its preferences.
 - **The settings page is Streamline's,** unchanged. Settings that only matter to Streamline's page stay visible there.
 - **The skin never writes Streamline's strip mode** (P/F/R), so switching back to Streamline finds it as it was left.
-- **Cafe-only state** goes in a `streamlineCafe` namespace. Nothing is kept there yet. There is no "Cafe" settings category until a setting needs one.
+- **Cafe-only state** goes in a `streamlineCafe` namespace, written by one module, `src/cafe/cafe-store.js`. It holds the choice of reference (`references`, recipe to Shot) and the graph's view (`graphView`). Decaid's store is the tablet's, not the skin's, so both of the skin's ids read the same values. There is no "Cafe" settings category until a setting needs one.
 - **Settings kept only in the browser don't carry over,** because each skin id is served from its own origin: the remembered scale, the cached theme, the auto-steam session and screensaver images. They are set once more in this skin. There is no migration.
 
 ## Plugin surfaces
@@ -124,12 +124,45 @@ Streamline lets a plugin add things to its page, such as a step size on a steppe
 
 ## Shots and the reference
 
-One seam with two sources, chosen by what Decent Sync's plugin answers to a status request.
+With a recipe loaded, the graph shows this machine's latest Shot pulled with it, and behind it the recipe's Reference Shot.
 
-- **With Decent Sync.** The plugin's endpoints for the Shots list, a Shot, the Reference Shot, and rating and note edits. The contract is "For a Skin's author" in Decent Sync's [`docs/PLUGIN.md`](https://github.com/loganfuller/decent-sync/blob/main/docs/PLUGIN.md). The skin keeps no cache of its own: the list is read when it opens, and the copy of a reference used while the server can't be reached is the plugin's. The plugin keeps that copy, and pushes a changed reference, only for a Recipe in a slot.
-- **Without it, or when it refuses.** Decaid's own Shots. The choice of reference is kept in the `streamlineCafe` namespace, as recipe to Shot.
+### The Shot seam
 
-Streamline's shot cache can't hold another machine's Shots: it removes any cached row that Decaid's own list doesn't return. A reference chosen on the tablet alone is not carried into Decent Sync if the plugin is installed later.
+One module, `src/cafe/shot-seam.js`, is asked for three things: a recipe's latest Shot on this machine (with no recipe, the tablet's newest Shot), a recipe's reference, and to make a Shot a recipe's reference. Its answer for a reference says whether it can be changed now. The page reads Shots and the choice no other way, and a test fails if another module does, so a second source changes no caller. A recipe is named by its DYE2 record id, the one Streamline's apply writes into the Workflow.
+
+- **The tablet's own Shots** are the one source today, and the source for good on a tablet without Decent Sync: Decaid's Shots, with the choice of reference kept in the `streamlineCafe` namespace as recipe to Shot.
+- **With Decent Sync** (not built yet). The plugin's endpoints for the Reference Shot, chosen by what the plugin answers to a status request. The contract is "For a Skin's author" in Decent Sync's [`docs/PLUGIN.md`](https://github.com/loganfuller/decent-sync/blob/main/docs/PLUGIN.md). The skin keeps no cache of its own: the copy of a reference used while the server can't be reached is the plugin's. Until this lands, a Machine Decent Sync serves keeps its reference on the tablet too. That choice is dropped then, not carried into Decent Sync, and neither is a reference chosen on a tablet where the plugin is installed later.
+- **Streamline's shot cache is not a source.** It can't hold another machine's Shots: it removes any cached row that Decaid's own list doesn't return.
+
+### The latest Shot
+
+- The newest Shot on this tablet whose Workflow names the loaded recipe. It is always read from Decaid, with Decent Sync or without.
+- **It is looked for among the tablet's newest 100 Shots,** one request to Decaid. Past that, the recipe has no Shot on this machine yet. A row of Decaid's list carries its Workflow and no measurements, so the newest match is read whole, and the next one tried if it is Unfinished.
+- **An Unfinished Shot never takes its place.** That is a Shot where the machine never reached pouring and the scale never read 1 g: Decent Sync's rule, worked out from the Shot's own record. No sample is in the `pouring` substate, and no sample after the Shot's Preheat, its leading samples in `preparingForShot`, has a weight of 1 g or more. Both are needed, because a shot stopped on weight inside a long preinfusion never reports pouring though it ran whole.
+- **When a shot ends** it becomes the latest once Decaid has it, unless it is Unfinished or was pulled with another recipe. Decaid saves a shot a few seconds after the pump stops, so the page looks for it at half a second, then 2, 4, 7, 11 and 15 seconds after the end, and stops at the first look that finds a new latest Shot. Until then the graph keeps the shot's live lines and its row names no time. When nothing had been read for the recipe before the shot started, the first answer read after the end is taken as the Shot before. After the last look the graph goes back to the Shot before it: the shot was Unfinished, pulled with another recipe, or never saved.
+- **With no recipe loaded** the graph shows the tablet's newest Shot, whatever it was pulled with and Unfinished or not, as Streamline shows it. It is labelled "Last shot", with the line "Pick a recipe to compare". It is read through the seam like any other, so the legend always has the Shot's own record to name.
+- **Which Shot is drawn is the page's choice.** Streamline's history module still asks the chart to draw the tablet's newest Shot: at start-up, on the way back from another page, and, where it works (see the next point), once a shot has been saved. The page turns that down, through a hook in the chart, and takes it as a cue to read the Shot and the reference again. Before DYE2 has said which recipe is loaded the request is let through, so the graph is not empty meanwhile. The page also reads them when a recipe loads or is unloaded, when a shot ends, and when the page comes back into view. Shots have no push channel, and there is no timer but the looks after a shot.
+- **Why the history module is not left to draw with no recipe.** At the Streamline commit the fork is on, that module stops drawing the newest Shot once a shot has ended in the same session: it takes the barista to be reading the Shot before (seen in the smoke run). Streamline v0.2.28 changes the line that does this. Reading the newest Shot through the seam does not depend on it either way.
+
+### The reference on the graph
+
+- **The overlay.** The reference's pressure, flow and weight flow, solid and faded in colours of their own, are drawn after Streamline's own seven lines, through a hook in the chart module. It is there at rest and through a live shot, on the main graph and the full-screen chart. A profile preview never carries it.
+- **Faded, not dashed.** The ticket had the reference dashed. The owner changed it on the pull request: the profile's targets keep the dotted lines, so it is clear which of the two the Shot is compared with.
+- **What keeps a live shot from a full redraw on each frame.** The reference's three lines are always present in the Reference view, empty when there is nothing to draw, and their arrays are the same from one frame to the next, so the count of lines and their order do not change through a shot.
+- **The line-end labels** name the Shot's own lines and never the reference's: a label finds its line by colour on the main chart and by name on the full-screen one, and the reference's colours and names are no line's of Streamline's.
+- **The time axis.** At rest it fits the longer of the two Shots. During a live shot, in Reference, it starts at the reference's length and grows only if the shot runs past it, so the whole reference shows from the first second. In Targets it follows live time, as in Streamline.
+- **Reference | Targets,** at the right of the legend. Reference draws the Shot against the reference and no targets. Targets is Streamline's own chart: the Shot against the profile's targets, with the "Profile target" legend, and nothing of the reference. The view is remembered per tablet. It starts on Reference, and neither a recipe load nor a finished shot resets it.
+- **The legend.** The Shot's row reads "Latest", or "Live shot" while one runs, with the day and time in the page's language, "Today" for today, and the barista the Shot recorded. The reference's row reads "Reference" with the same. Neither says which machine.
+- **"Different profile"** flags a reference pulled on another profile than the recipe's. Without Decent Sync the skin works it out, by the profiles' titles: Decaid's profile id is a hash of the profile's contents, so a brew temperature stepped on the page gives the same profile another id. It shows nothing when the recipe names no profile.
+- **When the latest Shot is the reference,** a "This shot is the reference" badge takes the reference row's place, the reference's lines are not drawn, and there is no Make reference. Once the next shot starts, that Shot is drawn behind it.
+- **With no Shot for the recipe yet** the reference is drawn alone, and a line says "No shot with this recipe on this machine yet". The line shows in Targets too, where the graph is then empty.
+
+### Make reference
+
+- It ends the latest Shot's row, and shows only where it can act: a recipe is loaded, a Shot is in the graph, no shot is running, and that Shot is not the reference already.
+- With no reference yet it makes the Shot in the graph the reference at once. When it would replace one it asks first, in a dialog titled "Replace the reference?" that names the recipe, the new Shot and the one it replaces.
+- **Nothing on the page clears a reference.**
+- A choice that names a Shot the tablet no longer has reads as no reference.
 
 ## Changing the profile from the dialog
 
@@ -182,7 +215,5 @@ Each slice is released on its own, and starts by settling its own open points.
 
 Open points known when this was written:
 
-- whether the graph's time axis stretches to the reference's length during a live shot (slice 3);
 - how first drip is worked out for the comparison row (slice 3);
-- how the skin decides a Shot is Unfinished without Decent Sync (slices 3 and 5);
 - what the sample data and its pretend machine do in the public preview (slice 8).

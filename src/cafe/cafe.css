@@ -647,12 +647,18 @@ button.cafe-card {
     gap: 28px;
     font-size: 18px;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .cafe-legend-item {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+}
+
+.cafe-legend-swatch {
+    flex: none;
 }
 
 .cafe-legend-name {
@@ -663,21 +669,124 @@ button.cafe-card {
     opacity: 0.6;
 }
 
-/* The Shot's time follows its label, and with no Shot yet the label goes too.
-   The time is first in the markup so the label can follow it in a selector. */
-#history-date {
-    order: 3;
+/* When a Shot was pulled and by whom: the first thing to give way in a narrow row. */
+.cafe-legend-when {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 17px;
     color: var(--data-card-title-text-color);
 }
 
-#history-date:empty ~ * {
+.cafe-legend-when:empty {
     display: none;
 }
 
-/* While a shot runs the graph is that shot, not the one this names. */
-#main-page.cafe-shot-live #shot-history-info {
-    visibility: hidden;
+/* "Pick a recipe to compare", "No shot with this recipe on this machine yet". */
+.cafe-legend-line {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 17px;
+    color: var(--data-card-title-text-color);
+}
+
+/* "Different profile", "This shot is the reference". */
+.cafe-legend-flag {
+    flex: none;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border-primary);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+/* Make reference, at the end of the Shot's row. */
+.cafe-legend-btn {
+    flex: none;
+    height: 34px;
+    margin-left: 6px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--mimoja-blue-v2);
+    border-radius: 10px;
+    background: var(--bgmain-color);
+    color: var(--mimoja-blue-v2);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+[data-theme="dark"] .cafe-legend-btn {
+    border-color: var(--button-primary-bg);
+    background: transparent;
+    color: var(--text-primary);
+}
+
+/* Reference | Targets, at the right of the row. */
+#cafe-view {
+    flex: none;
+    margin-left: auto;
+    display: flex;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#cafe-view button {
+    height: 34px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--data-card-title-text-color);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#cafe-view button[aria-pressed="true"] {
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+[data-theme="dark"] #cafe-view button[aria-pressed="true"] {
+    background: var(--button-primary-bg);
+}
+
+/* The dialog Make reference asks in before it replaces a reference. */
+#cafe-reference-dialog-recipe {
+    margin: 0 0 14px;
+    font-size: 20px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.cafe-reference-dialog-shots {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 20px;
+    font-size: 18px;
+}
+
+.cafe-reference-dialog-shots dt {
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-reference-dialog-shots dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.cafe-dialog .modal-action form {
+    display: flex;
+    gap: 12px;
 }
 
 /* ── Graph ────────────────────────────────────────────────────────────────── */
