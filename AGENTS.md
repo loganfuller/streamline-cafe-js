@@ -51,7 +51,9 @@ Start with [`docs/AI_REPO_MAP.md`](docs/AI_REPO_MAP.md). Open only the topic not
 
 ## Streamline Cafe (this fork)
 
-This repository is Streamline Cafe, a fork of Streamline with its own main page. Read [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md) before changing it. Where that file and the rules above disagree, that file wins.
+This repository is Streamline Cafe, a fork of Streamline with its own main page. Its design is [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md), and the bullets below carry the rules from it that every change needs. Before changing an area, read that area's sections of DESIGN.md by line range (`grep -n '^#' docs/cafe/DESIGN.md` lists them): the section a `src/cafe/` file names in its opening comment, or the one "Design sections by area" below names. Where DESIGN.md and the rules above disagree, DESIGN.md wins.
+
+Scout first: for a task spanning files, send one Explore subagent for a file-and-symbol map, where subagents are available to you, then batch independent lookups into a single turn.
 
 - The skin id is `streamline-cafe.js`. Never build or publish under `streamline.js`: a skin installed under an id replaces the one already there. The storage namespaces stay Streamline's, on purpose.
 - Put new behaviour in new files under `src/cafe/`. Change Streamline's own files only through small hooks, and list each one, with any Streamline test you change, in `docs/cafe/UPSTREAM_EDITS.md`.
@@ -67,3 +69,15 @@ This repository is Streamline Cafe, a fork of Streamline with its own main page.
 - For a change to the main page, do the smoke run in [`docs/cafe/SMOKE.md`](docs/cafe/SMOKE.md) and put its screenshots on the pull request. Sample data is made up: no cafe's names, beans or recipes.
 - Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.
 - Do not open issues or pull requests on `decentespresso` repositories from work on this fork.
+
+### Design sections by area
+
+Pick a DESIGN.md section by its heading. These areas sit under headings that do not name them:
+
+- The layout, a control, the dial-in column, the grinder, bean or basket dialog, rating and notes, or the Shots list: "What the screen shows".
+- The "needs DYE2" screen, the long-press menu, or saving the dial-in: "Recipes and the strip".
+- What a change does with Decent Sync, without it, on a Capture-only Machine, or with its server out of reach: "Who it is for", then the area's own section.
+- The graph's legend, time axis, overlay, or Reference | Targets toggle: "The reference on the graph".
+- A Decaid, DYE2 or Decent Sync version the page relies on: "Builds and installs".
+- Which of Streamline's modules still run on the page: "How the code is shaped".
+- Starting a slice: "Order of work", then the sections for what it builds.
