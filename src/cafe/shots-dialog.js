@@ -19,7 +19,7 @@ const NEAR_END_PX = 600;
 // The list as last read. It is kept while a Shot opened from it is in the
 // graph, so several can be opened one after another; once the graph is back
 // on the latest, the next opening reads it afresh.
-let list = null;         // { rows, recipes, offset, done, failed, scrollTop }
+let list = null;         // { rows, recipes, chips, offset, done, failed, scrollTop }
 let loading = null;      // the list a later page is on its way for
 let opening = null;      // the generation a first page is on its way in
 // Counts what ends a list on its way or on screen: a shot starting, the main
@@ -192,7 +192,8 @@ async function openList() {
         // read as one with no recipe.
         if (!recipes) throw new Error('DYE2\'s records could not be read.');
         if (generation !== asked) return;
-        list = { rows: withPage([], rowsOf(page, recipes)), recipes, scrollTop: 0, failed: false, ...nextPage({ offset: 0, read: page.items.length, asked: PAGE_SIZE, total: page.total }) };
+        // Where the choice of reference was not read, no row carries a chip.
+        list = { rows: withPage([], rowsOf(page, recipes)), recipes, chips: !!page.references, scrollTop: 0, failed: false, ...nextPage({ offset: 0, read: page.items.length, asked: PAGE_SIZE, total: page.total }) };
     } catch (error) {
         logger.warn('Cafe: could not read the Shots', error);
         if (generation !== asked) return;
@@ -241,7 +242,7 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
             list.rows = list.rows.map(row => (row.id === String(shotId) ? withRemarks(row, remarks) : row));
         },
         chosen(recipeId, shotId) {
-            if (!list) return;
+            if (!list || !list.chips) return;
             list.rows = withReference(list.rows, recipeId, shotId);
         },
         sourceMoved() { drop({ forget: true }); },

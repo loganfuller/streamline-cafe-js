@@ -651,14 +651,13 @@ function referenceChosen(s, todo, { recipeId, chosen }) {
     // The loaded recipe's too, where the opened Shot is one of its own: the
     // graph goes back to it with this reference.
     const forLoaded = !!s.recipe && String(s.recipe.id) === String(recipeId) && !s.settling;
-    if (forOpened) {
-        s.openSeq += 1; // a read begun before the choice would put the reference before it back
-        s.opened = { ...opened, reference };
-    }
-    // A Shot tapped meanwhile is read again: its read was dropped above, or it
-    // is of this recipe and may have read the reference before the choice.
+    if (forOpened) s.opened = { ...opened, reference };
+    // A read begun before the choice would put the reference before it back, so
+    // the Shot it was of is read again: the opened Shot, whose re-read may be on
+    // its way, or a Shot tapped meanwhile, which is read in its place.
     const { opening } = s;
-    if (opening && (forOpened || (opening.recipe && String(opening.recipe.id) === String(recipeId)))) readOpened(s, todo, opening);
+    const tappedOfIt = !!opening && !!opening.recipe && String(opening.recipe.id) === String(recipeId);
+    if (forOpened || tappedOfIt) readOpened(s, todo, opening || s.opened);
     if (forLoaded) {
         s.seq += 1;
         s.reference = reference;
@@ -765,19 +764,19 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
         backToLatest(s, todo);
         return;
     }
-    // A Shot not in the graph when an edit of it ended was not told the edit's
-    // answer, so a read begun before that is older than what was saved: it is
-    // read again.
-    if (!before && editedSince(s, target.id, editsThen)) {
-        s.opening = target;
-        readOpened(s, todo, target);
-        return;
-    }
     const { recipe } = target;
     // A reference that could not be read leaves the one read before for this
     // Shot. A Shot with no recipe has none, and none can be chosen.
     const kept = before ? before.reference : null;
     let found = recipe ? chosen || kept || NO_REFERENCE : NO_REFERENCE;
+    // A Shot not in the graph when an edit of it, or of its reference, ended was
+    // not told the edit's answer, so a read begun before that is older than
+    // what was saved: it is read again.
+    if (!before && (editedSince(s, target.id, editsThen) || (found.shot && editedSince(s, found.shot.id, editsThen)))) {
+        s.opening = target;
+        readOpened(s, todo, target);
+        return;
+    }
     if (found !== kept && found.shot && kept && kept.shot && kept.shot.id === found.shot.id && editedSince(s, found.shot.id, editsThen)) {
         found = { ...found, rating: kept.rating, note: kept.note };
     }

@@ -1030,7 +1030,7 @@ test('an opened Shot\'s rating and note follow an edit, and a read begun before 
 test('Make reference on an opened Shot sets its own recipe\'s reference, and the loaded recipe\'s only when it is the same', () => {
     const other = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
     const made = play(other, { type: 'referenceChosen', recipeId: OTHER.id, chosen: chosen(GUESTS) });
-    assert.deepEqual(kinds(made.effects), ['draw']);
+    assert.deepEqual(kinds(made.effects), ['readOpened', 'draw'], 'drawn at once, and read again for what a read on its way would have brought');
     assert.equal(made.state.opened.reference.shot, GUESTS);
     assert.equal(made.state.reference.shot, REF, 'the loaded recipe\'s reference is left');
     const own = opened(withRecipe()).state;
@@ -1041,6 +1041,10 @@ test('Make reference on an opened Shot sets its own recipe\'s reference, and the
     const due = play(own, { type: 'inView' }, { type: 'timer', timer: 'refresh' });
     const chose = play(due.state, { type: 'referenceChosen', recipeId: RECIPE.id, chosen: chosen(EARLIER) });
     assert.equal(openedAnswer(chose.state, due.effects, EARLIER, chosen(REF2)).state.opened.reference.shot, EARLIER);
+    // The read asked after the choice is taken: a rating made elsewhere is not lost with the dropped one.
+    const after = openedAnswer(chose.state, chose.effects, { ...EARLIER, annotations: { enjoyment: 10 } }, chosen(EARLIER));
+    assert.equal(shownRemarks(after.state).rating, 10);
+    assert.equal(after.state.opened.reference.shot, EARLIER);
 });
 
 test('a reference chosen while another row\'s read is on its way reads that row again, and it is opened', () => {
@@ -1120,4 +1124,17 @@ test('a Shot reopened while an edit of it was being saved is read again once the
     const fresh = openedAnswer(stale.state, stale.effects, { ...EARLIER, annotations: { enjoyment: 10 } }, chosen(REF2));
     assert.equal(inGraph(fresh.state).shot.id, EARLIER.id);
     assert.equal(shownRemarks(fresh.state).rating, 10);
+});
+
+test('a Shot tapped while an edit of its recipe\'s reference was being saved is read again once the edit has ended', () => {
+    // REF2, House's reference, opened and rated; another House Shot tapped before the save answers.
+    const base = opened(withRecipe(), REF2, RECIPE, chosen(REF2)).state;
+    const rating = play(base, { type: 'editStarted', shotId: REF2.id });
+    const asked = play(rating.state, { type: 'open', shotId: EARLIER.id, recipe: RECIPE });
+    const saved = play(asked.state, { type: 'edited', shotId: REF2.id, remarks: { rating: 8 } }, { type: 'editEnded', shotId: REF2.id });
+    const stale = openedAnswer(saved.state, asked.effects, EARLIER, chosen(REF2, { rating: 2 }));
+    assert.ok(!did(stale.effects, 'draw').length, 'the older read is not drawn');
+    const fresh = openedAnswer(stale.state, stale.effects, EARLIER, chosen(REF2, { rating: 8 }));
+    assert.equal(inGraph(fresh.state).shot.id, EARLIER.id);
+    assert.equal(inGraph(fresh.state).reference.rating, 8);
 });
