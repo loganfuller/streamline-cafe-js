@@ -1,7 +1,7 @@
 // The graph's Shots, its legend and the row of numbers under it: the loaded
 // recipe's latest Shot, its reference behind it, the Reference | Targets toggle,
-// Make reference, the comparison row and the stage names
-// (docs/cafe/DESIGN.md, "Shots and the reference").
+// Make reference, the Shot's stars and note, the comparison row and the stage
+// names (docs/cafe/DESIGN.md, "Shots and the reference" and "Rating and notes").
 //
 // Streamline's chart still draws everything. This module decides which finished
 // Shot it draws, through the two hooks the fork adds to chart.js. With a recipe
@@ -18,9 +18,11 @@ import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { latestShot, referenceShot, makeReference, watchReference } from './shot-seam.js';
+import { latestShot, referenceShot, makeReference, watchReference, newestShot, editShot } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
-import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot, sameReference } from './shot-model.js';
+import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot, sameReference, isDrawnShot } from './shot-model.js';
+import { shotRemarks, sameRemarks, editedRemarks, starFills, ratingForTap, ratingOf, ratingText, noteToSave } from './remarks.js';
+import { editNote, readNote } from './note-dialog.js';
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
@@ -61,14 +63,37 @@ let refreshTimer = null;
 let settleTimer = null;
 let lateTimer = null;     // the one look left after a recipe change stopped the others
 let busy = false;       // a reference is being chosen
+// The rating and note of the Shot in the graph: `{ id, rating, note, of }`,
+// where `of` is that Shot as `latest` holds it. Null until its record is
+// known: with no recipe the Shot comes from Streamline's history module with
+// no record, so the page reads the tablet's newest and takes it only if it is
+// the Shot drawn.
+let remarks = null;
+let edits = 0;          // counts each edit of a Shot as it starts and as it ends
+const editedAt = new Map(); // a Shot's id to that count at its last edit: a read begun before it is older than the edit
+let rating = false;     // a rating is on its way
+let lastSeq = 0;        // the reads of the tablet's newest record, for "Last shot"
 
 const el = id => document.getElementById(id);
 const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
 
 // ── What the chart draws ─────────────────────────────────────────────────────
 
+// An edit of a Shot starts, or ends.
+function markEdit(shotId) {
+    edits += 1;
+    editedAt.set(shotId, edits);
+}
+
+// Did the page edit a Shot after a read that began at `then`?
+const editedSince = (shotId, then) => (editedAt.get(shotId) ?? 0) > then;
+
+// The rating and note of the Shot in the graph, or null where they are not
+// known, or are another Shot's.
+const shownRemarks = () => (remarks && remarks.of === latest ? remarks : null);
+
 function model() {
-    return graphModel({ recipe, view, live, settling, shot: latest, reference });
+    return graphModel({ recipe, view, live, settling, shot: latest, reference, remarks: shownRemarks() });
 }
 
 // A stage name's width in pixels. A profile has a handful of steps, and each
@@ -162,6 +187,7 @@ function chooseShot(measurements, workflow) {
     if (recipe === null) {
         latest = handed;
         settling = false;
+        readLast();
         paint();
         return true;
     }
@@ -196,12 +222,17 @@ async function refresh({ onlyIfChanged = false } = {}) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
     // A running shot owns the chart's lines: its end asks again. With no recipe
-    // loaded there is nothing to read: the history module draws. While the page
-    // looks for a shot that has just ended, this read is one more look: it takes
-    // the place of a look still on its way, which may have read the reference
-    // before the change that asked for this one.
-    if (live || !recipe) return;
+    // loaded the history module draws, and there is nothing to read but the
+    // rating and note of the Shot it drew. While the page looks for a shot that
+    // has just ended, this read is one more look: it takes the place of a look
+    // still on its way, which may have read the reference before the change
+    // that asked for this one.
+    if (live || !recipe) {
+        if (!live && recipe === null) readLast();
+        return;
+    }
     const mine = ++seq;
+    const editsThen = edits;
     let shot;
     let chosen;
     try {
@@ -238,15 +269,69 @@ async function refresh({ onlyIfChanged = false } = {}) {
     // A reference that could not be read leaves the one read for this recipe
     // before, which is this source's: a change of source dropped any other.
     // With none read, there is none, and none can be chosen.
-    const answer = chosen || reference || NO_REFERENCE;
+    let answer = chosen || reference || NO_REFERENCE;
+    // The reference's rating and note, where the page edited that Shot after
+    // this read began: the read is older than the edit, as for the latest Shot.
+    if (answer !== reference && answer.shot && reference && reference.shot && reference.shot.id === answer.shot.id && editedSince(answer.shot.id, editsThen)) {
+        answer = { ...answer, rating: reference.rating, note: reference.note };
+    }
     const sameShot = latest !== undefined && (shot ? shot.id : null) === (latest ? latest.id : null);
-    if (!drawDue && !settling && sameShot && sameReference(reference, answer)) return;
+    if (!drawDue && !settling && sameShot && sameReference(reference, answer)) {
+        // The same two Shots: nothing is drawn again. A rating or a note may
+        // be another all the same, as the reference's is when it was changed
+        // elsewhere, and then only the legend's rows are written again.
+        const before = shownRemarks();
+        takeRemarks(shot, editsThen);
+        const rows = !sameRemarks(before, shownRemarks()) || !sameRemarks(reference, answer);
+        if (!sameRemarks(reference, answer)) reference = { ...reference, rating: answer.rating, note: answer.note };
+        if (rows) paint();
+        return;
+    }
     latest = shot;
+    takeRemarks(shot, editsThen);
     // Kept with no Shot too: the seam's answer still says whether one can be chosen.
     if (answer !== reference) reference = { ...answer, ...referenceParts(answer.shot) };
     settling = false;
     clearTimeout(settleTimer);
     draw();
+}
+
+// The rating and note a read found for the Shot in the graph, which `latest`
+// holds by now. Where the page edited that Shot after the read began, the read
+// is older than the edit, and what the edit answered stays.
+function takeRemarks(record, editsThen) {
+    if (!record || !latest) {
+        remarks = null;
+        return;
+    }
+    const edited = remarks && remarks.id === record.id && editedSince(record.id, editsThen);
+    remarks = { ...(edited ? { rating: remarks.rating, note: remarks.note } : shotRemarks(record)), id: record.id, of: latest };
+}
+
+// With no recipe loaded the graph's Shot is the one Streamline's history
+// module handed the chart: its measurements and its Workflow, and no record.
+// So the page asks the seam for the tablet's newest Shot, and takes its id,
+// rating and note only if it is the Shot drawn. Until then, and where it is
+// another, the row has no stars: they never act on a Shot that is not the one
+// in the graph. The module hands the same Shot over again on the way back from
+// another page, and what was read for it stands until this read answers.
+async function readLast() {
+    if (recipe !== null || !latest) return;
+    if (remarks && remarks.of !== latest && remarks.of.id == null && remarks.of.timestamp === latest.timestamp) remarks = { ...remarks, of: latest };
+    const mine = ++lastSeq;
+    const editsThen = edits;
+    let record;
+    try {
+        record = await newestShot();
+    } catch (error) {
+        logger.warn('Cafe: could not read the last Shot\'s rating and note', error);
+        return;
+    }
+    if (mine !== lastSeq || recipe !== null) return;
+    const before = shownRemarks();
+    takeRemarks(isDrawnShot(record, latest) ? record : null, editsThen);
+    const now = shownRemarks();
+    if (!!before !== !!now || !sameRemarks(before, now)) paint();
 }
 
 // The seam says a recipe's reference should be read again: with null, whichever
@@ -331,6 +416,7 @@ export function showGraphRecipe(next) {
         // A running shot keeps its lines until it ends.
         latest = handed;
         settling = false;
+        readLast();
         applyOverlay();
         if (live) paint();
         else draw();
@@ -372,6 +458,7 @@ function shotEnded() {
         heldBack = false;
         latest = handed;
         settling = false;
+        readLast();
         applyOverlay();
         draw();
         return;
@@ -392,6 +479,7 @@ function shotEnded() {
                 if (!settling || live || recipe) return;
                 settling = false;
                 latest = handed;
+                readLast();
                 draw();
             }, SETTLE_LAST_MS);
             applyOverlay();
@@ -414,11 +502,26 @@ function shotEnded() {
 
 const show = (element, shown) => { if (element) element.style.display = shown ? '' : 'none'; };
 
-// "Today 14:32 · Ana", for a Shot's row.
-function credit(shot) {
-    if (!shot) return '';
+// When a Shot was pulled and by whom: "Today 14:32" and "Ana".
+function creditParts(shot) {
+    if (!shot) return { time: '', who: '' };
     const { when, who } = shotCredit(shot);
-    return [whenText(when, new Date(), cafeDateLocale(), cafeText('Today')), who].filter(Boolean).join(' · ');
+    return { time: whenText(when, new Date(), cafeDateLocale(), cafeText('Today')), who };
+}
+
+// "Today 14:32 · Ana", for a dialog that names a Shot.
+function credit(shot) {
+    const { time, who } = creditParts(shot);
+    return [time, who].filter(Boolean).join(' · ');
+}
+
+// The same on a Shot's row of the legend, as two pieces: in a narrow row the
+// barista's name gives way before the time does.
+function paintCredit(row, shot) {
+    const { time, who } = creditParts(shot);
+    setText(el(`cafe-${row}-when`), time);
+    // The space before the name is the name's own: see `.cafe-legend-who`.
+    setText(el(`cafe-${row}-who`), who && time ? ` · ${who}` : who);
 }
 
 // The row under the graph: six live cards while a shot runs and until the
@@ -446,7 +549,19 @@ function paint() {
     show(el('cafe-legend-shot'), !!shown.row);
     if (shown.row) {
         setText(el('cafe-shot-label'), shown.row.label, { translate: true });
-        setText(el('cafe-shot-when'), credit(shown.row.shot));
+        paintCredit('shot', shown.row.shot);
+    }
+    // The Shot's stars and its note icon, which is a plus where it has no note.
+    show(el('cafe-stars'), !!shown.rate);
+    const noteButton = el('cafe-shot-note');
+    show(noteButton, !!shown.rate);
+    if (shown.rate) {
+        const fills = starFills(shown.rate.rating);
+        document.querySelectorAll('#cafe-stars .cafe-star').forEach((star, index) => {
+            star.style.setProperty('--cafe-star-fill', `${fills[index] * 100}%`);
+            star.setAttribute('aria-pressed', String(fills[index] > 0));
+        });
+        noteButton?.classList.toggle('cafe-has-note', !!shown.rate.note);
     }
     const make = el('cafe-make-reference');
     show(make, shown.makeReference);
@@ -454,7 +569,11 @@ function paint() {
     show(el('cafe-legend-notice'), !!shown.notice);
     if (shown.notice) setText(el('cafe-legend-notice'), shown.notice, { translate: true });
     show(el('cafe-legend-reference'), !!shown.reference);
-    if (shown.reference) setText(el('cafe-reference-when'), credit(shown.reference));
+    if (shown.reference) paintCredit('reference', shown.reference);
+    // The reference's rating and its note to read, each hidden when there is none.
+    show(el('cafe-reference-rating'), shown.referenceRating !== null);
+    setText(el('cafe-reference-rating'), ratingText(shown.referenceRating));
+    show(el('cafe-reference-note'), shown.referenceNote !== null);
     show(el('cafe-different-profile'), shown.flag);
     show(el('cafe-reference-badge'), shown.badge);
     show(el('cafe-legend-line'), !!shown.line);
@@ -539,6 +658,79 @@ function followChoice(forRecipe, chosen) {
     draw();
 }
 
+// ── Rating and notes ─────────────────────────────────────────────────────────
+
+// What an edit, or a read after one, left of a Shot's rating or its note: only
+// the one the edit was of, since an answer also carries the other as it stood
+// when the edit was made, which a later edit of that one may have changed
+// since. The Shot is named by its id: the graph may show another by now, and
+// then nothing on screen changes. When it is the reference too, that row
+// follows.
+function followEdit(shotId, now) {
+    if (remarks && remarks.id === shotId) remarks = { ...remarks, ...now };
+    if (reference && reference.shot && reference.shot.id === shotId) reference = { ...reference, ...now };
+    paint();
+}
+
+// A tap on a star: that many stars, or none for a tap on the star chosen. It
+// is saved at once, and the stars change as they are tapped. If the edit fails
+// they go back, to what a read after it found where there was one.
+async function onStar(star) {
+    const target = shownRemarks();
+    if (rating || !target || !model().rate) return;
+    const before = target.rating;
+    const next = ratingForTap(before, star);
+    rating = true;
+    markEdit(target.id);
+    followEdit(target.id, { rating: ratingOf(next) });
+    try {
+        followEdit(target.id, editedRemarks({ rating: next }, await editShot(target.id, { rating: next })));
+    } catch (error) {
+        logger.warn('Cafe: could not save the rating', error);
+        followEdit(target.id, editedRemarks({ rating: next }, error.remarks || { rating: before }));
+        // Decent Sync's refusal says why, in its own words.
+        showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
+    } finally {
+        rating = false;
+        markEdit(target.id);
+    }
+}
+
+// The note icon on the Shot's row opens its note to write. The edit names the
+// Shot by its id, so a note saved after the graph has moved on is still that
+// Shot's.
+function onNote() {
+    const shown = model();
+    const target = shownRemarks();
+    if (!target || !shown.rate) return;
+    editNote({
+        title: shown.row.label,
+        credit: credit(shown.row.shot),
+        note: target.note,
+        async save(text) {
+            const note = noteToSave(text);
+            if (note === (target.note || '')) return;
+            markEdit(target.id);
+            try {
+                followEdit(target.id, editedRemarks({ note }, await editShot(target.id, { note })));
+            } catch (error) {
+                logger.warn('Cafe: could not save the note', error);
+                followEdit(target.id, editedRemarks({ note }, error.remarks));
+                throw new Error(error.refusal || cafeText('The note could not be saved'));
+            } finally {
+                markEdit(target.id);
+            }
+        },
+    });
+}
+
+// The note icon on the reference's row opens its note to read.
+function onReferenceNote() {
+    const shown = model();
+    if (shown.referenceNote === null) return;
+    readNote({ title: 'Reference', credit: credit(shown.reference), rating: shown.referenceRating, note: shown.referenceNote });
+}
+
 // ── Start ────────────────────────────────────────────────────────────────────
 
 /** Called once, when the page starts. */
@@ -557,6 +749,11 @@ export function initGraph() {
         button.addEventListener('click', () => setView(viewFrom(button.dataset.view)));
     }
     el('cafe-make-reference')?.addEventListener('click', onMakeReference);
+    for (const star of document.querySelectorAll('#cafe-stars .cafe-star')) {
+        star.addEventListener('click', () => onStar(Number(star.dataset.star)));
+    }
+    el('cafe-shot-note')?.addEventListener('click', onNote);
+    el('cafe-reference-note')?.addEventListener('click', onReferenceNote);
     watchReference(referenceChanged);
 
     document.addEventListener('streamline:espresso-start', shotStarted);

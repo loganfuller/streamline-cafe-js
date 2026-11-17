@@ -58,6 +58,14 @@ test('an answer from the tablet\'s copy is drawn, and marks the reference as one
     assert.deepEqual(referenceFrom(answer(null, { source: 'tablet' })), { shot: null, canChange: false, unreachable: true }, 'a copy may say the Recipe has none');
 });
 
+test('the reference\'s rating and note are the answer\'s own, and none where it has none', () => {
+    const rated = referenceFrom({ ...answer('a'), reference: { ...answer('a').reference, rating: 7, note: ' Syrupy body ' } });
+    assert.deepEqual([rated.rating, rated.note], [7, 'Syrupy body']);
+    const bare = referenceFrom({ ...answer('a'), reference: { ...answer('a').reference, rating: 0, note: null } });
+    assert.deepEqual([bare.rating, bare.note], [null, null], '0 is unrated');
+    assert.deepEqual([referenceFrom(answer('a')).rating, referenceFrom(answer('a')).note], [8, null]);
+});
+
 test('"Different profile" is Decent Sync\'s word', () => {
     assert.equal(referenceFrom(answer('a', { profileDiffers: true })).profileDiffers, true);
     assert.equal(referenceFrom(answer('a')).profileDiffers, false);
@@ -170,13 +178,20 @@ const SERVED = { connected: true, served: true };
 const UNREACHABLE = { connected: false, served: false, code: 'unreachable' };
 const CAPTURE_ONLY = { connected: true, served: false, code: 'captureOnly' };
 
-// The two sources, each counting what it was asked, and what the seam tells its caller.
-function seam() {
+// The two sources, each counting what it was asked, and what the seam tells its
+// caller. `pluginReference` is what the plugin answers for a reference, or an
+// Error it rejects with, in place of its own Shot.
+function seam({ pluginReference } = {}) {
     const calls = { tablet: [], plugin: [], asked: 0, changed: [], moved: [] };
     let held = null; // a choice waits on this before it answers
     const source = name => ({
         latestShot: async id => { calls[name].push(['latest', id]); return whole(`${name}-latest`); },
-        referenceShot: async id => { calls[name].push(['reference', id]); return { shot: whole(`${name}-reference`), canChange: true }; },
+        referenceShot: async id => {
+            calls[name].push(['reference', id]);
+            if (name === 'plugin' && pluginReference instanceof Error) throw pluginReference;
+            if (name === 'plugin' && pluginReference) return pluginReference;
+            return { shot: whole(`${name}-reference`), canChange: true };
+        },
         makeReference: async (id, shotId) => {
             calls[name].push(['make', id, shotId]);
             if (held) await held;
@@ -208,23 +223,74 @@ test('before the status has answered: the latest Shot alone, no reference, and n
     assert.deepEqual(calls.changed, [], 'and nothing is read again for an answer that says nothing');
 });
 
-test('a plugin that can\'t ask its server, before the source is known: no reference, and the answer says why', async () => {
-    const { sources, calls } = seam();
-    sources.status(UNREACHABLE); // the plugin has not connected yet, or never will
-    assert.equal(sources.source(), 'unknown');
-    assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false, unreachable: true, unread: true });
-    await assert.rejects(sources.makeReference('r1', 'a'));
-    assert.deepEqual([calls.changed, calls.moved], [[null], [false]], 'the page is told once, to say so');
+// A page opened while the server is out of reach: the plugin has said so, and
+// it is not known yet whether the Machine is served.
+const COPY = { shot: whole('copy'), canChange: false, unreachable: true, profileDiffers: false, rating: 8, note: null };
+const NO_COPY = { shot: null, canChange: false, unreachable: true, unread: true };
+
+test('a plugin that can\'t ask its server, before the source is known, is asked for the reference: its copy is drawn, and can\'t be changed', async () => {
+    for (const status of [UNREACHABLE, { connected: true, served: false, code: 'serverTooOld' }]) {
+        const { sources, calls } = seam({ pluginReference: COPY });
+        sources.status(status);
+        assert.equal(sources.source(), 'unknown');
+        assert.deepEqual([calls.changed, calls.moved], [[null], [false]], 'the page is told once, to read it');
+        assert.deepEqual(await sources.referenceShot('r1'), COPY);
+        await assert.rejects(sources.makeReference('r1', 'a'), 'nothing can be chosen until the status says the Machine is served');
+        assert.deepEqual(calls.plugin, [['reference', 'r1']]);
+        assert.deepEqual(calls.tablet, [], 'the choice kept on the tablet is not read while the source is not known');
+        sources.status(status);
+        assert.deepEqual(calls.changed, [null], 'and not again for the same answer');
+    }
+});
+
+test('whatever the plugin answers before the source is known, the reference can\'t be changed', async () => {
+    // The server came back between the status and the read: the answer is the
+    // server's, and nothing is chosen before the status has said "served".
+    const { sources } = seam({ pluginReference: { shot: whole('server'), canChange: true, unreachable: false, profileDiffers: false, rating: null, note: null } });
     sources.status(UNREACHABLE);
-    assert.deepEqual(calls.changed, [null], 'and not again for the same answer');
-    assert.deepEqual([calls.tablet, calls.plugin], [[], []], 'neither source was asked');
+    const reference = await sources.referenceShot('r1');
+    assert.deepEqual([reference.shot.id, reference.canChange], ['server', false]);
+});
+
+test('a plugin with no copy, before the source is known: no reference, and the answer says nothing could be read', async () => {
+    const { sources, calls } = seam({ pluginReference: NO_COPY });
+    sources.status(UNREACHABLE);
+    assert.deepEqual(await sources.referenceShot('r1'), NO_COPY);
+    assert.deepEqual(calls.tablet, []);
+});
+
+test('only the plugin\'s own word has it asked: Decaid not answering, and a plugin still loading, ask nothing', async () => {
+    const { sources, calls } = seam({ pluginReference: COPY });
+    for (const status of [{}, { loading: true }]) {
+        sources.status(status);
+        assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false });
+    }
+    assert.deepEqual([calls.tablet, calls.plugin, calls.changed], [[], [], []]);
+    sources.status(UNREACHABLE);
+    assert.equal((await sources.referenceShot('r1')).shot.id, 'copy');
     sources.status({}); // Decaid stopped answering: the plugin no longer says so
     assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false });
-    assert.deepEqual(calls.changed, [null, null]);
+    assert.deepEqual(calls.changed, [null, null], 'the page reads again each time that word changes');
+    assert.equal(calls.plugin.length, 1);
+});
+
+test('a refusal before the source is known rejects, so the page keeps what it shows', async () => {
+    const { sources } = seam({ pluginReference: Object.assign(new Error('Sample refusal.'), { code: 'recipesUnread', status: 500 }) });
+    sources.status(UNREACHABLE);
+    await assert.rejects(sources.referenceShot('r1'), /Sample refusal/);
+});
+
+test('once the status says which, the source answers as ever', async () => {
+    const { sources, calls } = seam();
     sources.status(UNREACHABLE);
     sources.status(SERVED);
     assert.equal((await sources.referenceShot('r1')).shot.id, 'plugin-reference');
     assert.deepEqual(calls.moved.slice(-1), [true]);
+    const other = seam();
+    other.sources.status(UNREACHABLE);
+    other.sources.status(CAPTURE_ONLY);
+    assert.deepEqual(await other.sources.referenceShot('r1'), { shot: whole('tablet-reference'), canChange: true });
+    assert.deepEqual(other.calls.plugin, [], 'a Capture-only Machine\'s plugin was never asked');
 });
 
 test('on a served Machine the reference is the plugin\'s, and nothing kept on the tablet for it is read or written', async () => {

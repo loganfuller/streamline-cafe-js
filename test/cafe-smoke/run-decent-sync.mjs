@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { RECIPES, BARISTAS } from './sample-data.mjs';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides } from './page-helpers.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog } from './page-helpers.mjs';
 import { DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { shotRecipeId } from '../../src/cafe/shot-model.js';
 
@@ -52,7 +52,6 @@ const LOCATION = 'Sample Cafe';
 const MACHINE = 'Sample Machine';
 const REFERENCES = '/store/streamlineCafe/references';
 const CANT_CHANGE = "Decent Sync can't be reached, so the reference can't be changed";
-const CANT_SHOW = "Decent Sync can't be reached, so the reference can't be shown";
 
 const docker = (...command) => promisify(execFile)('docker', command);
 const decaid = decaidClient(`${DECAID}/api/v1`, TOKEN);
@@ -191,6 +190,11 @@ async function shotWith(page, recordId, seconds, barista) {
     await page.waitForTimeout(2500);
     return pulled;
 }
+// A Shot's rating and note as the server holds them: `{ rating, note }`, each null for none.
+const onServer = async shotId => {
+    const { shot } = await sync('GET', `/shots/${shotId}`);
+    return { rating: shot.enjoyment || null, note: shot.record?.annotations?.espressoNotes || null };
+};
 const pluginRequests = (seen, method) => seen.requests.filter(r => r.startsWith(`${method} /api/v1/plugins/${PLUGIN}/reference`));
 const storeRequests = seen => seen.requests.filter(r => r.includes(REFERENCES));
 
@@ -269,7 +273,60 @@ try {
     await shot(page, 'sync-reference-dark');
     await paint(page, 'light');
 
-    // 5. A reference chosen on the server arrives on the open page.
+    // 5. Rating and notes: an edit is the plugin's call, which writes the
+    //    tablet's own Shot through Decaid, and the server has it soon after.
+    {
+        const edits = [];
+        const listen = request => {
+            const url = new URL(request.url());
+            if (request.method() === 'PUT' && /\/shots?(\/|$)/.test(url.pathname)) edits.push(`${url.pathname}${url.search} ${request.postData()}`);
+        };
+        page.on('request', listen);
+        const edit = `/api/v1/plugins/${PLUGIN}/shot?id=${encodeURIComponent(second.id)}`;
+        const tablet = async () => (await decaid('GET', `/shots/${second.id}`)).annotations || {};
+        let shown = await remarks(page);
+        check('the latest Shot has empty stars and a plus, and the Reference Shot, with no rating or note, neither', JSON.stringify(shown) === JSON.stringify({ stars: [0, 0, 0, 0, 0], note: 'add', referenceRating: null, referenceNote: false }), JSON.stringify(shown));
+        await page.locator('#cafe-stars .cafe-star').nth(3).click();
+        let held = await until(async () => { const now = await onServer(second.id); return now.rating === 8 ? now : null; }, { timeout: 45_000 });
+        check('a tap on the fourth star rates the Shot: the stars, the tablet\'s own record, and the server', JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]' && (await tablet()).enjoyment === 8 && held?.rating === 8, `${JSON.stringify(await remarks(page))} tablet ${(await tablet()).enjoyment} server ${JSON.stringify(held || await onServer(second.id))}`);
+        check('the rating was one request to the plugin, with the rating alone, and the page sent Decaid nothing', edits.length === 1 && edits[0] === `${edit} {"rating":8}`, edits.join(' | '));
+        await page.locator('#cafe-stars .cafe-star').nth(3).click();
+        held = await until(async () => { const now = await onServer(second.id); return now.rating === null ? now : null; }, { timeout: 45_000 });
+        check('a tap on the chosen star clears the rating, on the tablet and on the server', JSON.stringify((await remarks(page)).stars) === '[0,0,0,0,0]' && !((await tablet()).enjoyment > 0) && !!held && edits[1] === `${edit} {"rating":0}`, `${edits[1]} server ${JSON.stringify(held || await onServer(second.id))}`);
+        await page.locator('#cafe-stars .cafe-star').nth(4).click();
+        await page.waitForTimeout(800);
+
+        const NOTE = 'Bright, with a clean finish.\nKeep the grind where it is.';
+        await page.locator('#cafe-shot-note').click();
+        await page.locator('#cafe-note-text').fill(`  ${NOTE}  `);
+        await shot(page, 'sync-note-dialog-light');
+        await page.locator('#cafe-note-save').click();
+        await page.locator('#cafe-note-dialog:not([open])').waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
+        held = await until(async () => { const now = await onServer(second.id); return now.note === NOTE ? now : null; }, { timeout: 45_000 });
+        check('a note is saved through the plugin, alone, and reaches the server with the rating untouched',
+            (await noteDialog(page)) === null && (await tablet()).espressoNotes === NOTE && (await tablet()).enjoyment === 10 && held?.rating === 10 && edits[3] === `${edit} ${JSON.stringify({ note: NOTE })}` && (await remarks(page)).note === 'note',
+            `${edits[3]} server ${JSON.stringify(held || await onServer(second.id))}`);
+        check('every edit went to the plugin, and none to Decaid\'s own Shot edit', edits.length === 4 && edits.every(sent => sent.startsWith(edit)), edits.join(' | '));
+        page.off('request', listen);
+
+        //    A rating and a note given to the Reference Shot on the server show
+        //    on the open page: the push has its row written, and nothing drawn.
+        await page.waitForTimeout(1500);
+        const counting = countDraws(page, 12_000);
+        await sync('PATCH', `/shots/${first.id}`, { rating: 7, note: 'The one to match.' });
+        const pushed = await until(async () => { const now = await remarks(page); return now.referenceRating ? now : null; }, { timeout: 10_000, every: 300 });
+        const redrawn = await counting;
+        check('a rating and a note given to the Reference Shot on the server show on its row, on the open page', pushed?.referenceRating === '★ 3.5' && pushed.referenceNote === true, JSON.stringify(pushed || await remarks(page)));
+        check('and the graph was not drawn again for it', redrawn.full === 0, `${redrawn.full} draws`);
+        await page.locator('#cafe-reference-note').click();
+        const reading = await noteDialog(page);
+        check('the Reference Shot\'s note opens to read, with its rating', reading?.title === 'Reference' && reading.read === 'The one to match.' && reading.rating === '★ 3.5' && reading.buttons.join() === 'Close', JSON.stringify(reading));
+        await shot(page, 'sync-reference-note-light');
+        await page.locator('#cafe-note-close').click();
+        await shot(page, 'sync-rated-light');
+    }
+
+    // 6. A reference chosen on the server arrives on the open page.
     const loads = seen.loads;
     await setReference(house, second.id);
     now = await waitLegend(page, l => l.badge !== null);
@@ -298,7 +355,7 @@ try {
     check('a repeated push reads the reference again and redraws nothing', reread >= 1 && redrawn.full === 0, `${reread} reads, ${redrawn.full} draws`);
     await page.locator('#cafe-title').filter({ hasText: new RegExp(`^${house.name}$`) }).waitFor({ timeout: 20_000 }).catch(() => {});
 
-    // 6. The socket: one, however often the main page mounts.
+    // 7. The socket: one, however often the main page mounts.
     await page.locator('#settings-btn').click();
     await page.locator('#subpage-host #settings-content-area').waitFor({ timeout: 20_000 });
     await page.goBack();
@@ -309,7 +366,7 @@ try {
     now = await legend(page);
     check('back on the main page the reference is still drawn', now.reference !== null && (await chartLines(page)).points[7] > 10, JSON.stringify(now));
 
-    // 7. With the server stopped: the tablet's copy, and Make reference muted.
+    // 8. With the server stopped: the tablet's copy, and Make reference muted.
     await docker('stop', SYNC_CONTAINER);
     stopped = true;
     now = await waitLegend(page, l => l.notice !== null, 60_000);
@@ -325,14 +382,30 @@ try {
     await shot(page, 'sync-server-stopped-light');
 
     //    A page opened while the server is out of reach does not know yet
-    //    whether the Machine is served: the latest Shot alone.
+    //    whether the Machine is served. The plugin has said it can't ask its
+    //    server, so it is asked for the reference all the same, and its copy is
+    //    drawn, with nothing to choose.
     {
         const cold = await openPage();
-        await cold.page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
-        await cold.page.waitForTimeout(3000);
-        const shown = await legend(cold.page);
-        check('a page opened with the server out of reach: the latest Shot alone, no reference and no Make reference, and a line saying why',
-            shown.label === 'Latest' && shown.reference === null && shown.make === null && shown.notice === CANT_SHOW && cold.seen.requests.every(r => !r.includes(REFERENCES)), JSON.stringify(shown));
+        const shown = await waitLegend(cold.page, l => l.label === 'Latest' && l.notice !== null && /\d{2}:\d{2}/.test(l.when || ''), 45_000) || await legend(cold.page);
+        await cold.page.waitForTimeout(1500);
+        const coldLines = await chartLines(cold.page);
+        check('a page opened with the server out of reach draws the tablet\'s copy of the Reference Shot, with Make reference muted and the line saying why',
+            shown.label === 'Latest' && /\d{2}:\d{2}/.test(shown.reference || '') && coldLines.points[7] > 10 && shown.make === 'Make reference' && shown.muted === true && shown.notice === CANT_CHANGE, `${JSON.stringify(shown)} ${JSON.stringify(coldLines.points)}`);
+        check('the copy carries the Reference Shot\'s rating and note', (await remarks(cold.page)).referenceRating === '★ 3.5' && (await remarks(cold.page)).referenceNote === true, JSON.stringify(await remarks(cold.page)));
+        check('the choice kept on the tablet was not read for it', cold.seen.requests.every(r => !r.includes(REFERENCES)), cold.seen.requests.filter(r => r.includes(REFERENCES)).join(', '));
+        mark = cold.seen.requests.length;
+        await cold.page.locator('#cafe-make-reference').click({ force: true }).catch(() => {});
+        await cold.page.waitForTimeout(800);
+        check('and a tap on the muted Make reference asks nothing', cold.seen.requests.slice(mark).filter(r => r.startsWith('PUT ')).length === 0);
+        //    The tablet's own Shot is still rated. The source is not known on
+        //    this page, so the edit is Decaid's own, and the plugin is not asked.
+        mark = cold.seen.requests.length;
+        await cold.page.locator('#cafe-stars .cafe-star').nth(2).click();
+        await cold.page.waitForTimeout(1200);
+        const rated = (await decaid('GET', `/shots/${second.id}`)).annotations?.enjoyment;
+        check('with the server out of reach the tablet\'s own Shot is still rated, by Decaid\'s own edit', rated === 6 && JSON.stringify((await remarks(cold.page)).stars) === '[100,100,100,0,0]'
+            && cold.seen.requests.slice(mark).filter(r => r.startsWith('PUT ')).join() === `PUT /api/v1/shots/${second.id}`, `${rated} ${JSON.stringify(await remarks(cold.page))}`);
         await shot(cold.page, 'sync-opened-while-stopped-light');
         check('no page error on it', cold.seen.errors.length === 0, cold.seen.errors.join(' | '));
         await cold.close();
@@ -344,7 +417,7 @@ try {
     now = await waitLegend(page, l => l.notice === null && l.make !== null && !l.muted, 120_000);
     check('with the server back the reference can be changed again, with no reload', !!now && now.reference !== null && seen.loads === loads, JSON.stringify(now || await legend(page)));
 
-    // 8. A Capture-only Machine keeps its reference on the tablet.
+    // 9. A Capture-only Machine keeps its reference on the tablet.
     await sync('PUT', `/machines/${machine.id}/sharing`, { sharing: false });
     sharingOff = machine.id;
     await until(async () => (await plugin('status').catch(error => error)).message?.includes('Capture-only'), { timeout: 30_000 });

@@ -19,9 +19,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BEANS, GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, REFERENCE_LINES } from './page-helpers.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
+import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
@@ -167,9 +168,13 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
             if (decentSync === 'coldStart') return route.fulfill(connected ? served : refused('unreachable'));
             return route.fulfill(refused(decentSync));
         });
-        // The stand-in has no Reference Shot for any recipe. Its socket pushes
-        // nothing, but for the cold start's one push.
-        await page.route(/\/api\/v1\/plugins\/decent-sync\.reaplugin\/reference\?/, route => route.fulfill({ status: 200, json: { recipe: null, reference: null, source: 'server' } }));
+        // The stand-in has no Reference Shot for any recipe, and no copy of one
+        // while it is not connected. Its socket pushes nothing, but for the
+        // cold start's one push.
+        await page.route(/\/api\/v1\/plugins\/decent-sync\.reaplugin\/reference\?/, route => {
+            if (decentSync === 'coldStart' && !connected) return route.fulfill({ status: 503, json: { code: 'unreachable', message: 'Sample refusal.' } });
+            return route.fulfill({ status: 200, json: { recipe: null, reference: null, source: 'server' } });
+        });
         await page.routeWebSocket(/\/ws\/v1\/plugins\/decent-sync\.reaplugin\/changes$/, socket => {
             if (decentSync !== 'coldStart') return;
             setTimeout(() => {
@@ -204,6 +209,220 @@ function withWeights(saved) {
 }
 
 const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) });
+// The page looks again, as when it comes back into view: Shots have no push.
+const lookAgain = async page => {
+    await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+    await page.waitForTimeout(1500);
+};
+const star = (page, n) => page.locator('#cafe-stars .cafe-star').nth(n - 1).click();
+const noteBox = page => page.locator('#cafe-note-text');
+const closed = page => page.locator('#cafe-note-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).then(() => true, () => false);
+const FINISHED_LANGUAGES = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
+
+// Rating and notes, on a page whose graph shows `latest` against the reference
+// `reference`, two of the tablet's own Shots, with no Decent Sync: the edit is
+// Decaid's own.
+async function ratingAndNotes(page, latest, reference) {
+    const record = id => decaid('GET', `/shots/${id}`);
+    const others = annotations => JSON.stringify(Object.fromEntries(Object.entries(annotations || {}).filter(([key]) => !['enjoyment', 'espressoNotes'].includes(key)).sort()));
+    const edits = [];
+    const listen = request => { if (request.method() === 'PUT' && /\/api\/v1\/shots\//.test(request.url())) edits.push(request.postData()); };
+    page.on('request', listen);
+    const SHOT_EDIT = /\/api\/v1\/shots\/[^/?]+$/;
+    const failing = route => (route.request().method() === 'PUT' ? route.abort() : route.fallback());
+
+    //    The stars.
+    let shown = await remarks(page);
+    check('a saved Shot has five empty stars and a plus for its note; a reference with no rating and no note shows neither',
+        JSON.stringify(shown) === JSON.stringify({ stars: [0, 0, 0, 0, 0], note: 'add', referenceRating: null, referenceNote: false }), JSON.stringify(shown));
+    const before = await record(latest.id);
+    await star(page, 4);
+    await page.waitForTimeout(800);
+    let saved = await record(latest.id);
+    check('a tap on the fourth star rates the Shot four stars, at once', JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]' && saved.annotations.enjoyment === 8, `${JSON.stringify(await remarks(page))} ${saved.annotations.enjoyment}`);
+    check('the edit sent Decaid the rating alone, and the Shot\'s other annotations are untouched', edits.length === 1 && edits[0] === '{"annotations":{"enjoyment":8}}' && others(saved.annotations) === others(before.annotations) && !saved.annotations.espressoNotes, edits.join(' | '));
+    await star(page, 4);
+    await page.waitForTimeout(800);
+    saved = await record(latest.id);
+    check('a tap on the chosen star clears the rating, by sending 0', JSON.stringify((await remarks(page)).stars) === '[0,0,0,0,0]' && !(saved.annotations.enjoyment > 0) && edits[1] === '{"annotations":{"enjoyment":0}}', `${saved.annotations.enjoyment} ${edits[1]}`);
+    //    A rating between two stars, as one given elsewhere.
+    await decaid('PUT', `/shots/${latest.id}`, { annotations: { enjoyment: 7 } });
+    await lookAgain(page);
+    check('a rating given elsewhere shows at the page\'s next read, and 7 is drawn as three and a half stars', JSON.stringify((await remarks(page)).stars) === '[100,100,100,50,0]', JSON.stringify(await remarks(page)));
+    await shot(page, 'rating-half-star-light');
+    await star(page, 4);
+    await page.waitForTimeout(800);
+    check('on a Shot rated 7 a tap on the fourth star sets 8: only an exact match clears', (await record(latest.id)).annotations.enjoyment === 8 && JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]');
+
+    //    A rating that fails: the stars go back, and a toast says so.
+    await page.route(SHOT_EDIT, failing);
+    await star(page, 2);
+    await page.locator('#app-toast').filter({ hasText: 'The rating could not be saved' }).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    check('a rating that could not be saved puts the stars back, and a toast says so',
+        JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]' && (await page.locator('#app-toast-message').textContent()) === 'The rating could not be saved' && (await record(latest.id)).annotations.enjoyment === 8,
+        `${JSON.stringify((await remarks(page)).stars)} "${await page.locator('#app-toast-message').textContent()}"`);
+    await page.unroute(SHOT_EDIT, failing);
+    //    An edit Decaid made and whose answer was lost: it is read again first.
+    const lost = async route => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        await route.fetch();
+        return route.abort();
+    };
+    await page.route(SHOT_EDIT, lost);
+    await page.waitForTimeout(4500); // the toast above goes
+    await star(page, 5);
+    await page.waitForTimeout(1200);
+    check('a rating Decaid made, whose answer never came, is read again and shown as made, with no toast',
+        JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,100]' && (await record(latest.id)).annotations.enjoyment === 10 && !(await page.locator('#app-toast').isVisible()), JSON.stringify(await remarks(page)));
+    await page.unroute(SHOT_EDIT, lost);
+    await star(page, 4);
+    await page.waitForTimeout(800);
+
+    //    The note.
+    const NOTE = 'Sweet, a little thin.\nNext time: grind a step finer.';
+    edits.length = 0;
+    await page.locator('#cafe-shot-note').click();
+    await page.waitForTimeout(400); // the dialog's box grows into place
+    let dialog = await noteDialog(page);
+    const row0 = await legend(page);
+    check('the plus opens the Shot\'s note to write: it names the Shot as its row does, with a box labelled "Note", Cancel and "Save note"',
+        !!dialog && dialog.title === 'Latest' && dialog.when === row0.when && dialog.label === 'Note' && dialog.text === '' && dialog.read === null
+        && dialog.placeholder === 'How did it taste? What would you change next time?' && dialog.buttons.join() === 'Cancel,Save note' && dialog.error === null, JSON.stringify(dialog));
+    await noteBox(page).fill(`  ${NOTE}  \n`);
+    await shot(page, 'note-dialog-light');
+    await paint(page, 'dark');
+    await page.waitForTimeout(500);
+    await shot(page, 'note-dialog-dark');
+    await paint(page, 'light');
+    //    The soft keyboard, which the run can't raise: Streamline's scaling says
+    //    how much of the screen is left above one, and the dialog takes it.
+    const scale = detail => page.evaluate(d => document.dispatchEvent(new CustomEvent('streamline:scaleupdate', { detail: d })), detail);
+    await scale({ keyboardUp: true, visibleHeight: 400 });
+    await page.waitForTimeout(300);
+    const lifted = await noteDialog(page);
+    await shot(page, 'note-dialog-above-keyboard-light');
+    await scale({ keyboardUp: false, visibleHeight: 1200 });
+    await page.waitForTimeout(300);
+    const settled = await noteDialog(page);
+    check('with a keyboard up the dialog sits in what is left above it, its text box giving up the height, with the box and both buttons in view; and it goes back after',
+        lifted.box.top >= 0 && lifted.box.bottom <= 400 && lifted.boxHeight >= 72 && lifted.boxHeight < settled.boxHeight && settled.box.bottom > 400 && settled.box.bottom - settled.box.top > lifted.box.bottom - lifted.box.top,
+        `${JSON.stringify(lifted.box)} box ${lifted.boxHeight}px, then ${JSON.stringify(settled.box)} box ${settled.boxHeight}px`);
+    //    A save that takes a while: nothing can be typed into the box meanwhile,
+    //    since only the text as it stood at the tap is saved.
+    const slow = async route => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        await sleep(1500);
+        return route.fallback();
+    };
+    await page.route(SHOT_EDIT, slow);
+    await page.locator('#cafe-note-save').click();
+    await page.waitForTimeout(400);
+    const during = await page.evaluate(() => ({ open: document.getElementById('cafe-note-dialog').open, locked: document.getElementById('cafe-note-text').readOnly, save: document.getElementById('cafe-note-save').disabled, cancel: document.getElementById('cafe-note-cancel').disabled }));
+    check('while a note is being saved the dialog stays, and its box and buttons take nothing', during.open && during.locked && during.save && during.cancel, JSON.stringify(during));
+    check('"Save note" closes the dialog', await closed(page));
+    await page.unroute(SHOT_EDIT, slow);
+    check('and the box can be typed in again the next time', (await page.evaluate(() => document.getElementById('cafe-note-text').readOnly)) === false);
+    saved = await record(latest.id);
+    check('the note is saved trimmed, sent alone, and the rating is untouched', saved.annotations.espressoNotes === NOTE && saved.annotations.enjoyment === 8 && edits.length === 1 && edits[0] === JSON.stringify({ annotations: { espressoNotes: NOTE } }) && others(saved.annotations) === others(before.annotations), edits.join(' | '));
+    check('the Shot\'s note icon is a page now, not a plus', (await remarks(page)).note === 'note', JSON.stringify(await remarks(page)));
+
+    //    A note that fails to save is not lost.
+    await page.locator('#cafe-shot-note').click();
+    check('the icon opens the note that was saved, to edit', (await noteDialog(page))?.text === NOTE, JSON.stringify(await noteDialog(page)));
+    await page.route(SHOT_EDIT, failing);
+    await noteBox(page).fill(`${NOTE}\nAnd a line that will not save at first.`);
+    await page.locator('#cafe-note-save').click();
+    await page.locator('#cafe-note-error').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    dialog = await noteDialog(page);
+    check('a note that could not be saved keeps the dialog open with its text, and a line says why',
+        !!dialog && dialog.text === `${NOTE}\nAnd a line that will not save at first.` && dialog.error === 'The note could not be saved' && (await record(latest.id)).annotations.espressoNotes === NOTE, JSON.stringify(dialog));
+    await shot(page, 'note-dialog-not-saved-light');
+    await page.unroute(SHOT_EDIT, failing);
+    await page.locator('#cafe-note-save').click();
+    check('and saving again saves it', (await closed(page)) && (await record(latest.id)).annotations.espressoNotes === `${NOTE}\nAnd a line that will not save at first.`);
+    //    Cancel changes nothing, a note saved as it was sends nothing, and an
+    //    emptied note clears it.
+    edits.length = 0;
+    await page.locator('#cafe-shot-note').click();
+    await noteBox(page).fill('Thrown away');
+    await page.locator('#cafe-note-cancel').click();
+    await closed(page);
+    await page.locator('#cafe-shot-note').click();
+    await page.locator('#cafe-note-save').click();
+    check('Cancel changes nothing, and a note saved as it was sends nothing', (await closed(page)) && edits.length === 0 && (await record(latest.id)).annotations.espressoNotes.startsWith(NOTE), edits.join(' | '));
+    await page.locator('#cafe-shot-note').click();
+    await noteBox(page).fill('   ');
+    await page.locator('#cafe-note-save').click();
+    await closed(page);
+    saved = await record(latest.id);
+    check('an emptied note clears it, by sending empty text, and the icon is a plus again', !saved.annotations.espressoNotes && edits.join() === '{"annotations":{"espressoNotes":""}}' && (await remarks(page)).note === 'add' && saved.annotations.enjoyment === 8, `${JSON.stringify(saved.annotations.espressoNotes)} ${edits.join(' | ')}`);
+    await page.locator('#cafe-shot-note').click();
+    await noteBox(page).fill(NOTE);
+    await page.locator('#cafe-note-save').click();
+    await closed(page);
+
+    //    The reference's row: its rating and its note, to read.
+    const REFERENCE_NOTE = 'Syrupy body, stone fruit, long sweet finish.\nBeans eight days off roast.';
+    await decaid('PUT', `/shots/${reference.id}`, { annotations: { enjoyment: 7, espressoNotes: REFERENCE_NOTE } });
+    await lookAgain(page);
+    shown = await remarks(page);
+    check('the reference\'s row shows its rating as "★ 3.5", and a note icon', shown.referenceRating === '★ 3.5' && shown.referenceNote === true && JSON.stringify(shown.stars) === '[100,100,100,100,0]', JSON.stringify(shown));
+    edits.length = 0;
+    await page.locator('#cafe-reference-note').click();
+    dialog = await noteDialog(page);
+    check('the reference\'s note opens to read: when and who, its rating, the note as text, and only Close',
+        !!dialog && dialog.title === 'Reference' && dialog.when === (await legend(page)).reference && dialog.rating === '★ 3.5' && dialog.read === REFERENCE_NOTE && dialog.text === null && dialog.label === null && dialog.buttons.join() === 'Close', JSON.stringify(dialog));
+    await shot(page, 'note-reference-light');
+    await page.locator('#cafe-note-close').click();
+    check('Close closes it, and nothing was edited', (await closed(page)) && edits.length === 0);
+
+    //    The row in English and every language Streamline has finished, at its
+    //    fullest: the Shot's stars, its note and Make reference, the
+    //    reference's rating and its note, the toggle, and a barista's name on
+    //    both Shots; then with "Different profile" as well. The run gives both
+    //    records a barista, and the reference another profile's title, itself:
+    //    the two Shots were pulled on one profile with no barista set.
+    const title = (await record(reference.id)).workflow?.profile?.title;
+    const inEveryLanguage = async name => {
+        const unfit = [];
+        const cut = [];
+        for (const code of ['en', ...FINISHED_LANGUAGES]) {
+            await setLanguage(page, code);
+            await page.waitForTimeout(700);
+            const fit = await legendFits(page);
+            if (fit.out.length || fit.times.length !== 2 || fit.names.length !== 2) unfit.push(`${code}: ${fit.out.join(', ') || 'a time or a name is missing'}`);
+            if (fit.times.some(lack => lack >= 0.1)) cut.push(`${code} ${Math.max(...fit.times)}px`);
+            if (code === 'de') await shot(page, `${name}-de-light`);
+        }
+        await setLanguage(page, 'en');
+        await page.waitForTimeout(700);
+        return { unfit, cut };
+    };
+    await decaid('PUT', `/shots/${latest.id}`, { workflow: { context: { baristaName: BARISTAS[1] } } });
+    await decaid('PUT', `/shots/${reference.id}`, { workflow: { context: { baristaName: BARISTAS[0] } } });
+    await lookAgain(page);
+    let full = await legend(page);
+    check('the row with everything but the flag: stars, a note, a barista and Make reference, and a reference with a rating, a barista and a note',
+        full.make === 'Make reference' && full.flag === null && (full.when || '').includes(' · ') && (full.reference || '').includes(' · ') && (await remarks(page)).referenceNote, JSON.stringify(full));
+    await shot(page, 'legend-full-light');
+    let fits = await inEveryLanguage('legend-full');
+    check(`that row fits in English and each of Streamline's ${FINISHED_LANGUAGES.length} finished languages: nothing runs past it, and only a barista's name is cut short, never a time`,
+        fits.unfit.length === 0 && fits.cut.length === 0, [...fits.unfit, ...fits.cut.map(lack => `time cut: ${lack}`)].join(' | '));
+    await decaid('PUT', `/shots/${reference.id}`, { workflow: { profile: { title: 'Sample other profile' } } });
+    await lookAgain(page);
+    full = await legend(page);
+    check('the fullest row: the same with "Different profile"', full.make === 'Make reference' && full.flag === 'Different profile', JSON.stringify(full));
+    await shot(page, 'legend-fullest-light');
+    fits = await inEveryLanguage('legend-fullest');
+    check('the fullest row still holds everything in each of those languages: nothing runs past it, and nothing but the names and the times is cut short', fits.unfit.length === 0, fits.unfit.join(' | '));
+    note(fits.cut.length ? `with "Different profile" too, a time is cut short in: ${fits.cut.join(', ')}` : 'with "Different profile" too, no time is cut short');
+    await decaid('PUT', `/shots/${reference.id}`, { workflow: { profile: { title }, context: { baristaName: null } } });
+    await decaid('PUT', `/shots/${latest.id}`, { workflow: { context: { baristaName: null } } });
+    await lookAgain(page);
+    check('no page error from rating and notes', true);
+    page.off('request', listen);
+}
+
 const gateLine = page => page.locator('#cafe-gate-line');
 async function waitForGate(page, theme = 'light') {
     await page.locator('#main-page.cafe-gated').waitFor({ timeout: 20_000 });
@@ -584,6 +803,7 @@ try {
         now = await legend(page);
         lines = await chartLines(page);
         check('during a shot the row reads "Live shot", the reference has its own row, and nothing can be chosen', now.label === 'Live shot' && now.when === null && /^Today /.test(now.reference || '') && now.make === null && now.badge === null, JSON.stringify(now));
+        check('a running shot has no stars and no note icon', (await remarks(page)).stars === null && (await remarks(page)).note === null, JSON.stringify(await remarks(page)));
         check('the reference is drawn behind the live shot', lines.points[7] > 10 && lines.points[0] > 5 && lines.names.length === 10, JSON.stringify(lines));
         check('the time axis shows the whole reference from the start', Math.abs(lines.end - lines.referenceEnd / 0.93) < 0.01, `${lines.end} for a reference of ${lines.referenceEnd} s`);
         check('no line is labelled during a shot', lines.labelled.length === 0);
@@ -635,6 +855,9 @@ try {
             cardsNow.mode === 'rest' && keys(cardsNow) === REST_REFERENCE && /^Ref \d+\.\d s$/.test(cardsNow.cards[0].side) && SIGNED.test(cardsNow.cards[0].diff)
             && /^Ref \d+\.\d bar$/.test(cardsNow.cards[4].side) && SIGNED.test(cardsNow.cards[4].diff), JSON.stringify(cardsNow));
         check('a value neither Shot recorded is "—", with no difference', cardsNow.cards[1].value === '—' && cardsNow.cards[1].side === 'Ref —' && cardsNow.cards[1].diff === '', JSON.stringify(cardsNow.cards[1]));
+
+        //    Rating and notes, for the Shot in the graph and its reference.
+        await ratingAndNotes(page, latestShot, first);
         await shot(page, 'graph-overlay-light');
         await paint(page, 'dark');
         await page.waitForTimeout(800);
@@ -1262,18 +1485,43 @@ try {
             await extra.page.waitForTimeout(1000);
             const now = await legend(extra.page);
             // The legend's time is the first sample's, within a second of the record's.
-            const minutes = [saved.timestamp, saved.measurements[0]?.machine?.timestamp].map(t => String(t).slice(11, 16));
+            // The browser's own English writes the hour on a twelve-hour clock.
+            const minutes = [saved.timestamp, saved.measurements[0]?.machine?.timestamp].map(t => String(t).slice(11, 16))
+                .flatMap(time => [time, `${String(Number(time.slice(0, 2)) % 12 || 12).padStart(2, '0')}${time.slice(2)}`]);
             check(`no recipe, shot ${n}: the graph draws it once Decaid has saved it`, lines?.points[0] === points, `${lines?.points[0]} points drawn, ${points} in the Shot`);
             check(`no recipe, shot ${n}: the legend names it "Last shot", with its time and barista`,
                 now.label === 'Last shot' && minutes.some(m => (now.when || '').startsWith(`Today ${m}`)) && (now.when || '').endsWith(` · ${barista}`) && now.line === 'Pick a recipe to compare',
                 JSON.stringify(now));
+            //     "Last shot" is rated and noted too: the page learns its record
+            //     from the tablet's newest Shot.
+            await extra.page.locator('#cafe-stars').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+            check(`no recipe, shot ${n}: "Last shot" has empty stars and a plus once its record is known`, JSON.stringify(await remarks(extra.page)) === JSON.stringify({ stars: [0, 0, 0, 0, 0], note: 'add', referenceRating: null, referenceNote: false }), JSON.stringify(await remarks(extra.page)));
+            const ratingBefore = before ? (await decaid('GET', `/shots/${before}`)).annotations?.enjoyment : undefined;
+            await star(extra.page, n + 2);
+            await extra.page.waitForTimeout(800);
+            check(`no recipe, shot ${n}: a tap rates the Shot drawn, and not the one before it`, (await decaid('GET', `/shots/${newest.id}`)).annotations.enjoyment === (n + 2) * 2
+                && (!before || (await decaid('GET', `/shots/${before}`)).annotations?.enjoyment === ratingBefore), `${(await decaid('GET', `/shots/${newest.id}`)).annotations.enjoyment}`);
+            if (n === 2) {
+                await extra.page.locator('#cafe-shot-note').click();
+                const dialog = await noteDialog(extra.page);
+                await noteBox(extra.page).fill('No recipe, and noted all the same.');
+                await extra.page.locator('#cafe-note-save').click();
+                check('no recipe: the note\'s dialog names it "Last shot", and the note is saved on the Shot drawn',
+                    (await closed(extra.page)) && dialog?.title === 'Last shot' && dialog.when === now.when && (await decaid('GET', `/shots/${newest.id}`)).annotations.espressoNotes === 'No recipe, and noted all the same.' && (await remarks(extra.page)).note === 'note', JSON.stringify(dialog));
+            }
         }
         // The seam lists the newest Shots by limit alone; Streamline's own reads
-        // name the page they want or the Shot by id.
+        // name the page they want or the Shot by id. With no recipe the seam is
+        // asked for the newest Shot only, for its rating and note, never for a
+        // recipe's latest among the newest 100.
         const read = urls.filter(url => url.pathname === '/api/v1/shots' && !url.searchParams.has('ids') && ['1', '100'].includes(url.searchParams.get('limit')));
-        check('no recipe: the page reads no Shot through the Shot seam', read.length === 0, read.map(String).join(', '));
+        check('no recipe: the page asks the Shot seam for the newest Shot only, for its rating and note', read.length > 0 && read.every(url => url.searchParams.get('limit') === '1'), read.map(String).join(', '));
         check('no recipe: no page error', extra.seen.errors.length === 0, extra.seen.errors.join(' | '));
         await shot(extra.page, 'page-no-recipe-after-two-shots-light');
+        await extra.page.reload();
+        await waitForPage(extra.page);
+        await extra.page.locator('#cafe-stars').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+        check('no recipe: after a reload "Last shot" shows the rating and the note it was given', JSON.stringify((await remarks(extra.page)).stars) === '[100,100,100,100,0]' && (await remarks(extra.page)).note === 'note', JSON.stringify(await remarks(extra.page)));
         await extra.close();
         await decaid('PUT', '/workflow', { context: { baristaName: null } });
     }
