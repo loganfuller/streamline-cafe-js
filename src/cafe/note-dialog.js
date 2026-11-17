@@ -68,10 +68,10 @@ function wire(dialog) {
         fit(null);
     });
     document.addEventListener('streamline:scaleupdate', event => { if (dialog.open) fit(event.detail); });
-    // A shot that starts takes the screen back from a note being read. One
-    // being written stays: it is the note of a Shot already saved, and the
-    // text typed so far is not thrown away.
-    document.addEventListener('streamline:espresso-start', () => { if (dialog.open && !onSave) dialog.close(); });
+    // A shot that starts takes the screen back, as from the page's other
+    // dialogs: starting one is the barista's own choice. A note being written
+    // is closed unsaved; one whose save is already on its way is still saved.
+    document.addEventListener('streamline:espresso-start', () => { if (dialog.open) dialog.close(); });
 }
 
 function open({ title, credit, rating = null, note, save: saveWith = null }) {

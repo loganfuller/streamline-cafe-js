@@ -229,7 +229,7 @@ The note:
 - **The text is trimmed, and an emptied note clears it,** as in DYE2. The box takes at most 40,000 characters, the plugin's limit. A note saved as it was sends nothing.
 - **While a note is being saved the box takes no typing,** and Cancel and Escape do nothing: what is saved is the text as it stood at the tap.
 - **A note that could not be saved is not lost.** The dialog stays open with its text, and a line in the dialog says why. It is not a toast: the dialog is drawn over everything else on the page, a toast included.
-- **A shot that starts leaves the dialog open,** unlike the page's other dialogs: the note is of a Shot already saved, named by its id, and the text typed so far is not thrown away. Only the taps outside the box that would close it are left out, for the same reason.
+- **A shot that starts closes the dialog,** as it closes the page's other dialogs: starting one is the barista's own choice. A note being written then is not saved, and one whose save was already on its way still is. A tap outside the dialog does not close it, so a stray tap does not throw away what was typed.
 - **A note is text, never markup.** It is written into the page as text.
 - **The soft keyboard.** This is the page's first text field. Streamline lays the page out for the window with no keyboard and lifts its canvas to keep a focused field in view, which does not move a dialog. So the dialog says it fits itself (`data-keyboard-fit`), as Streamline's own full-screen editors do, and takes the height Streamline's scaling reports as left above the keyboard, with the text box giving up what the box lacks. The smoke run can't raise a keyboard, so this is checked by hand on a tablet.
 
