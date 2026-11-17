@@ -145,20 +145,23 @@ export function createPluginShots({ readReference, chooseReference, editShot, re
 
     // A Shot whole, from Decaid where this tablet holds it and through the
     // plugin otherwise; null for one that is in neither. `met.unreachable` is
-    // set where the server could not be asked for it.
+    // set where the server could not be asked for it, and `met.nothing` where
+    // the request for another Machine's Shot reached nothing.
     async function wholeShot(shotId, met = {}) {
         const own = await readShot(shotId);
         if (own) return own;
+        let answer;
         try {
-            const answer = await oneWhole(shotId);
-            if (!answer || typeof answer !== 'object') throw new Error('The plugin\'s answer holds no Shot.');
-            return answer.shot && answer.shot.id != null ? answer.shot : null;
+            answer = await oneWhole(shotId);
         } catch (error) {
             if (error.code === 'noSuchShot') return null;
             if (NOT_SERVED.includes(error.code)) notServed();
             if (cantAsk(error)) met.unreachable = true;
+            if (error.code === undefined && error.status === undefined) met.nothing = true;
             throw error;
         }
+        if (!answer || typeof answer !== 'object') throw new Error('The plugin\'s answer holds no Shot.');
+        return answer.shot && answer.shot.id != null ? answer.shot : null;
     }
 
     const source = {
@@ -283,9 +286,12 @@ export function createPluginShots({ readReference, chooseReference, editShot, re
                 if (refused.code !== 'shotUnwritten') throw shown;
                 return editReadAgain(edit, () => readShot(shotId), refused).catch(read => { throw Object.assign(shown, { remarks: read.remarks }); });
             }
+            // A read of another Machine's Shot that reached nothing can't tell
+            // either: Decaid has just said it does not hold the Shot, so only
+            // the server could have.
             const met = {};
             return editReadAgain(edit, () => wholeShot(shotId, met), refused).catch(read => {
-                throw met.unreachable ? Object.assign(read, { unreachable: true }) : read;
+                throw met.unreachable || met.nothing ? Object.assign(read, { unreachable: true }) : read;
             });
         },
     };

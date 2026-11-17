@@ -325,6 +325,9 @@ test('an edit of it that may have been made is read again through the plugin bef
 test('where that read can\'t ask the server either, nothing is known either way, and the failure says so', async () => {
     const { source } = plugin({ edits: [refusal('unreachable', 503)], wholes: [refusal('unreachable', 503)] });
     await assert.rejects(source.editShot('s2', { rating: 8 }), error => error.unreachable === true && error.remarks === null && error.refusal === undefined);
+    // So too where that read of another Machine's Shot reached nothing: Decaid has said it does not hold it.
+    const nothing = plugin({ edits: [refusal('unreachable', 503)], wholes: [new Error('no answer')] });
+    await assert.rejects(nothing.source.editShot('s2', { rating: 8 }), error => error.unreachable === true && error.remarks === null);
     // A read that fails for another reason is a failed edit.
     const other = plugin({ edits: [refusal('unreachable', 503)], wholes: [refusal('noSuchShot', 404)] });
     await assert.rejects(other.source.editShot('s2', { rating: 8 }), error => error.unreachable === undefined && error.remarks === null);
@@ -366,7 +369,8 @@ function seam({ pluginReference, pluginList, choicesFail = false } = {}) {
         },
         shotsPage: async (from, limit, extra) => {
             calls[name].push(['page', from, limit, extra]);
-            if (name === 'plugin' && pluginList instanceof Error) throw pluginList;
+            const failure = name === 'plugin' && Array.isArray(pluginList) ? pluginList.shift() : pluginList;
+            if (name === 'plugin' && failure instanceof Error) throw failure;
             return { rows: [{ id: `${name}-row` }], next: name === 'plugin' ? 'cursor-2' : 50 };
         },
         shotById: async id => { calls[name].push(['byId', id]); return { shot: whole(id), canChange: true }; },
@@ -630,10 +634,15 @@ test('a refusal of the list that means "the tablet\'s own Shots" is answered fro
         const first = await sources.shotsPage(null, 50);
         assert.deepEqual([first.rows, first.list, first.afresh], [[{ id: 'tablet-row' }], { of: 'tablet', why }, false], code);
         assert.equal(calls.asked, 1, code);
+        assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null]);
         // On a later page the list is read afresh from the tablet, from its first row.
-        const later = await sources.shotsPage({ of: 'location', at: 'cursor-2' }, 50);
+        const served = seam({ pluginList: [null, refusal(code, STATUS[code])] });
+        served.sources.status(AT_CAFE);
+        const page = await served.sources.shotsPage(null, 50);
+        const later = await served.sources.shotsPage(page.next, 50);
         assert.deepEqual([later.rows, later.list, later.afresh], [[{ id: 'tablet-row' }], { of: 'tablet', why }, true], code);
-        assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null, null]);
+        assert.deepEqual(pages(served.calls, 'plugin').map(([, from]) => from), [null, 'cursor-2'], `${code}: the refusal was of the later page`);
+        assert.deepEqual(pages(served.calls, 'tablet').map(([, from]) => from), [null]);
     }
     // Decaid answering in the plugin's place is treated as unreachable.
     const decaid = seam({ pluginList: refusal(undefined, 504) });
@@ -675,7 +684,10 @@ test('a cursor belongs to the Location that gave it: a Machine moved to another 
     const { sources, calls } = seam();
     sources.status(AT_CAFE);
     const first = await sources.shotsPage(null, 50);
+    sources.status(AT_CAFE);
+    assert.deepEqual(calls.moved, [true], 'the same Location again is no move');
     sources.status({ ...AT_CAFE, location: { id: 'l2', name: 'Sample Annex' } });
+    assert.deepEqual(calls.moved, [true, true], 'a move to another Location is told as a change of source: an open list closes, an opened Shot gives way');
     const later = await sources.shotsPage(first.next, 50);
     assert.deepEqual([later.list.locationId, later.afresh], ['l2', true]);
     assert.deepEqual(pages(calls, 'plugin').map(([, from]) => from), [null, null], 'the first Location\'s cursor is not sent for the second');

@@ -886,7 +886,9 @@ function openedUnread(s, todo, { seq, shotId, unreachable = false }) {
     // can't be changed until the server is back. Where that read was to end
     // in a draw, it is drawn as read before, since the chart may have been
     // cleared meanwhile.
-    if (unreachable && s.opened && s.opened.id === String(shotId)) {
+    // One already shown so is read again later whatever failed this time, so
+    // a passing failure of Decaid's does not leave it so.
+    if (s.opened && s.opened.id === String(shotId) && (unreachable || !s.opened.canChange)) {
         if (s.opened.canChange) {
             s.opened = { ...s.opened, canChange: false };
             if (!s.drawDue) paint(todo);

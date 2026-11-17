@@ -107,7 +107,8 @@ export const editShot = (shotId, edit) => sources.editShot(shotId, edit);
  * `listener(recipeId, moved)` is called when a recipe's reference should be
  * read again: another was chosen elsewhere, or with null, where references are
  * kept changed, or the server came into reach or went out of it. `moved` says
- * where they are kept changed: a reference read before is the other source's.
+ * where they are kept changed, or that the Machine moved to another Location:
+ * a reference read before is the other source's, or the other Location's.
  */
 export function watchReference(listener) {
     watcher = listener;

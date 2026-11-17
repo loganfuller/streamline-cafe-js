@@ -855,6 +855,15 @@ test('a locked Shot is read again later, more slowly each time, until a read fin
     assert.deepEqual([lockedRetryMs(1), lockedRetryMs(2), lockedRetryMs(20)], [10_000, 20_000, 300_000]);
 });
 
+test('a locked Shot whose read again fails for another reason is read again later all the same', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const locked = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id }).state;
+    const fired = play(locked, { type: 'timer', timer: 'locked' });
+    const failed = play(fired.state, { type: 'openedUnread', seq: lastOpened(fired.effects).seq, shotId: GUESTS.id });
+    assert.deepEqual(did(failed.effects, 'startTimer'), [{ do: 'startTimer', timer: 'locked', ms: lockedRetryMs(2) }]);
+    assert.equal(inGraph(failed.state).opened.canChange, false);
+});
+
 test('the read again of a locked Shot waits for a tap on its way, and stops with a shot or once the Shot is closed', () => {
     const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
     const locked = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id }).state;

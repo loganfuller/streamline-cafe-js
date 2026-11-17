@@ -13,8 +13,9 @@ const where = listed => (listed && listed.of === 'location' ? `${listed.location
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
  * - `askStatus()`: asks Decent Sync's status again. Its answer comes to `status`.
  * - `changed(recipeId, moved)`: a recipe's reference should be read again; with
- *   null, whichever recipe is in the graph. `moved` says the source changed, so
- *   a reference read before is the other source's.
+ *   null, whichever recipe is in the graph. `moved` says the source changed,
+ *   or the Machine moved to another Location, so a reference read before is
+ *   the other source's, or the other Location's.
  */
 export function createShotSources({ tablet, plugin, askStatus, changed }) {
     let source = 'unknown';
@@ -167,12 +168,17 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             // follows whether the plugin can ask its server.
             const reach = serverOutOfReach(answer);
             const said = next === 'unknown' && reach !== outOfReach;
+            // A Machine moved from one Location to another is told as a
+            // change of source: the references, an opened Shot and the list
+            // were the other Location's.
+            const before = list;
             list = shotsList(list, answer);
+            const relocated = before.of === 'location' && list.of === 'location' && where(before) !== where(list);
             source = next;
             outOfReach = reach;
-            const read = moved || readAfter || said;
+            const read = moved || relocated || readAfter || said;
             readAfter = false;
-            if (read) changed(null, moved);
+            if (read) changed(null, moved || relocated);
         },
 
         /**
