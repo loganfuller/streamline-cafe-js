@@ -195,7 +195,8 @@ On a Machine Decent Sync serves, the reference is the Recipe's Reference Shot: t
   - Only recipes in a slot are pushed. One in no slot is read when it loads.
 - **During a shot nothing is read.** The reference's lines stay the ones the shot started with, and the shot's end reads both Shots again.
 - **The socket** is opened through one export the fork adds to `api.js`, which uses Streamline's own socket helpers. Streamline's `connectPluginPush` keeps one socket for each plugin and gives it to the plugin's `changed` endpoint, so it could not carry this one as well. It opens once, after the plugin has first answered its status, so a tablet with no Decent Sync opens none. It is never closed, and comes back by itself after it drops.
-- **When Decent Sync can't be asked for the reference while Decaid answers,** as for a refusal the skin does not know, the latest Shot is still drawn, and the reference read before stays.
+- **When Decent Sync can't be asked for the reference while Decaid answers,** as for a refusal the skin does not know, the latest Shot is still drawn, and the reference read before stays. One read from the other source does not stay: once the source has changed, a read that fails leaves no reference, so the tablet's own choice is not left on a Machine Decent Sync has come to serve.
+- **A choice still on its way when the source changes** is not drawn when it answers. The read that follows the change is.
 - **A plugin that is installed and not loaded reads as no plugin.** If the skin starts before Decaid has loaded the plugin, a choice kept on the tablet is drawn until the status is next asked.
 
 ### The comparison row

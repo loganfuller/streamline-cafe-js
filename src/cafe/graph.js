@@ -46,6 +46,7 @@ let handed;             // the Shot the history module last asked the chart to d
 let heldBack = false;   // a request of the history module's was turned down during the running shot
 let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange, … }, with the Shot's curves, samples, numbers and stages
 let drawDue = false;    // a read was asked for that must end in a draw, whatever it finds
+let moved = false;      // where references are kept changed since the reference was read: it is the other source's
 let drawing = null;     // the measurements this module is handing the chart itself
 let overlayFor = null;  // what the chart was last drawn with: the view, the reference's lines and its stages
 let frame = null;       // what the running shot last read, for the live cards; kept until the finished Shot is in the graph
@@ -231,8 +232,11 @@ async function refresh({ onlyIfChanged = false } = {}) {
         }
     }
     // A reference that could not be read leaves the one read for this recipe
-    // before; with none read, there is none, and none can be chosen.
-    const answer = chosen || reference || { shot: null, canChange: false };
+    // before, unless that was the other source's: the choice kept on the tablet
+    // is never left on a Machine Decent Sync has come to serve. With none to
+    // leave there is none, and none can be chosen.
+    if (chosen) moved = false;
+    const answer = chosen || (moved ? null : reference) || { shot: null, canChange: false };
     const sameShot = latest !== undefined && (shot ? shot.id : null) === (latest ? latest.id : null);
     if (!drawDue && !settling && sameShot && sameReference(reference, answer)) return;
     latest = shot;
@@ -244,8 +248,10 @@ async function refresh({ onlyIfChanged = false } = {}) {
 }
 
 // The seam says a recipe's reference should be read again: with null, whichever
-// recipe is in the graph.
-function referenceChanged(recipeId) {
+// recipe is in the graph. `sourceMoved` says where references are kept changed,
+// so the one in the graph is no longer the one to fall back on.
+function referenceChanged(recipeId, sourceMoved = false) {
+    if (sourceMoved) moved = true;
     if (!recipe || (recipeId != null && String(recipeId) !== String(recipe.id))) return;
     refresh({ onlyIfChanged: true });
 }
@@ -293,6 +299,7 @@ export function showGraphRecipe(next) {
     }
     seq += 1; // a read for the recipe before is no longer wanted
     reference = null;
+    moved = false;
     clearTimeout(settleTimer);
     // A shot had just ended and Decaid may not have it yet. The graph is this
     // recipe's now, so the looks for that shot stop, bar one once Decaid must
@@ -505,6 +512,7 @@ function followChoice(forRecipe, chosen) {
     // the lines it started with, and its end reads the reference again.
     if (!recipe || recipe.id !== forRecipe.id || live || settling) return;
     seq += 1; // a read begun before the choice would put the reference before it back
+    moved = false;
     reference = { ...chosen, ...referenceParts(chosen.shot) };
     draw();
 }

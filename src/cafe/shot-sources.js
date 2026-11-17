@@ -7,8 +7,9 @@ import { shotSource } from './sync-status.js';
 /**
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
  * - `askStatus()`: asks Decent Sync's status again. Its answer comes to `status`.
- * - `changed(recipeId)`: a recipe's reference should be read again; with null,
- *   whichever recipe is in the graph.
+ * - `changed(recipeId, moved)`: a recipe's reference should be read again; with
+ *   null, whichever recipe is in the graph. `moved` says the source changed, so
+ *   a reference read before is the other source's.
  */
 export function createShotSources({ tablet, plugin, askStatus, changed }) {
     let source = 'unknown';
@@ -35,11 +36,22 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             return { shot: null, canChange: false };
         },
 
-        /** Make a Shot a recipe's reference. Resolves with the reference as it now is. */
+        /**
+         * Make a Shot a recipe's reference. Resolves with the reference as it
+         * now is; or with null where the source changed while the choice was
+         * on its way, so its answer is the other source's, and the read that
+         * follows the change is the one to draw.
+         */
         async makeReference(recipeId, shotId) {
-            if (source === 'plugin') return plugin.makeReference(recipeId, shotId);
-            if (source === 'tablet') return tablet.makeReference(recipeId, shotId);
-            throw new Error('Where the reference is kept is not known yet.');
+            const asked = source;
+            if (asked === 'unknown') throw new Error('Where the reference is kept is not known yet.');
+            try {
+                const made = await (asked === 'plugin' ? plugin : tablet).makeReference(recipeId, shotId);
+                return source === asked ? made : null;
+            } catch (error) {
+                if (source !== asked) delete error.reference;
+                throw error;
+            }
         },
 
         /** What Decent Sync's Status request answered (sync-status.js). */
@@ -49,7 +61,7 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             source = next;
             const read = moved || readAfter;
             readAfter = false;
-            if (read) changed(null);
+            if (read) changed(null, moved);
         },
 
         /**
@@ -65,7 +77,7 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
                 readAfter = true;
                 askStatus();
             } else if (change.what === 'reference' && source === 'plugin') {
-                changed(change.recipeId);
+                changed(change.recipeId, false);
             }
         },
     };

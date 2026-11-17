@@ -29,7 +29,7 @@ const sources = createShotSources({
     }),
     plugin: createPluginShots({ readReference, chooseReference, notServed: askStatus }),
     askStatus,
-    changed: recipeId => watcher(recipeId),
+    changed: (recipeId, moved) => watcher(recipeId, moved),
 });
 onStatus(sources.status);
 onPush(push => sources.push(changeOf(push)));
@@ -45,7 +45,8 @@ export const latestShot = recipeId => sources.latestShot(recipeId);
 export const referenceShot = recipeId => sources.referenceShot(recipeId);
 
 /**
- * Make a Shot a recipe's reference. Resolves with the reference as it now is.
+ * Make a Shot a recipe's reference. Resolves with the reference as it now is,
+ * or with null where the source changed meanwhile and a read is to follow.
  * Rejects with `refusal`, a message to show, where Decent Sync refused the
  * choice; or with `reference`, what a read after it found, where the choice
  * may have been made and was not.
@@ -53,9 +54,10 @@ export const referenceShot = recipeId => sources.referenceShot(recipeId);
 export const makeReference = (recipeId, shotId) => sources.makeReference(recipeId, shotId);
 
 /**
- * `listener(recipeId)` is called when a recipe's reference should be read
- * again: another was chosen elsewhere, or with null, where references are kept
- * changed, or the server came into reach or went out of it.
+ * `listener(recipeId, moved)` is called when a recipe's reference should be
+ * read again: another was chosen elsewhere, or with null, where references are
+ * kept changed, or the server came into reach or went out of it. `moved` says
+ * where they are kept changed: a reference read before is the other source's.
  */
 export function watchReference(listener) {
     watcher = listener;

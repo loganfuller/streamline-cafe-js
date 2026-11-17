@@ -172,19 +172,25 @@ const CAPTURE_ONLY = { connected: true, served: false, code: 'captureOnly' };
 
 // The two sources, each counting what it was asked, and what the seam tells its caller.
 function seam() {
-    const calls = { tablet: [], plugin: [], asked: 0, changed: [] };
+    const calls = { tablet: [], plugin: [], asked: 0, changed: [], moved: [] };
+    let held = null; // a choice waits on this before it answers
     const source = name => ({
         latestShot: async id => { calls[name].push(['latest', id]); return whole(`${name}-latest`); },
         referenceShot: async id => { calls[name].push(['reference', id]); return { shot: whole(`${name}-reference`), canChange: true }; },
-        makeReference: async (id, shotId) => { calls[name].push(['make', id, shotId]); return { shot: whole(shotId), canChange: true }; },
+        makeReference: async (id, shotId) => {
+            calls[name].push(['make', id, shotId]);
+            if (held) await held;
+            if (shotId === 'lost') throw Object.assign(new Error('Sample failure.'), { reference: { shot: whole('before'), canChange: false } });
+            return { shot: whole(shotId), canChange: true };
+        },
     });
     const sources = createShotSources({
         tablet: source('tablet'),
         plugin: source('plugin'),
         askStatus: () => { calls.asked += 1; },
-        changed: recipeId => calls.changed.push(recipeId),
+        changed: (recipeId, moved) => { calls.changed.push(recipeId); calls.moved.push(moved); },
     });
-    return { sources, calls };
+    return { sources, calls, hold: gate => { held = gate; } };
 }
 
 test('before the status has answered: the latest Shot alone, no reference, and none can be chosen', async () => {
@@ -238,6 +244,35 @@ test('a Machine that turns Capture-only, or is served again, changes source at t
     assert.equal((await sources.referenceShot('r1')).shot.id, 'tablet-reference');
     sources.status(SERVED);
     assert.deepEqual([sources.source(), calls.changed.length], ['plugin', 3]);
+});
+
+test('a change of source says the reference read before is the other source\'s; a change of connection alone does not', () => {
+    const { sources, calls } = seam();
+    sources.status(null);
+    sources.status(SERVED);
+    sources.push({ what: 'connection' });
+    sources.status(UNREACHABLE);
+    sources.push({ what: 'reference', recipeId: 'r1' });
+    assert.deepEqual(calls.changed, [null, null, null, 'r1']);
+    assert.deepEqual(calls.moved, [true, true, false, false]);
+});
+
+test('a choice answered after the source changed is not the reference to draw', async () => {
+    const { sources, hold } = seam();
+    sources.status(null);
+    let release;
+    hold(new Promise(resolve => { release = resolve; }));
+    const made = sources.makeReference('r1', 'b');
+    const lost = sources.makeReference('r1', 'lost');
+    sources.status(SERVED); // served meanwhile: the reference is Decent Sync's now
+    release();
+    assert.equal(await made, null, 'the tablet\'s answer is not followed');
+    const error = await lost.then(() => assert.fail('the choice failed'), e => e);
+    assert.equal(error.reference, undefined, 'nor what a failed choice read');
+    hold(null);
+    assert.equal((await sources.makeReference('r1', 'c')).shot.id, 'c', 'a choice the source stood through is');
+    const kept = await sources.makeReference('r1', 'lost').then(() => assert.fail('the choice failed'), e => e);
+    assert.equal(kept.reference.shot.id, 'before');
 });
 
 test('a push that names a recipe says to read that recipe\'s reference again', () => {
