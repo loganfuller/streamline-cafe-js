@@ -36,6 +36,14 @@ test('the page reads Shots and the choice of reference through the Shot seam onl
     assert.deepEqual(filesWith(/from '\.\.\/modules\/idb\.js'/), [], 'Streamline\'s shot cache is not a source');
 });
 
+test('the Shots list and a Shot by its id are read through the seam only', () => {
+    // The list is the seam's page, read by the list's dialog alone; a Shot by
+    // its id is the seam's too, read by the graph alone, for an opened Shot.
+    assert.deepEqual(filesWith(/\bshotsPage\b[^;]*from '\.\/shot-seam\.js'/), ['shots-dialog.js']);
+    assert.deepEqual(filesWith(/\bshotById\b[^;]*from '\.\/shot-seam\.js'/), ['graph.js']);
+    assert.deepEqual(filesWith(/\bopenShot\b[^;]*from '\.\/graph\.js'/), ['shots-dialog.js'], 'and a Shot is opened only by the graph, told by the list');
+});
+
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
     // Decaid's own Shot edit, and its delete, are named by the seam alone.
     assert.deepEqual(filesWith(/\b(updateShot|deleteShot)\b/), ['shot-seam.js', 'tablet-shots.js']);
@@ -99,7 +107,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

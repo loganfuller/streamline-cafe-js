@@ -1,7 +1,9 @@
 // The graph's Shots, its legend and the row of numbers under it: the loaded
 // recipe's latest Shot, its reference behind it, the Reference | Targets toggle,
 // Make reference, the Shot's stars and note, the comparison row and the stage
-// names (docs/cafe/DESIGN.md, "Shots and the reference" and "Rating and notes").
+// names, and a Shot opened from the Shots list in the latest's place
+// (docs/cafe/DESIGN.md, "Shots and the reference", "Rating and notes" and "The
+// Shots list").
 //
 // Streamline's chart still draws everything. Which finished Shot it draws, and
 // when the Shots are read again, is decided in `graph-state.js`, which touches
@@ -15,10 +17,10 @@ import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { latestShot, referenceShot, makeReference, watchReference, newestShot, editShot } from './shot-seam.js';
+import { latestShot, referenceShot, makeReference, watchReference, newestShot, editShot, shotById } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
 import { graphModel, shotCredit, whenText, viewFrom } from './shot-model.js';
-import { graphStep, initialGraphState, shownRemarks } from './graph-state.js';
+import { graphStep, initialGraphState, shownRemarks, inGraph, shotInGraphId } from './graph-state.js';
 import { starFills, ratingForTap, ratingOf, ratingText, noteToSave, editedRemarks } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
@@ -42,6 +44,7 @@ let liveFailed = false; // the live cards threw once: said once, not on every fr
 let busy = false;       // a reference is being chosen
 let rating = false;     // a rating is on its way
 const timers = {};      // the timers `graph-state.js` asked for, by name
+let listener = {};      // what the Shots list is told: `edited(shotId, remarks)`, `chosen(recipeId, shotId)`, `sourceMoved()`
 
 const el = id => document.getElementById(id);
 const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
@@ -62,6 +65,8 @@ function perform(effect) {
     switch (effect.do) {
         case 'readShots': readShots(effect); break;
         case 'readNewest': readNewest(effect); break;
+        case 'readOpened': readOpened(effect); break;
+        case 'unopened': showToast(cafeText('The shot could not be read'), 4000, 'error'); break;
         case 'draw': draw(); break;
         case 'overlay': applyOverlay(); break;
         case 'paint': paint(); break;
@@ -111,11 +116,29 @@ async function readNewest({ seq, edits }) {
     dispatch({ type: 'newestRead', seq, edits, record });
 }
 
+// Reads a Shot opened from the list, whole, and its recipe's reference. As for
+// the latest, a reference that can't be read must not cost the graph the Shot.
+async function readOpened({ shotId, recipeId, seq, edits }) {
+    let shot;
+    let chosen = null;
+    try {
+        [shot, chosen] = await Promise.all([shotById(shotId), recipeId === null ? null : referenceShot(recipeId).catch(error => {
+            logger.warn('Cafe: could not read the opened Shot\'s reference', error);
+            return null;
+        })]);
+    } catch (error) {
+        logger.warn('Cafe: could not read the opened Shot', error);
+        dispatch({ type: 'openedUnread', seq, shotId });
+        return;
+    }
+    dispatch({ type: 'openedRead', seq, edits, shotId, shot, chosen });
+}
+
 // ── What the chart draws ─────────────────────────────────────────────────────
 
 function model() {
-    const { recipe, live, settling, latest, reference } = state;
-    return graphModel({ recipe, view, live, settling, shot: latest, reference, remarks: shownRemarks(state) });
+    const { recipe, live, settling, shot, reference, remarks, opened } = inGraph(state);
+    return graphModel({ recipe, view, live, settling, shot, reference, remarks, opened });
 }
 
 // A stage name's width in pixels. A profile has a handful of steps, and each
@@ -150,7 +173,7 @@ function overlay(traces, layout, mode, chart) {
     // While a finished shot waits for Decaid to save it the chart still holds
     // its lines: a draw then, as on the way back from the full-screen chart,
     // brings the cards up to the shot's last frame.
-    if ((mode === 'live' && state.live) || state.settling) readLiveFrame(traces, layout);
+    if ((mode === 'live' && state.live) || inGraph(state).settling) readLiveFrame(traces, layout);
     return drawn;
 }
 
@@ -176,7 +199,7 @@ function readLiveFrame(traces, layout) {
 
 function applyOverlay() {
     const shown = model();
-    const { reference, latest } = state;
+    const { reference, shot: latest } = inGraph(state);
     const curves = view === 'reference' && shown.lines ? reference.curves : null;
     // With no Shot for the recipe yet the reference is drawn alone, and the
     // stages named are its own.
@@ -198,7 +221,7 @@ function draw() {
     applyOverlay();
     // The chart draws into whichever page is showing: never over another page's.
     if (!isSubPage()) {
-        const { latest } = state;
+        const { shot: latest } = inGraph(state);
         if (latest) {
             drawing = latest.measurements;
             try { plotHistoricalShot(latest.measurements, latest.workflow); } finally { drawing = null; }
@@ -255,7 +278,7 @@ function paintCredit(row, shot) {
 // The row under the graph: six live cards while a shot runs and until the
 // finished Shot is in the graph, five at rest.
 function paintCards() {
-    const { recipe, live, settling, latest, reference } = state;
+    const { recipe, live, settling, shot: latest, reference } = inGraph(state);
     if (live || settling) {
         const beside = recipe && reference && reference.shot ? reference : null;
         const stopAt = parseFloat(el('drink-out-value')?.textContent);
@@ -277,9 +300,14 @@ function paint() {
     paintCards();
     show(el('cafe-legend-shot'), !!shown.row);
     if (shown.row) {
-        setText(el('cafe-shot-label'), shown.row.label, { translate: true });
+        // A recipe's own name, for an opened Shot of another recipe, is not a phrase.
+        const label = el('cafe-shot-label');
+        if (shown.row.name) setText(label, shown.row.name);
+        else setText(label, shown.row.label, { translate: true });
+        label?.classList.toggle('cafe-legend-recipe', !!shown.row.name);
         paintCredit('shot', shown.row.shot);
     }
+    show(el('cafe-back'), shown.back);
     // The Shot's stars and its note icon, which is a plus where it has no note.
     show(el('cafe-stars'), !!shown.rate);
     const noteButton = el('cafe-shot-note');
@@ -341,20 +369,23 @@ function confirmReplace(forRecipe, shot, replaced) {
     });
 }
 
+// Make reference acts on the Shot in the graph, for the recipe it is compared
+// as: an opened Shot's own recipe, which the dialog names.
 async function onMakeReference() {
     const offered = model();
     if (busy || !offered.makeReference || offered.muted) return;
     busy = true;
     try {
-        const forRecipe = state.recipe;
-        const shot = state.latest;
-        const replaced = state.reference && state.reference.shot ? state.reference.shot.id : null;
-        if (replaced !== null && !(await confirmReplace(forRecipe, shot, state.reference.shot))) return;
+        const shown = inGraph(state);
+        const forRecipe = shown.recipe;
+        const shot = shown.shot;
+        const replaced = shown.reference && shown.reference.shot ? shown.reference.shot.id : null;
+        if (replaced !== null && !(await confirmReplace(forRecipe, shot, shown.reference.shot))) return;
         // The dialog was open a while: the page may show something else by now,
         // Decent Sync may have gone out of reach, or another reference may have
         // been chosen elsewhere, which the dialog did not name.
         const still = model();
-        const { recipe, latest, reference } = state;
+        const { recipe, shot: latest, reference } = inGraph(state);
         if (!recipe || recipe.id !== forRecipe.id || !latest || latest.id !== shot.id || !still.makeReference || still.muted) return;
         if ((reference && reference.shot ? reference.shot.id : null) !== replaced) return;
         let chosen;
@@ -372,8 +403,9 @@ async function onMakeReference() {
             if (!(chosen && chosen.unreachable)) showToast(error.refusal || cafeText('The reference could not be saved'), 4000, 'error');
         }
         // The seam's answer is the reference as it now is, and the graph
-        // follows it without another read.
+        // follows it without another read. So does the kept list's chip.
         dispatch({ type: 'referenceChosen', recipeId: forRecipe.id, chosen });
+        if (chosen) listener.chosen?.(forRecipe.id, chosen.shot ? chosen.shot.id : null);
     } finally {
         busy = false;
     }
@@ -383,7 +415,11 @@ async function onMakeReference() {
 
 // What an edit, or a read after one, left of a Shot's rating or its note,
 // named by the Shot's id (`edited` in graph-state.js).
-const followEdit = (shotId, remarks) => dispatch({ type: 'edited', shotId, remarks });
+// The kept list's row follows too.
+const followEdit = (shotId, remarks) => {
+    dispatch({ type: 'edited', shotId, remarks });
+    listener.edited?.(shotId, remarks);
+};
 const markEdit = (shotId, type) => dispatch({ type, shotId });
 
 // A tap on a star: that many stars, or none for a tap on the star chosen. It
@@ -419,6 +455,7 @@ function onNote() {
     if (!target || !shown.rate) return;
     editNote({
         title: shown.row.label,
+        name: shown.row.name,
         credit: credit(shown.row.shot),
         note: target.note,
         async save(text) {
@@ -445,6 +482,36 @@ function onReferenceNote() {
     readNote({ title: 'Reference', credit: credit(shown.reference), rating: shown.referenceRating, note: shown.referenceNote });
 }
 
+// ── A Shot opened from the list ──────────────────────────────────────────────
+
+/**
+ * Open a Shot from the Shots list in the latest's place. `recipe` is its own
+ * recipe's DYE2 record, or null. The latest's own row goes back to the latest.
+ */
+export function openShot(shotId, recipe) {
+    dispatch({ type: 'open', shotId, recipe });
+}
+
+/** The id of the Shot in the graph, for the list's highlight, or null. */
+export function shotInGraph() {
+    return shotInGraphId(state);
+}
+
+/** Is a Shot opened from the list in the graph? The list keeps its place while one is. */
+export function isShotOpened() {
+    return !!state.opened;
+}
+
+/**
+ * The Shots list hears what the page changes of a Shot it lists:
+ * `edited(shotId, remarks)`, a rating or note, and `chosen(recipeId, shotId)`,
+ * a recipe's reference; and `sourceMoved()`, that where references are kept
+ * changed, so which Shots are references is another source's answer now.
+ */
+export function onShotChanges(listen) {
+    listener = listen || {};
+}
+
 // ── Start ────────────────────────────────────────────────────────────────────
 
 /** Called once, when the page starts. */
@@ -468,9 +535,17 @@ export function initGraph() {
     }
     el('cafe-shot-note')?.addEventListener('click', onNote);
     el('cafe-reference-note')?.addEventListener('click', onReferenceNote);
+    el('cafe-back')?.addEventListener('click', () => dispatch({ type: 'backToLatest' }));
     // The seam says a recipe's reference should be read again (null for
     // whichever is in the graph), or that where references are kept changed.
-    watchReference((recipeId, sourceMoved = false) => dispatch(sourceMoved ? { type: 'sourceMoved' } : { type: 'referencePushed', recipeId }));
+    watchReference((recipeId, sourceMoved = false) => {
+        if (!sourceMoved) {
+            dispatch({ type: 'referencePushed', recipeId });
+            return;
+        }
+        dispatch({ type: 'sourceMoved' });
+        listener.sourceMoved?.();
+    });
 
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);

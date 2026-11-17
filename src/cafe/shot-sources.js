@@ -53,6 +53,32 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
         newestShot: () => tablet.newestShot(),
 
         /**
+         * A page of Shots for the Shots list, newest first: `items`, rows of
+         * Decaid's list; `total`, or null; and `references`, recipe to Shot,
+         * or null where it is not known which Shots are references. The rows
+         * are the tablet's own, whatever the source, until the Location's list
+         * comes through the plugin. Which Shots are references is read from
+         * the choice kept on the tablet where that is the source, and is not
+         * known otherwise: on a Machine that may be served, the choice kept on
+         * the tablet is never read. A choice that can't be read leaves the
+         * list without its chips, not without its rows.
+         */
+        async shotsPage(offset, limit) {
+            const page = await tablet.shotsPage(offset, limit);
+            let references = null;
+            if (source === 'tablet') {
+                try {
+                    references = await tablet.references();
+                } catch (error) { /* the rows stand without their chips */ }
+                if (source !== 'tablet') references = null;
+            }
+            return { ...page, references: references && typeof references === 'object' ? references : null };
+        },
+
+        /** One Shot, whole, by its id, or null where it is gone. The tablet's own, until the Location's list comes through the plugin. */
+        shotById: id => tablet.shotById(id),
+
+        /**
          * Set a Shot's rating, its note or both, as `{ rating?, note? }`.
          * Resolves with the two as they now are. The plugin on a Machine
          * Decent Sync serves, which edits a Shot whichever tablet holds it;

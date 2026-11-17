@@ -15,6 +15,7 @@ import { showGate, hideGate, checkAgain } from './gate-screen.js';
 import { initStrip, refreshStripSoon } from './strip.js';
 import { initPage, showRecipe, afterRecipeLoad, settleDialIn, showLoading, shotRunning } from './page.js';
 import { initGraph, showGraphRecipe } from './graph.js';
+import { initShotsList } from './shots-dialog.js';
 
 // A Decaid that does not answer must not hold a blank page for as long as the
 // request takes to fail.
@@ -62,6 +63,7 @@ function startPage() {
     initDyeStrip().catch(error => logger.warn('Cafe: Streamline\'s strip module failed to start', error));
     initPage({ onProfileChange: refreshStripSoon });
     initGraph();
+    initShotsList({ isShotRunning: shotRunning });
     initStrip({ onChange: recipe => { showRecipe(recipe); showGraphRecipe(recipe); }, onBeforeLoad: settleDialIn, onLoading: showLoading, onApply: afterRecipeLoad, isShotRunning: shotRunning })
         .catch(error => logger.warn('Cafe: could not read the recipes', error));
     // The graph was laid out while the page was hidden.

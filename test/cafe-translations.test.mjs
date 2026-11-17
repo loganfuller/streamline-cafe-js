@@ -87,6 +87,8 @@ function usedKeys() {
     const shot = { id: 'a' };
     for (const state of [
         { recipe, shot }, { recipe, shot: null }, { recipe, live: true }, { recipe: null, shot },
+        // A Shot opened from the Shots list: of the loaded recipe, and of none.
+        { recipe, shot, opened: { loaded: recipe, unfinished: false } }, { recipe: null, shot, opened: { loaded: recipe, unfinished: false } },
     ]) {
         const shown = graphModel({ view: 'reference', reference: null, ...state });
         if (shown.row) keys.add(shown.row.label);

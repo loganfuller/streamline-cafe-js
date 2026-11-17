@@ -181,7 +181,7 @@ const CAPTURE_ONLY = { connected: true, served: false, code: 'captureOnly' };
 // The two sources, each counting what it was asked, and what the seam tells its
 // caller. `pluginReference` is what the plugin answers for a reference, or an
 // Error it rejects with, in place of its own Shot.
-function seam({ pluginReference } = {}) {
+function seam({ pluginReference, choicesFail = false } = {}) {
     const calls = { tablet: [], plugin: [], asked: 0, changed: [], moved: [] };
     let held = null; // a choice waits on this before it answers
     const source = name => ({
@@ -191,6 +191,13 @@ function seam({ pluginReference } = {}) {
             if (name === 'plugin' && pluginReference instanceof Error) throw pluginReference;
             if (name === 'plugin' && pluginReference) return pluginReference;
             return { shot: whole(`${name}-reference`), canChange: true };
+        },
+        shotsPage: async (offset, limit) => { calls[name].push(['page', offset, limit]); return { items: [{ id: `${name}-row` }], total: 1 }; },
+        shotById: async id => { calls[name].push(['byId', id]); return whole(id); },
+        references: async () => {
+            calls[name].push(['references']);
+            if (choicesFail) throw new Error('offline');
+            return { r1: 'tablet-row' };
         },
         makeReference: async (id, shotId) => {
             calls[name].push(['make', id, shotId]);
@@ -389,4 +396,36 @@ test('when the connection comes or goes, or the socket opens, the status is aske
     assert.deepEqual(calls.changed, [null, null]);
     sources.status(UNREACHABLE); // an ask the connection did not cause
     assert.deepEqual(calls.changed, [null, null]);
+});
+
+// ── The Shots list ───────────────────────────────────────────────────────────
+
+test('the Shots list and a Shot by its id are the tablet\'s own, whatever the source', async () => {
+    for (const answer of [undefined, null, SERVED]) {
+        const { sources, calls } = seam();
+        if (answer !== undefined) sources.status(answer);
+        assert.deepEqual((await sources.shotsPage(50, 50)).items, [{ id: 'tablet-row' }]);
+        assert.equal((await sources.shotById('s1')).id, 's1');
+        assert.deepEqual(calls.plugin, [], 'the plugin is not asked until the Location\'s list comes through it');
+        assert.deepEqual(calls.tablet.filter(([what]) => what !== 'references'), [['page', 50, 50], ['byId', 's1']]);
+    }
+});
+
+test('which listed Shots are references is the choice kept on the tablet, only where that is the source', async () => {
+    const own = seam();
+    own.sources.status(null); // no plugin: the tablet's own choice
+    assert.deepEqual((await own.sources.shotsPage(0, 50)).references, { r1: 'tablet-row' });
+    for (const answer of [undefined, SERVED, { code: 'unreachable' }]) {
+        const { sources, calls } = seam();
+        if (answer !== undefined) sources.status(answer);
+        assert.equal((await sources.shotsPage(0, 50)).references, null, 'a Machine that is or may be served never reads the tablet\'s choice');
+        assert.ok(!calls.tablet.some(([what]) => what === 'references'));
+    }
+});
+
+test('a choice of reference that can\'t be read leaves the list its rows, without chips', async () => {
+    const { sources } = seam({ choicesFail: true });
+    sources.status(null);
+    const page = await sources.shotsPage(0, 50);
+    assert.deepEqual([page.items.length, page.references], [1, null]);
 });

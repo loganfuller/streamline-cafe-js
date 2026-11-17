@@ -74,13 +74,15 @@ function wire(dialog) {
     document.addEventListener('streamline:espresso-start', () => { if (dialog.open) dialog.close(); });
 }
 
-function open({ title, credit, rating = null, note, save: saveWith = null }) {
+function open({ title, name = null, credit, rating = null, note, save: saveWith = null }) {
     const dialog = el('cafe-note-dialog');
     if (!dialog || typeof dialog.showModal !== 'function' || dialog.open) return;
     wire(dialog);
     const editing = typeof saveWith === 'function';
     onSave = editing ? saveWith : null;
-    setText(el('cafe-note-title'), title, { translate: true });
+    // A recipe's own name, for an opened Shot of another recipe, is not a phrase.
+    if (name) setText(el('cafe-note-title'), name);
+    else setText(el('cafe-note-title'), title, { translate: true });
     setText(el('cafe-note-when'), credit);
     setText(el('cafe-note-rating'), ratingText(rating));
     const box = el('cafe-note-text');
@@ -94,13 +96,14 @@ function open({ title, credit, rating = null, note, save: saveWith = null }) {
 }
 
 /**
- * Open a Shot's note to write. `title` is the phrase its row is labelled with
- * and `credit` when it was pulled and by whom. `save(text)` is called with the
+ * Open a Shot's note to write. `title` is the phrase its row is labelled with,
+ * or `name` the recipe's name it is labelled with instead, and `credit` when
+ * it was pulled and by whom. `save(text)` is called with the
  * box's text on "Save note": the dialog closes when it resolves, and stays
  * open with the text, showing the error's message, when it rejects.
  */
-export function editNote({ title, credit, note, save: saveWith }) {
-    open({ title, credit, note, save: saveWith });
+export function editNote({ title, name, credit, note, save: saveWith }) {
+    open({ title, name, credit, note, save: saveWith });
 }
 
 /** Open a Shot's note to read, with its rating beside when it was pulled and by whom. */
