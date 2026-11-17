@@ -228,11 +228,12 @@ function shotStarted() {
 function shotEnded() {
     if (!live) return;
     live = false;
-    // With no recipe, a request turned down during the shot is drawn now: the
-    // module counts it as drawn and will not ask again. It is the shot just
-    // saved, when the end reached the page late, or the newest saved before it,
-    // which the module would show too; a shot saved later is still drawn then.
-    if (!recipe && heldBack) {
+    // With no recipe, a request turned down during the shot is drawn now, if it
+    // is not the Shot in the graph already: the module counts it as drawn and
+    // will not ask again. It is the shot just saved, when the end reached the
+    // page late, or the newest saved before it, which the module would show
+    // too; a shot saved later is still drawn then.
+    if (!recipe && heldBack && handed?.timestamp !== latest?.timestamp) {
         heldBack = false;
         latest = handed;
         settling = false;
@@ -246,7 +247,18 @@ function shotEnded() {
         settling = true;
         // With no recipe the history module draws the shot once Decaid has saved
         // it, and the legend then names it. Until then the row names no time.
+        // Decaid saves no cleaning or calibration run, so if nothing has been
+        // drawn by the last look a recipe's shot would get, the graph goes back
+        // to the Shot before, as it does with a recipe.
         if (!recipe) {
+            heldBack = false;
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+                if (!settling || live || recipe) return;
+                settling = false;
+                latest = handed;
+                draw();
+            }, SETTLE_LAST_MS);
             applyOverlay();
             paint();
             return;
