@@ -251,6 +251,33 @@ test('another Machine\'s Shot is read whole through the plugin, one request, and
     assert.deepEqual([calls.decaid, calls.whole], [['s2'], ['s2']]);
 });
 
+test('whole Shots are asked of the plugin one at a time, whoever asks, and a refused one does not stop the next', async () => {
+    const asked = [];
+    const answers = [];
+    const source = createPluginShots({
+        readReference: async () => null, chooseReference: async () => null, listShots: async () => null,
+        editShot: async () => { throw refusal('unreachable', 503); },
+        readShot: async () => null,
+        readWhole: id => { asked.push(id); return new Promise((resolve, reject) => answers.push({ resolve, reject })); },
+    });
+    const first = source.shotById('s1');
+    const second = source.shotById('s2');
+    // The read after an edit that may have been made waits its turn too.
+    const edit = source.editShot('s3', { rating: 6 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(asked, ['s1'], 'the second waits for the first');
+    answers[0].reject(refusal('unreachable', 503));
+    await assert.rejects(first);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(asked, ['s1', 's2']);
+    answers[1].resolve({ shot: whole('s2') });
+    assert.equal((await second).shot.id, 's2');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(asked, ['s1', 's2', 's3']);
+    answers[2].resolve({ shot: { ...whole('s3'), annotations: { enjoyment: 60 } } });
+    await edit.catch(() => {});
+});
+
 test('a Shot the Location\'s list no longer lists is gone', async () => {
     const { source } = plugin({ wholes: [refusal('noSuchShot', 404)] });
     assert.deepEqual(await source.shotById('s2'), { shot: null, canChange: true });
@@ -557,7 +584,7 @@ test('on a served Machine the list is the Location\'s, through the plugin, a pag
     sources.status(AT_CAFE);
     const first = await sources.shotsPage(null, 50);
     assert.deepEqual(first.rows, [{ id: 'plugin-row' }]);
-    assert.deepEqual(first.list, { of: 'location', why: 'served', location: 'Sample Cafe', machineId: 'machine-left' });
+    assert.deepEqual(first.list, { of: 'location', why: 'served', location: 'Sample Cafe', locationId: 'l', machineId: 'machine-left' });
     assert.equal(first.afresh, false);
     const second = await sources.shotsPage(first.next, 50);
     assert.equal(second.afresh, false);
@@ -622,6 +649,36 @@ test('any other failure of the list rejects: a list that can\'t be read is not t
         assert.deepEqual(pages(calls, 'tablet'), []);
         assert.equal(calls.asked, 0);
     }
+});
+
+test('a list the tablet gave in place of the Location\'s goes on from the tablet, page by page, while the plugin catches up', async () => {
+    // The status already says served, but the plugin refuses the list while the tablet catches up after an outage.
+    const { sources, calls } = seam({ pluginList: refusal('unreachable', 503) });
+    sources.status(AT_CAFE);
+    const first = await sources.shotsPage(null, 50);
+    assert.deepEqual([first.list.why, first.afresh], ['unreachable', false]);
+    const second = await sources.shotsPage(first.next, 50);
+    assert.deepEqual([second.rows, second.list, second.afresh], [[{ id: 'tablet-row' }], { of: 'tablet', why: 'unreachable' }, false]);
+    assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null, 50], 'the second page follows the first');
+    assert.equal(pages(calls, 'plugin').length, 1, 'the plugin is not asked again for a later page');
+    // Opened afresh, the list is asked of the plugin again.
+    await sources.shotsPage(null, 50);
+    assert.equal(pages(calls, 'plugin').length, 2);
+    // A Machine moved meanwhile reads its list afresh.
+    const fallback = await sources.shotsPage(null, 50);
+    sources.status({ ...AT_CAFE, location: { id: 'l2', name: 'Sample Annex' } });
+    const moved = await sources.shotsPage(fallback.next, 50);
+    assert.equal(moved.afresh, true);
+});
+
+test('a cursor belongs to the Location that gave it: a Machine moved to another reads its list afresh', async () => {
+    const { sources, calls } = seam();
+    sources.status(AT_CAFE);
+    const first = await sources.shotsPage(null, 50);
+    sources.status({ ...AT_CAFE, location: { id: 'l2', name: 'Sample Annex' } });
+    const later = await sources.shotsPage(first.next, 50);
+    assert.deepEqual([later.list.locationId, later.afresh], ['l2', true]);
+    assert.deepEqual(pages(calls, 'plugin').map(([, from]) => from), [null, null], 'the first Location\'s cursor is not sent for the second');
 });
 
 test('a Machine that turns Capture-only, or is served again, changes the list\'s source at the next status, and a later page is read afresh', async () => {

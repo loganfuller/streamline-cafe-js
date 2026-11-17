@@ -1350,10 +1350,12 @@ button.cafe-card {
 }
 
 /* The Location's list adds the Machine after Pulled, and Time, how long the
-   Shot ran, after Dose → yield. */
+   Shot ran, after Dose → yield. On a narrower screen the Machine gives up its
+   width before the Recipe goes below 140px: at 1280px wide the two are 128px
+   and 140px. */
 .cafe-shots-location .cafe-shots-columns,
 .cafe-shots-location .cafe-shots-row {
-    grid-template-columns: 110px 230px minmax(0, 1fr) 190px 90px 160px 150px 56px;
+    grid-template-columns: 110px minmax(0, 230px) minmax(140px, 1fr) 190px 90px 160px 150px 56px;
 }
 
 #cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-machine,

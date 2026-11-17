@@ -131,6 +131,18 @@ export function changeOf(data) {
  *   more, so the caller can ask the status again.
  */
 export function createPluginShots({ readReference, chooseReference, editShot, readShot, listShots, readWhole, notServed = () => {} }) {
+    // Whole Shots are asked of the plugin one at a time, as docs/PLUGIN.md
+    // asks: a long one passes 1 MiB, and one waiting behind another for 10
+    // seconds is refused. A read asked while another is on its way waits for
+    // it, whoever asked: a tap, a read again after the connection came back,
+    // or the read that follows an edit.
+    let turn = Promise.resolve();
+    function oneWhole(shotId) {
+        const mine = turn.then(() => readWhole(shotId));
+        turn = mine.catch(() => {});
+        return mine;
+    }
+
     // A Shot whole, from Decaid where this tablet holds it and through the
     // plugin otherwise; null for one that is in neither. `met.unreachable` is
     // set where the server could not be asked for it.
@@ -138,7 +150,7 @@ export function createPluginShots({ readReference, chooseReference, editShot, re
         const own = await readShot(shotId);
         if (own) return own;
         try {
-            const answer = await readWhole(shotId);
+            const answer = await oneWhole(shotId);
             if (!answer || typeof answer !== 'object') throw new Error('The plugin\'s answer holds no Shot.');
             return answer.shot && answer.shot.id != null ? answer.shot : null;
         } catch (error) {

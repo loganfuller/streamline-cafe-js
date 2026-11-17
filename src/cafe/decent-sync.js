@@ -40,9 +40,14 @@ async function readStatus() {
     try {
         return await callPluginEndpoint(PLUGIN_ID, 'status', null, 'GET');
     } catch (error) {
-        if (error.code) return { code: error.code }; // a refusal, which says why
-        // Decaid answers 404 itself for a plugin too old to have a Status request.
-        return error.status === 404 ? null : {};
+        // A refusal, which says why, with its message to show.
+        if (error.code) return { code: error.code, message: error.message };
+        // Decaid answers 404 itself for a plugin too old to have a Status
+        // request. Any other answer of its own, with a status and no `code`,
+        // is treated as `unreachable`, as docs/PLUGIN.md asks. A request that
+        // reached nothing says nothing.
+        if (error.status === 404) return null;
+        return error.status !== undefined ? { code: 'unreachable' } : {};
     }
 }
 

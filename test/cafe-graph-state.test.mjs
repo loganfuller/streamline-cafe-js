@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { graphStep, initialGraphState, shownRemarks, latestShotId, shotInGraphId, inGraph, REFRESH_GAP_MS, SETTLE_GAPS_MS, SETTLE_LAST_MS } from '../src/cafe/graph-state.js';
+import { graphStep, initialGraphState, shownRemarks, latestShotId, shotInGraphId, inGraph, REFRESH_GAP_MS, SETTLE_GAPS_MS, SETTLE_LAST_MS, lockedRetryMs } from '../src/cafe/graph-state.js';
 
 // ── Sample data ──────────────────────────────────────────────────────────────
 
@@ -192,7 +192,7 @@ test('a shot started: the running shot owns the chart, and every timer stops', (
         assert.equal(state.settling, false, name);
         assert.equal(state.heldBack, false, name);
         assert.ok(state.seq > before.seq, `${name}: a read on its way is no longer wanted`);
-        assert.deepEqual(state.timers, { refresh: false, settle: null, late: false }, name);
+        assert.deepEqual(state.timers, { refresh: false, settle: null, late: false, locked: false }, name);
         assert.ok(!did(effects, 'readShots').length && !did(effects, 'draw').length, name);
         assert.deepEqual(kinds(effects).filter(kind => kind !== 'stopTimer'), ['overlay', 'paint'], name);
     }
@@ -822,7 +822,7 @@ test('an opened Shot the server can\'t be asked for can\'t be changed, and only 
     const pushed = play(base, { type: 'referencePushed', recipeId: null });
     const read = lastOpened(pushed.effects);
     const out = play(pushed.state, { type: 'openedUnread', seq: read.seq, shotId: GUESTS.id, unreachable: true });
-    assert.deepEqual(kinds(out.effects), ['paint'], 'nothing is drawn again');
+    assert.deepEqual(kinds(out.effects), ['paint', 'startTimer'], 'nothing is drawn again, and it is read again later');
     assert.equal(inGraph(out.state).opened.canChange, false);
     assert.equal(inGraph(out.state).shot, GUESTS, 'it stays in the graph, as read before');
     assert.equal(inGraph(out.state).reference.shot, GUEST_REF);
@@ -831,8 +831,39 @@ test('an opened Shot the server can\'t be asked for can\'t be changed, and only 
     assert.deepEqual(play(again.state, { type: 'openedUnread', seq: lastOpened(again.effects).seq, shotId: GUESTS.id, unreachable: true }).effects, []);
     // The server is back: the same two Shots, and it can be changed again.
     const back = openedAnswer(again.state, again.effects, GUESTS, chosen(GUEST_REF));
-    assert.deepEqual(kinds(back.effects), ['paint']);
+    assert.deepEqual(kinds(back.effects), ['stopTimer', 'paint']);
     assert.equal(inGraph(back.state).opened.canChange, true);
+});
+
+test('a locked Shot is read again later, more slowly each time, until a read finds the server back', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    // The connection came back, but the plugin still refuses Shots while the tablet catches up.
+    const pushed = play(base, { type: 'referencePushed', recipeId: null });
+    let step = play(pushed.state, { type: 'openedUnread', seq: lastOpened(pushed.effects).seq, shotId: GUESTS.id, unreachable: true });
+    assert.deepEqual(did(step.effects, 'startTimer'), [{ do: 'startTimer', timer: 'locked', ms: lockedRetryMs(1) }]);
+    for (const tries of [2, 3]) {
+        const fired = play(step.state, { type: 'timer', timer: 'locked' });
+        const read = lastOpened(fired.effects);
+        assert.deepEqual([read.shotId, read.recipeId], [GUESTS.id, OTHER.id], 'the opened Shot and its reference are read again');
+        step = play(fired.state, { type: 'openedUnread', seq: read.seq, shotId: GUESTS.id, unreachable: true });
+        assert.deepEqual(did(step.effects, 'startTimer'), [{ do: 'startTimer', timer: 'locked', ms: lockedRetryMs(tries) }]);
+    }
+    const fired = play(step.state, { type: 'timer', timer: 'locked' });
+    const back = openedAnswer(fired.state, fired.effects, GUESTS, chosen(GUEST_REF));
+    assert.equal(inGraph(back.state).opened.canChange, true);
+    assert.equal(back.state.lockedTries, 0);
+    assert.deepEqual([lockedRetryMs(1), lockedRetryMs(2), lockedRetryMs(20)], [10_000, 20_000, 300_000]);
+});
+
+test('the read again of a locked Shot waits for a tap on its way, and stops with a shot or once the Shot is closed', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const locked = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id }).state;
+    const tapped = play(locked, { type: 'open', shotId: EARLIER.id, recipe: RECIPE });
+    assert.deepEqual(did(play(tapped.state, { type: 'timer', timer: 'locked' }).effects, 'readOpened'), [], 'the tap\'s read is not passed over');
+    const started = play(locked, { type: 'shotStarted' });
+    assert.ok(did(started.effects, 'stopTimer').some(effect => effect.timer === 'locked'));
+    const closed = play(locked, { type: 'backToLatest' }).state;
+    assert.deepEqual(did(play(closed, { type: 'timer', timer: 'locked' }).effects, 'readOpened'), [], 'nothing is opened to read');
 });
 
 test('a read that can\'t be made for any other reason leaves an opened Shot as one that can be changed', () => {
@@ -847,7 +878,7 @@ test('the way back from another page during an outage draws another Machine\'s S
     const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
     const seen = play(base, { type: 'inView' }, { type: 'timer', timer: 'refresh' });
     const out = play(seen.state, { type: 'openedUnread', seq: lastOpened(seen.effects).seq, shotId: GUESTS.id, unreachable: true });
-    assert.deepEqual(kinds(out.effects), ['draw'], 'the draw writes the legend too');
+    assert.deepEqual(kinds(out.effects), ['startTimer', 'draw'], 'the draw writes the legend too');
     assert.equal(inGraph(out.state).opened.canChange, false);
 });
 
@@ -864,7 +895,7 @@ test('an edit that could not be confirmed either way locks the opened Shot it wa
     const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
     const step = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id });
     assert.equal(step.allow, true, 'the Shot is in the graph, so the line says why');
-    assert.deepEqual(kinds(step.effects), ['paint']);
+    assert.deepEqual(kinds(step.effects), ['paint', 'startTimer']);
     assert.equal(inGraph(step.state).opened.canChange, false);
     assert.deepEqual(graphStep(step.state, { type: 'shotUnreachable', shotId: GUESTS.id }).effects, [], 'told again, nothing is written');
     for (const state of [base, withRecipe()]) {

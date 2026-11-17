@@ -106,8 +106,8 @@ test('a Machine that turns Capture-only, or is served again, changes source at t
 // ── What the Shots list lists ────────────────────────────────────────────────
 
 test('a served Machine lists its Location\'s Shots, under the Location\'s name, and knows its own Machine', () => {
-    assert.deepEqual(shotsList(null, SERVED), { of: 'location', why: 'served', location: 'Sample Cafe', machineId: 'm' });
-    assert.deepEqual(shotsList(null, { served: true }), { of: 'location', why: 'served', location: null, machineId: null }, 'a status that names neither');
+    assert.deepEqual(shotsList(null, SERVED), { of: 'location', why: 'served', location: 'Sample Cafe', locationId: 'l', machineId: 'm' });
+    assert.deepEqual(shotsList(null, { served: true }), { of: 'location', why: 'served', location: null, locationId: null, machineId: null }, 'a status that names neither');
 });
 
 test('with no plugin at all the list is the tablet\'s own, and says no more', () => {

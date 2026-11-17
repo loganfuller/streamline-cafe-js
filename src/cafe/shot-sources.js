@@ -5,6 +5,10 @@
 // what asks the status.
 import { shotSource, serverOutOfReach, shotsList, shotsListRefused } from './sync-status.js';
 
+// Which Location a list of the Location's Shots is of: its id, or its name
+// where the status gives no id.
+const where = listed => (listed && listed.of === 'location' ? `${listed.locationId ?? ''}|${listed.location ?? ''}` : null);
+
 /**
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
  * - `askStatus()`: asks Decent Sync's status again. Its answer comes to `status`.
@@ -23,12 +27,16 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
     // What the Shots list lists, and why: the status rule's answer.
     let list = shotsList(null, {});
 
-    // A page of the tablet's own Shots, under the header `listed` says. Which
+    // A page of the tablet's own Shots, under the header `listed` says. A page
+    // read in place of the Location's, because the plugin refused the list,
+    // gives a `next` that names that Location (`instead`) and the header it
+    // was listed under, so the next page goes on from it though the status
+    // still says the Machine is served. Which
     // Shots are references is read from the choice kept on the tablet where
     // that is the source, and is not known otherwise: on a Machine that is or
     // may be served, the choice kept on the tablet is never read. A choice
     // that can't be read leaves the list without its chips, not its rows.
-    async function tabletPage(from, limit, listed, afresh) {
+    async function tabletPage(from, limit, listed, afresh, instead = null) {
         let choices = null;
         if (source === 'tablet') {
             try {
@@ -37,7 +45,8 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             if (source !== 'tablet') choices = null;
         }
         const page = await tablet.shotsPage(from, limit, choices && typeof choices === 'object' ? choices : null);
-        return { rows: page.rows, next: page.next === null ? null : { of: 'tablet', at: page.next }, list: listed, afresh };
+        const next = page.next === null ? null : { of: 'tablet', at: page.next, ...(instead ? { instead, list: listed } : {}) };
+        return { rows: page.rows, next, list: listed, afresh };
     }
 
     return {
@@ -89,19 +98,28 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
          */
         async shotsPage(from, limit) {
             const listed = list;
-            const follows = !!from && from.of === listed.of;
+            // A page the tablet gave in place of the Location's goes on from
+            // the tablet while the list would still be that Location's: the
+            // plugin refuses the list while a tablet catches up after an
+            // outage, though the status already says the Machine is served.
+            // Opened afresh, the list is the Location's again.
+            if (from && from.of === 'tablet' && from.instead && listed.of === 'location' && from.instead === where(listed)) {
+                return tabletPage(from.at, limit, from.list, false, from.instead);
+            }
+            // A cursor belongs to the Location that gave it.
+            const follows = !!from && from.of === listed.of && (listed.of !== 'location' || from.where === where(listed));
             const afresh = !!from && !follows;
             if (listed.of !== 'location') return tabletPage(follows ? from.at : null, limit, listed, afresh);
             try {
                 const page = await plugin.shotsPage(follows ? from.at : null, limit, listed.machineId);
-                return { rows: page.rows, next: page.next === null ? null : { of: 'location', at: page.next }, list: listed, afresh };
+                return { rows: page.rows, next: page.next === null ? null : { of: 'location', at: page.next, where: where(listed) }, list: listed, afresh };
             } catch (error) {
                 // A request that reached nothing says nothing: Decaid can't be
                 // asked for its own Shots either.
                 const refused = error.code !== undefined || error.status !== undefined ? shotsListRefused(error.code) : null;
                 if (!refused) throw error;
                 askStatus();
-                return tabletPage(null, limit, refused, !!from);
+                return tabletPage(null, limit, refused, !!from, where(listed));
             }
         },
 

@@ -36,6 +36,17 @@ export const REFRESH_GAP_MS = 300;
 export const SETTLE_GAPS_MS = [500, 1500, 2000, 3000, 4000, 4000];
 /** When Decaid must have saved a shot, if it ever will. */
 export const SETTLE_LAST_MS = 15_000;
+/**
+ * How long until another Machine's Shot that can't be changed, because Decent
+ * Sync's server could not be asked for it, is read again: 10 seconds, then
+ * twice as long each time, to 5 minutes. The connection's coming back is told
+ * to the page, but the plugin refuses Shots while its tablet catches up after
+ * an outage, though the status already says the Machine is served, and then
+ * nothing else would read it again.
+ */
+export function lockedRetryMs(tries) {
+    return Math.min(300_000, 10_000 * 2 ** Math.max(0, tries - 1));
+}
 
 // The seam's answer for a recipe with no reference that none can be chosen for:
 // what stands in where the reference could not be read, or is not this source's.
@@ -81,7 +92,9 @@ const NO_REFERENCE = { shot: null, canChange: false };
  *   `settle`, the next look for a shot that has ended (`'look'`) or, with no
  *   recipe, the end of the wait for the history module to draw it
  *   (`'noRecipe'`); `late`, the one look left after a recipe change stopped the
- *   others.
+ *   others; `locked`, the next read of an opened Shot that can't be changed
+ *   because Decent Sync's server could not be asked for it, `lockedTries`
+ *   being how many there have been.
  */
 export function initialGraphState({ live = false } = {}) {
     return {
@@ -103,7 +116,8 @@ export function initialGraphState({ live = false } = {}) {
         editedAt: new Map(),
         seq: 0,
         lastSeq: 0,
-        timers: { refresh: false, settle: null, late: false },
+        timers: { refresh: false, settle: null, late: false, locked: false },
+        lockedTries: 0,
     };
 }
 
@@ -491,6 +505,9 @@ function timerRanOut(s, todo, timer) {
     }
     s.timers[timer] = false;
     if (timer === 'refresh') refreshShown(s, todo);
+    // A tap on its way is left to answer: where it fails, the Shot opened is
+    // read again then.
+    if (timer === 'locked' && s.opened && !s.opened.canChange && !s.opening && !s.live) readOpened(s, todo, s.opened);
     // The one look left for a shot pulled before a recipe change: it is a look
     // for the latest, whatever the graph shows meanwhile.
     if (timer === 'late') refresh(s, todo);
@@ -592,6 +609,7 @@ function shotStarted(s, todo) {
     stopTimer(s, todo, 'settle');
     stopTimer(s, todo, 'late');
     stopTimer(s, todo, 'refresh');
+    stopTimer(s, todo, 'locked');
     overlay(todo);
     paint(todo);
 }
@@ -707,6 +725,7 @@ function edited(s, todo, shotId, now) {
 // was in the graph.
 function closeOpened(s) {
     const was = !!s.opened;
+    s.lockedTries = 0;
     s.opened = null;
     s.opening = null;
     s.openSeq += 1;
@@ -750,7 +769,16 @@ function shotUnreachable(s, todo, shotId) {
         s.opened = { ...s.opened, canChange: false };
         paint(todo);
     }
+    readLockedLater(s, todo);
     return true;
+}
+
+// The opened Shot can't be changed because the server could not be asked for
+// it: it is read again later, until a read finds the server back.
+function readLockedLater(s, todo) {
+    if (s.timers.locked) return;
+    s.lockedTries += 1;
+    startTimer(s, todo, 'locked', lockedRetryMs(s.lockedTries));
 }
 
 // "Back to latest": the latest is drawn as it was kept, then read again, and
@@ -794,6 +822,10 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, canChange: c
     }
     const { recipe } = target;
     const canChange = can !== false;
+    if (canChange) {
+        s.lockedTries = 0;
+        stopTimer(s, todo, 'locked');
+    }
     // A reference that could not be read leaves the one read before for this
     // Shot. A Shot with no recipe has none, and none can be chosen.
     const kept = before ? before.reference : null;
@@ -854,9 +886,12 @@ function openedUnread(s, todo, { seq, shotId, unreachable = false }) {
     // can't be changed until the server is back. Where that read was to end
     // in a draw, it is drawn as read before, since the chart may have been
     // cleared meanwhile.
-    if (unreachable && s.opened && s.opened.id === String(shotId) && s.opened.canChange) {
-        s.opened = { ...s.opened, canChange: false };
-        if (!s.drawDue) paint(todo);
+    if (unreachable && s.opened && s.opened.id === String(shotId)) {
+        if (s.opened.canChange) {
+            s.opened = { ...s.opened, canChange: false };
+            if (!s.drawDue) paint(todo);
+        }
+        readLockedLater(s, todo);
     }
     if (s.drawDue && s.opened) draw(s, todo);
 }

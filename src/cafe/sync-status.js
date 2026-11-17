@@ -5,7 +5,8 @@
 // An answer, as decent-sync.js hands it on:
 //
 // - `{ served: true, … }`: the plugin serves this Machine.
-// - `{ code }`: the plugin refused, and the code says why.
+// - `{ code, message }`: the plugin refused, and the code says why. So too
+//   `{ code: 'unreachable' }` where Decaid answered in its place.
 // - `{}`: Decaid itself did not answer; or `{ loading: true }`, Decaid lists
 //   the plugin and has not loaded it yet, as for a moment after Decaid starts
 //   and while the plugin is reloaded.
@@ -101,8 +102,9 @@ export const NOT_SERVED_CODES = ['captureOnly', 'hardwareMismatch'];
  * (`listHeader` in shot-list.js).
  *
  * - `{ served: true }`: the Location's Shots (`served`), with `location`, the
- *   Location's name, and `machineId`, this Machine's id on the server, which
- *   marks its own rows.
+ *   Location's name, `locationId`, its id on the server, which a page's cursor
+ *   belongs to, and `machineId`, this Machine's id on the server, which marks
+ *   its own rows.
  * - `null`, for no Decent Sync plugin, or one switched off: the tablet's own
  *   (`noPlugin`).
  * - `captureOnly` and `hardwareMismatch`: the tablet's own (`notServed`).
@@ -120,7 +122,8 @@ export function shotsList(previous, answer) {
     if (answer.served === true) {
         const name = answer.location && typeof answer.location.name === 'string' ? answer.location.name.trim() : '';
         const machineId = answer.machine && answer.machine.id != null ? String(answer.machine.id) : null;
-        return { of: 'location', why: 'served', location: name || null, machineId };
+        const locationId = answer.location && answer.location.id != null ? String(answer.location.id) : null;
+        return { of: 'location', why: 'served', location: name || null, locationId, machineId };
     }
     if (serverOutOfReach(answer)) return { of: 'tablet', why: 'unreachable' };
     if (answer.code === undefined) return previous || { of: 'tablet', why: 'unknown' };
