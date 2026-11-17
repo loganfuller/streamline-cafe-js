@@ -204,6 +204,14 @@ test('a shot started over a finished one still waiting stops the looks for it', 
     assert.ok(did(effects, 'stopTimer').some(effect => effect.timer === 'settle'));
 });
 
+test('a shot started within the one look left after a recipe change stops that look', () => {
+    const changed = play(settling(withRecipe()).state, { type: 'recipe', recipe: OTHER });
+    assert.equal(changed.state.timers.late, true);
+    const { state, effects } = play(changed.state, { type: 'shotStarted' });
+    assert.equal(state.timers.late, false);
+    assert.ok(did(effects, 'stopTimer').some(effect => effect.timer === 'late'));
+});
+
 // ── A shot ended ─────────────────────────────────────────────────────────────
 
 test('a shot ended with a recipe is looked for at the set gaps until Decaid has it', () => {
@@ -591,6 +599,22 @@ test('a read of the Shots that fails draws again from what was last read, where 
     assert.equal(failed.state.latest, LATEST);
     const pushed = play(withRecipe(), { type: 'referencePushed', recipeId: null });
     assert.deepEqual(play(pushed.state, { type: 'shotsUnread', seq: lastRead(pushed.effects).seq }).effects, []);
+});
+
+test('a read of the Shots that fails after a newer read began changes nothing', () => {
+    // A look for a finished shot is on its way when the source moves: its
+    // failure does not move the looks on.
+    const ended = settling(withRecipe());
+    const look = play(ended.state, { type: 'timer', timer: 'settle' });
+    const moved = play(look.state, { type: 'sourceMoved' });
+    const lookFailed = play(moved.state, { type: 'shotsUnread', seq: lastRead(look.effects).seq });
+    assert.deepEqual(lookFailed.effects, []);
+    assert.equal(lookFailed.state.settleStep, moved.state.settleStep);
+    // A read that must end in a draw is overtaken by a push: its failure draws nothing.
+    const cue = play(withRecipe(), { type: 'inView' }, { type: 'timer', timer: 'refresh' });
+    const pushed = play(cue.state, { type: 'referencePushed', recipeId: null });
+    assert.equal(pushed.state.drawDue, true);
+    assert.deepEqual(play(pushed.state, { type: 'shotsUnread', seq: lastRead(cue.effects).seq }).effects, []);
 });
 
 test('a read that began before an edit of the same Shot does not put the old rating back', () => {
