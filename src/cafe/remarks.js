@@ -94,6 +94,20 @@ export async function editReadAgain(edit, readShot, failed) {
     throw Object.assign(new Error(failed.message), { code: failed.code, remarks: now });
 }
 
+/**
+ * What an edit's answer, or a read after it, says of the rating or the note
+ * the edit was of, and of nothing else. The answer also carries the other as
+ * it stood when the edit was made, which a later edit of that one may have
+ * changed since: an earlier rating's answer must not put a note back.
+ */
+export function editedRemarks(edit, remarks) {
+    const of = {};
+    if (!remarks) return of;
+    if (edit.rating !== undefined) of.rating = remarks.rating ?? null;
+    if (edit.note !== undefined) of.note = remarks.note ?? null;
+    return of;
+}
+
 /** Do two Shots, or two answers for a reference, have the same rating and note? */
 export function sameRemarks(a, b) {
     return (a?.rating ?? null) === (b?.rating ?? null) && (a?.note ?? null) === (b?.note ?? null);

@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    ratingOf, noteOf, shotRemarks, starFills, ratingForTap, ratingText, noteToSave, annotationsOf, editMade, editReadAgain, sameRemarks, NOTE_MAX,
+    ratingOf, noteOf, shotRemarks, starFills, ratingForTap, ratingText, noteToSave, annotationsOf, editMade, editReadAgain, sameRemarks, editedRemarks, NOTE_MAX,
 } from '../src/cafe/remarks.js';
 import { createTabletShots } from '../src/cafe/tablet-shots.js';
 import { createPluginShots } from '../src/cafe/plugin-shots.js';
@@ -84,6 +84,17 @@ test('an edit was made when the Shot holds what was asked for', () => {
     assert.ok(!editMade({ rating: 8 }, { rating: 6, note: null }));
     assert.ok(!editMade({ note: 'new' }, { rating: 8, note: 'old' }));
     assert.ok(!editMade({ rating: 8 }, null), 'a Shot that could not be read holds nothing');
+});
+
+test('an edit\'s answer changes only the rating or the note the edit was of', () => {
+    // A rating's answer carries the note as it stood then: one saved since must stay.
+    assert.deepEqual(editedRemarks({ rating: 8 }, { rating: 8, note: null }), { rating: 8 });
+    assert.deepEqual(editedRemarks({ note: 'New' }, { rating: 4, note: 'New' }), { note: 'New' });
+    assert.deepEqual(editedRemarks({ rating: 0 }, { rating: null, note: 'Kept' }), { rating: null });
+    assert.deepEqual(editedRemarks({ rating: 6, note: '' }, { rating: 6, note: null }), { rating: 6, note: null });
+    assert.deepEqual(editedRemarks({ rating: 8 }, { rating: 4 }), { rating: 4 }, 'a rating put back after a failure');
+    assert.deepEqual(editedRemarks({ note: 'x' }, null), {}, 'a read that found nothing changes nothing');
+    assert.deepEqual({ rating: 2, note: 'Saved since', ...editedRemarks({ rating: 8 }, { rating: 8, note: null }) }, { rating: 8, note: 'Saved since' });
 });
 
 // ── Decaid's own Shot edit ───────────────────────────────────────────────────

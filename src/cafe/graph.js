@@ -21,7 +21,7 @@ import { logger } from '../modules/logger.js';
 import { latestShot, referenceShot, makeReference, watchReference, newestShot, editShot } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
 import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot, sameReference, isDrawnShot } from './shot-model.js';
-import { shotRemarks, sameRemarks, starFills, ratingForTap, ratingOf, ratingText, noteToSave } from './remarks.js';
+import { shotRemarks, sameRemarks, editedRemarks, starFills, ratingForTap, ratingOf, ratingText, noteToSave } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
@@ -259,7 +259,12 @@ async function refresh({ onlyIfChanged = false } = {}) {
     // A reference that could not be read leaves the one read for this recipe
     // before, which is this source's: a change of source dropped any other.
     // With none read, there is none, and none can be chosen.
-    const answer = chosen || reference || NO_REFERENCE;
+    let answer = chosen || reference || NO_REFERENCE;
+    // The reference's rating and note, where the page edited that Shot after
+    // this read began: the read is older than the edit, as for the latest Shot.
+    if (answer !== reference && edits !== editsThen && answer.shot && reference && reference.shot && reference.shot.id === answer.shot.id) {
+        answer = { ...answer, rating: reference.rating, note: reference.note };
+    }
     const sameShot = latest !== undefined && (shot ? shot.id : null) === (latest ? latest.id : null);
     if (!drawDue && !settling && sameShot && sameReference(reference, answer)) {
         // The same two Shots: nothing is drawn again. A rating or a note may
@@ -668,10 +673,10 @@ async function onStar(star) {
     edits += 1;
     followEdit(target.id, { rating: ratingOf(next) });
     try {
-        followEdit(target.id, { rating: (await editShot(target.id, { rating: next })).rating });
+        followEdit(target.id, editedRemarks({ rating: next }, await editShot(target.id, { rating: next })));
     } catch (error) {
         logger.warn('Cafe: could not save the rating', error);
-        followEdit(target.id, { rating: error.remarks ? error.remarks.rating : before });
+        followEdit(target.id, editedRemarks({ rating: next }, error.remarks || { rating: before }));
         // Decent Sync's refusal says why, in its own words.
         showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
     } finally {
@@ -696,10 +701,10 @@ function onNote() {
             if (note === (target.note || '')) return;
             edits += 1;
             try {
-                followEdit(target.id, { note: (await editShot(target.id, { note })).note });
+                followEdit(target.id, editedRemarks({ note }, await editShot(target.id, { note })));
             } catch (error) {
                 logger.warn('Cafe: could not save the note', error);
-                if (error.remarks) followEdit(target.id, { note: error.remarks.note });
+                followEdit(target.id, editedRemarks({ note }, error.remarks));
                 throw new Error(error.refusal || cafeText('The note could not be saved'));
             } finally {
                 edits += 1;

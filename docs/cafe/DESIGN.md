@@ -251,7 +251,7 @@ Which Shot, and when:
 
 - **"Last shot", with no recipe loaded, is rated and noted too.** Streamline's history module hands the chart that Shot's measurements and Workflow and no record. So the page asks the seam for the tablet's newest Shot, whole, and takes its id, rating and note only if its first sample is the one the chart was handed. Until that read answers, and where the newest Shot is another, the row has no stars: they never act on a Shot other than the one drawn. No hook is added to Streamline's files for it.
 - **An edit made elsewhere shows at the page's next read:** a recipe load, the page coming back into view, or a shot ending. That covers DYE2 on the same tablet and the management interface. Nothing is pushed for a Shot's edit, and there is no timer.
-- **After the page's own edit** the row shows what the edit answered, for the rating or the note it was of. The answer's other half is left: a rating still on its way when a note is saved would otherwise put the note back as it was. A read that began before the edit is older than it, and does not put the old rating back.
+- **After the page's own edit** the row shows what the edit answered, for the rating or the note it was of. The answer's other half is left: a rating still on its way when a note is saved would otherwise put the note back as it was. A read that began before the edit is older than it, and does not put the old rating back, on the Shot's own row or on the reference's.
 - **A change of rating or note never draws the graph again.** Only the legend's rows are written.
 
 ### The comparison row
