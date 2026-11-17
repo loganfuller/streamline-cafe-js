@@ -106,9 +106,12 @@ function readLiveFrame(traces, layout) {
     try {
         // The scale's weight is no line of the chart's. During the shot it is
         // read as the weight in the title band is. Once the shot has ended the
-        // scale may read a lifted cup, so the weight is the shot's own last.
+        // scale may read a lifted cup, so the weight is the shot's own last; and
+        // once Streamline's history module has cleared that, as it does when
+        // Decaid has saved the shot, the weight the card already shows.
         const weights = live ? null : getCurrentShot().weights;
-        const weight = live ? getScaleReading().weight : weights && weights.length ? weights[weights.length - 1] : null;
+        const ended = (weights && weights.length ? weights[weights.length - 1] : null) ?? (frame ? frame.weight : null);
+        const weight = live ? getScaleReading().weight : ended;
         frame = liveFrame(traces, layout.shapes, weight);
         paintCards();
     } catch (error) {
