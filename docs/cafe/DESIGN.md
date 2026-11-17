@@ -245,13 +245,13 @@ Where an edit goes:
 - **Every Shot the page edits today is the tablet's own:** the recipe's latest Shot, or "Last shot" with no recipe. For such a Shot the plugin's call is Decaid's own edit, so it works while the server can't be reached and on a Capture-only Machine. Editing another machine's Shot comes with the Shots list.
 - **Only the field edited is sent,** by either route. A rating leaves the note alone, and the reverse. To clear a rating 0 is sent, and to clear a note empty text. Decaid merges what it is sent into the Shot's annotations key by key, so every other annotation is kept.
 - **An edit that may have been made is read again before it is shown as failed:** one the plugin answered `unreachable` or `serverTooOld`, or Decaid answered with no `code`, or that was not answered at all, and any failure of Decaid's own edit, which does not say why it failed. The Shot is read from Decaid. If it holds what was asked for, the edit was made. If not, the row follows what the read found.
-- **Any other refusal shows its message,** which is the plugin's and in English, as for Make reference, and changes nothing.
+- **Any other refusal shows its message,** which is the plugin's and in English, as for Make reference, and changes nothing. One is read again first all the same: `shotUnwritten`, which the plugin also answers when Decaid did not answer its own edit, and Decaid may have made it. Its message shows only if the Shot does not hold what was asked for.
 
 Which Shot, and when:
 
 - **"Last shot", with no recipe loaded, is rated and noted too.** Streamline's history module hands the chart that Shot's measurements and Workflow and no record. So the page asks the seam for the tablet's newest Shot, whole, and takes its id, rating and note only if its first sample is the one the chart was handed. Until that read answers, and where the newest Shot is another, the row has no stars: they never act on a Shot other than the one drawn. No hook is added to Streamline's files for it.
 - **An edit made elsewhere shows at the page's next read:** a recipe load, the page coming back into view, or a shot ending. That covers DYE2 on the same tablet and the management interface. Nothing is pushed for a Shot's edit, and there is no timer.
-- **After the page's own edit** the row shows what the edit answered, for the rating or the note it was of. The answer's other half is left: a rating still on its way when a note is saved would otherwise put the note back as it was. A read that began before the edit is older than it, and does not put the old rating back, on the Shot's own row or on the reference's.
+- **After the page's own edit** the row shows what the edit answered, for the rating or the note it was of. The answer's other half is left: a rating still on its way when a note is saved would otherwise put the note back as it was. A read that began before an edit of that Shot is older than the edit, and does not put the old rating back, on the Shot's own row or on the reference's.
 - **A change of rating or note never draws the graph again.** Only the legend's rows are written.
 
 ### The comparison row

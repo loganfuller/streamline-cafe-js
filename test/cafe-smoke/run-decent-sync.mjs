@@ -398,11 +398,14 @@ try {
         await cold.page.locator('#cafe-make-reference').click({ force: true }).catch(() => {});
         await cold.page.waitForTimeout(800);
         check('and a tap on the muted Make reference asks nothing', cold.seen.requests.slice(mark).filter(r => r.startsWith('PUT ')).length === 0);
-        //    The tablet's own Shot is still rated: the plugin writes it through Decaid.
+        //    The tablet's own Shot is still rated. The source is not known on
+        //    this page, so the edit is Decaid's own, and the plugin is not asked.
+        mark = cold.seen.requests.length;
         await cold.page.locator('#cafe-stars .cafe-star').nth(2).click();
         await cold.page.waitForTimeout(1200);
         const rated = (await decaid('GET', `/shots/${second.id}`)).annotations?.enjoyment;
-        check('with the server out of reach the tablet\'s own Shot is still rated', rated === 6 && JSON.stringify((await remarks(cold.page)).stars) === '[100,100,100,0,0]', `${rated} ${JSON.stringify(await remarks(cold.page))}`);
+        check('with the server out of reach the tablet\'s own Shot is still rated, by Decaid\'s own edit', rated === 6 && JSON.stringify((await remarks(cold.page)).stars) === '[100,100,100,0,0]'
+            && cold.seen.requests.slice(mark).filter(r => r.startsWith('PUT ')).join() === `PUT /api/v1/shots/${second.id}`, `${rated} ${JSON.stringify(await remarks(cold.page))}`);
         await shot(cold.page, 'sync-opened-while-stopped-light');
         check('no page error on it', cold.seen.errors.length === 0, cold.seen.errors.join(' | '));
         await cold.close();

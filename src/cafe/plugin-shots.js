@@ -138,7 +138,9 @@ export function createPluginShots({ readReference, chooseReference, editShot, re
          * read again, and the edit has failed only if it does not hold what
          * was asked for. That read is Decaid's: every Shot the page edits
          * today is the tablet's own. Any other refusal rejects with `refusal`,
-         * its message to show, and changes nothing.
+         * its message to show, and changes nothing. One of them is read again
+         * all the same: `shotUnwritten` also says Decaid did not answer its
+         * own edit, which it may have made.
          */
         async editShot(shotId, edit) {
             let refused;
@@ -150,7 +152,9 @@ export function createPluginShots({ readReference, chooseReference, editShot, re
             }
             if (refused.code !== undefined && !CANT_ASK.includes(refused.code)) {
                 if (NOT_SERVED.includes(refused.code)) notServed();
-                throw Object.assign(new Error(refused.message), { code: refused.code, refusal: refused.message });
+                const shown = Object.assign(new Error(refused.message), { code: refused.code, refusal: refused.message });
+                if (refused.code !== 'shotUnwritten') throw shown;
+                return editReadAgain(edit, () => readShot(shotId), refused).catch(read => { throw Object.assign(shown, { remarks: read.remarks }); });
             }
             return editReadAgain(edit, () => readShot(shotId), refused);
         },

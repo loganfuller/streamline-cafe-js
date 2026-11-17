@@ -69,7 +69,8 @@ let busy = false;       // a reference is being chosen
 // no record, so the page reads the tablet's newest and takes it only if it is
 // the Shot drawn.
 let remarks = null;
-let edits = 0;          // counts each edit of a Shot as it starts and as it ends: a read begun before either is older than the edit
+let edits = 0;          // counts each edit of a Shot as it starts and as it ends
+const editedAt = new Map(); // a Shot's id to that count at its last edit: a read begun before it is older than the edit
 let rating = false;     // a rating is on its way
 let lastSeq = 0;        // the reads of the tablet's newest record, for "Last shot"
 
@@ -77,6 +78,15 @@ const el = id => document.getElementById(id);
 const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
 
 // ── What the chart draws ─────────────────────────────────────────────────────
+
+// An edit of a Shot starts, or ends.
+function markEdit(shotId) {
+    edits += 1;
+    editedAt.set(shotId, edits);
+}
+
+// Did the page edit a Shot after a read that began at `then`?
+const editedSince = (shotId, then) => (editedAt.get(shotId) ?? 0) > then;
 
 // The rating and note of the Shot in the graph, or null where they are not
 // known, or are another Shot's.
@@ -262,7 +272,7 @@ async function refresh({ onlyIfChanged = false } = {}) {
     let answer = chosen || reference || NO_REFERENCE;
     // The reference's rating and note, where the page edited that Shot after
     // this read began: the read is older than the edit, as for the latest Shot.
-    if (answer !== reference && edits !== editsThen && answer.shot && reference && reference.shot && reference.shot.id === answer.shot.id) {
+    if (answer !== reference && answer.shot && reference && reference.shot && reference.shot.id === answer.shot.id && editedSince(answer.shot.id, editsThen)) {
         answer = { ...answer, rating: reference.rating, note: reference.note };
     }
     const sameShot = latest !== undefined && (shot ? shot.id : null) === (latest ? latest.id : null);
@@ -294,7 +304,7 @@ function takeRemarks(record, editsThen) {
         remarks = null;
         return;
     }
-    const edited = edits !== editsThen && remarks && remarks.id === record.id;
+    const edited = remarks && remarks.id === record.id && editedSince(record.id, editsThen);
     remarks = { ...(edited ? { rating: remarks.rating, note: remarks.note } : shotRemarks(record)), id: record.id, of: latest };
 }
 
@@ -670,7 +680,7 @@ async function onStar(star) {
     const before = target.rating;
     const next = ratingForTap(before, star);
     rating = true;
-    edits += 1;
+    markEdit(target.id);
     followEdit(target.id, { rating: ratingOf(next) });
     try {
         followEdit(target.id, editedRemarks({ rating: next }, await editShot(target.id, { rating: next })));
@@ -681,7 +691,7 @@ async function onStar(star) {
         showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
     } finally {
         rating = false;
-        edits += 1;
+        markEdit(target.id);
     }
 }
 
@@ -699,7 +709,7 @@ function onNote() {
         async save(text) {
             const note = noteToSave(text);
             if (note === (target.note || '')) return;
-            edits += 1;
+            markEdit(target.id);
             try {
                 followEdit(target.id, editedRemarks({ note }, await editShot(target.id, { note })));
             } catch (error) {
@@ -707,7 +717,7 @@ function onNote() {
                 followEdit(target.id, editedRemarks({ note }, error.remarks));
                 throw new Error(error.refusal || cafeText('The note could not be saved'));
             } finally {
-                edits += 1;
+                markEdit(target.id);
             }
         },
     });

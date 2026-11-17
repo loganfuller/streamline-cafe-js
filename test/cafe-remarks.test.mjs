@@ -224,7 +224,7 @@ test('an edit answered unreachable or serverTooOld, by Decaid with no code, or n
 });
 
 test('any other refusal shows its message, reads nothing and changes nothing', async () => {
-    for (const code of ['noSuchShot', 'shotUnwritten', 'invalidRequest']) {
+    for (const code of ['noSuchShot', 'invalidRequest']) {
         const { source, calls } = plugin({ answers: [refusal(code, 400, `Refused as ${code}.`)] });
         await assert.rejects(source.editShot('a', { note: 'x' }), error => error.refusal === `Refused as ${code}.` && error.code === code && error.remarks === undefined);
         assert.deepEqual([calls.read, calls.notServed], [[], 0]);
@@ -232,6 +232,17 @@ test('any other refusal shows its message, reads nothing and changes nothing', a
     const moved = plugin({ answers: [refusal('captureOnly', 409)] });
     await assert.rejects(moved.source.editShot('a', { rating: 2 }), error => error.refusal === 'Sample refusal.');
     assert.equal(moved.calls.notServed, 1, 'a Machine no longer served has its status asked again');
+});
+
+test('shotUnwritten also says Decaid did not answer its own edit: it is read again, and shows its message only if the edit was not made', async () => {
+    const made = plugin({ answers: [refusal('shotUnwritten', 500, 'Decaid did not answer.')], held: shot('a', { enjoyment: 8 }) });
+    assert.deepEqual(await made.source.editShot('a', { rating: 8 }), { rating: 8, note: null });
+    const not = plugin({ answers: [refusal('shotUnwritten', 500, 'Decaid answered 400.')], held: shot('a', { enjoyment: 4 }) });
+    await assert.rejects(not.source.editShot('a', { rating: 8 }), error => {
+        assert.deepEqual([error.refusal, error.code, error.remarks], ['Decaid answered 400.', 'shotUnwritten', { rating: 4, note: null }]);
+        return true;
+    });
+    assert.deepEqual(not.calls.read, ['a']);
 });
 
 // ── Which route an edit takes ────────────────────────────────────────────────
