@@ -1353,7 +1353,7 @@ button.cafe-card {
    Shot ran, after Dose → yield. */
 .cafe-shots-location .cafe-shots-columns,
 .cafe-shots-location .cafe-shots-row {
-    grid-template-columns: 110px 180px minmax(0, 1fr) 190px 90px 160px 150px 56px;
+    grid-template-columns: 110px 230px minmax(0, 1fr) 190px 90px 160px 150px 56px;
 }
 
 #cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-machine,

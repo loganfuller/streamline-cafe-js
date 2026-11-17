@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BEANS, GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES } from './page-helpers.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
@@ -1636,6 +1636,10 @@ try {
         check('the row of the Shot in the graph is highlighted', shown.filter(r => r.current).map(r => r.id).join() === latestId, JSON.stringify(shown.filter(r => r.current)));
         const references = (await storeValue(REFERENCES)) || {};
         check('a Shot that is its recipe\'s reference carries the chip', shown.filter(r => r.chip).every(r => Object.values(references).includes(r.id)) && (!shown.some(r => r.id === references[targetId]) || shown.find(r => r.id === references[targetId]).chip), JSON.stringify(shown.filter(r => r.chip).map(r => r.id)));
+        const header = await shotsHeader(list.page);
+        check('with no Decent Sync the list is headed "Shots" and no more: no line, no Machine column and no Time column',
+            header.title === 'Shots' && header.under === null && header.line === null && header.columns.join('|') === 'Pulled|Recipe|Dose → yield|Rating|Barista|Note', JSON.stringify(header));
+        check('and no row is marked Unfinished or names a Machine', (await list.page.locator('#cafe-shots-list .cafe-shots-unfinished').count()) === 0 && (await list.page.locator('#cafe-shots-list .cafe-shots-machine').evaluateAll(cells => cells.every(cell => getComputedStyle(cell).display === 'none'))));
         await shot(list.page, 'shots-list-light');
 
         //     Older rows as the list is scrolled near its end, none twice.

@@ -173,3 +173,18 @@ export const legendFits = page => page.evaluate(() => {
     });
     return { out, times: lacking('.cafe-legend-when'), names: lacking('.cafe-legend-who') };
 });
+
+// The Shots list's header while the list is open: what stands under its title
+// and its line, each null where it does not show, and the columns that show.
+export const shotsHeader = page => page.evaluate(() => {
+    const shown = id => {
+        const element = document.getElementById(id);
+        return element && getComputedStyle(element).display !== 'none' ? element.textContent.trim() : null;
+    };
+    return {
+        title: shown('cafe-shots-title'),
+        under: shown('cafe-shots-under'),
+        line: shown('cafe-shots-line'),
+        columns: [...document.querySelectorAll('#cafe-shots-dialog .cafe-shots-columns > span')].filter(span => getComputedStyle(span).display !== 'none').map(span => span.textContent.trim()),
+    };
+});
