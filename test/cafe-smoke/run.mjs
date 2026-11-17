@@ -18,7 +18,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, RECIPES, BARISTA } from './sample-data.mjs';
+import { BEANS, GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
@@ -1098,7 +1098,6 @@ try {
     //     legend names it with its time and barista. The page reads no Shot
     //     itself then, and the history arrows and the shot panel stay out of reach.
     {
-        await decaid('PUT', '/workflow', { context: { baristaName: BARISTA } });
         const extra = await openPage();
         const urls = [];
         extra.page.on('request', request => urls.push(new URL(request.url())));
@@ -1111,7 +1110,8 @@ try {
         ]);
         check('no recipe, at rest: the history arrows and the shot panel are out of reach', (await reachable()).length === 0, (await reachable()).join(', '));
         // Of different lengths, so each drawing tells the two apart.
-        for (const [n, seconds] of [[1, 10], [2, 16]]) {
+        for (const [n, seconds, barista] of [[1, 10, BARISTAS[0]], [2, 16, BARISTAS[1]]]) {
+            await decaid('PUT', '/workflow', { context: { baristaName: barista } });
             const before = ((await decaid('GET', '/shots?limit=1')).items || [])[0]?.id;
             const run = pullShot(seconds);
             await extra.page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
@@ -1136,7 +1136,7 @@ try {
             const minutes = [saved.timestamp, saved.measurements[0]?.machine?.timestamp].map(t => String(t).slice(11, 16));
             check(`no recipe, shot ${n}: the graph draws it once Decaid has saved it`, lines?.points[0] === points, `${lines?.points[0]} points drawn, ${points} in the Shot`);
             check(`no recipe, shot ${n}: the legend names it "Last shot", with its time and barista`,
-                now.label === 'Last shot' && minutes.some(m => (now.when || '').startsWith(`Today ${m}`)) && (now.when || '').endsWith(` · ${BARISTA}`) && now.line === 'Pick a recipe to compare',
+                now.label === 'Last shot' && minutes.some(m => (now.when || '').startsWith(`Today ${m}`)) && (now.when || '').endsWith(` · ${barista}`) && now.line === 'Pick a recipe to compare',
                 JSON.stringify(now));
         }
         // The seam lists the newest Shots by limit alone; Streamline's own reads

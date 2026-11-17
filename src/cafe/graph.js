@@ -71,9 +71,13 @@ function applyOverlay() {
 // is let through, and the legend names the Shot drawn. Until DYE2 has said which
 // recipe is loaded it is let through too, so the graph is not empty meanwhile.
 // Each request is kept, so the graph can go back to it when a recipe is unloaded.
+// While a shot runs every request is turned down: the module may still be
+// waiting for the shot before to be saved, and drawing it would reset the
+// running shot's lines. It asks again once the running shot has been saved.
 function chooseShot(measurements, workflow) {
     if (measurements === drawing) return true;
     handed = drawnShot(measurements, workflow);
+    if (live) return false;
     if (recipe === undefined) return true;
     if (recipe === null) {
         latest = handed;
