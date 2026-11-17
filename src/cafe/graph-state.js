@@ -323,9 +323,12 @@ function refreshSoon(s, todo) {
 }
 
 // Reads the Shots the graph shows again: an opened Shot and its recipe's
-// reference, or the recipe's latest Shot and its reference.
+// reference, or the recipe's latest Shot and its reference. Either read ends in
+// a draw, whatever it finds: the cue may be the page back from another, whose
+// chart was cleared on the way.
 function refreshShown(s, todo, options) {
     if (!s.opened) return refresh(s, todo, options);
+    s.drawDue = true;
     stopTimer(s, todo, 'refresh');
     return readOpened(s, todo, s.opening || s.opened);
 }
@@ -651,6 +654,10 @@ function referenceChosen(s, todo, { recipeId, chosen }) {
         s.openSeq += 1; // a read begun before the choice would put the reference before it back
         s.opened = { ...opened, reference };
     }
+    // A Shot tapped meanwhile is read again: its read was dropped above, or it
+    // is of this recipe and may have read the reference before the choice.
+    const { opening } = s;
+    if (opening && (forOpened || (opening.recipe && String(opening.recipe.id) === String(recipeId)))) readOpened(s, todo, opening);
     if (forLoaded) {
         s.seq += 1;
         s.reference = reference;
@@ -748,6 +755,7 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
         // to the latest.
         if (!before) {
             todo.push({ do: 'unopened' });
+            redrawOpened(s, todo);
             return;
         }
         backToLatest(s, todo);
@@ -762,7 +770,7 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
         found = { ...found, rating: kept.rating, note: kept.note };
     }
     const remarks = openedRemarks(s, before, shot, editsThen);
-    if (before && sameReference(kept, found)) {
+    if (before && !s.drawDue && sameReference(kept, found)) {
         // The same two Shots: only a rating or a note can have changed.
         const rows = !sameRemarks(before.remarks, remarks) || !sameRemarks(kept, found);
         s.opened = { ...before, remarks: { ...remarks, of: before.shot }, reference: sameRemarks(kept, found) ? kept : { ...kept, rating: found.rating, note: found.note } };
@@ -796,4 +804,12 @@ function openedUnread(s, todo, { seq, shotId }) {
         s.opening = null;
         todo.push({ do: 'unopened' });
     }
+    redrawOpened(s, todo);
+}
+
+// A read that was to end in a draw found nothing new to draw: the Shot already
+// opened is drawn again as it was read before, since the chart may have been
+// cleared meanwhile.
+function redrawOpened(s, todo) {
+    if (s.drawDue && s.opened) draw(s, todo);
 }

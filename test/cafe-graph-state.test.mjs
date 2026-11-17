@@ -894,13 +894,32 @@ test('with a Shot opened, the page back in view reads that Shot again, not the l
     const due = play(cue.state, { type: 'timer', timer: 'refresh' });
     assert.ok(!did(due.effects, 'readShots').length);
     assert.equal(lastOpened(due.effects).shotId, EARLIER.id);
-    // Rated elsewhere meanwhile: only the legend's rows are written.
+    // Rated elsewhere meanwhile: the rating is taken, and the Shot drawn kept.
     const rated = openedAnswer(due.state, due.effects, { ...EARLIER, annotations: { enjoyment: 10 } }, chosen(REF2));
-    assert.deepEqual(kinds(rated.effects), ['paint']);
     assert.equal(shownRemarks(rated.state).rating, 10);
-    assert.equal(rated.state.opened.shot, EARLIER, 'the Shot drawn is kept');
-    // Nothing changed: nothing is drawn.
-    assert.deepEqual(openedAnswer(due.state, due.effects, EARLIER, chosen(REF2)).effects, []);
+    assert.equal(rated.state.opened.id, EARLIER.id, 'the same Shot is in the graph');
+    // Nothing changed: it is drawn again all the same, as the chart was cleared on the way back.
+    assert.deepEqual(kinds(openedAnswer(due.state, due.effects, EARLIER, chosen(REF2)).effects), ['overlay', 'draw']);
+});
+
+test('with a Shot opened, the way back from another page draws it again though nothing changed', () => {
+    // The router clears the chart, the history module's request is turned down,
+    // and the read finds the same two Shots.
+    const base = opened(withRecipe()).state;
+    const asks = play(base, { type: 'inView' }, { type: 'chartAsks', measurements: LATEST.measurements, workflow: LATEST.workflow }, { type: 'timer', timer: 'refresh' });
+    assert.equal(asks.allow, undefined);
+    const same = openedAnswer(asks.state, asks.effects, EARLIER, chosen(REF2));
+    assert.equal(did(same.effects, 'draw').length, 1);
+    assert.equal(same.state.drawDue, false);
+    assert.equal(inGraph(same.state).shot, EARLIER);
+    // One that can't be read is drawn as read before.
+    const read = lastOpened(asks.effects);
+    const failed = play(asks.state, { type: 'openedUnread', seq: read.seq, shotId: EARLIER.id });
+    assert.equal(did(failed.effects, 'draw').length, 1);
+    assert.equal(inGraph(failed.state).shot, EARLIER);
+    // A push's re-read that finds the same two Shots still draws nothing.
+    const pushed = play(base, { type: 'referencePushed', recipeId: RECIPE.id });
+    assert.deepEqual(openedAnswer(pushed.state, pushed.effects, EARLIER, chosen(REF2)).effects, []);
 });
 
 test('with a Shot opened, a re-read that finds it gone sends the graph back to the latest', () => {
@@ -1022,4 +1041,27 @@ test('Make reference on an opened Shot sets its own recipe\'s reference, and the
     const due = play(own, { type: 'inView' }, { type: 'timer', timer: 'refresh' });
     const chose = play(due.state, { type: 'referenceChosen', recipeId: RECIPE.id, chosen: chosen(EARLIER) });
     assert.equal(openedAnswer(chose.state, due.effects, EARLIER, chosen(REF2)).state.opened.reference.shot, EARLIER);
+});
+
+test('a reference chosen while another row\'s read is on its way reads that row again, and it is opened', () => {
+    // Shot A opened, Make reference tapped, then B tapped before the choice answers.
+    const base = opened(withRecipe()).state;
+    for (const [target, recipe] of [[GUESTS, OTHER], [shot('s-house-2', 12), RECIPE]]) {
+        const asked = play(base, { type: 'open', shotId: target.id, recipe });
+        const made = play(asked.state, { type: 'referenceChosen', recipeId: RECIPE.id, chosen: chosen(EARLIER) });
+        const again = lastOpened(made.effects);
+        assert.ok(again && again.shotId === target.id, `${target.id} is read again`);
+        assert.equal(inGraph(made.state).reference.shot, EARLIER, 'the opened Shot follows the choice meanwhile');
+        // The tap's first read is dropped; the second is taken.
+        assert.deepEqual(openedAnswer(made.state, asked.effects, target, chosen(REF2)).effects, []);
+        const found = openedAnswer(made.state, made.effects, target, recipe === RECIPE ? chosen(EARLIER) : chosen(GUEST_REF));
+        assert.equal(inGraph(found.state).shot, target);
+        assert.equal(found.state.opening, null);
+    }
+    // A row of the chosen recipe tapped from the latest is read again too: its read may hold the reference before.
+    const fromLatest = play(withRecipe(), { type: 'open', shotId: EARLIER.id, recipe: RECIPE }, { type: 'referenceChosen', recipeId: RECIPE.id, chosen: chosen(LATEST) });
+    assert.equal(did(fromLatest.effects, 'readOpened').length, 2);
+    // One of another recipe is left to answer.
+    const other = play(withRecipe(), { type: 'open', shotId: GUESTS.id, recipe: OTHER }, { type: 'referenceChosen', recipeId: RECIPE.id, chosen: chosen(LATEST) });
+    assert.equal(did(other.effects, 'readOpened').length, 1);
 });

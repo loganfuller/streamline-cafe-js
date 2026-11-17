@@ -44,7 +44,7 @@ let liveFailed = false; // the live cards threw once: said once, not on every fr
 let busy = false;       // a reference is being chosen
 let rating = false;     // a rating is on its way
 const timers = {};      // the timers `graph-state.js` asked for, by name
-let listener = {};      // what the Shots list is told: `edited(shotId, remarks)`, `chosen(recipeId, shotId)`
+let listener = {};      // what the Shots list is told: `edited(shotId, remarks)`, `chosen(recipeId, shotId)`, `sourceMoved()`
 
 const el = id => document.getElementById(id);
 const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
@@ -505,7 +505,8 @@ export function isShotOpened() {
 /**
  * The Shots list hears what the page changes of a Shot it lists:
  * `edited(shotId, remarks)`, a rating or note, and `chosen(recipeId, shotId)`,
- * a recipe's reference.
+ * a recipe's reference; and `sourceMoved()`, that where references are kept
+ * changed, so which Shots are references is another source's answer now.
  */
 export function onShotChanges(listen) {
     listener = listen || {};
@@ -537,7 +538,14 @@ export function initGraph() {
     el('cafe-back')?.addEventListener('click', () => dispatch({ type: 'backToLatest' }));
     // The seam says a recipe's reference should be read again (null for
     // whichever is in the graph), or that where references are kept changed.
-    watchReference((recipeId, sourceMoved = false) => dispatch(sourceMoved ? { type: 'sourceMoved' } : { type: 'referencePushed', recipeId }));
+    watchReference((recipeId, sourceMoved = false) => {
+        if (!sourceMoved) {
+            dispatch({ type: 'referencePushed', recipeId });
+            return;
+        }
+        dispatch({ type: 'sourceMoved' });
+        listener.sourceMoved?.();
+    });
 
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);

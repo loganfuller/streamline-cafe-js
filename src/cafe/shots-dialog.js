@@ -22,6 +22,10 @@ const NEAR_END_PX = 600;
 let list = null;         // { rows, recipes, offset, done, failed, scrollTop }
 let loading = false;     // a page is on its way
 let opening = false;     // the first page is on its way
+// Counts what ends a list on its way or on screen: a shot starting, the main
+// page hidden behind another, where references are kept changing. A first page
+// read across one is not shown.
+let generation = 0;
 let shotRunning = () => false;
 
 const el = id => document.getElementById(id);
@@ -179,14 +183,17 @@ async function openList() {
     }
     list = null;
     opening = true;
+    const asked = generation;
     try {
         const [recipes, page] = await Promise.all([getDye2KvArray(RECIPES_KEY), shotsPage(0, PAGE_SIZE)]);
         // A recipe is named from DYE2's records: without them every Shot would
         // read as one with no recipe.
         if (!recipes) throw new Error('DYE2\'s records could not be read.');
+        if (generation !== asked) return;
         list = { rows: withPage([], rowsOf(page, recipes)), recipes, scrollTop: 0, failed: false, ...nextPage({ offset: 0, read: page.items.length, asked: PAGE_SIZE, total: page.total }) };
     } catch (error) {
         logger.warn('Cafe: could not read the Shots', error);
+        if (generation !== asked) return;
         showToast(cafeText('Could not read the shots'), 4000, 'error');
         return;
     } finally {
@@ -207,12 +214,21 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
     el('cafe-shots-scroll')?.addEventListener('scroll', onScroll, { passive: true });
 
     // While a shot runs the button takes no taps, and a shot that starts
-    // closes the list, as it closes the page's other dialogs.
-    document.addEventListener('streamline:espresso-start', () => {
-        if (button) button.disabled = true;
+    // closes the list, as it closes the page's other dialogs. A list still on
+    // its way is not shown once a shot has started, the page has gone behind
+    // another, or where references are kept has changed: its chips are the
+    // other source's.
+    const drop = ({ forget = false } = {}) => {
+        generation += 1;
+        if (forget) list = null;
         const dialog = el('cafe-shots-dialog');
         if (dialog?.open) dialog.close();
+    };
+    document.addEventListener('streamline:espresso-start', () => {
+        if (button) button.disabled = true;
+        drop();
     });
+    document.addEventListener('streamline:mainpagehidden', () => drop());
     document.addEventListener('streamline:espresso-end', () => { if (button) button.disabled = false; });
     if (button) button.disabled = shotRunning();
 
@@ -226,6 +242,7 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
             if (!list) return;
             list.rows = withReference(list.rows, recipeId, shotId);
         },
+        sourceMoved() { drop({ forget: true }); },
     });
     document.addEventListener('streamline:languagechange', () => { if (el('cafe-shots-dialog')?.open) render(); });
 }
