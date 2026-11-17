@@ -31,7 +31,18 @@ test('the page reads Shots and the choice of reference through the Shot seam onl
     assert.deepEqual(filesWith(/\bgetShots?\b|\bgetLatestShotSummary\b|\bgetShotIds\b/), ['shot-seam.js']);
     assert.deepEqual(filesWith(/\bREFERENCES_KEY\b/), ['cafe-store.js', 'shot-seam.js']);
     assert.deepEqual(filesWith(/from '\.\/tablet-shots\.js'/), ['shot-seam.js']);
+    assert.deepEqual(filesWith(/from '\.\/plugin-shots\.js'/), ['shot-seam.js']);
+    assert.deepEqual(filesWith(/from '\.\/shot-sources\.js'/), ['shot-seam.js']);
     assert.deepEqual(filesWith(/from '\.\.\/modules\/idb\.js'/), [], 'Streamline\'s shot cache is not a source');
+});
+
+test('one module speaks to Decent Sync\'s plugin', () => {
+    // Its Status request has two readers, the dial-in label and the Shot seam,
+    // and its Reference Shot is read and chosen through the seam alone.
+    assert.deepEqual(filesWith(/decent-sync\.reaplugin/), ['decent-sync.js']);
+    assert.deepEqual(filesWith(/\bconnectPluginMessages\b|\bconnectPluginPush\b|\bWebSocket\b/), ['decent-sync.js'], 'and one socket, through api.js');
+    assert.deepEqual(filesWith(/from '\.\/decent-sync\.js'/), ['page.js', 'shot-seam.js']);
+    assert.deepEqual(filesWith(/\b(readReference|chooseReference|onPush)\b/), ['decent-sync.js', 'plugin-shots.js', 'shot-seam.js']);
 });
 
 test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modules', () => {
@@ -47,6 +58,7 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
     assert.match(chart, /export function plotHistoricalShot\(measurements, workflow = null\) \{\s*if \(cafeShotChooser && !cafeShotChooser\(measurements, workflow\)\) return;/);
     const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
     assert.match(api, /export async function getShot\(id\) \{/);
+    assert.match(api, /export function connectPluginMessages\(pluginId, endpoint, onMessage, onOpen\) \{/);
 });
 
 test('no module opens one of DYE2\'s pages', () => {
@@ -75,7 +87,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

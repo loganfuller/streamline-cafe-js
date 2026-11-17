@@ -5,9 +5,12 @@
 //
 // Streamline's chart still draws everything. This module decides which finished
 // Shot it draws, through the two hooks the fork adds to chart.js. With a recipe
-// loaded it asks the Shot seam for the recipe's latest Shot and its reference.
-// With none, Streamline's history module draws the tablet's newest Shot, as on
-// Streamline's own page, and the legend names the Shot it handed the chart.
+// loaded it asks the Shot seam for the recipe's latest Shot and its reference,
+// and reads them again when the seam says the reference may have changed: on a
+// Machine Decent Sync serves, another was chosen elsewhere, or the server came
+// into reach or went out of it. With none, Streamline's history module draws
+// the tablet's newest Shot, as on Streamline's own page, and the legend names
+// the Shot it handed the chart.
 import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
 import { getTotalTime, getCurrentShot } from '../modules/shotData.js';
 import { getScaleReading } from '../modules/api.js';
@@ -15,9 +18,9 @@ import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { latestShot, referenceShot, makeReference } from './shot-seam.js';
+import { latestShot, referenceShot, makeReference, watchReference } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
-import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot } from './shot-model.js';
+import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot, sameReference } from './shot-model.js';
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
@@ -26,6 +29,9 @@ import { shotStages, stageShapes, withStageNames, STAGE_NAME_FONT } from './stag
 import { paintRow } from './compare-row.js';
 
 const REFRESH_GAP_MS = 300;
+// The seam's answer for a recipe with no reference that none can be chosen for:
+// what stands in where the reference could not be read, or is not this source's.
+const NO_REFERENCE = { shot: null, canChange: false };
 // Once a shot ends, how long between looks for it among Decaid's Shots: at half
 // a second, then 2, 4, 7, 11 and 15 seconds after the end. Decaid saves a shot
 // once its last drops have been weighed, a few seconds after the pump stops.
@@ -41,7 +47,8 @@ let settleFrom = null;  // the id of the Shot in the graph before that shot; und
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
 let handed;             // the Shot the history module last asked the chart to draw; undefined until it asks
 let heldBack = false;   // a request of the history module's was turned down during the running shot
-let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves, samples, numbers and stages
+let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange, … }, with the Shot's curves, samples, numbers and stages
+let drawDue = false;    // a read was asked for that must end in a draw, whatever it finds
 let drawing = null;     // the measurements this module is handing the chart itself
 let overlayFor = null;  // what the chart was last drawn with: the view, the reference's lines and its stages
 let frame = null;       // what the running shot last read, for the live cards; kept until the finished Shot is in the graph
@@ -163,6 +170,7 @@ function chooseShot(measurements, workflow) {
 }
 
 function draw() {
+    drawDue = false;
     applyOverlay();
     // The chart draws into whichever page is showing: never over another page's.
     if (!isSubPage()) {
@@ -178,17 +186,31 @@ function draw() {
 
 // ── Reading the Shots ────────────────────────────────────────────────────────
 
-async function refresh() {
+// Reads the recipe's latest Shot and its reference, and draws them. With
+// `onlyIfChanged` the graph is drawn again only if either is another than the
+// one drawn: the seam said the reference may have changed, and a push may
+// repeat. A read that must end in a draw still does, when one like this
+// overtakes it.
+async function refresh({ onlyIfChanged = false } = {}) {
+    if (refreshTimer || !onlyIfChanged) drawDue = true;
     clearTimeout(refreshTimer);
     refreshTimer = null;
     // A running shot owns the chart's lines: its end asks again. With no recipe
-    // loaded there is nothing to read: the history module draws.
+    // loaded there is nothing to read: the history module draws. While the page
+    // looks for a shot that has just ended, this read is one more look: it takes
+    // the place of a look still on its way, which may have read the reference
+    // before the change that asked for this one.
     if (live || !recipe) return;
     const mine = ++seq;
     let shot;
     let chosen;
     try {
-        [shot, chosen] = await Promise.all([latestShot(recipe.id), referenceShot(recipe.id)]);
+        // The reference may come from Decent Sync, which can fail while Decaid
+        // answers: that must not cost the graph its latest Shot.
+        [shot, chosen] = await Promise.all([latestShot(recipe.id), referenceShot(recipe.id).catch(error => {
+            logger.warn('Cafe: could not read the reference', error);
+            return null;
+        })]);
     } catch (error) {
         logger.warn('Cafe: could not read the Shots for the graph', error);
         if (mine !== seq || live) return;
@@ -197,7 +219,7 @@ async function refresh() {
         // read: the page may have come back from another page with its chart
         // cleared, and the legend must name the Shot that is drawn. With nothing
         // read yet for this recipe that is an empty graph, never another recipe's Shot.
-        else draw();
+        else if (drawDue) draw();
         return;
     }
     if (mine !== seq || live) return;
@@ -213,12 +235,43 @@ async function refresh() {
             return;
         }
     }
+    // A reference that could not be read leaves the one read for this recipe
+    // before, which is this source's: a change of source dropped any other.
+    // With none read, there is none, and none can be chosen.
+    const answer = chosen || reference || NO_REFERENCE;
+    const sameShot = latest !== undefined && (shot ? shot.id : null) === (latest ? latest.id : null);
+    if (!drawDue && !settling && sameShot && sameReference(reference, answer)) return;
     latest = shot;
     // Kept with no Shot too: the seam's answer still says whether one can be chosen.
-    reference = { ...chosen, ...referenceParts(chosen.shot) };
+    if (answer !== reference) reference = { ...answer, ...referenceParts(answer.shot) };
     settling = false;
     clearTimeout(settleTimer);
     draw();
+}
+
+// The seam says a recipe's reference should be read again: with null, whichever
+// recipe is in the graph.
+//
+// `sourceMoved` says where references are kept changed. The reference in the
+// graph is then the other source's, and is dropped at once, whatever the page
+// is doing: the choice kept on the tablet is never left on a Machine Decent
+// Sync has come to serve, whichever read fails or is overtaken next. The read
+// that follows is a full one. It ends in a draw, and it takes the place of a
+// read still on its way from the source before, as a look for a shot that has
+// just ended may be.
+function referenceChanged(recipeId, sourceMoved = false) {
+    if (!recipe) return;
+    if (sourceMoved) {
+        if (reference) {
+            reference = { ...NO_REFERENCE, ...referenceParts(null) };
+            applyOverlay();
+            paint();
+        }
+        refresh();
+        return;
+    }
+    if (recipeId != null && String(recipeId) !== String(recipe.id)) return;
+    refresh({ onlyIfChanged: true });
 }
 
 // What is worked out once for a reference: its lines, its samples and numbers
@@ -395,7 +448,11 @@ function paint() {
         setText(el('cafe-shot-label'), shown.row.label, { translate: true });
         setText(el('cafe-shot-when'), credit(shown.row.shot));
     }
-    show(el('cafe-make-reference'), shown.makeReference);
+    const make = el('cafe-make-reference');
+    show(make, shown.makeReference);
+    if (make) make.disabled = shown.muted;
+    show(el('cafe-legend-notice'), !!shown.notice);
+    if (shown.notice) setText(el('cafe-legend-notice'), shown.notice, { translate: true });
     show(el('cafe-legend-reference'), !!shown.reference);
     if (shown.reference) setText(el('cafe-reference-when'), credit(shown.reference));
     show(el('cafe-different-profile'), shown.flag);
@@ -437,25 +494,49 @@ function confirmReplace(forRecipe, shot, replaced) {
 }
 
 async function onMakeReference() {
-    if (busy || !model().makeReference) return;
+    const offered = model();
+    if (busy || !offered.makeReference || offered.muted) return;
     busy = true;
     try {
         const forRecipe = recipe;
         const shot = latest;
-        if (reference && reference.shot && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
-        // The dialog was open a while: the page may show something else by now.
-        if (!recipe || recipe.id !== forRecipe.id || !latest || latest.id !== shot.id || live) return;
+        const replaced = reference && reference.shot ? reference.shot.id : null;
+        if (replaced !== null && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
+        // The dialog was open a while: the page may show something else by now,
+        // Decent Sync may have gone out of reach, or another reference may have
+        // been chosen elsewhere, which the dialog did not name.
+        const still = model();
+        if (!recipe || recipe.id !== forRecipe.id || !latest || latest.id !== shot.id || !still.makeReference || still.muted) return;
+        if ((reference && reference.shot ? reference.shot.id : null) !== replaced) return;
+        let chosen;
         try {
-            await makeReference(forRecipe.id, shot.id);
+            chosen = await makeReference(forRecipe.id, shot.id);
         } catch (error) {
             logger.warn('Cafe: could not keep the reference', error);
-            showToast(cafeText('The reference could not be saved'), 4000, 'error');
-            return;
+            // A choice that may have been made was read again before it was
+            // called failed: the page follows what that read found.
+            chosen = error.reference;
+            // Decent Sync's refusal says why, in its own words. Where that read
+            // found the server out of reach it could not tell either way, and
+            // the server may yet make the choice: the line under the legend
+            // says the reference can't be changed, and nothing says it failed.
+            if (!(chosen && chosen.unreachable)) showToast(error.refusal || cafeText('The reference could not be saved'), 4000, 'error');
         }
-        await refresh();
+        if (chosen) followChoice(forRecipe, chosen);
     } finally {
         busy = false;
     }
+}
+
+// The reference as a choice left it: the seam's answer to the choice is the
+// reference as it now is, and the graph follows it without another read.
+function followChoice(forRecipe, chosen) {
+    // The page may show another recipe by now. A shot that has started keeps
+    // the lines it started with, and its end reads the reference again.
+    if (!recipe || recipe.id !== forRecipe.id || live || settling) return;
+    seq += 1; // a read begun before the choice would put the reference before it back
+    reference = { ...chosen, ...referenceParts(chosen.shot) };
+    draw();
 }
 
 // ── Start ────────────────────────────────────────────────────────────────────
@@ -476,6 +557,7 @@ export function initGraph() {
         button.addEventListener('click', () => setView(viewFrom(button.dataset.view)));
     }
     el('cafe-make-reference')?.addEventListener('click', onMakeReference);
+    watchReference(referenceChanged);
 
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);

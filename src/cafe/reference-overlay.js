@@ -51,14 +51,19 @@ function dtickForTime(seconds) {
     return 30;
 }
 
+// The last second any of the chart's own lines reaches.
+const ownEnd = traces => Math.max(0, ...traces.map(trace => (trace.x && trace.x.length ? trace.x[trace.x.length - 1] : 0)));
+
 // The time axis, long enough for the whole reference. At rest it fits the
 // longer of the two Shots: the chart has fitted the Shot's own lines and their
 // labels already, and the axis only grows. During a shot it starts at the
-// reference's length and follows the shot only once it runs past it.
-function withRoomFor(layout, seconds, mode) {
+// reference's length and follows the shot only once it runs past it. A chart
+// left to fit its own axis, as after a change of theme, has room for its own
+// lines and no more: it is given a range only where the reference is longer.
+function withRoomFor(layout, seconds, mode, traces) {
     if (!(seconds > 0)) return layout;
     const xaxis = layout.xaxis || {};
-    const shown = xaxis.autorange !== true && Array.isArray(xaxis.range) ? xaxis.range[1] : 0;
+    const shown = xaxis.autorange !== true && Array.isArray(xaxis.range) ? xaxis.range[1] : ownEnd(traces);
     const wanted = mode === 'live' ? seconds / LIVE_X_DATA_FRACTION : seconds;
     if (shown >= wanted) return layout;
     const next = { ...xaxis, range: [0, wanted], autorange: false };
@@ -90,5 +95,5 @@ export function referenceOverlay(traces, layout, mode, { curves = null, dark = f
             hoverinfo: 'skip',
         });
     }
-    return { traces: drawn, layout: withRoomFor(layout, curves ? curves.seconds : 0, mode) };
+    return { traces: drawn, layout: withRoomFor(layout, curves ? curves.seconds : 0, mode, traces) };
 }

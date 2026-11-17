@@ -181,6 +181,11 @@ export function viewFrom(stored) {
     return stored === 'targets' ? 'targets' : 'reference';
 }
 
+/** The line under the legend while Decent Sync can't be reached: the tablet's copy is drawn, or says the recipe has none. */
+export const UNCHANGEABLE_NOTICE = "Decent Sync can't be reached, so the reference can't be changed";
+/** The same where nothing could be read: the tablet has no copy, as for a recipe in no slot, or it is not known yet whether Decent Sync serves the Machine. */
+export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can't be shown";
+
 /**
  * What the graph and its legend show.
  *
@@ -191,14 +196,18 @@ export function viewFrom(stored) {
  * - `shot`: the Shot in the graph: the recipe's latest, or with no recipe the
  *   tablet's newest. Undefined before it was read, null for none.
  * - `reference`: the seam's answer for the recipe, `{ shot, canChange }`, whose
- *   `shot` is null with no reference; or null before it was read.
+ *   `shot` is null with no reference; or null before it was read. On a Machine
+ *   Decent Sync serves it may carry `unreachable`, the server can't be reached;
+ *   `unread`, so nothing could be read; and `profileDiffers`, Decent Sync's
+ *   word on the reference's profile.
  *
  * The answer: `row`, the Shot's row (`label`, a phrase, and `shot`, whose time
  * and barista follow it, or null); `line`, a phrase under no row, or null;
  * `reference`, the Shot the reference row names, or null; `flag`, whether that
  * row says "Different profile"; `badge`, "This shot is the reference";
- * `targets`, the "Profile target" legend; `makeReference`; and `lines`, whether
- * the reference's lines are drawn.
+ * `targets`, the "Profile target" legend; `makeReference`, with `muted` where
+ * it is shown and can't act; `notice`, a phrase saying why, or null; and
+ * `lines`, whether the reference's lines are drawn.
  */
 export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null }) {
     const inReference = view !== 'targets';
@@ -216,16 +225,46 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
     else if (recipe && atRest && shot === null) line = 'No shot with this recipe on this machine yet';
 
     const showsReference = inReference && !!referenceShot && !isReference;
+    // Decent Sync can't be reached, and a line says so. Where the tablet's copy
+    // answered, Make reference stays, muted: the reference is known, and can't
+    // be changed now. Where nothing could be read there is no Make reference.
+    const unreachable = !!recipe && !!reference && reference.unreachable === true;
+    const canChange = !reference || reference.canChange !== false;
+    const offered = !!recipe && atRest && !!shot && !isReference;
+    const muted = offered && !canChange && unreachable && !reference.unread;
+    // The line stays through a shot: it has a line of its own, and the graph
+    // keeps its height.
+    let notice = null;
+    if (unreachable) notice = reference.unread ? UNREAD_NOTICE : UNCHANGEABLE_NOTICE;
     return {
         row,
         line,
         reference: showsReference ? referenceShot : null,
-        flag: showsReference && differentProfile(recipe, referenceShot),
+        // Decent Sync says whether the profile differs, by the Library's
+        // Profiles. Without it the skin works it out, by title.
+        flag: showsReference && (typeof reference.profileDiffers === 'boolean' ? reference.profileDiffers : differentProfile(recipe, referenceShot)),
         badge: inReference && isReference,
         targets: !inReference,
-        makeReference: !!recipe && atRest && !!shot && !isReference && (!reference || reference.canChange !== false),
+        makeReference: offered && (canChange || muted),
+        muted,
+        notice,
         lines: showsReference,
     };
+}
+
+/**
+ * Are two of the seam's answers for a reference the same to the page? The same
+ * Shot, or none, with the same things said about it. A push may repeat, and
+ * the graph is drawn again only for an answer that differs.
+ */
+export function sameReference(a, b) {
+    if (!a || !b) return false;
+    const id = answer => (answer.shot && answer.shot.id != null ? String(answer.shot.id) : null);
+    return id(a) === id(b)
+        && (a.canChange !== false) === (b.canChange !== false)
+        && !!a.unreachable === !!b.unreachable
+        && !!a.unread === !!b.unread
+        && a.profileDiffers === b.profileDiffers;
 }
 
 /** The Shot a stored choice names for a recipe, or null. `stored` is recipe to Shot. */

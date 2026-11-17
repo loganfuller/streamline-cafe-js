@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BEANS, GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, REFERENCE_LINES } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
@@ -49,6 +50,8 @@ const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
 const REFERENCES = '/store/streamlineCafe/references';
 const GRAPH_VIEW = '/store/streamlineCafe/graphView';
 const RECIPE_STORE = `/store/${DYE2_PLUGIN_ID}/recipes`;
+// How long the stand-in for Decent Sync's plugin takes to connect, in its cold start.
+const COLD_START_MS = 8000;
 
 // ── Results ──────────────────────────────────────────────────────────────────
 
@@ -61,17 +64,7 @@ const note = text => console.log(`     ${text}`);
 
 // ── Decaid ───────────────────────────────────────────────────────────────────
 
-async function decaid(method, path, body, { manage = false } = {}) {
-    const res = await fetch(`${API}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json', ...(manage ? { Authorization: `Bearer ${TOKEN}` } : {}) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`${method} ${path} answered ${res.status}: ${text.slice(0, 200)}`);
-    try { return JSON.parse(text); } catch { return text; }
-}
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const decaid = decaidClient(API, TOKEN);
 const dye2 = async () => (await decaid('GET', '/plugins')).find(p => p.id === DYE2_PLUGIN_ID) || null;
 const setSetting = on => fetch(SETTING, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(on ? 'true' : 'false') });
 
@@ -160,17 +153,29 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
     if (decentSync) {
         await page.route('**/api/v1/plugins', async route => {
             const response = await route.fetch();
-            await route.fulfill({ response, json: [...(await response.json()), { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, api: [] }] });
+            // In place of the real one, where the second run left it switched off.
+            const others = (await response.json()).filter(plugin => plugin.id !== 'decent-sync.reaplugin');
+            await route.fulfill({ response, json: [...others, { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, autoLoad: true, api: [] }] });
         });
-        // 'coldStart': not connected yet at the first ask, served from the second.
-        let asked = 0;
+        // 'coldStart': not connected yet, and served once the plugin says its
+        // connection came, a few seconds after the page opened its socket.
+        let connected = false;
         const served = { status: 200, json: { connected: true, served: true, machine: { id: 'sample-machine', name: 'Sample Machine' }, location: { id: 'sample-location', name: 'Sample Cafe' } } };
         const refused = code => ({ status: code === 'unreachable' ? 503 : 409, json: { connected: code !== 'unreachable', served: false, machine: null, location: null, code, message: 'Sample refusal.' } });
         await page.route('**/api/v1/plugins/decent-sync.reaplugin/status', route => {
-            asked += 1;
             if (decentSync === 'served') return route.fulfill(served);
-            if (decentSync === 'coldStart') return route.fulfill(asked === 1 ? refused('unreachable') : served);
+            if (decentSync === 'coldStart') return route.fulfill(connected ? served : refused('unreachable'));
             return route.fulfill(refused(decentSync));
+        });
+        // The stand-in has no Reference Shot for any recipe. Its socket pushes
+        // nothing, but for the cold start's one push.
+        await page.route(/\/api\/v1\/plugins\/decent-sync\.reaplugin\/reference\?/, route => route.fulfill({ status: 200, json: { recipe: null, reference: null, source: 'server' } }));
+        await page.routeWebSocket(/\/ws\/v1\/plugins\/decent-sync\.reaplugin\/changes$/, socket => {
+            if (decentSync !== 'coldStart') return;
+            setTimeout(() => {
+                connected = true;
+                socket.send(JSON.stringify({ what: 'connection', connected: true }));
+            }, COLD_START_MS);
         });
     }
     await page.goto(`${BASE}/index.html`);
@@ -200,9 +205,6 @@ function withWeights(saved) {
 
 const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) });
 const gateLine = page => page.locator('#cafe-gate-line');
-// The theme is painted, never stored: a stored one would be carried to Decaid's
-// settings store, which every later page then reads back.
-const paint = (page, theme) => page.evaluate(t => window.app.ui.paintTheme(t), theme);
 async function waitForGate(page, theme = 'light') {
     await page.locator('#main-page.cafe-gated').waitFor({ timeout: 20_000 });
     await paint(page, theme);
@@ -263,67 +265,10 @@ const overflowing = page => page.evaluate(() => [...document.querySelectorAll('#
 const smallestLabel = page => page.evaluate(() => Math.min(...[...document.querySelectorAll('#main-page [data-fit-text]')]
     .filter(el => el.offsetParent !== null).map(el => parseFloat(getComputedStyle(el).fontSize))));
 
-// The legend: the text of each part that shows, and null for one that does not.
-const legend = page => page.evaluate(() => {
-    const shown = id => {
-        const element = document.getElementById(id);
-        return element && element.offsetParent !== null ? element.textContent.trim() : null;
-    };
-    return {
-        label: shown('cafe-shot-label'), when: shown('cafe-shot-when'), make: shown('cafe-make-reference'),
-        reference: shown('cafe-legend-reference') === null ? null : shown('cafe-reference-when') || '',
-        flag: shown('cafe-different-profile'), badge: shown('cafe-reference-badge'), line: shown('cafe-legend-line'),
-        targets: shown('cafe-legend-targets'),
-        view: [...document.querySelectorAll('#cafe-view button')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.view).join(),
-    };
-});
-// What a chart holds: each line's name, how many points it has and whether it
-// carries an end label, and where the time axis ends.
-const chartLines = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
-    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
-    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
-    if (!chart) return null;
-    const option = chart.getOption();
-    const lines = option.series.filter(series => series && String(series.id).startsWith('trace-'));
-    return {
-        end: option.xAxis[0].max,
-        names: lines.map(line => line.name),
-        points: lines.map(line => line.data.length),
-        labelled: lines.filter(line => line.markPoint).map(line => line.name),
-        referenceEnd: Math.max(0, ...lines.filter(line => /^Reference /.test(line.name)).map(line => (line.data.length ? line.data[line.data.length - 1][0] : 0))),
-    };
-}, id);
-// The comparison row: its mode, and each card that shows. In Arabic and Hebrew a
-// number with its unit is kept together by two marks that are not text.
-const row = page => page.evaluate(() => {
-    const text = element => element.textContent.replace(/[\u2068\u2069]/g, '');
-    const element = document.getElementById('cafe-compare');
-    return {
-        mode: element.dataset.mode,
-        height: Math.round(element.getBoundingClientRect().height),
-        cards: [...element.querySelectorAll('.cafe-compare-card')].filter(card => card.offsetParent !== null).map(card => ({
-            key: card.dataset.card,
-            title: text(card.querySelector('.cafe-compare-title')),
-            value: text(card.querySelector('.cafe-compare-value')),
-            diff: text(card.querySelector('.cafe-compare-diff')),
-            side: text(card.querySelector('.cafe-compare-side')),
-        })),
-    };
-});
-const keys = shown => shown.cards.map(card => card.key).join(' ');
-const sides = shown => shown.cards.map(card => card.side);
 const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const REST_TARGETS = 'time dose yield ratio peak';
 const LIVE = 'time weight weightFlow flow pressure temperature';
 const SIGNED = /^([+\u2212]\d|0\.0)/;
-// The stage lines on a chart, each with the name written on it, or null.
-const stageNames = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
-    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
-    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
-    const markers = chart?.getOption().series.find(series => series && series.id === 'markers-0');
-    return (markers?.markLine?.data || []).map(line => (line.label && line.label.show ? line.label.formatter() : null));
-}, id);
-const REFERENCE_LINES = ['Reference pressure', 'Reference flow', 'Reference weight'];
 // The newest of Decaid's Shots pulled with a recipe.
 const newestShotWith = async recipeId => ((await decaid('GET', '/shots?limit=100')).items || []).find(row => shotRecipeId(row.workflow) === String(recipeId)) || null;
 // The gate took the page's place: nothing behind it, no recipe read or loaded,
@@ -356,6 +301,12 @@ for (const [label, url] of [['the skin', `${BASE}/index.html`], ['Decaid', `${AP
 }
 if (TOKEN.length < 32) {
     console.error('Give Decaid\'s extensions token with --token=. See docs/cafe/SMOKE.md.');
+    process.exit(2);
+}
+// This run is the page without Decent Sync. With its plugin loaded, as the
+// second run leaves it, a served Machine keeps no reference on the tablet.
+if ((await decaid('GET', '/plugins')).some(plugin => plugin.id === 'decent-sync.reaplugin' && plugin.loaded)) {
+    console.error('Decent Sync\'s plugin is loaded on this Decaid. Disable it first: see docs/cafe/SMOKE.md.');
     process.exit(2);
 }
 
@@ -623,8 +574,11 @@ try {
         check('the choice is kept in Decaid\'s store, as recipe to Shot', (await storeValue(REFERENCES))?.[recipeId] === first.id, JSON.stringify(await storeValue(REFERENCES)));
         await shot(page, 'graph-shot-is-reference-light');
 
-        //    A second shot, with the reference behind it.
-        const second = pullShot(14);
+        //    A second shot, with the reference behind it. It runs longer than the
+        //    first: the simulated machine can pull two shots of one length alike
+        //    to the last sample, and the renderer then takes the reference's
+        //    line for the Shot's own when it places the end labels.
+        const second = pullShot(16);
         await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
         await page.waitForTimeout(6000);
         now = await legend(page);
@@ -639,18 +593,7 @@ try {
             && /^Ref \d+\.\d bar$/.test(cardsNow.cards[4].side) && SIGNED.test(cardsNow.cards[4].diff) && /^Ref \d+\.\d ml\/s$/.test(cardsNow.cards[3].side) && SIGNED.test(cardsNow.cards[3].diff)
             && /^Ref \d+\.\d °C$/.test(cardsNow.cards[5].side), JSON.stringify(cardsNow));
         //    Frames are appended: the chart is not drawn again in full for each.
-        const drawn = await page.evaluate(async () => {
-            const { echarts } = await import('/src/modules/echarts-streamline.min.js');
-            const chart = echarts.getInstanceByDom(document.getElementById('plotly-chart'));
-            const counts = { appended: 0, full: 0 };
-            const { setOption, appendData } = chart;
-            chart.setOption = function (option, ...rest) { if (option.series?.some(series => series.data)) counts.full += 1; return setOption.call(this, option, ...rest); };
-            chart.appendData = function (...args) { if (args[0].seriesIndex === 0) counts.appended += 1; return appendData.apply(this, args); };
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            chart.setOption = setOption;
-            chart.appendData = appendData;
-            return counts;
-        });
+        const drawn = await countDraws(page, 3000);
         check('a live shot still draws by appending frames, with the reference behind it', drawn.appended >= 10 && drawn.full <= 3, `${drawn.appended} frames appended, ${drawn.full} drawn in full, in 3 s`);
         await shot(page, 'graph-live-reference-light');
         //    The toggle switches the cards during a shot, and back.
@@ -1243,15 +1186,26 @@ try {
         if (status === 'served') await shot(extra.page, 'page-recipe-decent-sync-light');
         await extra.close();
     }
-    //     The skin loaded before the plugin had connected: the first answer says
-    //     nothing either way, and the page asks again without waiting for focus.
+    //     The skin loaded before the plugin had connected: its answers say
+    //     nothing either way, until it says its connection came, and the page
+    //     asks again then, without waiting for focus.
     {
         const extra = await openPage({ decentSync: 'coldStart' });
         await waitForPage(extra.page);
         await extra.page.waitForTimeout(3000);
         check('Decent Sync not connected yet: the column reads "not saved" until an answer comes', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to the recipe');
+        //     Whether the Machine is served is not known yet either: the latest
+        //     Shot alone, and the choice kept on the tablet is not read.
+        const before = await legend(extra.page);
+        check('Decent Sync not connected yet: the latest Shot alone, with no reference and no Make reference, and a line saying why',
+            before.label === 'Latest' && before.reference === null && before.badge === null && before.make === null
+            && before.notice === "Decent Sync can't be reached, so the reference can't be shown" && !extra.seen.requests.some(r => r.includes(REFERENCES)), JSON.stringify(before));
         await extra.page.locator('#cafe-dial-label').filter({ hasText: 'Dial-in · saved to the recipe' }).waitFor({ timeout: 45_000 }).catch(() => {});
-        check('and the page asks again by itself: the column then reads "saved to the recipe"', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe', await extra.page.locator('#cafe-dial-label').textContent());
+        check('and the page asks again when the plugin says it has connected: the column then reads "saved to the recipe"', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe', await extra.page.locator('#cafe-dial-label').textContent());
+        await extra.page.waitForTimeout(1500);
+        const after = await legend(extra.page);
+        check('and Make reference is there once the Machine is known to be served, with Decent Sync asked for the reference', after.make === 'Make reference' && !after.muted && after.notice === null
+            && extra.seen.requests.some(r => r === 'GET /api/v1/plugins/decent-sync.reaplugin/reference') && !extra.seen.requests.some(r => r.includes(REFERENCES)), JSON.stringify(after));
         await extra.close();
     }
     await unloadRecipe();

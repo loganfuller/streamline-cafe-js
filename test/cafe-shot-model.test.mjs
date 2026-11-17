@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 
 import {
     shotRecipeId, shotsWithRecipe, isUnfinished, shotCurves, shotCredit,
-    differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot,
+    differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot, sameReference,
+    UNCHANGEABLE_NOTICE, UNREAD_NOTICE,
 } from '../src/cafe/shot-model.js';
 import { createTabletShots } from '../src/cafe/tablet-shots.js';
 
@@ -208,6 +209,73 @@ test('a reference that can\'t be changed now offers no Make reference', () => {
     assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: true } }).makeReference, true);
 });
 
+test('before Decent Sync has answered its status: the latest Shot alone, no reference and no Make reference', () => {
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false } });
+    assert.deepEqual([shown.row.label, shown.reference, shown.makeReference, shown.muted, shown.notice, shown.lines], ['Latest', null, false, false, null, false]);
+});
+
+test('the tablet\'s copy, drawn while Decent Sync can\'t be reached: Make reference muted, and a line saying why', () => {
+    const copy = { shot: shot('b'), canChange: false, unreachable: true, profileDiffers: false };
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: copy });
+    assert.deepEqual([shown.reference.id, shown.lines, shown.makeReference, shown.muted], ['b', true, true, true]);
+    assert.equal(shown.notice, "Decent Sync can't be reached, so the reference can't be changed");
+    assert.equal(shown.notice, UNCHANGEABLE_NOTICE);
+    // In Targets Make reference stays, so the line that explains it does too.
+    const targets = graphModel({ recipe, view: 'targets', shot: shot('a'), reference: copy });
+    assert.deepEqual([targets.makeReference, targets.muted, targets.notice], [true, true, UNCHANGEABLE_NOTICE]);
+    // The copy may say the recipe has none: none is drawn, and none can be chosen.
+    const none = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false, unreachable: true } });
+    assert.deepEqual([none.reference, none.muted, none.notice], [null, true, UNCHANGEABLE_NOTICE]);
+});
+
+test('a served Machine whose reference can\'t be read at all: none is drawn, and the line says Decent Sync can\'t be reached', () => {
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false, unreachable: true, unread: true } });
+    assert.deepEqual([shown.reference, shown.lines, shown.makeReference, shown.muted], [null, false, false, false], 'and with nothing read there is no Make reference to mute');
+    assert.equal(shown.notice, "Decent Sync can't be reached, so the reference can't be shown");
+    assert.equal(shown.notice, UNREAD_NOTICE);
+    // With no Shot for the recipe both lines show.
+    const empty = graphModel({ recipe, view: 'reference', shot: null, reference: { shot: null, canChange: false, unreachable: true, unread: true } });
+    assert.deepEqual([empty.makeReference, empty.muted, empty.line, empty.notice], [false, false, 'No shot with this recipe on this machine yet', UNREAD_NOTICE]);
+});
+
+test('the line about Decent Sync stays through a shot, where nothing can be chosen, and is never shown with no recipe', () => {
+    const copy = { shot: shot('b'), canChange: false, unreachable: true };
+    for (const state of [{ live: true }, { settling: true }]) {
+        const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: copy, ...state });
+        assert.deepEqual([shown.notice, shown.makeReference, shown.muted], [UNCHANGEABLE_NOTICE, false, false]);
+    }
+    assert.equal(graphModel({ recipe: null, view: 'reference', shot: shot('a'), reference: copy }).notice, null);
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('b') }).notice, null);
+});
+
+test('when the latest Shot is the tablet\'s copy of the reference: the badge, no Make reference, and the line', () => {
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: shot('a'), canChange: false, unreachable: true } });
+    assert.deepEqual([shown.badge, shown.makeReference, shown.muted, shown.notice], [true, false, false, UNCHANGEABLE_NOTICE]);
+});
+
+test('"Different profile" follows Decent Sync\'s word where it gives one', () => {
+    const sameTitle = { shot: shot('b', 'Default'), canChange: true, profileDiffers: true };
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: sameTitle }).flag, true, 'though the titles agree');
+    const otherTitle = { shot: shot('b', 'Adaptive v3'), canChange: true, profileDiffers: false };
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: otherTitle }).flag, false, 'though the titles differ');
+    assert.equal(graphModel({ recipe, view: 'targets', shot: shot('a'), reference: sameTitle }).flag, false, 'the reference has no row in Targets');
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('b'), reference: sameTitle }).flag, false, 'nor when the Shot is the reference');
+});
+
+test('two answers for a reference are the same when they name the same Shot and say the same of it', () => {
+    const a = { shot: shot('a'), canChange: true, unreachable: false, profileDiffers: false };
+    assert.equal(sameReference(a, { ...a, shot: { id: 'a', measurements: [] }, curves: {} }), true, 'a repeated push: the Shot is compared by id');
+    assert.equal(sameReference(a, { ...a, shot: shot('b') }), false);
+    assert.equal(sameReference(a, { ...a, shot: null }), false);
+    assert.equal(sameReference({ shot: null, canChange: true }, { shot: null, canChange: true }), true);
+    assert.equal(sameReference(a, { ...a, canChange: false, unreachable: true }), false, 'the same Shot, now the tablet\'s copy');
+    assert.equal(sameReference(a, { ...a, profileDiffers: true }), false);
+    assert.equal(sameReference({ shot: null, canChange: false, unreachable: true }, { shot: null, canChange: false, unreachable: true, unread: true }), false);
+    assert.equal(sameReference({ shot: null, canChange: false }, { shot: null, canChange: true }), false, 'the source became known');
+    assert.equal(sameReference(null, a), false);
+    assert.equal(sameReference(a, null), false);
+});
+
 test('the kept choice is recipe to Shot, and one recipe\'s choice leaves the others', () => {
     const stored = { r1: 'a', r2: 'b' };
     assert.equal(chosenShotId(stored, 'r1'), 'a');
@@ -281,7 +349,8 @@ test('a reference may be an Unfinished Shot or one pulled with another recipe: i
 
 test('making a reference keeps every other recipe\'s choice, and is read back', async () => {
     const { seam, calls } = tablet({ shots: [whole('a', 'r1', POURED), whole('b', 'r1', POURED)], choices: { r2: 'z' } });
-    await seam.makeReference('r1', 'a');
+    const first = await seam.makeReference('r1', 'a');
+    assert.deepEqual([first.shot.id, first.canChange], ['a', true], 'the answer is the reference as it now is');
     await seam.makeReference('r1', 'b');
     assert.deepEqual(calls.written, [{ r2: 'z', r1: 'a' }, { r2: 'z', r1: 'b' }]);
     assert.equal((await seam.referenceShot('r1')).shot.id, 'b');

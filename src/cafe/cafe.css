@@ -691,6 +691,20 @@ button.cafe-card {
     color: var(--data-card-title-text-color);
 }
 
+/* Under the legend, on a line of its own, while Decent Sync can't be reached:
+   why the reference can't be changed, or can't be shown. The graph gives up
+   its height. */
+#cafe-legend-notice {
+    flex: none;
+    padding-bottom: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    text-align: left;
+    color: var(--data-card-title-text-color);
+}
+
 /* "Different profile", "This shot is the reference". */
 .cafe-legend-flag {
     flex: none;
@@ -725,6 +739,12 @@ button.cafe-card {
     border-color: var(--button-primary-bg);
     background: transparent;
     color: var(--text-primary);
+}
+
+/* Make reference while Decent Sync can't be reached: shown, and takes no tap. */
+.cafe-legend-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 /* Reference | Targets, at the right of the row. */
@@ -813,6 +833,7 @@ button.cafe-card {
    buttons and gives the graph the width. The legend and the comparison row go
    with them. */
 #main-page.chart-zoomed #cafe-legend,
+#main-page.chart-zoomed #cafe-legend-notice,
 #main-page.chart-zoomed #cafe-compare {
     display: none;
 }

@@ -92,6 +92,10 @@ function usedKeys() {
         if (shown.row) keys.add(shown.row.label);
         if (shown.line) keys.add(shown.line);
     }
+    // What the legend says while Decent Sync can't be reached.
+    for (const unread of [false, true]) {
+        keys.add(graphModel({ view: 'reference', recipe, shot, reference: { shot: null, canChange: false, unreachable: true, unread } }).notice);
+    }
     // The comparison row's titles and what each card says beside its number.
     for (const phrase of Object.values(PHRASES)) keys.add(phrase);
     return keys;

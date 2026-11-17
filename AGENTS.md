@@ -60,6 +60,7 @@ This repository is Streamline Cafe, a fork of Streamline with its own main page.
 - Before changing which recipe is loaded any other way (DYE2's `save-recipe`, or clearing its selection), call `forgetAppliedItem()`, the fork's one hook in `src/modules/dyeStrip.js`. Never open one of DYE2's pages from the cafe page.
 - Write DYE2's recipe records only through the fork's one writer module, `src/cafe/recipe-writer.js`.
 - Read Shots and the choice of reference only through the Shot seam, `src/cafe/shot-seam.js`. Keep the page's own state in the `streamlineCafe` namespace, through `src/cafe/cafe-store.js`.
+- Speak to Decent Sync's plugin only through `src/cafe/decent-sync.js`. On a Machine it serves, never read or write the reference kept on the tablet.
 - Draw on the graph only through the fork's two hooks in `src/modules/chart.js`. Lines added to the chart follow Streamline's own, and keep their count and their arrays through a shot. Text on a stage line goes through the fork's hook in `src/modules/echarts-renderer.js`.
 - Work out every number under the graph in `src/cafe/comparison.js`, as Decent Sync works it out. Write the live cards only from the chart's own live draw, never from a timer or a second read of the machine.
 - Key the cafe page's text with `data-cafe-text` or `cafeText()`, never `data-i18n-key`. A phrase Streamline's translation file lacks goes into `src/cafe/translations.js` in every language Streamline has finished, marked `machine: true` when a machine translated it.

@@ -108,6 +108,16 @@ test('at rest the time axis fits the longer of the two Shots', () => {
     assert.deepEqual(alone.xaxis, { range: [0, 70], autorange: false, dtick: 20 }, 'no Shot yet: the reference alone');
 });
 
+test('a chart left to fit its own axis keeps a Shot that is longer than the reference whole', () => {
+    // After a change of theme the chart draws from a layout it has not fitted.
+    const own = seven();
+    const end = Math.max(...own.map(trace => (trace.x.length ? trace.x[trace.x.length - 1] : 0)));
+    assert.ok(end > 0, 'the fixture\'s lines have a length');
+    const fitting = layout({ autorange: true, dtick: 5 });
+    assert.strictEqual(referenceOverlay(own, fitting, 'full', { curves: curves(end / 2) }).layout, fitting, 'the axis is not cut to the reference\'s length');
+    assert.deepEqual(referenceOverlay(own, fitting, 'full', { curves: curves(end + 30) }).layout.xaxis.range, [0, end + 30], 'and still grows for a longer reference');
+});
+
 test('during a shot the axis starts at the reference\'s length and follows the shot only past it', () => {
     const during = seconds => referenceOverlay(seven(), layout({ range: seconds > 0 ? [0, seconds / 0.93] : [-1, 1], autorange: false, dtick: 1 }), 'live', { curves: curves(30) }).layout.xaxis;
     assert.deepEqual(during(0), { range: [0, 30 / 0.93], autorange: false, dtick: 5 });

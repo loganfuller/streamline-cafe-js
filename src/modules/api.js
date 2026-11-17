@@ -908,6 +908,29 @@ export function closePluginPush(pluginId) {
     pluginPushSlots.delete(pluginId);
 }
 
+// Streamline Cafe: a plugin's websocket whose messages are read, where
+// connectPluginPush above keeps one "something changed" socket per plugin and
+// would close this one to open that. One socket per plugin endpoint, closed
+// before it is replaced, with the push sockets' reconnect timing. `onMessage`
+// is handed each message's data, and `onOpen` runs on every open.
+const pluginMessageSlots = new Map();
+export function connectPluginMessages(pluginId, endpoint, onMessage, onOpen) {
+    const key = `${pluginId}/${endpoint}`;
+    let slot = pluginMessageSlots.get(key);
+    if (!slot) {
+        slot = createSocketSlot(`plugin ${key} messages`);
+        pluginMessageSlots.set(key, slot);
+    }
+    return slot.replace(() => {
+        const socket = new ReconnectingWebSocket(
+            `${WS_PROTOCOL}//${reaHostname}:${REA_PORT}/ws/v1/plugins/${encodeURIComponent(pluginId)}/${encodeURIComponent(endpoint)}`,
+            [], { ...RECONNECT_POLICY.background, maxReconnectInterval: 5000 });
+        socket.onopen = () => { try { onOpen?.(); } catch (error) { logger.warn('Plugin message open handler failed:', error); } };
+        socket.onmessage = (event) => { try { onMessage(event?.data); } catch (error) { logger.warn('Plugin message handler failed:', error); } };
+        return socket;
+    });
+}
+
 export function connectTimeToReadyWebSocket(onData) {
     const timeToReadyWebSocket = new ReconnectingWebSocket(`${WS_PROTOCOL}//${reaHostname}:${REA_PORT}/ws/v1/plugins/time-to-ready.reaplugin/timeToReady`, [], { ...RECONNECT_POLICY.standard });
 

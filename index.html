@@ -330,6 +330,10 @@
                         <div id="shot-history-info" class="cafe-stub" aria-live="polite"><span id="history-date"></span><span id="history-profile-name"></span><span id="history-dose-in"></span><span id="history-grind-size"></span></div>
                     </div>
 
+                    <!-- Why Make reference is muted, while Decent Sync can't be reached
+                         (src/cafe/graph.js). A line of its own: the legend's row has no room for it. -->
+                    <div id="cafe-legend-notice" role="status" style="display:none"></div>
+
                     <!-- Shot chart (tap to open the full-screen chart) -->
                     <div id="chart-wrap">
                         <div id="plotly-chart" role="img" aria-label="Shot extraction graph"></div>
