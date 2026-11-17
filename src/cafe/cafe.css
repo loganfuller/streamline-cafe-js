@@ -810,9 +810,88 @@ button.cafe-card {
 }
 
 /* Full-screen chart: Streamline hides the dial-in column and the machine
-   buttons and gives the graph the width. The legend goes with them. */
-#main-page.chart-zoomed #cafe-legend {
+   buttons and gives the graph the width. The legend and the comparison row go
+   with them. */
+#main-page.chart-zoomed #cafe-legend,
+#main-page.chart-zoomed #cafe-compare {
     display: none;
+}
+
+/* ── Comparison row ───────────────────────────────────────────────────────── */
+
+/* Under the graph, which gives up this height: five cards at rest, six while a
+   shot runs. A card is a title, the Shot's number with its difference, and what
+   it is compared with. No colour says better or worse. */
+#cafe-compare {
+    flex: none;
+    height: 96px;
+    display: flex;
+    text-align: left;
+}
+
+.cafe-compare-card {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 12px;
+    border-left: 1px solid var(--border-primary);
+}
+
+.cafe-compare-card:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.cafe-compare-card p {
+    margin: 0;
+}
+
+.cafe-compare-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 18px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    overflow: hidden;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-compare-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+    line-height: 32px;
+}
+
+.cafe-compare-value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-compare-diff {
+    font-size: 17px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* "Ref 27.9 s", "No reference", "No target this step". Its height is kept when
+   it is empty, so the numbers above it do not move. */
+.cafe-compare-side {
+    height: 22px;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+    color: var(--data-card-title-text-color);
 }
 
 /* ── Machine buttons ──────────────────────────────────────────────────────── */

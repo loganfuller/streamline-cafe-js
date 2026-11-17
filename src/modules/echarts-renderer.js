@@ -101,6 +101,28 @@ function gridOptions(layout, size) {
     }));
 }
 
+// Streamline Cafe's hook (docs/cafe/UPSTREAM_EDITS.md): a shape that carries a
+// `label` has its text written inside the plot, at the top of its line and to
+// the right of it. Streamline's own shapes carry none.
+function cafeShapeLabel(shape) {
+    if (!shape.label) return {};
+    return {
+        label: {
+            show: true,
+            formatter: () => shape.label.text,
+            position: 'end',
+            align: 'left',
+            verticalAlign: 'top',
+            distance: -4,
+            padding: [0, 0, 0, shape.label.pad || 0],
+            color: shape.label.color,
+            fontFamily: 'Inter, sans-serif',
+            fontSize: shape.label.size,
+            fontWeight: 500
+        }
+    };
+}
+
 function markerData(layout, axisIndex) {
     const axisName = axisIndex ? 'x2' : 'x';
     const shapes = (layout.shapes || []).filter(shape => (shape.xref || 'x') === axisName);
@@ -115,7 +137,8 @@ function markerData(layout, axisIndex) {
                 color: shape.line?.color,
                 width: (shape.line?.width || 1) * lineWidthScale(),
                 type: dashType(shape.line?.dash)
-            }
+            },
+            ...cafeShapeLabel(shape)
         }))
     };
 }

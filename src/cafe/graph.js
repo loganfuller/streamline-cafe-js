@@ -1,5 +1,6 @@
-// The graph's Shots and its legend: the loaded recipe's latest Shot, its
-// reference behind it, the Reference | Targets toggle and Make reference
+// The graph's Shots, its legend and the row of numbers under it: the loaded
+// recipe's latest Shot, its reference behind it, the Reference | Targets toggle,
+// Make reference, the comparison row and the stage names
 // (docs/cafe/DESIGN.md, "Shots and the reference").
 //
 // Streamline's chart still draws everything. This module decides which finished
@@ -8,7 +9,9 @@
 // With none, Streamline's history module draws the tablet's newest Shot, as on
 // Streamline's own page, and the legend names the Shot it handed the chart.
 import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
-import { getTotalTime } from '../modules/shotData.js';
+import { getTotalTime, getCurrentShot } from '../modules/shotData.js';
+import { getScaleReading } from '../modules/api.js';
+import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
@@ -18,6 +21,9 @@ import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot } fro
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
+import { shotSamples, shotNumbers, restCards, liveCards, liveFrame } from './comparison.js';
+import { shotStages, stageShapes, withStageNames, STAGE_NAME_FONT } from './stage-names.js';
+import { paintRow } from './compare-row.js';
 
 const REFRESH_GAP_MS = 300;
 // Once a shot ends, how long between looks for it among Decaid's Shots: at half
@@ -35,9 +41,14 @@ let settleFrom = null;  // the id of the Shot in the graph before that shot; und
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
 let handed;             // the Shot the history module last asked the chart to draw; undefined until it asks
 let heldBack = false;   // a request of the history module's was turned down during the running shot
-let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves
+let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves, samples, numbers and stages
 let drawing = null;     // the measurements this module is handing the chart itself
-let overlayKey;         // what the overlay was last set for
+let overlayFor = null;  // what the chart was last drawn with: the view, the reference's lines and its stages
+let frame = null;       // what the running shot last read, for the live cards; kept until the finished Shot is in the graph
+let numbers;            // the numbers of the Shot in the graph, worked out once for each Shot
+let numbersOf;          // the Shot they were worked out for
+let chartWidth = 0;     // the main chart's width in pixels, kept so a live frame measures nothing
+let liveFailed = false; // the live cards threw once: said once, not on every frame
 let seq = 0;
 let refreshTimer = null;
 let settleTimer = null;
@@ -53,16 +64,71 @@ function model() {
     return graphModel({ recipe, view, live, settling, shot: latest, reference });
 }
 
-// In Targets the chart is Streamline's own. In Reference the targets are hidden
+// A stage name's width in pixels. A profile has a handful of steps, and each
+// name is measured once.
+const nameWidths = new Map();
+let nameMeter = null;
+function nameWidth(name) {
+    if (!nameWidths.has(name)) {
+        if (!nameMeter) nameMeter = document.createElement('canvas').getContext('2d');
+        if (!nameMeter) return Infinity;
+        nameMeter.font = STAGE_NAME_FONT;
+        nameWidths.set(name, Math.ceil(nameMeter.measureText(name).width));
+    }
+    return nameWidths.get(name);
+}
+
+// What the chart draws in place of its own lines and layout, on each draw. In
+// Targets the lines are Streamline's own. In Reference the targets are hidden
 // and the reference's three lines follow the Shot's, empty when none is drawn.
+// On the main chart, in both views, each stage line carries its step's name
+// where there is room; with no Shot for the recipe yet the stages are the
+// reference's. A live draw of the main chart is also when the live cards are
+// written, so they are repainted exactly as often as the chart is.
+function overlay(traces, layout, mode, chart) {
+    const { curves, stages } = overlayFor;
+    let drawn = view === 'reference' ? referenceOverlay(traces, layout, mode, { curves, dark: isDark() }) : { traces, layout };
+    if (chart !== 'main') return drawn;
+    let shown = drawn.layout;
+    if (stages && !(shown.shapes && shown.shapes.length)) shown = { ...shown, shapes: stageShapes(stages, isDark()) };
+    const margin = shown.margin || {};
+    drawn = { traces: drawn.traces, layout: withStageNames(shown, { plotWidth: chartWidth - (margin.l ?? 50) - (margin.r ?? 50), measure: nameWidth }) };
+    // While a finished shot waits for Decaid to save it the chart still holds
+    // its lines: a draw then, as on the way back from the full-screen chart,
+    // brings the cards up to the shot's last frame.
+    if ((mode === 'live' && live) || settling) readLiveFrame(traces, layout);
+    return drawn;
+}
+
+// The running shot's numbers, from the lines the chart is about to draw. A
+// failure here must never cost the chart its draw.
+function readLiveFrame(traces, layout) {
+    try {
+        // The scale's weight is no line of the chart's. During the shot it is
+        // read as the weight in the title band is. Once the shot has ended the
+        // scale may read a lifted cup, so the weight is the shot's own last; and
+        // once Streamline's history module has cleared that, as it does when
+        // Decaid has saved the shot, the weight the card already shows.
+        const weights = live ? null : getCurrentShot().weights;
+        const ended = (weights && weights.length ? weights[weights.length - 1] : null) ?? (frame ? frame.weight : null);
+        const weight = live ? getScaleReading().weight : ended;
+        frame = liveFrame(traces, layout.shapes, weight);
+        paintCards();
+    } catch (error) {
+        if (!liveFailed) logger.warn('Cafe: could not write the live cards', error);
+        liveFailed = true;
+    }
+}
+
 function applyOverlay() {
-    const curves = view === 'reference' && model().lines ? reference.curves : null;
-    const key = view === 'reference' ? curves || 'none' : null;
-    if (key === overlayKey) return;
-    overlayKey = key;
-    setChartOverlay(view === 'reference'
-        ? (traces, layout, mode) => referenceOverlay(traces, layout, mode, { curves, dark: isDark() })
-        : null);
+    const shown = model();
+    const curves = view === 'reference' && shown.lines ? reference.curves : null;
+    // With no Shot for the recipe yet the reference is drawn alone, and the
+    // stages named are its own.
+    const stages = curves && shown.line && latest === null ? reference.stages : null;
+    if (overlayFor && overlayFor.view === view && overlayFor.curves === curves && overlayFor.stages === stages) return;
+    overlayFor = { view, curves, stages };
+    setChartOverlay(overlay);
 }
 
 // Streamline's history module asks to draw a finished Shot: the tablet's
@@ -149,10 +215,22 @@ async function refresh() {
     }
     latest = shot;
     // Kept with no Shot too: the seam's answer still says whether one can be chosen.
-    reference = { ...chosen, curves: chosen.shot ? shotCurves(chosen.shot.measurements) : null };
+    reference = { ...chosen, ...referenceParts(chosen.shot) };
     settling = false;
     clearTimeout(settleTimer);
     draw();
+}
+
+// What is worked out once for a reference: its lines, its samples and numbers
+// for the cards, and its stages.
+function referenceParts(shot) {
+    if (!shot) return { curves: null, samples: null, numbers: null, stages: null };
+    return {
+        curves: shotCurves(shot.measurements),
+        samples: shotSamples(shot.measurements),
+        numbers: shotNumbers(shot),
+        stages: shotStages(shot.measurements, shot.workflow),
+    };
 }
 
 function refreshSoon() {
@@ -216,6 +294,7 @@ export function showGraphRecipe(next) {
 
 function shotStarted() {
     live = true;
+    frame = null;
     heldBack = false;
     settling = false;
     seq += 1;
@@ -289,8 +368,28 @@ function credit(shot) {
     return [whenText(when, new Date(), cafeDateLocale(), cafeText('Today')), who].filter(Boolean).join(' · ');
 }
 
+// The row under the graph: six live cards while a shot runs and until the
+// finished Shot is in the graph, five at rest.
+function paintCards() {
+    if (live || settling) {
+        const beside = recipe && reference && reference.shot ? reference : null;
+        const stopAt = parseFloat(el('drink-out-value')?.textContent);
+        paintRow(liveCards({ view, frame, reference: beside, stopAt, fahrenheit: getTempUnit() === 'F' }), 'live');
+        return;
+    }
+    // Before DYE2 has said which recipe is loaded, no row names the Shot drawn.
+    const shot = recipe === undefined ? undefined : latest;
+    if (shot !== numbersOf) {
+        numbersOf = shot;
+        numbers = shot ? shotNumbers(shot) : shot;
+    }
+    const chosen = recipe && reference ? reference.shot : null;
+    paintRow(restCards({ view, shot: numbers, reference: chosen ? reference.numbers : null, isReference: !!shot && !!chosen && shot.id === chosen.id }), 'rest');
+}
+
 function paint() {
     const shown = model();
+    paintCards();
     show(el('cafe-legend-shot'), !!shown.row);
     if (shown.row) {
         setText(el('cafe-shot-label'), shown.row.label, { translate: true });
@@ -387,5 +486,22 @@ export function initGraph() {
     // A time is written in the page's language, and the reference's swatch in
     // the theme's colour.
     document.addEventListener('streamline:languagechange', paint);
+    document.addEventListener('streamline:unitchange', paintCards);
+    // A name measured before its font had loaded was measured in another.
+    document.fonts?.addEventListener?.('loadingdone', () => nameWidths.clear());
+    // The chart's width, for the stage names: read here and on a resize, never
+    // on a live frame.
+    const chart = el('plotly-chart');
+    if (chart) {
+        chartWidth = chart.clientWidth;
+        new ResizeObserver(entries => {
+            const width = entries[0].contentRect.width;
+            // No width is the page hidden behind another: nothing to draw into.
+            if (!width || width === chartWidth) return;
+            chartWidth = width;
+            // A name that fitted may not now, and one that did not may.
+            if (overlayFor) setChartOverlay(overlay);
+        }).observe(chart);
+    }
     new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }

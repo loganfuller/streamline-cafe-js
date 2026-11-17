@@ -22,6 +22,8 @@ import { BEANS, GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
+import { shotNumbers } from '../../src/cafe/comparison.js';
+import { shotStages } from '../../src/cafe/stage-names.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -136,7 +138,7 @@ const browser = await chromium.launch({ headless: !HEADED });
 // that one answer is rewritten on the way in. `decentSync` stands in for Decent
 // Sync's plugin, which this Decaid does not have: its entry in the plugin list
 // and its Status answer, `served` or a refusal's code.
-async function openPage({ theme = 'light', machineButtons = true, decentSync = null } = {}) {
+async function openPage({ theme = 'light', machineButtons = true, decentSync = null, weights = false } = {}) {
     const context = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], theme };
@@ -146,6 +148,13 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
         await page.route('**/api/v1/machine/info', async route => {
             const response = await route.fetch();
             await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
+        });
+    }
+    if (weights) {
+        await page.route(/\/api\/v1\/shots\/[^/?]+$/, async route => {
+            const response = await route.fetch();
+            if (!response.ok()) return route.fulfill({ response });
+            return route.fulfill({ response, json: withWeights(await response.json()) });
         });
     }
     if (decentSync) {
@@ -166,6 +175,27 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
     }
     await page.goto(`${BASE}/index.html`);
     return { page, seen, close: () => context.close() };
+}
+
+// A Shot as Decaid answers it, with a scale's readings and a weighed dose and
+// yield added: the simulated scale reads no weight. Coffee lands from a fifth of
+// the way in, at a rate that differs a little from Shot to Shot.
+function withWeights(saved) {
+    const poured = (saved.measurements || []).filter(m => ['preinfusion', 'pouring'].includes(m.machine?.state?.substate));
+    if (poured.length === 0) return saved;
+    const start = new Date(poured[0].machine.timestamp).getTime();
+    const length = (new Date(poured[poured.length - 1].machine.timestamp).getTime() - start) / 1000;
+    const rate = 1.8 + (poured.length % 7) / 10;
+    let last = 0;
+    const measurements = saved.measurements.map(m => {
+        if (!poured.includes(m)) return m;
+        const seconds = (new Date(m.machine.timestamp).getTime() - start) / 1000;
+        const weight = Math.round(Math.max(0, seconds - length / 5) * rate * 10) / 10;
+        last = weight;
+        return { ...m, scale: { ...(m.scale || {}), timestamp: m.machine.timestamp, weight, weightFlow: weight > 0 ? rate : 0 } };
+    });
+    const dose = saved.workflow?.context?.targetDoseWeight;
+    return { ...saved, measurements, annotations: { ...(saved.annotations || {}), actualYield: last + 0.8, ...(dose ? { actualDoseWeight: dose + 0.1 } : {}) } };
 }
 
 const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) });
@@ -215,7 +245,7 @@ const setLanguage = (page, language) => page.evaluate(async code => {
 // Text that does not fit its place: wider than its own box, cut short where a
 // card clamps its lines, broken over two lines where a label has one, or
 // reaching outside the page.
-const overflowing = page => page.evaluate(() => [...document.querySelectorAll('#main-page [data-cafe-text], #main-page [data-i18n-key], #cafe-strip .cafe-card span')]
+const overflowing = page => page.evaluate(() => [...document.querySelectorAll('#main-page [data-cafe-text], #main-page [data-i18n-key], #cafe-strip .cafe-card span, #cafe-compare .cafe-compare-title, #cafe-compare .cafe-compare-side, #cafe-compare span')]
     .filter(el => el.offsetParent !== null)
     .filter(el => {
         const box = el.getBoundingClientRect();
@@ -262,6 +292,36 @@ const chartLines = (page, id = 'plotly-chart') => page.evaluate(async chartId =>
         labelled: lines.filter(line => line.markPoint).map(line => line.name),
         referenceEnd: Math.max(0, ...lines.filter(line => /^Reference /.test(line.name)).map(line => (line.data.length ? line.data[line.data.length - 1][0] : 0))),
     };
+}, id);
+// The comparison row: its mode, and each card that shows. In Arabic and Hebrew a
+// number with its unit is kept together by two marks that are not text.
+const row = page => page.evaluate(() => {
+    const text = element => element.textContent.replace(/[\u2068\u2069]/g, '');
+    const element = document.getElementById('cafe-compare');
+    return {
+        mode: element.dataset.mode,
+        height: Math.round(element.getBoundingClientRect().height),
+        cards: [...element.querySelectorAll('.cafe-compare-card')].filter(card => card.offsetParent !== null).map(card => ({
+            key: card.dataset.card,
+            title: text(card.querySelector('.cafe-compare-title')),
+            value: text(card.querySelector('.cafe-compare-value')),
+            diff: text(card.querySelector('.cafe-compare-diff')),
+            side: text(card.querySelector('.cafe-compare-side')),
+        })),
+    };
+});
+const keys = shown => shown.cards.map(card => card.key).join(' ');
+const sides = shown => shown.cards.map(card => card.side);
+const REST_REFERENCE = 'time firstDrip yield ratio peak';
+const REST_TARGETS = 'time dose yield ratio peak';
+const LIVE = 'time weight weightFlow flow pressure temperature';
+const SIGNED = /^([+\u2212]\d|0\.0)/;
+// The stage lines on a chart, each with the name written on it, or null.
+const stageNames = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+    const markers = chart?.getOption().series.find(series => series && series.id === 'markers-0');
+    return (markers?.markLine?.data || []).map(line => (line.label && line.label.show ? line.label.formatter() : null));
 }, id);
 const REFERENCE_LINES = ['Reference pressure', 'Reference flow', 'Reference weight'];
 // The newest of Decaid's Shots pulled with a recipe.
@@ -501,6 +561,14 @@ try {
     await page.waitForTimeout(7000);
     check('during a shot the weight shows against its target', /^\d+\.\d \/ \d+(\.\d)? g$/.test(await page.locator('#cafe-live-weight').textContent()), await page.locator('#cafe-live-weight').textContent());
     check('during a shot the status line has the stage and its seconds', /\d+s/.test(await page.locator('#machine-status').textContent()), await page.locator('#machine-status').textContent());
+    {
+        const live = await row(page);
+        check('when the shot starts six live cards take the row\'s place', live.mode === 'live' && keys(live) === LIVE, JSON.stringify(live));
+        check('the live cards read the running shot', /^\d+\.\d s$/.test(live.cards[0].value) && /^\d+\.\d bar$/.test(live.cards[4].value) && /^\d+\.\d °C$/.test(live.cards[5].value) && /^\d+\.\d ml\/s$/.test(live.cards[3].value), JSON.stringify(live.cards.map(c => c.value)));
+        check('with no reference the live cards read "No reference" and show no difference', sides(live).every(side => side === 'No reference') && live.cards.every(card => card.diff === ''), JSON.stringify(live));
+        const named = await stageNames(page);
+        check('during a shot each stage reached has its line, named where there is room', named.length > 0 && named.some(name => name), JSON.stringify(named));
+    }
     await shot(page, 'page-shot-running-light');
     await shotRun;
     await page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
@@ -522,6 +590,25 @@ try {
             lines.names.length === 10 && JSON.stringify(lines.names.slice(7)) === JSON.stringify(REFERENCE_LINES) && lines.points.slice(7).every(n => n === 0)
             && [2, 3, 5].every(i => lines.points[i] === 0) && lines.points[0] > 10, JSON.stringify(lines));
         check('Make reference ends the latest Shot\'s row', now.make === 'Make reference');
+        let cardsNow = await row(page);
+        check('when the finished Shot is in the graph the five cards return', cardsNow.mode === 'rest' && keys(cardsNow) === REST_REFERENCE, JSON.stringify(cardsNow));
+        check('with no reference chosen each card reads "No reference" and shows no difference', sides(cardsNow).every(side => side === 'No reference') && cardsNow.cards.every(card => card.diff === ''), JSON.stringify(cardsNow));
+        check('the row has the Shot\'s time and peak pressure, and "—" for what the simulated scale never weighed',
+            /^\d+\.\d s$/.test(cardsNow.cards[0].value) && /^\d+\.\d bar$/.test(cardsNow.cards[4].value) && cardsNow.cards[1].value === '—' && cardsNow.cards[2].value === '—', JSON.stringify(cardsNow.cards.map(c => c.value)));
+        {
+            const whole = await decaid('GET', `/shots/${first.id}`);
+            const numbers = shotNumbers(whole);
+            check('the row\'s time and peak are the Shot\'s own, its Preheat left out', cardsNow.cards[0].value === `${numbers.time.toFixed(1)} s` && cardsNow.cards[4].value === `${numbers.peak.toFixed(1)} bar`, `${cardsNow.cards[0].value}, ${cardsNow.cards[4].value} for ${numbers.time} s, ${numbers.peak} bar`);
+            const named = await stageNames(page);
+            const stages = shotStages(whole.measurements, whole.workflow);
+            check('at rest each stage the Shot reached has its line, named from the Shot\'s own profile where there is room',
+                named.length === stages.length && named.every((name, index) => name === null || name === stages[index].name.trim()) && named.some(name => name), `${JSON.stringify(named)} of ${JSON.stringify(stages.map(stage => stage.name))}`);
+        }
+        const boxes = await page.evaluate(() => {
+            const box = id => document.getElementById(id).getBoundingClientRect();
+            return { chartBottom: box('plotly-chart').bottom, chartHeight: box('plotly-chart').height, rowTop: box('cafe-compare').top, rowBottom: box('cafe-compare').bottom, page: window.innerHeight };
+        });
+        check('the graph gives up the row\'s height: the row sits under it, inside the page', cardsNow.height > 60 && boxes.rowTop >= boxes.chartBottom && boxes.rowTop - boxes.chartBottom < 24 && boxes.rowBottom <= boxes.page && boxes.chartHeight >= 450, JSON.stringify(boxes));
         await shot(page, 'graph-no-reference-light');
 
         //    With no reference yet, Make reference chooses at once.
@@ -531,6 +618,8 @@ try {
         check('Make reference with none chosen asks nothing', (await page.locator('#cafe-reference-dialog[open]').count()) === 0);
         check('the latest Shot is now the reference: a badge, no reference row, no Make reference', now.badge === 'This shot is the reference' && now.reference === null && now.make === null, JSON.stringify(now));
         check('and the reference\'s lines are not drawn', (await chartLines(page)).points.slice(7).every(n => n === 0));
+        cardsNow = await row(page);
+        check('when the Shot is the reference each card reads "Ref = this shot"', sides(cardsNow).every(side => side === 'Ref = this shot') && cardsNow.cards.every(card => card.diff === ''), JSON.stringify(cardsNow));
         check('the choice is kept in Decaid\'s store, as recipe to Shot', (await storeValue(REFERENCES))?.[recipeId] === first.id, JSON.stringify(await storeValue(REFERENCES)));
         await shot(page, 'graph-shot-is-reference-light');
 
@@ -544,6 +633,11 @@ try {
         check('the reference is drawn behind the live shot', lines.points[7] > 10 && lines.points[0] > 5 && lines.names.length === 10, JSON.stringify(lines));
         check('the time axis shows the whole reference from the start', Math.abs(lines.end - lines.referenceEnd / 0.93) < 0.01, `${lines.end} for a reference of ${lines.referenceEnd} s`);
         check('no line is labelled during a shot', lines.labelled.length === 0);
+        cardsNow = await row(page);
+        check('live, in Reference: Time says how long the reference ran, and each card sits beside the reference at the same second, with the difference',
+            cardsNow.mode === 'live' && keys(cardsNow) === LIVE && /^Ref ran \d+\.\d s$/.test(cardsNow.cards[0].side) && cardsNow.cards[0].diff === ''
+            && /^Ref \d+\.\d bar$/.test(cardsNow.cards[4].side) && SIGNED.test(cardsNow.cards[4].diff) && /^Ref \d+\.\d ml\/s$/.test(cardsNow.cards[3].side) && SIGNED.test(cardsNow.cards[3].diff)
+            && /^Ref \d+\.\d °C$/.test(cardsNow.cards[5].side), JSON.stringify(cardsNow));
         //    Frames are appended: the chart is not drawn again in full for each.
         const drawn = await page.evaluate(async () => {
             const { echarts } = await import('/src/modules/echarts-streamline.min.js');
@@ -559,10 +653,25 @@ try {
         });
         check('a live shot still draws by appending frames, with the reference behind it', drawn.appended >= 10 && drawn.full <= 3, `${drawn.appended} frames appended, ${drawn.full} drawn in full, in 3 s`);
         await shot(page, 'graph-live-reference-light');
+        //    The toggle switches the cards during a shot, and back.
+        await page.locator('#cafe-view button[data-view="targets"]').click();
+        await page.waitForTimeout(600);
+        cardsNow = await row(page);
+        check('live, in Targets: Time names the stage, Weight the weight it stops at, weight flow "No profile target", and the rest their target or "No target this step"',
+            cardsNow.mode === 'live' && keys(cardsNow) === LIVE && cardsNow.cards[0].side !== '' && !/^Ref/.test(cardsNow.cards[0].side)
+            && /^Stops at \d+\.\d g$/.test(cardsNow.cards[1].side) && cardsNow.cards[2].side === 'No profile target'
+            && [3, 4, 5].every(i => /^Target \d+\.\d /.test(cardsNow.cards[i].side) || cardsNow.cards[i].side === 'No target this step')
+            && [3, 4].some(i => /^Target /.test(cardsNow.cards[i].side)) && cardsNow.cards.every(card => card.diff === ''), JSON.stringify(cardsNow));
+        check('live, in Targets: the stage lines keep their names', (await stageNames(page)).some(name => name), JSON.stringify(await stageNames(page)));
+        await shot(page, 'graph-live-targets-light');
+        await page.locator('#cafe-view button[data-view="reference"]').click();
+        await page.waitForTimeout(600);
+        check('and back in Reference the live cards sit beside the reference again', /^Ref ran /.test((await row(page)).cards[0].side));
         await page.locator('#plotly-chart').click();
         await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
         await page.waitForTimeout(1500);
         const zoomed = await chartLines(page, 'expanded-chart');
+        check('the full-screen chart stays as it is: its stage lines carry no names, and the row is not on it', (await stageNames(page, 'expanded-chart')).every(name => name === null) && !(await page.locator('#cafe-compare').isVisible()), JSON.stringify(await stageNames(page, 'expanded-chart')));
         check('the full-screen chart draws the reference too, after its own lines', JSON.stringify(zoomed.names.slice(-3)) === JSON.stringify(REFERENCE_LINES) && zoomed.points[zoomed.points.length - 3] > 10, JSON.stringify(zoomed));
         await shot(page, 'graph-live-full-screen-light');
         await page.locator('#expanded-chart').click();
@@ -578,6 +687,11 @@ try {
         check('the reference keeps its row, with when it was pulled, and Make reference is back', /^Today \d/.test(now.reference || '') && now.make === 'Make reference' && now.badge === null && now.flag === null, JSON.stringify(now));
         check('at rest the reference is drawn, and the end labels name the Shot\'s own lines only', lines.points[7] > 10 && lines.labelled.length > 0 && lines.labelled.every(name => !/^Reference /.test(name)), JSON.stringify(lines));
         check('the time axis fits the longer of the two Shots', lines.end >= lines.referenceEnd, `${lines.end} for a reference of ${lines.referenceEnd} s`);
+        cardsNow = await row(page);
+        check('at rest, in Reference: each card gives the Shot\'s value, the reference\'s beside it and the difference',
+            cardsNow.mode === 'rest' && keys(cardsNow) === REST_REFERENCE && /^Ref \d+\.\d s$/.test(cardsNow.cards[0].side) && SIGNED.test(cardsNow.cards[0].diff)
+            && /^Ref \d+\.\d bar$/.test(cardsNow.cards[4].side) && SIGNED.test(cardsNow.cards[4].diff), JSON.stringify(cardsNow));
+        check('a value neither Shot recorded is "—", with no difference', cardsNow.cards[1].value === '—' && cardsNow.cards[1].side === 'Ref —' && cardsNow.cards[1].diff === '', JSON.stringify(cardsNow.cards[1]));
         await shot(page, 'graph-overlay-light');
         await paint(page, 'dark');
         await page.waitForTimeout(800);
@@ -598,6 +712,11 @@ try {
         check('in Targets: the "Profile target" legend, no reference row, and Make reference stays', now.view === 'targets' && now.targets === 'Profile target' && now.reference === null && now.badge === null && now.line === null && now.make === 'Make reference', JSON.stringify(now));
         check('in Targets the chart is Streamline\'s seven lines, with their targets', lines.names.length === 7 && lines.points[2] > 10, JSON.stringify(lines));
         check('the view is kept in Decaid\'s store', (await storeValue(GRAPH_VIEW)) === 'targets');
+        cardsNow = await row(page);
+        check('at rest, in Targets: Time with first drip beside it, Dose, Yield and Ratio against what was set, and Peak pressure alone',
+            keys(cardsNow) === REST_TARGETS && /^First drip /.test(cardsNow.cards[0].side) && /^Target \d+\.\d g$/.test(cardsNow.cards[1].side) && /^Target \d+\.\d g$/.test(cardsNow.cards[2].side)
+            && /^Target 1:\d+\.\d\d$/.test(cardsNow.cards[3].side) && cardsNow.cards[4].side === '' && cardsNow.cards[4].diff === '' && /^\d+\.\d bar$/.test(cardsNow.cards[4].value), JSON.stringify(cardsNow));
+        check('in Targets the stage lines keep their names', (await stageNames(page)).some(name => name), JSON.stringify(await stageNames(page)));
         await shot(page, 'graph-targets-light');
         await page.reload();
         await waitForPage(page);
@@ -662,7 +781,21 @@ try {
             lines = await chartLines(page);
             check('a recipe with no Shot yet says so, and has no Make reference', now.line === 'No shot with this recipe on this machine yet' && now.label === null && now.make === null, JSON.stringify(now));
             check('its reference is drawn alone, and flagged "Different profile"', now.reference !== null && now.flag === 'Different profile' && lines.points[0] === 0 && lines.points[7] > 10 && Math.abs(lines.end - lines.referenceEnd) < 0.01, `${JSON.stringify(now)} ${JSON.stringify(lines)}`);
+            cardsNow = await row(page);
+            check('with no Shot for the recipe yet the values are "—" and the cards give the reference\'s numbers', cardsNow.cards.every(card => card.value === '—' && card.diff === '') && /^Ref \d+\.\d s$/.test(cardsNow.cards[0].side) && /^Ref \d+\.\d bar$/.test(cardsNow.cards[4].side), JSON.stringify(cardsNow));
+            {
+                const whole = await decaid('GET', `/shots/${first.id}`);
+                const named = await stageNames(page);
+                check('and the stages named are the reference\'s', named.length === shotStages(whole.measurements, whole.workflow).length && named.some(name => name), JSON.stringify(named));
+            }
             await shot(page, 'graph-no-shot-yet-light');
+            await page.locator('#cafe-view button[data-view="targets"]').click();
+            await page.waitForTimeout(800);
+            cardsNow = await row(page);
+            check('in Targets with no Shot yet the cards read "No shot yet"', keys(cardsNow) === REST_TARGETS && cardsNow.cards.every(card => card.value === '—' && card.side === 'No shot yet'), JSON.stringify(cardsNow));
+            await shot(page, 'graph-no-shot-yet-targets-light');
+            await page.locator('#cafe-view button[data-view="reference"]').click();
+            await page.waitForTimeout(800);
             //    A choice that names a Shot the tablet no longer has.
             await decaid('POST', REFERENCES, { ...choices, [empty.row.id]: 'a-shot-that-is-gone' });
             await page.reload();
@@ -681,6 +814,43 @@ try {
         } else {
             note('every sample recipe on another profile has a Shot on this Decaid, so "no Shot yet" and "Different profile" were skipped');
         }
+    }
+
+    //    The row with every number in it. The simulated scale reads no weight, so
+    //    on this one page the run adds a scale's readings and a weighed dose and
+    //    yield to each Shot Decaid answers with. One more shot first, so the
+    //    latest Shot is not the reference.
+    {
+        const weighed = await openPage({ weights: true });
+        const wp = weighed.page;
+        await waitForPage(wp);
+        await wp.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+        const run = pullShot(11);
+        await wp.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+        await run;
+        await wp.locator('#cafe-make-reference').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+        // Streamline's "Shot Stopped" notice sits over the row for a few seconds.
+        await wp.waitForTimeout(7000);
+        let full = await row(wp);
+        check('with a scale\'s readings: first drip, yield and ratio beside the reference\'s, each with its difference',
+            keys(full) === REST_REFERENCE && full.cards.every(card => !card.value.includes('—') && /^Ref /.test(card.side) && SIGNED.test(card.diff))
+            && /^\d+\.\d s$/.test(full.cards[1].value) && /^\d+\.\d g$/.test(full.cards[2].value) && /^1:\d+\.\d\d$/.test(full.cards[3].value), JSON.stringify(full));
+        check('the Ratio card names the dose it was worked from', /^RATIO · \d+\.\d g DOSE$/.test(full.cards[3].title), full.cards[3].title);
+        await shot(wp, 'row-reference-light');
+        await paint(wp, 'dark');
+        await wp.waitForTimeout(800);
+        await shot(wp, 'row-reference-dark');
+        await paint(wp, 'light');
+        await wp.locator('#cafe-view button[data-view="targets"]').click();
+        await wp.waitForTimeout(1000);
+        full = await row(wp);
+        check('with a scale\'s readings, in Targets: dose, yield and ratio against what was set, each with its difference',
+            keys(full) === REST_TARGETS && /^First drip \d+\.\d s$/.test(full.cards[0].side) && [1, 2, 3].every(i => /^Target /.test(full.cards[i].side) && SIGNED.test(full.cards[i].diff)), JSON.stringify(full));
+        await shot(wp, 'row-targets-light');
+        await wp.locator('#cafe-view button[data-view="reference"]').click();
+        await wp.waitForTimeout(800);
+        check('no page error with the row and the stage names', weighed.seen.errors.length === 0, weighed.seen.errors.join(' | '));
+        await weighed.close();
     }
 
     // 9. The full-screen chart, and back.
@@ -896,10 +1066,12 @@ try {
         await lp.locator('#cafe-strip .cafe-card').nth(RECIPES[1].slot - 1).click();
         await lp.locator('#cafe-title').filter({ hasText: RECIPES[1].name }).waitFor({ timeout: 20_000 });
         await lp.waitForTimeout(3000);
+        // The row's titles are written in capitals.
+        const ROW_TITLES = { de: 'DAUER | ERSTER TROPFEN | ERTRAG | VERHÄLTNIS | SPITZENDRUCK', ar: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' };
         check('in English nothing overflows its place', (await overflowing(lp)).length === 0, (await overflowing(lp)).join(' | '));
         for (const [code, expected] of [
-            ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', roasted: /geröstet am 28\. Okt/ }],
-            ['ar', { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', roasted: /حمص في/ }],
+            ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', row: ROW_TITLES.de, roasted: /geröstet am 28\. Okt/ }],
+            ['ar', { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', row: ROW_TITLES.ar, roasted: /حمص في/ }],
         ]) {
             await setLanguage(lp, code);
             await lp.waitForTimeout(2500);
@@ -913,6 +1085,7 @@ try {
                 settings: (await lp.locator('#settings-btn').textContent()).trim(),
                 latest: await lp.locator('#cafe-shot-label').textContent(),
                 view: (await lp.locator('#cafe-view button').allTextContents()).join(' | '),
+                row: (await row(lp)).cards.map(card => card.title.split(' · ')[0]).join(' | '),
             };
             for (const [what, text] of Object.entries(got)) {
                 check(`${code}: ${what} reads "${expected[what]}"`, text === expected[what], text);
@@ -1090,6 +1263,8 @@ try {
         const none = await legend(extra.page);
         check('with no recipe: the tablet\'s newest Shot as "Last shot", "Pick a recipe to compare", no reference and no Make reference',
             none.label === 'Last shot' && /\d/.test(none.when || '') && none.line === 'Pick a recipe to compare' && none.reference === null && none.badge === null && none.make === null, JSON.stringify(none));
+        const lastShot = await row(extra.page);
+        check('with no recipe the row shows the last Shot\'s numbers with no reference', lastShot.mode === 'rest' && keys(lastShot) === REST_REFERENCE && /^\d+\.\d s$/.test(lastShot.cards[0].value) && sides(lastShot).every(side => side === 'No reference'), JSON.stringify(lastShot));
         await shot(extra.page, 'page-no-recipe-dark');
         await extra.close();
     }

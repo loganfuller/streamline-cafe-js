@@ -76,12 +76,13 @@ async function disposeECharts(element) {
 // ── Streamline Cafe's two hooks (docs/cafe/UPSTREAM_EDITS.md) ────────────────
 // The overlay: a function the cafe page gives, called with the chart's own lines
 // and layout just before they are drawn, on the main chart and the full-screen
-// one. It answers the lines and layout to draw in their place. It is never
-// called for a profile preview, which is drawn from a copy of the lines.
+// one, and told which of the two (`main` or `expanded`). It answers the lines
+// and layout to draw in their place. It is never called for a profile preview,
+// which is drawn from a copy of the lines.
 let cafeOverlay = null;
 
-function withCafeOverlay(traces, layout, mode) {
-    return cafeOverlay ? cafeOverlay(traces, layout, mode) : { traces, layout };
+function withCafeOverlay(traces, layout, mode, chart) {
+    return cafeOverlay ? cafeOverlay(traces, layout, mode, chart) : { traces, layout };
 }
 
 /** Set, change or (with null) remove the overlay, and draw again with it. */
@@ -111,7 +112,7 @@ function renderMain(traces, layout, mode = 'full') {
         mainRenderDirty = true;
         return;
     }
-    const drawn = traces === chartTraces ? withCafeOverlay(traces, layout, mode) : { traces, layout };
+    const drawn = traces === chartTraces ? withCafeOverlay(traces, layout, mode, 'main') : { traces, layout };
     renderECharts(element, drawn.traces, drawn.layout, mode);
     mainRenderDirty = false;
 }
@@ -492,6 +493,7 @@ function addStepMarker(layout, time, theme, stepName = '') {
         y0: 0,
         y1: 1,
         yref: 'paper',
+        name: stepName, // Streamline Cafe: the step's name stays with its line (docs/cafe/UPSTREAM_EDITS.md)
         line: {
             color: theme === 'dark' ? STEP_MARKER_COLORS.dark : STEP_MARKER_COLORS.light, // ::state_change_color from skin.tcl
             width: 2,
@@ -756,7 +758,7 @@ function renderExpandedCharts(mode = 'full') {
     const element = document.getElementById('expanded-chart');
     if (!element) return;
     const own = expandedTraces();
-    const { traces, layout } = withCafeOverlay(own, expandedLayout(currentTheme, own, expandedXRange(mode, own)), mode);
+    const { traces, layout } = withCafeOverlay(own, expandedLayout(currentTheme, own, expandedXRange(mode, own)), mode, 'expanded');
     renderECharts(element, traces, layout, mode);
 }
 
