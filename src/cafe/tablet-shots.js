@@ -12,8 +12,9 @@ import { LATEST_WINDOW, shotsWithRecipe, isUnfinished, chosenShotId, withChosenS
 import { shotRemarks, annotationsOf, editReadAgain } from './remarks.js';
 
 /**
- * - `listShots(limit)`: Decaid's newest Shots, newest first, as `{ items }`,
- *   each with its Workflow and no measurements.
+ * - `listShots(limit, offset)`: a page of Decaid's Shots, newest first, as
+ *   `{ items, total }`, each with its Workflow and no measurements. With no
+ *   offset, the newest.
  * - `readShot(id)`: one Shot whole, or null when Decaid no longer has it.
  * - `readChoices()`: the stored choices, or null when none were kept.
  * - `writeChoices(choices)`.
@@ -63,6 +64,25 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
             const row = page && Array.isArray(page.items) ? page.items[0] : null;
             return row && row.id != null ? readShot(row.id) : null;
         },
+
+        /**
+         * A page of the tablet's Shots for the Shots list, newest first:
+         * `items`, rows of Decaid's list, and `total`, how many Decaid says it
+         * has, or null where it does not say.
+         */
+        async shotsPage(offset, limit) {
+            const page = await listShots(limit, offset);
+            return {
+                items: page && Array.isArray(page.items) ? page.items.filter(row => row && row.id != null) : [],
+                total: page && typeof page.total === 'number' ? page.total : null,
+            };
+        },
+
+        /** One of the tablet's Shots, whole, by its id, or null when Decaid no longer has it. */
+        shotById: id => readShot(id),
+
+        /** The choices of reference kept on the tablet, recipe to Shot, or null where none were kept. */
+        references: () => readChoices(),
 
         /**
          * Set a Shot's rating, its note or both, with Decaid's own Shot edit:

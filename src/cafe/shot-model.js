@@ -2,6 +2,7 @@
 // latest, when a Shot is Unfinished, a Shot's lines, and what the legend says
 // (docs/cafe/DESIGN.md, "Shots and the reference"). No browser global is touched.
 import { createPourPhaseTracker, createScaleFlowResolver, hasMachineGFlow, isPourPhase } from '../modules/historical-gflow.js';
+import { recipeName } from './strip-model.js';
 
 /** How many of the tablet's newest Shots a recipe's latest is looked for among. */
 export const LATEST_WINDOW = 100;
@@ -204,9 +205,13 @@ export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can
  * - `remarks`: the rating and note of the Shot in the graph, `{ rating, note }`,
  *   or null where its record is not known: with no recipe the Shot comes from
  *   Streamline's history module with no record, until the page has read one.
+ * - `opened`: for a Shot opened from the Shots list, `{ loaded, unfinished }`,
+ *   the loaded recipe, null for none, and whether the Shot is Unfinished; null
+ *   otherwise. `recipe` is then the Shot's own recipe, null for none, and
+ *   `reference` that recipe's.
  *
- * The answer: `row`, the Shot's row (`label`, a phrase, and `shot`, whose time
- * and barista follow it, or null); `line`, a phrase under no row, or null;
+ * The answer: `row`, the Shot's row (`label`, a phrase, or `name`, a recipe's
+ * name, and `shot`, whose time and barista follow it, or null); `line`, a phrase under no row, or null;
  * `reference`, the Shot the reference row names, or null; `flag`, whether that
  * row says "Different profile"; `badge`, "This shot is the reference";
  * `targets`, the "Profile target" legend; `makeReference`, with `muted` where
@@ -215,9 +220,10 @@ export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can
  * note the Shot's row shows with its stars and note icon, or null where it has
  * neither: only a saved Shot is rated, so not while a shot runs or waits to be
  * saved; and `referenceRating` and `referenceNote`, what the reference's row
- * shows, each null where the reference has none.
+ * shows, each null where the reference has none; and `back`, whether "Back to
+ * latest" shows.
  */
-export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null, remarks = null }) {
+export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null, remarks = null, opened = null }) {
     const inReference = view !== 'targets';
     const atRest = !live && !settling;
     const referenceShot = recipe && reference ? reference.shot : null;
@@ -226,10 +232,12 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
 
     let row = null;
     if (live) row = { label: 'Live shot', shot: null };
+    else if (opened) row = openedRow(recipe, opened.loaded, shot);
     else if (!unknown && (settling || shot)) row = { label: recipe ? 'Latest' : 'Last shot', shot: settling ? null : shot };
 
     let line = null;
-    if (inReference && recipe === null) line = 'Pick a recipe to compare';
+    if (opened) line = null;
+    else if (inReference && recipe === null) line = 'Pick a recipe to compare';
     else if (recipe && atRest && shot === null) line = 'No shot with this recipe on this machine yet';
 
     const showsReference = inReference && !!referenceShot && !isReference;
@@ -238,7 +246,8 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
     // be changed now. Where nothing could be read there is no Make reference.
     const unreachable = !!recipe && !!reference && reference.unreachable === true;
     const canChange = !reference || reference.canChange !== false;
-    const offered = !!recipe && atRest && !!shot && !isReference;
+    // An opened Unfinished Shot is drawn as it is, and is never made a reference.
+    const offered = !!recipe && atRest && !!shot && !isReference && !(opened && opened.unfinished);
     const muted = offered && !canChange && unreachable && !reference.unread;
     // The line stays through a shot: it has a line of its own, and the graph
     // keeps its height.
@@ -260,7 +269,17 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
         rate: atRest && !unknown && !!shot && remarks ? { rating: remarks.rating ?? null, note: remarks.note ?? null } : null,
         referenceRating: showsReference ? reference.rating ?? null : null,
         referenceNote: showsReference ? reference.note ?? null : null,
+        back: !!opened && !live,
     };
+}
+
+// An opened Shot's row: "Viewing" for a Shot of the loaded recipe, the
+// recipe's own name for one of another, and "No recipe" for one pulled with
+// none.
+function openedRow(recipe, loaded, shot) {
+    if (!recipe) return { label: 'No recipe', shot };
+    if (loaded && String(loaded.id) === String(recipe.id)) return { label: 'Viewing', shot };
+    return { label: null, name: recipeName(recipe), shot };
 }
 
 /**

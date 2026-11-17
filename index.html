@@ -245,10 +245,11 @@
                 </div>
             </div>
 
-            <!-- Settings and Sleep. src/cafe/page.js moves this block to the top of the
+            <!-- Settings, Shots and Sleep. src/cafe/page.js moves this block to the top of the
                  machine-button column when that column shows. -->
             <div id="cafe-system">
                 <button id="settings-btn" type="button" class="cafe-btn" data-fit-text data-cafe-text="Settings">Settings</button>
+                <button id="cafe-shots-btn" type="button" class="cafe-btn" data-fit-text data-cafe-text="Shots">Shots</button>
                 <button id="sleep-button" type="button" class="cafe-btn" data-fit-text data-i18n-key="Sleep">Sleep</button>
             </div>
         </aside>
@@ -263,6 +264,8 @@
                             <h1 id="cafe-title"></h1>
                             <p id="cafe-subtitle"></p>
                         </div>
+                        <!-- While a Shot opened from the Shots list is in the graph (src/cafe/graph.js). -->
+                        <button id="cafe-back" type="button" class="cafe-btn" data-cafe-text="Back to latest" style="display:none">Back to latest</button>
                         <div id="machine-status" data-i18n-key="Connecting" aria-live="assertive">Connecting</div>
                         <!-- The weight against its target, while a shot runs (src/cafe/page.js). -->
                         <div id="cafe-live" style="display:none">
@@ -406,6 +409,32 @@
                 <form method="dialog">
                     <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
                 </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
+
+    <!-- The Shots list (src/cafe/shots-dialog.js). A row opens that Shot in the graph. -->
+    <dialog id="cafe-shots-dialog" class="modal" aria-labelledby="cafe-shots-title">
+        <div class="modal-box cafe-dialog cafe-shots-box">
+            <div class="cafe-shots-head">
+                <h3 id="cafe-shots-title" data-cafe-text="Shots">Shots</h3>
+                <form method="dialog">
+                    <button class="cafe-btn cafe-btn-primary" data-cafe-text="Close">Close</button>
+                </form>
+            </div>
+            <div class="cafe-shots-columns" aria-hidden="true">
+                <span data-cafe-text="Pulled">Pulled</span>
+                <span data-cafe-text="Recipe">Recipe</span>
+                <span data-cafe-text="Dose → yield">Dose → yield</span>
+                <span data-cafe-text="Rating">Rating</span>
+                <span data-cafe-text="Barista">Barista</span>
+                <span class="cafe-shots-note" data-cafe-text="Note">Note</span>
+            </div>
+            <div id="cafe-shots-scroll">
+                <div id="cafe-shots-list"></div>
+                <p id="cafe-shots-empty" data-cafe-text="No shots yet" style="display:none">No shots yet</p>
+                <p id="cafe-shots-end" role="status" style="display:none"></p>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>

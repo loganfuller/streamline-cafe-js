@@ -1,11 +1,13 @@
 // The Shot seam: the one place the page asks for a recipe's latest Shot, for
 // its reference, to make a Shot its reference, for the tablet's newest Shot,
-// and to set a Shot's rating and note (docs/cafe/DESIGN.md, "Shots and the
-// reference" and "Rating and notes"). The page reads and changes Shots, and
+// to set a Shot's rating and note, for a page of the Shots list and for one
+// Shot by its id (docs/cafe/DESIGN.md, "Shots and the reference", "Rating and
+// notes" and "The Shots list"). The page reads and changes Shots, and
 // the choice, no other way, so which source answers changes no caller.
 //
 // It has two sources. The latest and the newest Shot are always the tablet's
-// own (tablet-shots.js). The reference is Decent Sync's on a Machine it serves
+// own (tablet-shots.js), and so, for now, are the Shots list and a Shot read
+// by its id. The reference is Decent Sync's on a Machine it serves
 // (plugin-shots.js) and the tablet's otherwise, and an edit goes the same way;
 // what the plugin answers to a status request decides which (shot-sources.js).
 //
@@ -23,7 +25,7 @@ let watcher = () => {};
 
 const sources = createShotSources({
     tablet: createTabletShots({
-        listShots: limit => getShots({ limit }),
+        listShots: (limit, offset) => getShots({ limit, offset }),
         readShot: getShot,
         readChoices: () => readCafe(REFERENCES_KEY),
         writeChoices: choices => writeCafe(REFERENCES_KEY, choices),
@@ -58,6 +60,17 @@ export const makeReference = (recipeId, shotId) => sources.makeReference(recipeI
 
 /** The tablet's newest Shot, whole, whatever it was pulled with, or null. */
 export const newestShot = () => sources.newestShot();
+
+/**
+ * A page of the Shots list, newest first, from `offset`: `items`, rows of
+ * Decaid's list, each with its Workflow and annotations and no measurements;
+ * `total`, or null; and `references`, recipe to Shot, or null where it is not
+ * known which Shots are references.
+ */
+export const shotsPage = (offset, limit) => sources.shotsPage(offset, limit);
+
+/** One Shot, whole, by its id, or null where it is gone. */
+export const shotById = shotId => sources.shotById(shotId);
 
 /**
  * Set a Shot's rating, its note or both: `edit` is `{ rating?, note? }`, where

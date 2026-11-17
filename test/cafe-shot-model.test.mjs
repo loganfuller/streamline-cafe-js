@@ -145,6 +145,45 @@ test('with a recipe: the latest Shot against its reference', () => {
     assert.deepEqual([shown.line, shown.flag, shown.badge, shown.targets, shown.makeReference, shown.lines], [null, false, false, false, true, true]);
 });
 
+// A Shot opened from the Shots list: `recipe` is its own recipe.
+const guest = { id: 'r2', title: 'Guest espresso', profileTitle: 'Adaptive v3' };
+const openedAs = (loaded, unfinished = false) => ({ loaded, unfinished });
+
+test('an opened Shot of the loaded recipe reads "Viewing", with "Back to latest", Make reference and its stars', () => {
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('b'), remarks: { rating: 6, note: null }, opened: openedAs(recipe) });
+    assert.deepEqual(shown.row, { label: 'Viewing', shot: shot('a') });
+    assert.deepEqual([shown.back, shown.makeReference, shown.lines, shown.line], [true, true, true, null]);
+    assert.deepEqual(shown.rate, { rating: 6, note: null });
+    assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('b') }).back, false, 'only an opened Shot has it');
+});
+
+test('an opened Shot of another recipe is labelled with that recipe\'s name, against its reference and its profile', () => {
+    const shown = graphModel({ recipe: guest, view: 'reference', shot: shot('a', 'Adaptive v3'), reference: ref('b', 'Default'), opened: openedAs(recipe) });
+    assert.deepEqual(shown.row, { label: null, name: 'Guest espresso', shot: shot('a', 'Adaptive v3') });
+    assert.equal(shown.flag, true, '"Different profile" is judged against its own recipe\'s profile');
+    assert.equal(shown.makeReference, true);
+    // With no recipe loaded, every opened Shot of a recipe is labelled by its name.
+    assert.equal(graphModel({ recipe: guest, view: 'reference', shot: shot('a'), reference: ref('b'), opened: openedAs(null) }).row.name, 'Guest espresso');
+    assert.equal(graphModel({ recipe: guest, view: 'reference', shot: shot('a'), reference: ref('b'), opened: openedAs(null) }).line, null, 'no "Pick a recipe to compare"');
+});
+
+test('an opened Shot pulled with no recipe reads "No recipe", with no reference and no Make reference', () => {
+    const shown = graphModel({ recipe: null, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false }, opened: openedAs(recipe) });
+    assert.deepEqual(shown.row, { label: 'No recipe', shot: shot('a') });
+    assert.deepEqual([shown.makeReference, shown.reference, shown.line, shown.back], [false, null, null, true]);
+});
+
+test('an opened Unfinished Shot has no Make reference, and is rated as any other', () => {
+    const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('b'), remarks: { rating: null, note: null }, opened: openedAs(recipe, true) });
+    assert.equal(shown.makeReference, false);
+    assert.deepEqual(shown.rate, { rating: null, note: null });
+});
+
+test('an opened Shot that is its recipe\'s reference shows "This shot is the reference"', () => {
+    const shown = graphModel({ recipe: guest, view: 'reference', shot: shot('a'), reference: ref('a'), opened: openedAs(recipe) });
+    assert.deepEqual([shown.badge, shown.makeReference], [true, false]);
+});
+
 test('"Different profile" shows when the reference was pulled on another profile', () => {
     assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: ref('b', 'Adaptive v3') }).flag, true);
     assert.equal(graphModel({ recipe: { id: 'r1' }, view: 'reference', shot: shot('a'), reference: ref('b', 'Adaptive v3') }).flag, false, 'the recipe names no profile');
@@ -353,7 +392,7 @@ const UNFINISHED = [sample(0, 'preparingForShot'), sample(1, 'preinfusion')];
 function tablet({ shots = [], choices, gone = [] } = {}) {
     const calls = { list: [], read: [], written: [] };
     const seam = createTabletShots({
-        listShots: async limit => { calls.list.push(limit); return { items: shots.slice(0, limit).map(({ measurements, ...row }) => row) }; },
+        listShots: async (limit, offset = 0) => { calls.list.push(offset ? [limit, offset] : limit); return { items: shots.slice(offset, offset + limit).map(({ measurements, ...row }) => row), total: shots.length }; },
         readShot: async id => { calls.read.push(id); return gone.includes(id) ? null : shots.find(s => s.id === id) || null; },
         readChoices: async () => choices,
         writeChoices: async next => { calls.written.push(next); choices = next; },
@@ -423,4 +462,32 @@ test('a request Decaid does not answer rejects, so a failure is never "none"', a
     await assert.rejects(failing.latestShot('r1'));
     await assert.rejects(failing.referenceShot('r1'));
     await assert.rejects(failing.makeReference('r1', 'a'));
+});
+
+test('a page of the Shots list is read by offset, its rows without measurements, with Decaid\'s total', async () => {
+    const shots = ['e', 'd', 'c', 'b', 'a'].map(id => whole(id, 'r1', POURED));
+    const { seam, calls } = tablet({ shots });
+    const page = await seam.shotsPage(2, 2);
+    assert.deepEqual(page.items.map(row => row.id), ['c', 'b']);
+    assert.ok(page.items.every(row => !('measurements' in row)), 'a row is never read whole for the list');
+    assert.equal(page.total, 5);
+    assert.deepEqual(calls.list, [[2, 2]]);
+    assert.deepEqual(calls.read, []);
+});
+
+test('a page Decaid answers oddly is an empty page, and one it does not answer rejects', async () => {
+    const odd = createTabletShots({ listShots: async () => ({ items: [null, { id: 'a' }, { name: 'no id' }] }) });
+    assert.deepEqual(await odd.shotsPage(0, 50), { items: [{ id: 'a' }], total: null });
+    assert.deepEqual(await createTabletShots({ listShots: async () => null }).shotsPage(0, 50), { items: [], total: null });
+    await assert.rejects(createTabletShots({ listShots: async () => { throw new Error('offline'); } }).shotsPage(0, 50));
+});
+
+test('a Shot read by its id is whole, or null once the tablet no longer has it', async () => {
+    const { seam } = tablet({ shots: [whole('a', 'r1', POURED)], gone: ['b'] });
+    assert.equal((await seam.shotById('a')).measurements, POURED);
+    assert.equal(await seam.shotById('b'), null);
+});
+
+test('the choices of reference are read as they are kept', async () => {
+    assert.deepEqual(await tablet({ choices: { r1: 'a' } }).seam.references(), { r1: 'a' });
 });

@@ -1,6 +1,7 @@
 // Which Shot is in the graph, which reference is behind it, and when both are
 // read again (docs/cafe/DESIGN.md, "The latest Shot", "The reference with
-// Decent Sync" and "Rating and notes"). No browser global is touched.
+// Decent Sync", "Rating and notes" and "The Shots list"). No browser global is
+// touched.
 //
 // The page (`graph.js`) tells this module what happened, as an event, and
 // `graphStep` answers with the next state and a list of things for the page to
@@ -9,15 +10,18 @@
 // `seq` and `edits` the read was asked with, so an answer that arrives late is
 // known for what it is.
 //
-// The Shot in the graph is one of four:
+// The Shot in the graph is one of five:
 // - with a recipe loaded, the recipe's latest Shot on this machine, read
 //   through the Shot seam;
 // - with none, "Last shot", the one Streamline's history module handed the
 //   chart;
 // - while a shot runs, the running shot, whose lines are the chart's own;
 // - once it has ended and until Decaid has saved it, that shot still
-//   (`settling`), its lines kept until the saved Shot is in the graph.
-import { drawnShot, shotCurves, sameReference, isDrawnShot } from './shot-model.js';
+//   (`settling`), its lines kept until the saved Shot is in the graph;
+// - a Shot opened from the Shots list (`opened`), with its own recipe's
+//   reference, until something sends the graph back to the latest. The
+//   latest is kept meanwhile, so going back returns to the Shot that was there.
+import { drawnShot, shotCurves, sameReference, isDrawnShot, isUnfinished } from './shot-model.js';
 import { shotRemarks, sameRemarks } from './remarks.js';
 import { shotSamples, shotNumbers } from './comparison.js';
 import { shotStages } from './stage-names.js';
@@ -57,6 +61,14 @@ const NO_REFERENCE = { shot: null, canChange: false };
  * - `remarks`: the rating and note of the Shot in the graph, `{ id, rating,
  *   note, of }`, where `of` is that Shot as `latest` holds it; null until its
  *   record is known.
+ * - `opened`: the Shot opened from the Shots list, or null: `{ id, recipe,
+ *   shot, unfinished, reference, remarks }`, where `recipe` is its own
+ *   recipe's DYE2 record, or null for a Shot pulled with none or with a recipe
+ *   the tablet no longer holds; `shot` is the Shot whole; `reference` is that
+ *   recipe's, as `reference` above; and `remarks` its rating and note, as
+ *   `remarks` below. `opening`: a Shot asked to be opened whose read has not
+ *   answered, `{ id, recipe }`, or null. `openSeq`: the reads of an opened
+ *   Shot; only the newest's answer is taken.
  * - `edits`: counts each edit of a Shot as it starts and as it ends.
  *   `editedAt`: a Shot's id to that count at its last edit, so a read begun
  *   before it is known to be older than the edit.
@@ -81,6 +93,9 @@ export function initialGraphState({ live = false } = {}) {
         reference: null,
         drawDue: false,
         remarks: null,
+        opened: null,
+        opening: null,
+        openSeq: 0,
         edits: 0,
         editedAt: new Map(),
         seq: 0,
@@ -94,7 +109,50 @@ export function initialGraphState({ live = false } = {}) {
  * known, or are another Shot's.
  */
 export function shownRemarks(state) {
+    if (state.opened) return state.opened.remarks;
     return state.remarks && state.remarks.of === state.latest ? state.remarks : null;
+}
+
+/**
+ * The id of the Shot the graph goes back to: the recipe's latest, or with no
+ * recipe "Last shot" once its record is known; null where there is none or it
+ * is not known.
+ */
+export function latestShotId(state) {
+    if (state.recipe) return state.latest ? String(state.latest.id) : null;
+    const remarks = state.remarks && state.remarks.of === state.latest ? state.remarks : null;
+    return remarks && remarks.id != null ? String(remarks.id) : null;
+}
+
+/** The id of the Shot in the graph, or null: none while a shot runs or waits to be saved. */
+export function shotInGraphId(state) {
+    if (state.opened) return state.opened.id;
+    if (state.live || state.settling) return null;
+    return latestShotId(state);
+}
+
+/**
+ * What the graph shows: `recipe`, the recipe the Shot in the graph is
+ * compared as (its own recipe for an opened Shot, null for none; the loaded
+ * recipe otherwise, undefined before DYE2 was read); `shot`; `reference`;
+ * `remarks`; `live` and `settling`; and `opened`, null, or for an opened Shot
+ * `{ loaded, unfinished }`, the loaded recipe and whether the Shot is
+ * Unfinished.
+ */
+export function inGraph(state) {
+    const { opened } = state;
+    if (opened) {
+        return {
+            recipe: opened.recipe,
+            shot: opened.shot,
+            reference: opened.reference,
+            remarks: opened.remarks,
+            live: false,
+            settling: false,
+            opened: { loaded: state.recipe ?? null, unfinished: opened.unfinished },
+        };
+    }
+    return { recipe: state.recipe, shot: state.latest, reference: state.reference, remarks: shownRemarks(state), live: state.live, settling: state.settling, opened: null };
 }
 
 /**
@@ -140,12 +198,22 @@ export function referenceParts(shot) {
  *   of a Shot's rating or note started, or ended.
  * - `{ type: 'edited', shotId, remarks }`: what an edit, or a read after one,
  *   left of a Shot's rating or note: only the one the edit was of.
+ * - `{ type: 'open', shotId, recipe }`: a row of the Shots list was tapped;
+ *   `recipe` is the Shot's own recipe's DYE2 record, or null.
+ * - `{ type: 'backToLatest' }`: "Back to latest" was tapped.
+ * - `{ type: 'openedRead', seq, edits, shotId, shot, chosen }`: a read of an
+ *   opened Shot and its recipe's reference answered; `shot` is null where the
+ *   Shot is gone. `{ type: 'openedUnread', seq, shotId }`: it could not be read.
  *
  * Things to do, each `{ do }`:
  * - `readShots` (`recipeId`, `seq`, `edits`): read the recipe's latest Shot and
  *   its reference, and answer with `shotsRead` or `shotsUnread`.
  * - `readNewest` (`seq`, `edits`): read the tablet's newest Shot, and answer
  *   with `newestRead`; a failure needs no answer.
+ * - `readOpened` (`shotId`, `recipeId`, `seq`, `edits`): read a Shot whole by
+ *   its id, and its recipe's reference where `recipeId` is not null, and
+ *   answer with `openedRead` or `openedUnread`.
+ * - `unopened`: say that the Shot tapped could not be read.
  * - `draw`: draw the chart from the state, and the legend.
  * - `overlay`: give the chart what it draws in place of its own lines.
  * - `paint`: write the legend and the row under the graph.
@@ -175,6 +243,10 @@ function handle(s, todo, event) {
         case 'editStarted':
         case 'editEnded': return markEdit(s, event.shotId);
         case 'edited': return edited(s, todo, event.shotId, event.remarks);
+        case 'open': return open(s, todo, event.shotId, event.recipe);
+        case 'backToLatest': return backToLatest(s, todo);
+        case 'openedRead': return openedRead(s, todo, event);
+        case 'openedUnread': return openedUnread(s, todo, event);
         default: return undefined;
     }
 }
@@ -248,6 +320,14 @@ function refresh(s, todo, { onlyIfChanged = false } = {}) {
 function refreshSoon(s, todo) {
     if (s.timers.refresh || s.live) return;
     startTimer(s, todo, 'refresh', REFRESH_GAP_MS);
+}
+
+// Reads the Shots the graph shows again: an opened Shot and its recipe's
+// reference, or the recipe's latest Shot and its reference.
+function refreshShown(s, todo, options) {
+    if (!s.opened) return refresh(s, todo, options);
+    stopTimer(s, todo, 'refresh');
+    return readOpened(s, todo, s.opening || s.opened);
 }
 
 // Decaid can't be asked for the recipe's latest Shot.
@@ -332,6 +412,14 @@ function newestRead(s, todo, { seq, edits: editsThen, record }) {
 // The seam says a recipe's reference should be read again: with null, whichever
 // recipe is in the graph.
 function referencePushed(s, todo, recipeId) {
+    // An opened Shot follows its own recipe's reference. The loaded recipe's
+    // is read again on the way back to the latest.
+    if (s.opened) {
+        // A Shot tapped meanwhile is read in place of the one in the graph.
+        const target = s.opening || s.opened;
+        if (target.recipe && (recipeId == null || String(recipeId) === String(target.recipe.id))) readOpened(s, todo, target);
+        return;
+    }
     if (!s.recipe) return;
     if (recipeId != null && String(recipeId) !== String(s.recipe.id)) return;
     refresh(s, todo, { onlyIfChanged: true });
@@ -344,6 +432,12 @@ function referencePushed(s, todo, recipeId) {
 // full one. It ends in a draw, and it takes the place of a read still on its
 // way from the source before, as a look for a shot that has just ended may be.
 function sourceMoved(s, todo) {
+    // An opened Shot gives way to the latest: its reference was the source
+    // before's too.
+    if (closeOpened(s)) {
+        if (s.recipe === null) s.latest = s.handed;
+        draw(s, todo);
+    }
     if (!s.recipe) return;
     if (s.reference) {
         s.reference = { ...NO_REFERENCE, ...referenceParts(null) };
@@ -377,7 +471,10 @@ function timerRanOut(s, todo, timer) {
         return refresh(s, todo);
     }
     s.timers[timer] = false;
-    if (timer === 'refresh' || timer === 'late') refresh(s, todo);
+    if (timer === 'refresh') refreshShown(s, todo);
+    // The one look left for a shot pulled before a recipe change: it is a look
+    // for the latest, whatever the graph shows meanwhile.
+    if (timer === 'late') refresh(s, todo);
     return undefined;
 }
 
@@ -392,6 +489,7 @@ function recipeChanged(s, todo, next) {
     }
     s.seq += 1; // a read for the recipe before is no longer wanted
     s.reference = null;
+    closeOpened(s);
     stopTimer(s, todo, 'settle');
     // A shot had just ended and Decaid may not have it yet. The graph is this
     // recipe's now, so the looks for that shot stop, bar one once Decaid must
@@ -437,6 +535,18 @@ function chartAsks(s, todo, { measurements, workflow }) {
         s.heldBack = true;
         return false;
     }
+    // An opened Shot keeps the graph. With no recipe the Shot handed over is
+    // still the one the graph goes back to. The request is a cue to read the
+    // opened Shot again, as the page coming back into view is.
+    if (s.opened) {
+        if (s.recipe === null) {
+            s.latest = s.handed;
+            s.settling = false;
+            readLast(s, todo);
+        }
+        refreshSoon(s, todo);
+        return false;
+    }
     if (s.recipe === undefined) {
         s.latest = s.handed; // no row names it until the recipe is known
         return true;
@@ -455,6 +565,7 @@ function chartAsks(s, todo, { measurements, workflow }) {
 // ── During a shot ────────────────────────────────────────────────────────────
 
 function shotStarted(s, todo) {
+    closeOpened(s);
     s.live = true;
     s.heldBack = false;
     s.settling = false;
@@ -529,10 +640,22 @@ function settledWithoutRecipe(s, todo) {
 // page may show another recipe by now. A shot that has started keeps the lines
 // it started with, and its end reads the reference again.
 function referenceChosen(s, todo, { recipeId, chosen }) {
-    if (!chosen || !s.recipe || s.recipe.id !== recipeId || s.live || s.settling) return;
-    s.seq += 1; // a read begun before the choice would put the reference before it back
-    s.reference = { ...chosen, ...referenceParts(chosen.shot) };
-    draw(s, todo);
+    if (!chosen || s.live) return;
+    const reference = { ...chosen, ...referenceParts(chosen.shot) };
+    const { opened } = s;
+    const forOpened = !!opened && !!opened.recipe && String(opened.recipe.id) === String(recipeId);
+    // The loaded recipe's too, where the opened Shot is one of its own: the
+    // graph goes back to it with this reference.
+    const forLoaded = !!s.recipe && String(s.recipe.id) === String(recipeId) && !s.settling;
+    if (forOpened) {
+        s.openSeq += 1; // a read begun before the choice would put the reference before it back
+        s.opened = { ...opened, reference };
+    }
+    if (forLoaded) {
+        s.seq += 1;
+        s.reference = reference;
+    }
+    if (forOpened || (forLoaded && !opened)) draw(s, todo);
 }
 
 // ── Rating and notes ─────────────────────────────────────────────────────────
@@ -546,5 +669,131 @@ function referenceChosen(s, todo, { recipeId, chosen }) {
 function edited(s, todo, shotId, now) {
     if (s.remarks && s.remarks.id === shotId) s.remarks = { ...s.remarks, ...now };
     if (s.reference && s.reference.shot && s.reference.shot.id === shotId) s.reference = { ...s.reference, ...now };
+    const { opened } = s;
+    if (opened) {
+        const remarks = opened.remarks.id === shotId ? { ...opened.remarks, ...now } : opened.remarks;
+        const { reference } = opened;
+        const ofReference = reference.shot && reference.shot.id === shotId;
+        if (remarks !== opened.remarks || ofReference) s.opened = { ...opened, remarks, reference: ofReference ? { ...reference, ...now } : reference };
+    }
     paint(todo);
+}
+
+// ── A Shot opened from the list ──────────────────────────────────────────────
+
+// Ends an opened Shot, and any open still on its way. Answers whether a Shot
+// was in the graph.
+function closeOpened(s) {
+    const was = !!s.opened;
+    s.opened = null;
+    s.opening = null;
+    s.openSeq += 1;
+    return was;
+}
+
+function readOpened(s, todo, { id, recipe }) {
+    s.openSeq += 1;
+    todo.push({ do: 'readOpened', shotId: id, recipeId: recipe ? String(recipe.id) : null, seq: s.openSeq, edits: s.edits });
+}
+
+// A row of the list was tapped. The graph keeps what it shows until the Shot
+// has been read. The latest's own row goes back to the latest. While a shot
+// runs nothing opens: the list does not either.
+function open(s, todo, shotId, recipe) {
+    if (s.live || shotId == null) return;
+    const id = String(shotId);
+    if (id === latestShotId(s)) {
+        backToLatest(s, todo);
+        return;
+    }
+    if (s.opened && s.opened.id === id) {
+        s.opening = null;
+        s.openSeq += 1;
+        return;
+    }
+    s.opening = { id, recipe: recipe || null };
+    readOpened(s, todo, s.opening);
+}
+
+// "Back to latest": the latest is drawn as it was kept, then read again, and
+// drawn again only if it or its reference is another by now. With no recipe it
+// is the Shot the history module last handed the chart.
+function backToLatest(s, todo) {
+    if (!closeOpened(s)) return;
+    if (s.recipe === null) {
+        s.latest = s.handed;
+        readLast(s, todo);
+    }
+    overlay(todo);
+    draw(s, todo);
+    if (s.recipe) refresh(s, todo, { onlyIfChanged: true });
+}
+
+// The rating and note a read found for an opened Shot. Where the page edited
+// that Shot after the read began, the read is older than the edit, and what
+// the edit answered stays.
+function openedRemarks(s, before, shot, editsThen) {
+    const keep = before && before.remarks.id === String(shot.id) && editedSince(s, before.remarks.id, editsThen);
+    return { ...(keep ? { rating: before.remarks.rating, note: before.remarks.note } : shotRemarks(shot)), id: String(shot.id), of: shot };
+}
+
+function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
+    if (seq !== s.openSeq || s.live) return;
+    const target = s.opening || s.opened;
+    if (!target || target.id !== String(shotId)) return;
+    const before = s.opened && s.opened.id === target.id ? s.opened : null;
+    s.opening = null;
+    if (!shot) {
+        // Gone from the tablet. One tapped says so; one in the graph gives way
+        // to the latest.
+        if (!before) {
+            todo.push({ do: 'unopened' });
+            return;
+        }
+        backToLatest(s, todo);
+        return;
+    }
+    const { recipe } = target;
+    // A reference that could not be read leaves the one read before for this
+    // Shot. A Shot with no recipe has none, and none can be chosen.
+    const kept = before ? before.reference : null;
+    let found = recipe ? chosen || kept || NO_REFERENCE : NO_REFERENCE;
+    if (found !== kept && found.shot && kept && kept.shot && kept.shot.id === found.shot.id && editedSince(s, found.shot.id, editsThen)) {
+        found = { ...found, rating: kept.rating, note: kept.note };
+    }
+    const remarks = openedRemarks(s, before, shot, editsThen);
+    if (before && sameReference(kept, found)) {
+        // The same two Shots: only a rating or a note can have changed.
+        const rows = !sameRemarks(before.remarks, remarks) || !sameRemarks(kept, found);
+        s.opened = { ...before, remarks: { ...remarks, of: before.shot }, reference: sameRemarks(kept, found) ? kept : { ...kept, rating: found.rating, note: found.note } };
+        if (rows) paint(todo);
+        return;
+    }
+    s.opened = {
+        id: target.id,
+        recipe,
+        shot,
+        unfinished: isUnfinished(shot),
+        reference: found === kept ? kept : { ...found, ...referenceParts(found.shot) },
+        remarks,
+    };
+    // A finished shot still waiting to be saved loses its live lines to this
+    // Shot: the looks for it stop, and the history module's request once it
+    // is saved, or the way back to the latest, reads it.
+    if (s.settling) {
+        s.settling = false;
+        stopTimer(s, todo, 'settle');
+    }
+    overlay(todo);
+    draw(s, todo);
+}
+
+function openedUnread(s, todo, { seq, shotId }) {
+    if (seq !== s.openSeq || s.live) return;
+    // A Shot tapped that could not be read leaves the graph as it was, and
+    // says so. One already in the graph stays, as read before.
+    if (s.opening && s.opening.id === String(shotId)) {
+        s.opening = null;
+        todo.push({ do: 'unopened' });
+    }
 }

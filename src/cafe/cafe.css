@@ -116,6 +116,12 @@
     color: var(--button-primary-text);
 }
 
+/* The Shots button while a shot runs: shown, and takes no tap. */
+.cafe-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 
 /* A stub: an element a Streamline module needs and the page does not show. */
@@ -473,12 +479,12 @@ button.cafe-card {
     flex-direction: column !important;
 }
 
-/* Settings and Sleep: at the bottom of the column, side by side. */
+/* Settings, Shots and Sleep: at the bottom of the column, side by side. */
 #shot-settings > #cafe-system {
     margin-top: auto;
     padding-top: 16px;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -532,6 +538,14 @@ button.cafe-card {
     font-size: 30px;
     font-weight: 600;
     line-height: 40px;
+}
+
+/* "Back to latest", beside the machine's status while a Shot opened from the
+   Shots list is in the graph. */
+#cafe-back {
+    flex: none;
+    height: 52px;
+    margin-bottom: 4px;
 }
 
 #cafe-live {
@@ -672,6 +686,16 @@ button.cafe-card {
     font-weight: 600;
 }
 
+/* An opened Shot of another recipe is labelled with that recipe's name, which
+   gives way as the times do, and never takes the whole row. */
+.cafe-legend-name.cafe-legend-recipe {
+    flex: 0 1 auto;
+    min-width: 3em;
+    max-width: 16em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .cafe-legend-target {
     opacity: 0.6;
 }
@@ -774,13 +798,15 @@ button.cafe-card {
 /* ── Rating and notes ─────────────────────────────────────────────────────── */
 
 #cafe-legend,
-#cafe-note-dialog {
+#cafe-note-dialog,
+#cafe-shots-dialog {
     --cafe-star: #b7791f;
     --cafe-star-empty: #c9ced5;
 }
 
 [data-theme="dark"] #cafe-legend,
-[data-theme="dark"] #cafe-note-dialog {
+[data-theme="dark"] #cafe-note-dialog,
+[data-theme="dark"] #cafe-shots-dialog {
     --cafe-star: #e8b84a;
     --cafe-star-empty: #4a505c;
 }
@@ -1237,4 +1263,203 @@ button.cafe-card {
 
 .cafe-dialog .modal-action .cafe-btn {
     min-width: 160px;
+}
+
+/* ── The Shots list ───────────────────────────────────────────────────────── */
+
+.cafe-dialog.cafe-shots-box {
+    width: 1560px;
+    height: calc(100vh - 96px);
+    max-width: calc(100vw - 48px);
+    padding: 28px 32px;
+    gap: 12px;
+}
+
+.cafe-shots-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-shots-head h3 {
+    margin: 0;
+    font-size: 32px;
+}
+
+.cafe-shots-head .cafe-btn {
+    min-width: 160px;
+}
+
+/* Pulled, Recipe, Dose → yield, Rating, Barista, Note. */
+.cafe-shots-columns,
+.cafe-shots-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) 190px 160px 150px 56px;
+    align-items: center;
+    gap: 16px;
+    padding: 0 16px;
+}
+
+.cafe-shots-columns {
+    flex: none;
+    height: 40px;
+    border-bottom: 2px solid var(--border-primary);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-columns > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#cafe-shots-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.cafe-shots-day {
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 16px 8px;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--border-primary);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-row {
+    width: 100%;
+    height: 70px;
+    box-sizing: border-box;
+    border: 0;
+    border-bottom: 1px solid var(--border-primary);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* The row of the Shot in the graph. */
+.cafe-shots-row[aria-current="true"] {
+    background: var(--profile-button-background-color);
+}
+
+.cafe-shots-row > span {
+    min-width: 0;
+}
+
+.cafe-shots-time,
+.cafe-shots-weights {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cafe-shots-time {
+    font-weight: 600;
+}
+
+.cafe-shots-recipe {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cafe-shots-recipe-top {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cafe-shots-name,
+.cafe-shots-bean,
+.cafe-shots-barista {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cafe-shots-name {
+    font-weight: 600;
+}
+
+.cafe-shots-bean {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-bean:empty {
+    display: none;
+}
+
+.cafe-shots-muted {
+    color: var(--data-card-title-text-color);
+}
+
+/* "Reference", on the row of a Shot that is its recipe's reference. */
+.cafe-shots-chip {
+    flex: none;
+    padding: 2px 8px;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 8px;
+    color: var(--mimoja-blue-v2);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .cafe-shots-chip {
+    border-color: var(--button-primary-bg);
+    color: var(--text-primary);
+}
+
+.cafe-shots-rating .cafe-shots-muted {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.cafe-shots-stars {
+    display: inline-flex;
+    letter-spacing: 2px;
+}
+
+/* Filled from its left as far as the rating reaches, as the legend's stars are. */
+.cafe-shots-star {
+    background: linear-gradient(90deg, var(--cafe-star) var(--cafe-star-fill, 0%), var(--cafe-star-empty) var(--cafe-star-fill, 0%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.cafe-shots-note {
+    display: flex;
+    justify-content: center;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-shots-empty,
+#cafe-shots-end {
+    margin: 20px 16px;
+    font-size: 20px;
+    color: var(--data-card-title-text-color);
 }

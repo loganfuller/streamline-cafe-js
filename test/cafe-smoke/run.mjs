@@ -14,7 +14,9 @@
 // the language, and pulls simulated shots. Point it at a throwaway Decaid only.
 
 import { chromium } from 'playwright';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -116,6 +118,31 @@ const unloadRecipe = () => decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/selection`
 const records = async () => (await decaid('GET', RECIPE_STORE)) || [];
 const recordNamed = async name => (await records()).find(row => row && row.name === name);
 const storeValue = path => decaid('GET', path).catch(() => null);
+
+// Shots added through Decaid's own data import, for the Shots list's second
+// page: copies of a Shot this run pulled, with ids of their own, set back in
+// time, and with the recipe, rating and note each copy is given. The archive
+// is the shape Decaid's own export writes: metadata and a list of Shots.
+const LIST_SHOT = n => `cafe-smoke-list-${String(n).padStart(2, '0')}`;
+// A time as Decaid writes it: the container's local time with no offset.
+function decaidTime(date) {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        .formatToParts(date).map(part => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000`;
+}
+async function importShots(shots) {
+    const dir = await mkdtemp(join(tmpdir(), 'cafe-smoke-'));
+    try {
+        await writeFile(join(dir, 'metadata.json'), JSON.stringify({ formatVersion: 1 }));
+        await writeFile(join(dir, 'shots.json'), JSON.stringify(shots));
+        execFileSync('zip', ['-j', '-q', join(dir, 'import.zip'), join(dir, 'metadata.json'), join(dir, 'shots.json')]);
+        const res = await fetch(`${API}/data/import?onConflict=overwrite`, { method: 'POST', headers: { 'Content-Type': 'application/zip', Authorization: `Bearer ${TOKEN}` }, body: await readFile(join(dir, 'import.zip')) });
+        // A part of the archive refused is a 207.
+        if (res.status !== 200) throw new Error(`the import answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    } finally {
+        await rm(dir, { recursive: true, force: true });
+    }
+}
 
 async function pullShot(seconds) {
     await decaid('PUT', '/machine/state/espresso');
@@ -1524,6 +1551,191 @@ try {
         check('no recipe: after a reload "Last shot" shows the rating and the note it was given', JSON.stringify((await remarks(extra.page)).stars) === '[100,100,100,100,0]' && (await remarks(extra.page)).note === 'note', JSON.stringify(await remarks(extra.page)));
         await extra.close();
         await decaid('PUT', '/workflow', { context: { baristaName: null } });
+    }
+
+    // 17. The Shots list (docs/cafe/DESIGN.md, "The Shots list"), from the
+    //     tablet's own Shots: the list, a page at a time, a Shot of the loaded
+    //     recipe and one of another opened in the graph, rated and made a
+    //     reference, "Back to latest", and a shot started with a Shot opened.
+    {
+        const target = RECIPES[1];
+        const another = RECIPES[4]; // on the same profile, so no check above takes it for a recipe with no Shot
+        const targetId = String((await recordNamed(target.name)).id);
+        const anotherId = String((await recordNamed(another.name)).id);
+        const modelId = (await newestShotWith(targetId)).id;
+        const model = await decaid('GET', `/shots/${modelId}`);
+        // Decaid's import takes a double only as a number written with a
+        // fraction, and JSON written from here drops a whole one's ".0". So the
+        // copies are made from the Shot as Decaid wrote it, each such number
+        // kept as its own text.
+        const asWritten = JSON.parse(await (await fetch(`${API}/shots/${modelId}`)).text(),
+            (key, value, context) => (typeof value === 'number' && Number.isInteger(value) && /[.eE]/.test(context?.source ?? '') ? JSON.rawJSON(context.source) : value));
+        // Sixty copies, from yesterday evening back, every 25 minutes: of the
+        // loaded recipe, of another, and of none, some rated and some noted.
+        const evening = new Date();
+        evening.setUTCDate(evening.getUTCDate() - 1);
+        const copies = Array.from({ length: 60 }, (unused, i) => {
+            const recipeId = [null, targetId, anotherId][i % 3];
+            const context = { ...asWritten.workflow.context, extras: { ...(asWritten.workflow.context?.extras || {}), dye: recipeId ? { ...(asWritten.workflow.context?.extras?.dye || {}), recipeId } : undefined } };
+            if (!recipeId) delete context.extras.dye;
+            return {
+                ...asWritten,
+                id: LIST_SHOT(i),
+                timestamp: decaidTime(new Date(evening.getTime() - (i * 25 + (evening.getUTCHours() - 18) * 60) * 60_000)),
+                workflow: { ...asWritten.workflow, context: { ...context, baristaName: BARISTAS[i % 2] } },
+            };
+        });
+        await importShots(copies);
+        // Each copy's rating and note, through Decaid's Shot edit.
+        for (let i = 0; i < copies.length; i += 1) {
+            await decaid('PUT', `/shots/${LIST_SHOT(i)}`, { annotations: { enjoyment: i % 4 === 0 ? 0 : (i % 5) * 2 + 2, espressoNotes: i % 6 === 0 ? 'A note from the sample data.' : '' } });
+        }
+        const total = (await decaid('GET', '/shots?limit=1')).total;
+        check('the list\'s sample Shots are in Decaid', ((await decaid('GET', `/shots/${LIST_SHOT(59)}`)) || {}).id === LIST_SHOT(59) && total > 60, `${total} Shots`);
+
+        const list = await openPage();
+        const urls = [];
+        list.page.on('request', request => urls.push(new URL(request.url())));
+        await waitForPage(list.page);
+        await list.page.locator('#cafe-strip .cafe-card').nth(target.slot - 1).click();
+        await list.page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
+        await list.page.locator('#cafe-shot-when').filter({ hasText: /\d/ }).waitFor({ timeout: 20_000 }).catch(() => {});
+        await list.page.waitForTimeout(2500);
+        const latest = await legend(list.page);
+        const latestId = (await newestShotWith(targetId)).id;
+
+        //     The button: with Settings and Sleep, the same size.
+        const sizes = await list.page.evaluate(() => ['settings-btn', 'cafe-shots-btn', 'sleep-button'].map(id => {
+            const box = document.getElementById(id).getBoundingClientRect();
+            return [Math.round(box.width), Math.round(box.height), document.getElementById(id).parentElement.id];
+        }));
+        check('the Shots button sits with Settings and Sleep, the same size', sizes.every(([w, h, parent]) => w === sizes[0][0] && h === sizes[0][1] && parent === 'cafe-system'), JSON.stringify(sizes));
+
+        //     The list: 50 rows, the newest first under a header for each day,
+        //     the Shot in the graph highlighted.
+        const rows = () => list.page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-row')].map(row => ({
+            id: row.dataset.shotId,
+            current: row.getAttribute('aria-current') === 'true',
+            name: row.querySelector('.cafe-shots-name').textContent,
+            chip: !!row.querySelector('.cafe-shots-chip'),
+            stars: [...row.querySelectorAll('.cafe-shots-star')].map(star => parseFloat(star.style.getPropertyValue('--cafe-star-fill'))),
+            unrated: !!row.querySelector('.cafe-shots-rating .cafe-shots-muted'),
+            note: !!row.querySelector('.cafe-shots-note svg'),
+            text: row.textContent,
+        })));
+        const days = () => list.page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-day')].map(day => day.textContent));
+        const openList = async () => {
+            await list.page.locator('#cafe-shots-btn').click();
+            await list.page.locator('#cafe-shots-dialog[open]').waitFor({ timeout: 10_000 });
+            await list.page.waitForTimeout(500);
+        };
+        const firstReads = () => urls.filter(url => url.pathname === '/api/v1/shots' && url.searchParams.get('limit') === '50').map(url => Number(url.searchParams.get('offset') || 0));
+        await openList();
+        let shown = await rows();
+        check('the list opens with 50 rows, the newest first, under "Today"', shown.length === 50 && (await days())[0] === 'Today' && JSON.stringify(firstReads()) === '[0]', `${shown.length} rows, days ${JSON.stringify(await days())}, reads ${JSON.stringify(firstReads())}`);
+        check('the row of the Shot in the graph is highlighted', shown.filter(r => r.current).map(r => r.id).join() === latestId, JSON.stringify(shown.filter(r => r.current)));
+        const references = (await storeValue(REFERENCES)) || {};
+        check('a Shot that is its recipe\'s reference carries the chip', shown.filter(r => r.chip).every(r => Object.values(references).includes(r.id)) && (!shown.some(r => r.id === references[targetId]) || shown.find(r => r.id === references[targetId]).chip), JSON.stringify(shown.filter(r => r.chip).map(r => r.id)));
+        await shot(list.page, 'shots-list-light');
+
+        //     Older rows as the list is scrolled near its end, none twice.
+        for (let i = 0; i < 6 && (await rows()).length <= 50; i += 1) {
+            await list.page.locator('#cafe-shots-scroll').evaluate(element => { element.scrollTop = element.scrollHeight; element.dispatchEvent(new Event('scroll')); });
+            await list.page.waitForTimeout(800);
+        }
+        shown = await rows();
+        check('scrolling near the end reads the next 50, and no Shot is listed twice', shown.length > 50 && new Set(shown.map(r => r.id)).size === shown.length && firstReads().includes(50), `${shown.length} rows, reads ${JSON.stringify(firstReads())}`);
+        check('a day before is headed "Yesterday"', (await days()).includes('Yesterday'), JSON.stringify(await days()));
+        const copy = n => shown.find(r => r.id === LIST_SHOT(n));
+        check('a row names its recipe from DYE2\'s records, and a Shot with none as "No recipe"', copy(1)?.name === target.name && copy(2)?.name === another.name && copy(3)?.name === 'No recipe', JSON.stringify([copy(1), copy(2), copy(3)].map(r => r?.name)));
+        check('a row shows its stars, "Not rated", and a note icon where it has a note', copy(0)?.unrated && copy(1)?.stars.length === 5 && copy(6)?.note && !copy(1)?.note, JSON.stringify([copy(0), copy(1), copy(6)]));
+        await list.page.locator('#cafe-shots-scroll').evaluate(element => { element.scrollTop = element.scrollHeight / 3; });
+        await shot(list.page, 'shots-list-older-light');
+
+        //     A Shot of the loaded recipe: "Viewing", with "Back to latest".
+        await list.page.locator(`[data-shot-id="${LIST_SHOT(4)}"]`).click();
+        await list.page.locator('#cafe-back').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        await list.page.waitForTimeout(1500);
+        let now = await legend(list.page);
+        check('a tap on a row of the loaded recipe closes the list and opens that Shot as "Viewing", with "Back to latest"',
+            !(await list.page.locator('#cafe-shots-dialog[open]').count()) && now.label === 'Viewing' && (await list.page.locator('#cafe-back').isVisible()) && /\d{2}:\d{2}/.test(now.when || ''), JSON.stringify(now));
+        check('the header and the dial-in column stay on the loaded recipe', (await list.page.locator('#cafe-title').textContent()) === target.name);
+        const linesOpened = await chartLines(list.page);
+        check('the opened Shot is in the graph with its own lines', linesOpened?.points[0] === shotCurves(model.measurements).pressure.x.length, `${linesOpened?.points[0]} points drawn`);
+        await shot(list.page, 'shots-opened-viewing-light');
+        await star(list.page, 3);
+        await list.page.waitForTimeout(800);
+        check('an opened Shot is rated', (await decaid('GET', `/shots/${LIST_SHOT(4)}`)).annotations.enjoyment === 6);
+        //     The list keeps its place and shows the change.
+        await openList();
+        shown = await rows();
+        check('the list opens where it was left, without reading it again, with the rating in its row and the opened Shot highlighted',
+            shown.length > 50 && JSON.stringify(firstReads()) === '[0,50]' && JSON.stringify(shown.find(r => r.id === LIST_SHOT(4))?.stars) === '[100,100,100,0,0]' && shown.find(r => r.current)?.id === LIST_SHOT(4),
+            `${shown.length} rows, reads ${JSON.stringify(firstReads())}`);
+
+        //     A Shot of another recipe: labelled by its name, with that recipe's
+        //     reference; Make reference sets that recipe's, not the loaded one's.
+        const choicesBefore = (await storeValue(REFERENCES)) || {};
+        await list.page.locator(`[data-shot-id="${LIST_SHOT(5)}"]`).click();
+        await list.page.locator('#cafe-shot-label').filter({ hasText: another.name }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await list.page.waitForTimeout(1000);
+        now = await legend(list.page);
+        check('a Shot of another recipe is labelled with that recipe\'s name, while the header stays on the loaded recipe', now.label === another.name && (await list.page.locator('#cafe-title').textContent()) === target.name, JSON.stringify(now));
+        await shot(list.page, 'shots-opened-other-recipe-light');
+        await list.page.locator('#cafe-make-reference').click();
+        if (await list.page.locator('#cafe-reference-dialog[open]').count()) {
+            check('the "Replace the reference?" dialog names that recipe', (await list.page.locator('#cafe-reference-dialog-recipe').textContent()) === another.name);
+            await list.page.locator('#cafe-reference-dialog-replace').click();
+        }
+        await list.page.locator('#cafe-reference-badge').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        const choicesAfter = (await storeValue(REFERENCES)) || {};
+        check('Make reference on it sets that recipe\'s reference and leaves the loaded recipe\'s', choicesAfter[anotherId] === LIST_SHOT(5) && choicesAfter[targetId] === choicesBefore[targetId] && (await legend(list.page)).badge === 'This shot is the reference', JSON.stringify(choicesAfter));
+
+        //     A Shot with no recipe: no reference and no Make reference.
+        await openList();
+        check('the kept list moves the chip to the Shot made a reference', (await rows()).find(r => r.id === LIST_SHOT(5))?.chip === true);
+        await list.page.locator(`[data-shot-id="${LIST_SHOT(3)}"]`).click();
+        await list.page.locator('#cafe-shot-label').filter({ hasText: 'No recipe' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await list.page.waitForTimeout(800);
+        now = await legend(list.page);
+        check('a Shot with no recipe reads "No recipe", with no reference and no Make reference', now.label === 'No recipe' && now.make === null && now.reference === null && now.badge === null, JSON.stringify(now));
+
+        //     Back to latest.
+        await list.page.locator('#cafe-back').click();
+        await list.page.waitForTimeout(1500);
+        now = await legend(list.page);
+        check('"Back to latest" returns to the Shot that was there', now.label === 'Latest' && now.when === latest.when && !(await list.page.locator('#cafe-back').isVisible()), JSON.stringify(now));
+        await openList();
+        check('once back on the latest the list is read afresh', JSON.stringify(firstReads()) === '[0,50,0]' && (await rows()).length === 50, JSON.stringify(firstReads()));
+        //     The latest's own row is "Back to latest": it opens nothing.
+        await list.page.locator(`[data-shot-id="${latestId}"]`).click();
+        await list.page.waitForTimeout(800);
+        check('the latest\'s own row opens nothing', (await legend(list.page)).label === 'Latest' && !(await list.page.locator('#cafe-back').isVisible()));
+
+        //     A shot started with a Shot opened draws live, and the latest is in
+        //     the graph when it ends. The list does not open during it.
+        await openList();
+        await list.page.locator(`[data-shot-id="${LIST_SHOT(1)}"]`).click();
+        await list.page.locator('#cafe-back').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        const run = pullShot(12);
+        await list.page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+        await list.page.waitForTimeout(3000);
+        now = await legend(list.page);
+        check('a shot that starts with a Shot opened draws live, and "Back to latest" goes', now.label === 'Live shot' && !(await list.page.locator('#cafe-back').isVisible()), JSON.stringify(now));
+        check('while a shot runs the Shots button takes no taps', await list.page.locator('#cafe-shots-btn').isDisabled());
+        const drawn = await countDraws(list.page, 3000);
+        check('a live shot still draws by appending frames', drawn.appended >= 10 && drawn.full <= 3, `${drawn.appended} frames appended, ${drawn.full} drawn in full, in 3 s`);
+        await run;
+        await list.page.locator('#cafe-shot-label').filter({ hasText: 'Latest' }).waitFor({ timeout: 30_000 }).catch(() => {});
+        await list.page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
+        await list.page.waitForTimeout(2000);
+        now = await legend(list.page);
+        const pulled = (await newestShotWith(targetId)).id;
+        check('when it ends the latest is in the graph', now.label === 'Latest' && pulled !== latestId && now.when !== latest.when, JSON.stringify(now));
+        check('the Shots list: no page error', list.seen.errors.length === 0, list.seen.errors.join(' | '));
+        await list.close();
+        for (let i = 0; i < copies.length; i += 1) await decaid('DELETE', `/shots/${LIST_SHOT(i)}`).catch(() => {});
+        await decaid('POST', REFERENCES, choicesBefore);
     }
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
