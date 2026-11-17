@@ -209,11 +209,12 @@ function onScroll(event) {
 
 // ── Opening ──────────────────────────────────────────────────────────────────
 
+// Shows the list; one already open, read again in place, is drawn again.
 function showDialog() {
     const dialog = el('cafe-shots-dialog');
-    if (!dialog || typeof dialog.showModal !== 'function' || dialog.open) return;
+    if (!dialog || typeof dialog.showModal !== 'function') return;
     render();
-    dialog.showModal();
+    if (!dialog.open) dialog.showModal();
     const scroller = el('cafe-shots-scroll');
     if (scroller) scroller.scrollTop = list.scrollTop || 0;
 }
@@ -241,6 +242,9 @@ async function openList() {
     } catch (error) {
         logger.warn('Cafe: could not read the Shots', error);
         if (generation !== asked) return;
+        // A list open while it was read again in place closes.
+        const dialog = el('cafe-shots-dialog');
+        if (dialog?.open) dialog.close();
         showToast(cafeText('Could not read the shots'), 4000, 'error');
         return;
     } finally {
@@ -290,7 +294,22 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
             if (!list) return;
             list.rows = withReference(list.rows, recipeId, shotId);
         },
-        sourceMoved() { drop({ forget: true }); },
+        // Where the list's Shots come from changed. A list open or on its way
+        // is read again in place, from the new source, so the tap is not
+        // lost: the list's own refusal, as for a Machine whose sharing was
+        // turned off since the status was last asked, has the status asked,
+        // and its answer is such a change. Otherwise the kept list is dropped.
+        sourceMoved() {
+            const shown = !!el('cafe-shots-dialog')?.open;
+            const waiting = opening !== null;
+            if ((!shown && !waiting) || shotRunning()) {
+                drop({ forget: true });
+                return;
+            }
+            generation += 1;
+            list = null;
+            openList();
+        },
     });
     document.addEventListener('streamline:languagechange', () => { if (el('cafe-shots-dialog')?.open) render(); });
 }
