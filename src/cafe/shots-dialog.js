@@ -263,6 +263,9 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
     const button = el('cafe-shots-btn');
     button?.addEventListener('click', openList);
     el('cafe-shots-scroll')?.addEventListener('scroll', onScroll, { passive: true });
+    // The list closed while it was read again in place, by its Close button
+    // or a row tapped, stays closed: the page then read is not shown.
+    el('cafe-shots-dialog')?.addEventListener('close', () => { if (opening === generation) generation += 1; });
 
     // While a shot runs the button takes no taps, and a shot that starts
     // closes the list, as it closes the page's other dialogs. A list still on
@@ -301,13 +304,17 @@ export function initShotsList({ isShotRunning = () => false } = {}) {
         // and its answer is such a change. Otherwise the kept list is dropped.
         sourceMoved() {
             const shown = !!el('cafe-shots-dialog')?.open;
-            const waiting = opening !== null;
+            // Only a first page on its way in this generation: one a shot or
+            // the page going behind another has ended is not shown.
+            const waiting = opening === generation;
             if ((!shown && !waiting) || shotRunning()) {
                 drop({ forget: true });
                 return;
             }
             generation += 1;
             list = null;
+            // The other source's rows are not left to be tapped meanwhile.
+            el('cafe-shots-list')?.replaceChildren();
             openList();
         },
     });
