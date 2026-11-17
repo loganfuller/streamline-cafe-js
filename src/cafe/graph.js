@@ -430,11 +430,16 @@ const followEdit = (shotId, remarks) => {
 };
 const markEdit = (shotId, type) => dispatch({ type, shotId });
 
-// An edit that could not be confirmed either way, because Decent Sync's server
-// can't be asked: the server may yet make it. Where the Shot is the one in the
-// graph it is now shown as one that can't be changed, and the line under the
-// legend says why. Answers whether it is.
-const cantTell = (shotId, error) => error.unreachable === true && dispatch({ type: 'shotUnreachable', shotId }) === true;
+// Was an edit not confirmed either way, because Decent Sync's server can't be
+// asked? The server may yet make it, so it is not shown as failed, wherever
+// the graph has gone meanwhile. Where the Shot is the one in the graph it is
+// now shown as one that can't be changed, and the line under the legend says
+// why.
+function cantTell(shotId, error) {
+    if (error.unreachable !== true) return false;
+    dispatch({ type: 'shotUnreachable', shotId });
+    return true;
+}
 
 // A tap on a star: that many stars, or none for a tap on the star chosen. It
 // is saved at once, and the stars change as they are tapped. If the edit fails

@@ -469,7 +469,7 @@ function referencePushed(s, todo, recipeId) {
 function sourceMoved(s, todo) {
     // An opened Shot gives way to the latest: its reference was the source
     // before's too.
-    if (closeOpened(s)) {
+    if (closeOpened(s, todo)) {
         if (s.recipe === null) s.latest = s.handed;
         draw(s, todo);
     }
@@ -527,7 +527,7 @@ function recipeChanged(s, todo, next) {
     }
     s.seq += 1; // a read for the recipe before is no longer wanted
     s.reference = null;
-    closeOpened(s);
+    closeOpened(s, todo);
     stopTimer(s, todo, 'settle');
     // A shot had just ended and Decaid may not have it yet. The graph is this
     // recipe's now, so the looks for that shot stop, bar one once Decaid must
@@ -603,7 +603,7 @@ function chartAsks(s, todo, { measurements, workflow }) {
 // ── During a shot ────────────────────────────────────────────────────────────
 
 function shotStarted(s, todo) {
-    closeOpened(s);
+    closeOpened(s, todo);
     s.live = true;
     s.heldBack = false;
     s.settling = false;
@@ -611,7 +611,6 @@ function shotStarted(s, todo) {
     stopTimer(s, todo, 'settle');
     stopTimer(s, todo, 'late');
     stopTimer(s, todo, 'refresh');
-    stopTimer(s, todo, 'locked');
     overlay(todo);
     paint(todo);
 }
@@ -725,9 +724,10 @@ function edited(s, todo, shotId, now) {
 
 // Ends an opened Shot, and any open still on its way. Answers whether a Shot
 // was in the graph.
-function closeOpened(s) {
+function closeOpened(s, todo) {
     const was = !!s.opened;
     s.lockedTries = 0;
+    stopTimer(s, todo, 'locked');
     s.opened = null;
     s.opening = null;
     s.openSeq += 1;
@@ -788,7 +788,7 @@ function readLockedLater(s, todo) {
 // drawn again only if it or its reference is another by now. With no recipe it
 // is the Shot the history module last handed the chart.
 function backToLatest(s, todo) {
-    if (!closeOpened(s)) return;
+    if (!closeOpened(s, todo)) return;
     if (s.recipe === null) {
         s.latest = s.handed;
         readLast(s, todo);

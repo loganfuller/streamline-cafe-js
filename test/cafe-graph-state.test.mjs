@@ -883,8 +883,9 @@ test('the read again of a locked Shot waits for a tap on its way, and stops with
     assert.deepEqual(did(play(tapped.state, { type: 'timer', timer: 'locked' }).effects, 'readOpened'), [], 'the tap\'s read is not passed over');
     const started = play(locked, { type: 'shotStarted' });
     assert.ok(did(started.effects, 'stopTimer').some(effect => effect.timer === 'locked'));
-    const closed = play(locked, { type: 'backToLatest' }).state;
-    assert.deepEqual(did(play(closed, { type: 'timer', timer: 'locked' }).effects, 'readOpened'), [], 'nothing is opened to read');
+    const back = play(locked, { type: 'backToLatest' });
+    assert.ok(did(back.effects, 'stopTimer').some(effect => effect.timer === 'locked'), 'closing the Shot stops its read again');
+    assert.deepEqual(did(play(back.state, { type: 'timer', timer: 'locked' }).effects, 'readOpened'), [], 'nothing is opened to read');
 });
 
 test('a read that can\'t be made for any other reason leaves an opened Shot as one that can be changed', () => {
