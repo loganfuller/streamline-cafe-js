@@ -199,12 +199,32 @@ test('before the status has answered: the latest Shot alone, no reference, and n
     assert.equal((await sources.latestShot('r1')).id, 'tablet-latest');
     assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false });
     await assert.rejects(sources.makeReference('r1', 'a'));
-    sources.status(UNREACHABLE); // the plugin has not connected yet
+    sources.status({}); // Decaid itself did not answer
+    sources.status({ loading: true }); // Decaid has not loaded the plugin yet
     assert.equal(sources.source(), 'unknown');
     assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false });
     assert.deepEqual(calls.tablet, [['latest', 'r1']], 'the choice kept on the tablet was not read');
     assert.deepEqual(calls.plugin, []);
     assert.deepEqual(calls.changed, [], 'and nothing is read again for an answer that says nothing');
+});
+
+test('a plugin that can\'t ask its server, before the source is known: no reference, and the answer says why', async () => {
+    const { sources, calls } = seam();
+    sources.status(UNREACHABLE); // the plugin has not connected yet, or never will
+    assert.equal(sources.source(), 'unknown');
+    assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false, unreachable: true, unread: true });
+    await assert.rejects(sources.makeReference('r1', 'a'));
+    assert.deepEqual([calls.changed, calls.moved], [[null], [false]], 'the page is told once, to say so');
+    sources.status(UNREACHABLE);
+    assert.deepEqual(calls.changed, [null], 'and not again for the same answer');
+    assert.deepEqual([calls.tablet, calls.plugin], [[], []], 'neither source was asked');
+    sources.status({}); // Decaid stopped answering: the plugin no longer says so
+    assert.deepEqual(await sources.referenceShot('r1'), { shot: null, canChange: false });
+    assert.deepEqual(calls.changed, [null, null]);
+    sources.status(UNREACHABLE);
+    sources.status(SERVED);
+    assert.equal((await sources.referenceShot('r1')).shot.id, 'plugin-reference');
+    assert.deepEqual(calls.moved.slice(-1), [true]);
 });
 
 test('on a served Machine the reference is the plugin\'s, and nothing kept on the tablet for it is read or written', async () => {

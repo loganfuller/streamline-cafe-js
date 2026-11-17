@@ -230,10 +230,10 @@ test('the tablet\'s copy, drawn while Decent Sync can\'t be reached: Make refere
 
 test('a served Machine whose reference can\'t be read at all: none is drawn, and the line says Decent Sync can\'t be reached', () => {
     const shown = graphModel({ recipe, view: 'reference', shot: shot('a'), reference: { shot: null, canChange: false, unreachable: true, unread: true } });
-    assert.deepEqual([shown.reference, shown.lines, shown.makeReference, shown.muted], [null, false, true, true]);
+    assert.deepEqual([shown.reference, shown.lines, shown.makeReference, shown.muted], [null, false, false, false], 'and with nothing read there is no Make reference to mute');
     assert.equal(shown.notice, "Decent Sync can't be reached, so the reference can't be shown");
     assert.equal(shown.notice, UNREAD_NOTICE);
-    // With no Shot for the recipe there is no Make reference to mute, and both lines show.
+    // With no Shot for the recipe both lines show.
     const empty = graphModel({ recipe, view: 'reference', shot: null, reference: { shot: null, canChange: false, unreachable: true, unread: true } });
     assert.deepEqual([empty.makeReference, empty.muted, empty.line, empty.notice], [false, false, 'No shot with this recipe on this machine yet', UNREAD_NOTICE]);
 });

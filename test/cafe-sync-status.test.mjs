@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decentSyncSaves, statusUnknown, statusRetryMs, shotSource } from '../src/cafe/sync-status.js';
+import { decentSyncSaves, statusUnknown, statusRetryMs, shotSource, serverOutOfReach } from '../src/cafe/sync-status.js';
 
 test('Decent Sync saves the dial-in on a Machine it serves', () => {
     assert.equal(decentSyncSaves(false, { connected: true, served: true }), true);
@@ -44,6 +44,20 @@ test('only an answer that says nothing either way is asked for again', () => {
 test('asking again starts at half a minute and slows to five', () => {
     assert.deepEqual([1, 2, 3, 4, 5, 6, 20].map(statusRetryMs), [30_000, 60_000, 120_000, 240_000, 300_000, 300_000, 300_000]);
     assert.equal(statusRetryMs(0), 30_000);
+});
+
+test('a plugin Decaid has not loaded yet is asked again within seconds, a few times', () => {
+    assert.deepEqual([1, 2, 5, 6, 7].map(tries => statusRetryMs(tries, true)), [3000, 3000, 3000, 300_000, 300_000]);
+    assert.equal(statusUnknown({ loading: true }), true, 'it says nothing either way');
+    assert.equal(decentSyncSaves(true, { loading: true }), true, 'so the last answer stands, as while the plugin is reloaded');
+    assert.equal(shotSource('plugin', { loading: true }), 'plugin');
+    assert.equal(shotSource('unknown', { loading: true }), 'unknown', 'and the tablet\'s own choice is not drawn meanwhile');
+});
+
+test('only the plugin\'s own word says its server is out of reach', () => {
+    assert.equal(serverOutOfReach({ served: false, code: 'unreachable' }), true);
+    assert.equal(serverOutOfReach({ served: false, code: 'serverTooOld' }), true);
+    for (const answer of [{}, { loading: true }, null, { served: true }, { code: 'captureOnly' }]) assert.equal(serverOutOfReach(answer), false);
 });
 
 // ── Where the reference is kept ──────────────────────────────────────────────

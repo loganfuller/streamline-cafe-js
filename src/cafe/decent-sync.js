@@ -29,7 +29,13 @@ function tell(listeners, value) {
 async function readStatus() {
     const plugins = await getPlugins();
     if (!Array.isArray(plugins)) return {}; // Decaid did not answer
-    if (!plugins.some(plugin => plugin && plugin.id === PLUGIN_ID && plugin.loaded)) return null;
+    const plugin = plugins.find(listed => listed && listed.id === PLUGIN_ID);
+    if (!plugin) return null;
+    // Listed and not loaded: switched off in Decaid, which is no plugin; or not
+    // loaded yet, as for a moment after Decaid starts and while the plugin is
+    // reloaded, which says nothing either way. Taken as no plugin, that moment
+    // would put a served Machine's reference on the tablet.
+    if (!plugin.loaded) return plugin.autoLoad === false ? null : { loading: true };
     try {
         return await callPluginEndpoint(PLUGIN_ID, 'status', null, 'GET');
     } catch (error) {
@@ -61,7 +67,7 @@ async function ask() {
     // A tablet that stays on this page fires no event that would ask.
     if (statusUnknown(answer)) {
         tries += 1;
-        retry = setTimeout(askStatus, statusRetryMs(tries));
+        retry = setTimeout(askStatus, statusRetryMs(tries, answer.loading === true));
     } else {
         tries = 0;
     }

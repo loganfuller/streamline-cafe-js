@@ -1195,13 +1195,14 @@ try {
         //     Whether the Machine is served is not known yet either: the latest
         //     Shot alone, and the choice kept on the tablet is not read.
         const before = await legend(extra.page);
-        check('Decent Sync not connected yet: the latest Shot alone, with no reference and no Make reference',
-            before.label === 'Latest' && before.reference === null && before.badge === null && before.make === null && !extra.seen.requests.some(r => r.includes(REFERENCES)), JSON.stringify(before));
+        check('Decent Sync not connected yet: the latest Shot alone, with no reference and no Make reference, and a line saying why',
+            before.label === 'Latest' && before.reference === null && before.badge === null && before.make === null
+            && before.notice === "Decent Sync can't be reached, so the reference can't be shown" && !extra.seen.requests.some(r => r.includes(REFERENCES)), JSON.stringify(before));
         await extra.page.locator('#cafe-dial-label').filter({ hasText: 'Dial-in · saved to the recipe' }).waitFor({ timeout: 45_000 }).catch(() => {});
         check('and the page asks again when the plugin says it has connected: the column then reads "saved to the recipe"', (await extra.page.locator('#cafe-dial-label').textContent()) === 'Dial-in · saved to the recipe', await extra.page.locator('#cafe-dial-label').textContent());
         await extra.page.waitForTimeout(1500);
         const after = await legend(extra.page);
-        check('and Make reference is there once the Machine is known to be served, with Decent Sync asked for the reference', after.make === 'Make reference' && !after.muted
+        check('and Make reference is there once the Machine is known to be served, with Decent Sync asked for the reference', after.make === 'Make reference' && !after.muted && after.notice === null
             && extra.seen.requests.some(r => r === 'GET /api/v1/plugins/decent-sync.reaplugin/reference') && !extra.seen.requests.some(r => r.includes(REFERENCES)), JSON.stringify(after));
         await extra.close();
     }

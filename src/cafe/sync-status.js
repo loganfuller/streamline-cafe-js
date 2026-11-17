@@ -6,8 +6,15 @@
 //
 // - `{ served: true, … }`: the plugin serves this Machine.
 // - `{ code }`: the plugin refused, and the code says why.
-// - `{}`: Decaid itself did not answer.
-// - `null`: no Decent Sync plugin is loaded on this tablet.
+// - `{}`: Decaid itself did not answer; or `{ loading: true }`, Decaid lists
+//   the plugin and has not loaded it yet, as for a moment after Decaid starts
+//   and while the plugin is reloaded.
+// - `null`: this tablet has no Decent Sync plugin, or the plugin is switched off.
+
+/** Did the plugin say it can't ask its server? `serverTooOld` is treated as `unreachable`, as the contract asks. */
+export function serverOutOfReach(answer) {
+    return !!answer && (answer.code === 'unreachable' || answer.code === 'serverTooOld');
+}
 
 /**
  * Did the Status request say nothing either way? The server could not be asked,
@@ -17,14 +24,21 @@
  */
 export function statusUnknown(answer) {
     if (!answer || answer.served === true) return false;
-    return answer.code === undefined || answer.code === 'unreachable' || answer.code === 'serverTooOld';
+    return answer.code === undefined || serverOutOfReach(answer);
 }
+
+const LOADING_TRIES = 5;
 
 // How long to wait before asking again, having asked `tries` times with no
 // answer either way: 30 s, then twice as long each time, to 5 minutes. A plugin
 // that never connects, as one installed and never set up, is not asked for ever
 // at the first pace.
-export function statusRetryMs(tries) {
+//
+// `loading` is a plugin Decaid lists and has not loaded yet. Loading takes
+// seconds, and nothing tells the skin when it is done, so the first few asks
+// come 3 s apart. One that never loads falls back to the pace above.
+export function statusRetryMs(tries, loading = false) {
+    if (loading === true && tries <= LOADING_TRIES) return 3000;
     return Math.min(300_000, 30_000 * 2 ** Math.max(0, tries - 1));
 }
 
@@ -55,15 +69,15 @@ export const SOURCES = ['unknown', 'plugin', 'tablet'];
  * tablet; or `unknown`, before any answer has said which.
  *
  * - `{ served: true }`: the plugin.
- * - `null`, for no Decent Sync plugin loaded; `captureOnly` and
+ * - `null`, for no Decent Sync plugin, or one switched off; `captureOnly` and
  *   `hardwareMismatch`; and any refusal this skin does not know, which is a
  *   Machine not served for a reason that lasts: the tablet.
- * - `unreachable`, `serverTooOld`, or Decaid itself not answering (`{}`): the
- *   server could not be asked, so the last answer stands. A served Machine
- *   stays with the plugin through an outage, which then answers from the
- *   tablet's copy; and before any answer the source is not known, and no
- *   reference is drawn, so the choice kept on the tablet is never drawn on a
- *   Machine that turns out to be served.
+ * - `unreachable`, `serverTooOld`, Decaid itself not answering (`{}`), or a
+ *   plugin still loading: nothing was said either way, so the last answer
+ *   stands. A served Machine stays with the plugin through an outage, which
+ *   then answers from the tablet's copy; and before any answer the source is
+ *   not known, and no reference is drawn, so the choice kept on the tablet is
+ *   never drawn on a Machine that turns out to be served.
  */
 export function shotSource(previous, answer) {
     if (!answer) return 'tablet';

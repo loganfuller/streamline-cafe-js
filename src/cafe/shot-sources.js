@@ -2,7 +2,7 @@
 // the reference"): Decent Sync's plugin on a Machine it serves, the tablet
 // otherwise, and neither before the Status request has said which. No browser
 // global is touched: shot-seam.js hands in the sources and what asks the status.
-import { shotSource } from './sync-status.js';
+import { shotSource, serverOutOfReach } from './sync-status.js';
 
 /**
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
@@ -16,6 +16,9 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
     // The next status answer is followed by a read of the reference, whatever
     // it says: the plugin's connection to the server came or went.
     let readAfter = false;
+    // The plugin said it can't ask its server. Before the source is known,
+    // that is why no reference can be shown.
+    let outOfReach = false;
 
     return {
         /** Where references are kept now: `plugin`, `tablet` or `unknown`. */
@@ -29,11 +32,13 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
          * `unreachable`, `unread` and `profileDiffers` too. Before the source is
          * known there is none, and none can be chosen: the choice kept on the
          * tablet is never read on a Machine that may turn out to be served.
+         * Where the plugin has said it can't ask its server, the answer says so,
+         * as the plugin's does for a reference it can't read.
          */
         async referenceShot(recipeId) {
             if (source === 'plugin') return plugin.referenceShot(recipeId);
             if (source === 'tablet') return tablet.referenceShot(recipeId);
-            return { shot: null, canChange: false };
+            return outOfReach ? { shot: null, canChange: false, unreachable: true, unread: true } : { shot: null, canChange: false };
         },
 
         /**
@@ -58,8 +63,13 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
         status(answer) {
             const next = shotSource(source, answer);
             const moved = next !== source;
+            // With the source still not known, what `referenceShot` answers
+            // follows whether the plugin can ask its server.
+            const reach = serverOutOfReach(answer);
+            const said = next === 'unknown' && reach !== outOfReach;
             source = next;
-            const read = moved || readAfter;
+            outOfReach = reach;
+            const read = moved || readAfter || said;
             readAfter = false;
             if (read) changed(null, moved);
         },

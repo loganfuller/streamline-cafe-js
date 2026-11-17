@@ -500,21 +500,27 @@ async function onMakeReference() {
     try {
         const forRecipe = recipe;
         const shot = latest;
-        if (reference && reference.shot && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
+        const replaced = reference && reference.shot ? reference.shot.id : null;
+        if (replaced !== null && !(await confirmReplace(forRecipe, shot, reference.shot))) return;
         // The dialog was open a while: the page may show something else by now,
-        // or Decent Sync may have gone out of reach.
+        // Decent Sync may have gone out of reach, or another reference may have
+        // been chosen elsewhere, which the dialog did not name.
         const still = model();
         if (!recipe || recipe.id !== forRecipe.id || !latest || latest.id !== shot.id || !still.makeReference || still.muted) return;
+        if ((reference && reference.shot ? reference.shot.id : null) !== replaced) return;
         let chosen;
         try {
             chosen = await makeReference(forRecipe.id, shot.id);
         } catch (error) {
             logger.warn('Cafe: could not keep the reference', error);
-            // Decent Sync's refusal says why, in its own words.
-            showToast(error.refusal || cafeText('The reference could not be saved'), 4000, 'error');
             // A choice that may have been made was read again before it was
             // called failed: the page follows what that read found.
             chosen = error.reference;
+            // Decent Sync's refusal says why, in its own words. Where that read
+            // found the server out of reach it could not tell either way, and
+            // the server may yet make the choice: the line under the legend
+            // says the reference can't be changed, and nothing says it failed.
+            if (!(chosen && chosen.unreachable)) showToast(error.refusal || cafeText('The reference could not be saved'), 4000, 'error');
         }
         if (chosen) followChoice(forRecipe, chosen);
     } finally {

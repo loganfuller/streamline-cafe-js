@@ -52,6 +52,7 @@ const LOCATION = 'Sample Cafe';
 const MACHINE = 'Sample Machine';
 const REFERENCES = '/store/streamlineCafe/references';
 const CANT_CHANGE = "Decent Sync can't be reached, so the reference can't be changed";
+const CANT_SHOW = "Decent Sync can't be reached, so the reference can't be shown";
 
 const docker = (...command) => promisify(execFile)('docker', command);
 const decaid = decaidClient(`${DECAID}/api/v1`, TOKEN);
@@ -330,8 +331,8 @@ try {
         await cold.page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
         await cold.page.waitForTimeout(3000);
         const shown = await legend(cold.page);
-        check('a page opened with the server out of reach: the latest Shot alone, no reference and no Make reference',
-            shown.label === 'Latest' && shown.reference === null && shown.make === null && cold.seen.requests.every(r => !r.includes(REFERENCES)), JSON.stringify(shown));
+        check('a page opened with the server out of reach: the latest Shot alone, no reference and no Make reference, and a line saying why',
+            shown.label === 'Latest' && shown.reference === null && shown.make === null && shown.notice === CANT_SHOW && cold.seen.requests.every(r => !r.includes(REFERENCES)), JSON.stringify(shown));
         await shot(cold.page, 'sync-opened-while-stopped-light');
         check('no page error on it', cold.seen.errors.length === 0, cold.seen.errors.join(' | '));
         await cold.close();

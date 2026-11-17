@@ -183,7 +183,7 @@ export function viewFrom(stored) {
 
 /** The line under the legend while Decent Sync can't be reached: the tablet's copy is drawn, or says the recipe has none. */
 export const UNCHANGEABLE_NOTICE = "Decent Sync can't be reached, so the reference can't be changed";
-/** The same where the tablet has no copy to draw, as for a recipe in no slot. */
+/** The same where nothing could be read: the tablet has no copy, as for a recipe in no slot, or it is not known yet whether Decent Sync serves the Machine. */
 export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can't be shown";
 
 /**
@@ -225,11 +225,13 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
     else if (recipe && atRest && shot === null) line = 'No shot with this recipe on this machine yet';
 
     const showsReference = inReference && !!referenceShot && !isReference;
-    // Decent Sync can't be reached: the reference drawn is the tablet's copy, or
-    // none could be read. Make reference stays, muted, and a line says why.
+    // Decent Sync can't be reached, and a line says so. Where the tablet's copy
+    // answered, Make reference stays, muted: the reference is known, and can't
+    // be changed now. Where nothing could be read there is no Make reference.
     const unreachable = !!recipe && !!reference && reference.unreachable === true;
     const canChange = !reference || reference.canChange !== false;
     const offered = !!recipe && atRest && !!shot && !isReference;
+    const muted = offered && !canChange && unreachable && !reference.unread;
     // The line stays through a shot: it has a line of its own, and the graph
     // keeps its height.
     let notice = null;
@@ -243,8 +245,8 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
         flag: showsReference && (typeof reference.profileDiffers === 'boolean' ? reference.profileDiffers : differentProfile(recipe, referenceShot)),
         badge: inReference && isReference,
         targets: !inReference,
-        makeReference: offered && (canChange || unreachable),
-        muted: offered && !canChange && unreachable,
+        makeReference: offered && (canChange || muted),
+        muted,
         notice,
         lines: showsReference,
     };
