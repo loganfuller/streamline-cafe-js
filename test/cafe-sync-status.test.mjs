@@ -47,7 +47,7 @@ test('asking again starts at half a minute and slows to five', () => {
 });
 
 test('a plugin Decaid has not loaded yet is asked again within seconds, a few times', () => {
-    assert.deepEqual([1, 2, 5, 6, 7].map(tries => statusRetryMs(tries, true)), [3000, 3000, 3000, 300_000, 300_000]);
+    assert.deepEqual([1, 2, 5, 6, 7, 20].map(tries => statusRetryMs(tries, true)), [3000, 3000, 3000, 30_000, 60_000, 300_000], 'and then at the usual pace, from its start');
     assert.equal(statusUnknown({ loading: true }), true, 'it says nothing either way');
     assert.equal(decentSyncSaves(true, { loading: true }), true, 'so the last answer stands, as while the plugin is reloaded');
     assert.equal(shotSource('plugin', { loading: true }), 'plugin');

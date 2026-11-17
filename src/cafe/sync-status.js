@@ -36,9 +36,13 @@ const LOADING_TRIES = 5;
 //
 // `loading` is a plugin Decaid lists and has not loaded yet. Loading takes
 // seconds, and nothing tells the skin when it is done, so the first few asks
-// come 3 s apart. One that never loads falls back to the pace above.
+// come 3 s apart. One that never loads is then asked at the pace above, from
+// its start.
 export function statusRetryMs(tries, loading = false) {
-    if (loading === true && tries <= LOADING_TRIES) return 3000;
+    if (loading === true) {
+        if (tries <= LOADING_TRIES) return 3000;
+        tries -= LOADING_TRIES;
+    }
     return Math.min(300_000, 30_000 * 2 ** Math.max(0, tries - 1));
 }
 

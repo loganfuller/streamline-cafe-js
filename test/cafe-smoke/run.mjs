@@ -153,7 +153,9 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
     if (decentSync) {
         await page.route('**/api/v1/plugins', async route => {
             const response = await route.fetch();
-            await route.fulfill({ response, json: [...(await response.json()), { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, api: [] }] });
+            // In place of the real one, where the second run left it switched off.
+            const others = (await response.json()).filter(plugin => plugin.id !== 'decent-sync.reaplugin');
+            await route.fulfill({ response, json: [...others, { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, autoLoad: true, api: [] }] });
         });
         // 'coldStart': not connected yet, and served once the plugin says its
         // connection came, a few seconds after the page opened its socket.

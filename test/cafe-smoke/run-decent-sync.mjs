@@ -378,6 +378,10 @@ try {
     await close();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
+    // Where it stopped, and what the pages showed then.
+    console.log(error.stack);
+    const pages = browser.contexts().flatMap(context => context.pages());
+    for (const [index, open] of pages.entries()) await open.screenshot({ path: join(OUT, `sync-failed-${index}.png`) }).catch(() => {});
 } finally {
     // Leave the server running and the Machine sharing, whatever failed.
     if (stopped) await docker('start', SYNC_CONTAINER).catch(() => {});
