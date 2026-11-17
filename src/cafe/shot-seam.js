@@ -15,7 +15,7 @@ const tablet = createTabletShots({
     writeChoices: choices => writeCafe(REFERENCES_KEY, choices),
 });
 
-/** This machine's latest Shot pulled with a recipe, whole, or null. With no recipe (null), the tablet's newest Shot. */
+/** This machine's latest Shot pulled with a recipe, whole, or null. With no recipe (null), null. */
 export const latestShot = recipeId => tablet.latestShot(recipeId);
 
 /** A recipe's reference: `{ shot, canChange }`. */

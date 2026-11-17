@@ -6,6 +6,7 @@
 //   node test/cafe-smoke/run.mjs --token=... --base=http://127.0.0.1:13999 --decaid=http://127.0.0.1:8080
 //   node test/cafe-smoke/run.mjs --token=... --headed
 //   node test/cafe-smoke/run.mjs --token=... --streamline=http://127.0.0.1:13998
+//   node test/cafe-smoke/run.mjs --token=... --timezone=Europe/Berlin   (the container's zone, UTC by default)
 //
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
 // switches Streamline's "DYE2 on" setting, writes made-up beans, a grinder and
@@ -17,10 +18,10 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, RECIPES } from './sample-data.mjs';
+import { BEANS, GRINDER, RECIPES, BARISTA } from './sample-data.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
-import { isUnfinished, shotRecipeId } from '../../src/cafe/shot-model.js';
+import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -35,6 +36,10 @@ const OUT = flag('out', join(HERE, 'out'));
 // Official Streamline, served beside the skin, for the switch there and back.
 const STREAMLINE = flag('streamline', '');
 const HEADED = args.includes('--headed');
+// Decaid writes a Shot's time as its own local time, with no offset, and the
+// page reads it in the browser's. On a tablet the two are one clock; here the
+// browser is put in the container's zone, which is UTC unless it was given another.
+const TIMEZONE = flag('timezone', 'UTC');
 const API = `${DECAID}/api/v1`;
 const SETTING = `${API}/store/streamlineSettings/streamline.dye2Enabled`;
 const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
@@ -132,7 +137,7 @@ const browser = await chromium.launch({ headless: !HEADED });
 // Sync's plugin, which this Decaid does not have: its entry in the plugin list
 // and its Status answer, `served` or a refusal's code.
 async function openPage({ theme = 'light', machineButtons = true, decentSync = null } = {}) {
-    const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], theme };
     page.on('pageerror', error => seen.errors.push(error.message));
@@ -981,7 +986,7 @@ try {
     // 13. Official Streamline on the same Decaid, and back: the settings the two
     //     skins share are kept, and Streamline's strip mode is as it was left.
     if (STREAMLINE) {
-        const sl = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
+        const sl = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
         const sp = await sl.newPage();
         await sp.goto(`${STREAMLINE}/index.html`);
         await sp.locator('#dye-toggle-R').waitFor({ state: 'visible', timeout: 30_000 });
@@ -1010,7 +1015,7 @@ try {
         check('the cafe page still finds DYE2 on', (await (await fetch(SETTING)).json()) === 'true');
         await back.close();
 
-        const sl2 = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
+        const sl2 = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
         const sp2 = await sl2.newPage();
         await sp2.goto(`${STREAMLINE}/index.html`);
         await sp2.locator('#dye-toggle-R').waitFor({ state: 'visible', timeout: 30_000 });
@@ -1087,6 +1092,61 @@ try {
             none.label === 'Last shot' && /\d/.test(none.when || '') && none.line === 'Pick a recipe to compare' && none.reference === null && none.badge === null && none.make === null, JSON.stringify(none));
         await shot(extra.page, 'page-no-recipe-dark');
         await extra.close();
+    }
+    //     With no recipe loaded Streamline's history module draws the newest
+    //     Shot, after each of two shots in one session without a reload, and the
+    //     legend names it with its time and barista. The page reads no Shot
+    //     itself then, and the history arrows and the shot panel stay out of reach.
+    {
+        await decaid('PUT', '/workflow', { context: { baristaName: BARISTA } });
+        const extra = await openPage();
+        const urls = [];
+        extra.page.on('request', request => urls.push(new URL(request.url())));
+        await waitForPage(extra.page);
+        await extra.page.waitForTimeout(4000);
+        const reachable = () => extra.page.evaluate(() => [
+            ...['history-prev-btn', 'history-next-btn', 'shot-history-info']
+                .filter(id => document.getElementById(id)?.offsetParent != null),
+            ...(document.getElementById('shot-history-panel') ? ['shot-history-panel'] : []),
+        ]);
+        check('no recipe, at rest: the history arrows and the shot panel are out of reach', (await reachable()).length === 0, (await reachable()).join(', '));
+        // Of different lengths, so each drawing tells the two apart.
+        for (const [n, seconds] of [[1, 10], [2, 16]]) {
+            const before = ((await decaid('GET', '/shots?limit=1')).items || [])[0]?.id;
+            const run = pullShot(seconds);
+            await extra.page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+            await extra.page.waitForTimeout(4000);
+            check(`no recipe, shot ${n}: during it the history arrows and the shot panel are out of reach`, (await reachable()).length === 0, (await reachable()).join(', '));
+            await run;
+            let newest = null;
+            for (let i = 0; i < 30 && !(newest && newest.id !== before); i += 1) {
+                await sleep(1000);
+                newest = ((await decaid('GET', '/shots?limit=1')).items || [])[0];
+            }
+            const saved = await decaid('GET', `/shots/${newest.id}`);
+            const points = shotCurves(saved.measurements).pressure.x.length;
+            let lines = null;
+            for (let i = 0; i < 30 && lines?.points[0] !== points; i += 1) {
+                await sleep(1000);
+                lines = await chartLines(extra.page);
+            }
+            await extra.page.waitForTimeout(1000);
+            const now = await legend(extra.page);
+            // The legend's time is the first sample's, within a second of the record's.
+            const minutes = [saved.timestamp, saved.measurements[0]?.machine?.timestamp].map(t => String(t).slice(11, 16));
+            check(`no recipe, shot ${n}: the graph draws it once Decaid has saved it`, lines?.points[0] === points, `${lines?.points[0]} points drawn, ${points} in the Shot`);
+            check(`no recipe, shot ${n}: the legend names it "Last shot", with its time and barista`,
+                now.label === 'Last shot' && minutes.some(m => (now.when || '').startsWith(`Today ${m}`)) && (now.when || '').endsWith(` · ${BARISTA}`) && now.line === 'Pick a recipe to compare',
+                JSON.stringify(now));
+        }
+        // The seam lists the newest Shots by limit alone; Streamline's own reads
+        // name the page they want or the Shot by id.
+        const read = urls.filter(url => url.pathname === '/api/v1/shots' && !url.searchParams.has('ids') && ['1', '100'].includes(url.searchParams.get('limit')));
+        check('no recipe: the page reads no Shot through the Shot seam', read.length === 0, read.map(String).join(', '));
+        check('no recipe: no page error', extra.seen.errors.length === 0, extra.seen.errors.join(' | '));
+        await shot(extra.page, 'page-no-recipe-after-two-shots-light');
+        await extra.close();
+        await decaid('PUT', '/workflow', { context: { baristaName: null } });
     }
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);

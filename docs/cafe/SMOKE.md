@@ -6,7 +6,7 @@ Everything the run writes is made up. The sample beans, grinder and recipes are 
 
 ## What it needs
 
-- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, makes recipes and moves them between slots from the page, chooses reference Shots and clears the choices an earlier run left, changes the language, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
+- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, makes recipes and moves them between slots from the page, chooses reference Shots and clears the choices an earlier run left, changes the language, sets the Workflow's barista, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
 - Network access to GitHub, where Decaid fetches DYE2's latest release from.
 - Node, and this repository's dependencies (`npm ci`). Once per machine: `npx playwright install chromium`.
 
@@ -62,7 +62,7 @@ For the switch to Streamline and back, serve the Streamline release the skin is 
 
 ```sh
 mkdir /path/to/streamline-release
-git archive v0.2.27 | tar -x -C /path/to/streamline-release
+git archive v0.2.28 | tar -x -C /path/to/streamline-release
 python3 -m http.server --bind 127.0.0.1 --directory /path/to/streamline-release 13998
 ```
 
@@ -72,7 +72,7 @@ python3 -m http.server --bind 127.0.0.1 --directory /path/to/streamline-release 
 node test/cafe-smoke/run.mjs --token=$TOKEN --streamline=http://127.0.0.1:13998
 ```
 
-It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere. Without `--streamline=` the switch to Streamline and back is skipped, and the run says so.
+It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere. Decaid writes a Shot's time as its own local time with no offset, so the browser runs in the container's time zone, UTC unless `--timezone=` names another; otherwise the legend's "Today" is wrong whenever the two zones' dates differ. Without `--streamline=` the switch to Streamline and back is skipped, and the run says so.
 
 In order, it:
 
@@ -89,7 +89,8 @@ In order, it:
 11. holds a filled card and checks its three items; takes recipes out of their slots, chooses one for an empty slot and one in place of another, and checks DYE2's records, the list's order and that nothing loads; removes the loaded recipe's card and checks it is unloaded with the machine set as it was; replaces the loaded card with a new recipe; checks no menu opens during a shot, and that the page never left for one of DYE2's pages;
 12. changes the language to German and to Arabic and checks the page's text, the roast date, that no label overflows its place or is shrunk below 14px, and that the layout stays left to right; then the menu and the list in German, the page with no recipe and the "DYE2 is needed" screen in German, and a change of language while that screen shows;
 13. with `--streamline=`, opens official Streamline on the same Decaid, sets its strip to R, loads a recipe and arranges the strip on the cafe page, and checks the strip mode is still R in Decaid's store and on Streamline's page;
-14. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded.
+14. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded;
+15. with no recipe loaded, pulls two shots in one session and checks the graph draws each once Decaid has saved it, the legend names it "Last shot" with its time and barista, the page reads no Shot through the Shot seam, and the history arrows and Streamline's shot panel are out of reach during each shot and at rest.
 
 The run puts DYE2's records back as they were before it made and moved recipes, so it can be repeated on the same Decaid.
 
