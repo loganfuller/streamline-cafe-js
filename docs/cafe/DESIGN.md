@@ -63,7 +63,7 @@ Three rules keep merges cheap.
 2. **`index.html` is the fork's own.** It keeps the element ids Streamline's modules drive. Where a module needs an element the layout drops, the page keeps a hidden stub instead of editing the module.
 3. **Streamline's files get only small hooks.** Each hook, and each Streamline test the fork changes, is listed in `UPSTREAM_EDITS.md`, so a merge has a checklist.
 
-Streamline's modules keep running for the work that isn't drawing. Its shot-data module feeds the stop notice and the shot timer, and its history module still reads the tablet's Shots, so both stay even though their panels are gone. With a recipe loaded, which finished Shot the graph draws is the page's choice; with none, the history module draws (see [Shots and the reference](#shots-and-the-reference)).
+Streamline's modules keep running for the work that isn't drawing. Its shot-data module feeds the stop notice and the shot timer, and its history module still reads the tablet's Shots, so both stay even though their panels are gone. With a recipe loaded, which finished Shot the graph draws is the page's choice; with none, the history module draws (see [Shots and the reference](#shots-and-the-reference)). Either way the choice is made in `src/cafe/graph-state.js` (see [The latest Shot](#the-latest-shot)).
 
 ## Recipes and the strip
 
@@ -137,6 +137,7 @@ One module, `src/cafe/shot-seam.js`, is asked for five things: a recipe's latest
 
 ### The latest Shot
 
+- **Which Shot is in the graph is decided in one module,** `src/cafe/graph-state.js`, which touches no browser global: a state, and a function from that state and an event to the next state and a list of things to do. The events are what can change it: a recipe loaded or unloaded, a shot started or ended, the page back in view, the history module asking the chart to draw, a reference push, the source of the reference changing, a timer running out, and the answers to its reads, to Make reference and to an edit of a rating or note. The things to do are the reads through the Shot seam, a draw, and starting or stopping a timer, and `src/cafe/graph.js` does them and tells the module what each read found. The guards against an answer that arrives late are the module's too: each read carries a count, and only the newest read's answer is taken.
 - The newest Shot on this tablet whose Workflow names the loaded recipe. It is always read from Decaid, with Decent Sync or without.
 - **It is looked for among the tablet's newest 100 Shots,** one request to Decaid. Past that, the recipe has no Shot on this machine yet. A row of Decaid's list carries its Workflow and no measurements, so the newest match is read whole, and the next one tried if it is Unfinished.
 - **An Unfinished Shot never takes its place.** That is a Shot where the machine never reached pouring and the scale never read 1 g: Decent Sync's rule, worked out from the Shot's own record. No sample is in the `pouring` substate, and no sample after the Shot's Preheat, its leading samples in `preparingForShot`, has a weight of 1 g or more. Both are needed, because a shot stopped on weight inside a long preinfusion never reports pouring though it ran whole.

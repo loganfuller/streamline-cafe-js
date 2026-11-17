@@ -99,7 +99,16 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
+});
+
+test('the graph\'s Shot is assigned only from what graph-state.js answers', () => {
+    // graph.js keeps the module's state whole: it never sets the Shot in the
+    // graph, its reference or its rating and note itself.
+    const graph = SOURCES.find(({ name }) => name === 'graph.js').text;
+    assert.deepEqual([...graph.matchAll(/\bstate\s*=(?!=)[^;]*/g)].map(match => match[0]), ['state = initialGraphState()', 'state = step.state', 'state = initialGraphState({ live: !!window.app?.isShotActive?.() })']);
+    assert.doesNotMatch(graph, /\b(latest|reference|remarks|recipe|live|settling|handed)\s*=(?!=)/);
+    assert.doesNotMatch(graph, /\bstate\.\w+\s*=(?!=)/);
 });
