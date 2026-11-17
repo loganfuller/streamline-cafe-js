@@ -5,12 +5,14 @@
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
-import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight, getPlugins, callPluginEndpoint } from '../modules/api.js';
+import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight } from '../modules/api.js';
 import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { pageHeading, decentSyncSaves, statusUnknown, statusRetryMs, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { decentSyncSaves } from './sync-status.js';
+import { askStatus, onStatus } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
 
@@ -23,13 +25,8 @@ const NAMES_GAP_MS = 300;
 const SETTLE_QUIET_MS = 1000;
 const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier edit to land
 
-const DECENT_SYNC_PLUGIN_ID = 'decent-sync.reaplugin';
-
 let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
-let savedSeq = 0;
-let savedRetry = null;  // the timer to ask again, while no answer has come either way
-let savedTries = 0;
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
@@ -61,44 +58,13 @@ export function showRecipe(next) {
 
 // The skin saves nothing onto a recipe itself. Decent Sync's plugin does, after
 // every change on a Machine it serves, so the column says "saved to the recipe"
-// only there. This is its Status request, in the shape decentSyncSaves reads.
-async function readDecentSync() {
-    const plugins = await getPlugins();
-    if (!Array.isArray(plugins)) return {}; // Decaid did not answer
-    if (!plugins.some(plugin => plugin && plugin.id === DECENT_SYNC_PLUGIN_ID && plugin.loaded)) return null;
-    try {
-        return await callPluginEndpoint(DECENT_SYNC_PLUGIN_ID, 'status', null, 'GET');
-    } catch (error) {
-        if (error.code) return { code: error.code }; // a refusal, which says why
-        // Decaid answers 404 itself for a plugin too old to have a Status request.
-        return error.status === 404 ? null : {};
-    }
-}
-
-async function readSaved() {
-    clearTimeout(savedRetry);
-    savedRetry = null;
-    const seq = ++savedSeq;
-    const answer = await readDecentSync();
-    if (seq !== savedSeq) return; // a newer read has begun
-    // No answer either way, as when the skin loads before the plugin has
-    // connected: ask again shortly, and more slowly each time, until one comes.
-    // A tablet that stays on this page fires none of the events below.
-    if (statusUnknown(answer)) {
-        savedTries += 1;
-        savedRetry = setTimeout(refreshSaved, statusRetryMs(savedTries));
-    } else {
-        savedTries = 0;
-    }
+// only there. Its Status request says which (decent-sync.js), and is asked at
+// start-up, when the page comes back into view and after each recipe load.
+function showStatus(answer) {
     const next = decentSyncSaves(saved, answer);
     if (next === saved) return;
     saved = next;
     renderHeading();
-}
-
-/** Ask Decent Sync again whether it saves this Machine's dial-in. */
-export function refreshSaved() {
-    readSaved().catch(error => logger.warn('Cafe: could not ask Decent Sync for its status', error));
 }
 
 // ── What the dial-in rows name ───────────────────────────────────────────────
@@ -159,7 +125,7 @@ function refreshSoon() {
     namesTimer = setTimeout(() => {
         namesTimer = null;
         refreshNames();
-        refreshSaved();
+        askStatus();
     }, NAMES_GAP_MS);
 }
 
@@ -170,7 +136,7 @@ function refreshSoon() {
  */
 export function afterRecipeLoad() {
     refreshNames();
-    refreshSaved();
+    askStatus();
 }
 
 // ── Steam flow ───────────────────────────────────────────────────────────────
@@ -303,7 +269,8 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     placeSystemButtons();
     paintBattery();
     refreshNames();
-    refreshSaved();
+    onStatus(showStatus);
+    askStatus();
 
     const profile = el('profile-name');
     if (profile) {

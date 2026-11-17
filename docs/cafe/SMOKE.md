@@ -2,6 +2,8 @@
 
 A run of the real page in a real Chromium against a real Decaid with a simulated machine. It is done by hand before a release and for any change to the main page, and is not in CI: it needs Docker, a browser and several minutes. The unit tests under `test/cafe-*.test.mjs` are what CI runs.
 
+There are two runs. The first, `test/cafe-smoke/run.mjs`, is the page against Decaid alone. The second, `test/cafe-smoke/run-decent-sync.mjs`, is the page against the same Decaid with Decent Sync's plugin and a local Decent Sync server: see [The second run](#the-second-run-with-decent-sync).
+
 Everything the run writes is made up. The sample beans, grinder and recipes are in `test/cafe-smoke/sample-data.mjs`; add to that file, with invented names, instead of copying a cafe's data.
 
 ## What it needs
@@ -9,6 +11,7 @@ Everything the run writes is made up. The sample beans, grinder and recipes are 
 - Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, a grinder and recipes, makes recipes and moves them between slots from the page, chooses reference Shots and clears the choices an earlier run left, changes the language, sets the Workflow's barista, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
 - Network access to GitHub, where Decaid fetches DYE2's latest release from.
 - Node, and this repository's dependencies (`npm ci`). Once per machine: `npx playwright install chromium`.
+- For the second run, Docker images of the Decent Sync server and PostgreSQL as well.
 
 ## Decaid, headless, with a simulated machine
 
@@ -89,7 +92,7 @@ In order, it:
 11. holds a filled card and checks its three items; takes recipes out of their slots, chooses one for an empty slot and one in place of another, and checks DYE2's records, the list's order and that nothing loads; removes the loaded recipe's card and checks it is unloaded with the machine set as it was; replaces the loaded card with a new recipe; checks no menu opens during a shot, and that the page never left for one of DYE2's pages;
 12. changes the language to German and to Arabic and checks the page's text, the roast date, that no label overflows its place or is shrunk below 14px, and that the layout stays left to right; then the menu and the list in German, the page with no recipe and the "DYE2 is needed" screen in German, and a change of language while that screen shows;
 13. with `--streamline=`, opens official Streamline on the same Decaid, sets its strip to R, loads a recipe and arranges the strip on the cafe page, and checks the strip mode is still R in Decaid's store and on Streamline's page;
-14. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded;
+14. checks the dial-in column's label with Decent Sync serving the Machine and refusing it, and, with a plugin that has not connected yet, the latest Shot alone with no reference and no Make reference until the status answers; and takes the screenshots a pull request needs: light and dark, with and without the on-screen machine buttons, with and without a recipe loaded;
 15. with no recipe loaded, pulls two shots in one session and checks the graph draws each once Decaid has saved it, the legend names it "Last shot" with its time and barista, the page reads no Shot through the Shot seam, and the history arrows and Streamline's shot panel are out of reach during each shot and at rest.
 
 The run puts DYE2's records back as they were before it made and moved recipes, so it can be repeated on the same Decaid.
@@ -103,18 +106,68 @@ Five things are not Decaid's own answers:
 
 - **A scale's readings.** The simulated scale reads no weight, so a Shot has no first drip, yield or ratio. On one page the run adds a scale's readings, a weighed dose and a yield to each Shot as the browser reads it, for the checks and screenshots of the row with every number in it. Decaid's own Shots are not changed.
 
-- **Decent Sync.** This Decaid has no Decent Sync plugin, and the plugin needs a server. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin not yet connected at the first ask. Nothing saves a dial-in in that check: it shows the label only.
+- **Decent Sync.** In the first run this Decaid has no Decent Sync plugin. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin that connects a few seconds after the page opens. It answers the plugin's `reference` request too, with no Reference Shot, and takes its `changes` socket, on which it sends only the push that says its connection came. Nothing saves a dial-in in that check: it shows the label only. The real plugin is the second run's.
 
 The theme is painted in the page and never stored: a stored theme is carried to Decaid's settings store, which every later page then reads back.
+
+## The second run: with Decent Sync
+
+The same page against the same Decaid, with Decent Sync's plugin connected to a Decent Sync server of its own. Run it after the first run, which leaves DYE2 on and the sample recipes in place. It changes the server as well as the Decaid, so never point it at a server someone uses.
+
+### A local Decent Sync server
+
+The server is one image and needs PostgreSQL. Both go on a Docker network with Decaid's container, so the plugin reaches the server by its container's name.
+
+```sh
+docker network create cafe-smoke
+docker network connect cafe-smoke cafe-smoke-decaid
+docker run -d --name cafe-smoke-sync-db --network cafe-smoke \
+  -e POSTGRES_USER=decent_sync -e POSTGRES_PASSWORD=decent_sync -e POSTGRES_DB=decent_sync postgres:17
+docker run -d --name cafe-smoke-sync --network cafe-smoke -p 127.0.0.1:3999:3000 \
+  -e DATABASE_URL=postgresql://decent_sync:decent_sync@cafe-smoke-sync-db:5432/decent_sync \
+  -e PUBLIC_URL=http://127.0.0.1:3999 -e DRAIN_GRACE_SECONDS=0 \
+  ghcr.io/loganfuller/decent-sync:1.11.0
+```
+
+Take the server's newest release: the run installs the plugin from Decent Sync's newest GitHub release, and the two should be one release. `curl http://127.0.0.1:3999/api/setup` answers once the server is up. It has no account yet, and the run makes its first Admin, with a made-up address and password that `--email=` and `--password=` change.
+
+### The run
+
+```sh
+node test/cafe-smoke/run-decent-sync.mjs --token=$TOKEN
+```
+
+It prints one line per check and exits non-zero if any failed, and its screenshots are named `sync-*.png`. `--sync=` is the server as the run reaches it (`http://127.0.0.1:3999`), `--sync-for-tablet=` the server as the plugin reaches it (`http://cafe-smoke-sync:3000`), and `--sync-container=` the container the run stops and starts (`cafe-smoke-sync`). `--base=`, `--decaid=`, `--timezone=`, `--out=` and `--headed` are the first run's.
+
+In order, it:
+
+1. makes the server's Admin, a Location named Sample Cafe and a Machine named Sample Machine, where they are missing; installs the plugin on Decaid, gives it the server's address and the Machine's token, and waits until the plugin serves the Machine and the tablet's sample recipes are the Location's Recipes;
+2. clears two recipes' Reference Shots on the server, and writes a choice of reference for one of them into Decaid's store, as a tablet that chose one before the plugin came would hold;
+3. checks the dial-in column's label, the latest Shot with no reference though the tablet keeps a choice, and that the reference was asked of the plugin by the recipe's DYE2 record id with nothing read from Decaid's store;
+4. presses Make reference, and checks the server's Recipe names the Shot, the badge shows, and the choice was one request to the plugin with nothing written to Decaid's store;
+5. pulls a second shot, and checks the Reference Shot drawn behind it with frames appended, then the legend: when and who for each Shot, and never where;
+6. chooses Reference Shots through the server's own API, as the management interface does, and checks each arrives on the open page with no reload: the latest Shot, a Shot pulled on another profile with "Different profile", none, and one again; then renames the Recipe and names it back, and checks the push that repeats reads the reference and draws nothing;
+7. opens Settings and comes back, and checks one `changes` socket was opened;
+8. stops the server's container, and checks the tablet's copy is drawn, Make reference is muted and takes no tap, the line under the legend, and the dial-in label; opens a second page meanwhile and checks it shows the latest Shot alone; starts the container and checks the reference can be changed again;
+9. turns the Machine's sharing off on the server, and checks the page falls back to the tablet's own choice at the next recipe load, that Make reference there writes Decaid's store and asks the plugin nothing, and that the server's Reference Shot is as it was; turns sharing on and checks the reference is Decent Sync's again.
+
+It leaves the server running and the Machine sharing, whatever failed, and a repeat uses the same Admin, Location and Machine.
+
+The first run is the page without Decent Sync, and does not start while the plugin is loaded. To run it again on this Decaid, disable the plugin first. The second run enables it again. The sample recipes are the Library's by then, and Decent Sync has taken from them the basket its Library does not hold, so the first run's "Yield names the basket" fails on a Decaid the second run has used. For a first run with nothing failing for that, start from a fresh Decaid and a fresh server.
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/v1/plugins/decent-sync.reaplugin/disable -H "Authorization: Bearer $TOKEN"
+```
 
 ## Afterwards
 
 ```sh
-docker rm -f cafe-smoke-decaid
+docker rm -f cafe-smoke-decaid cafe-smoke-sync cafe-smoke-sync-db
+docker network rm cafe-smoke
 ```
 
 A running Decaid keeps a CPU busy for as long as it is up.
 
 ## What it does not cover
 
-A real machine and scale (the simulated scale reads no weight, so no Shot in the run has a weight-flow line, a live card never shows a weight above 0 g, and the run's Unfinished Shot is one that never poured), the tablet's own WebView, the skin installed under its other id, touch input (a long-press is made with the mouse), the languages other than German, Arabic and French, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. Say so on the pull request when a change needs one of them.
+A real machine and scale (the simulated scale reads no weight, so no Shot in the run has a weight-flow line, a live card never shows a weight above 0 g, and the run's Unfinished Shot is one that never poured), the tablet's own WebView, the skin installed under its other id, touch input (a long-press is made with the mouse), the languages other than German, Arabic and French, a screen that is not 1920 by 1200, and a real Decent Sync plugin saving a change. The second run has one tablet, so a reference chosen elsewhere is one chosen through the server's API. It does not cover a recipe in no slot while the server is out of reach, a recipe the Library does not have yet, or a choice the plugin refuses or whose answer is lost: the unit tests do. Say so on the pull request when a change needs one of them.
