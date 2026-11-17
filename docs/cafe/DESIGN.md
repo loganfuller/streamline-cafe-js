@@ -184,7 +184,7 @@ A row of five cards under the graph, for the Shot in the graph. The graph gives 
   - With no Shot for the recipe yet the values are "—" and the cards give the reference's numbers.
 - **In Targets** the cards are Time, with first drip beside it; Dose against the dose set; Yield against its target; Ratio against the ratio set; and Peak pressure.
   - **Peak pressure has no target.** The card shows the Shot's own peak with nothing beside it: a target for it does not hold for every profile.
-  - The yield's target is the Workflow's, or the profile's own target weight where the Workflow sets none. Where nothing was set a card reads "No target".
+  - The yield's target is the Workflow's. A yield of 0 there is stop-at-weight switched off, so the Shot had no target, whatever its profile's target weight; that weight stands in only for a Workflow that holds no yield at all. Where nothing was set a card reads "No target".
   - The Dose card shows only a dose the Shot weighed.
   - With no Shot for the recipe yet each card reads "No shot yet".
 - **A value the Shot did not record is "—",** with no difference. A difference is the difference of the two numbers as they are shown, so 28.4 s beside 27.9 s is +0.5 s.
@@ -197,12 +197,13 @@ While a shot runs, six cards take the row's place: Time, Weight, Weight flow, Wa
 
 - **In Reference** each sits beside the reference at the same second of its own run, with the difference. Time's card says how long the reference ran.
   - **"The same second"** is seconds from the start of each Shot's profile, its Preheat left out, taking the reference's value between its two nearest samples.
+  - The reference's weight flow is the scale's, or the machine's own on a machine that measures one, as on the graph.
   - With no reference the cards read "No reference". Once the shot runs past the reference's last second they read "Ref ended". Neither shows a difference, and the page does not switch to Targets by itself.
 - **In Targets** each sits beside what the profile asks for at that moment: Time names the stage, Weight the weight the shot stops at, and Water flow, Pressure and Temperature their targets.
   - Where the profile sets no target for a card at that step it says "No target this step", which holds for any profile. A target of zero is a step that sets none.
   - No profile sets a weight flow, so that card reads "No profile target".
 - **The toggle switches the cards** between the two during a shot.
-- **The cards are written when the chart draws a live frame, and at no other time,** so they are repainted exactly as often as the chart is. The chart calls the page's overlay just before it draws, and the page reads the running shot's numbers off the lines the chart is about to draw. A card never says more than the graph shows, and writing the cards asks the chart for nothing. The scale's weight is not one of the chart's lines, and is read from Streamline's shot-data module.
+- **The cards are written when the chart draws a live frame,** so they are repainted exactly as often as the chart is. The chart calls the page's overlay just before it draws, and the page reads the running shot's numbers off the lines the chart is about to draw. A card never says more than the graph shows, and writing the cards asks the chart for nothing. The scale's weight is not one of the chart's lines, and is read from Streamline's shot-data module. A draw made while a finished shot waits to be saved writes them once more, so a shot that ended behind the full-screen chart leaves its last frame on the cards, not the one from when that chart was opened.
 - **The weight in the title band stays,** as the layout slice left it.
 
 ### Stage names

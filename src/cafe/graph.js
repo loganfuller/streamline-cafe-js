@@ -92,7 +92,10 @@ function overlay(traces, layout, mode, chart) {
     if (stages && !(shown.shapes && shown.shapes.length)) shown = { ...shown, shapes: stageShapes(stages, isDark()) };
     const margin = shown.margin || {};
     drawn = { traces: drawn.traces, layout: withStageNames(shown, { plotWidth: chartWidth - (margin.l ?? 50) - (margin.r ?? 50), measure: nameWidth }) };
-    if (mode === 'live' && live) readLiveFrame(traces, layout);
+    // While a finished shot waits for Decaid to save it the chart still holds
+    // its lines: a draw then, as on the way back from the full-screen chart,
+    // brings the cards up to the shot's last frame.
+    if ((mode === 'live' && live) || settling) readLiveFrame(traces, layout);
     return drawn;
 }
 

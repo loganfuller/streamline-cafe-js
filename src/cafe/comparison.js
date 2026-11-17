@@ -8,6 +8,7 @@
 // one Shot the same numbers: the Preheat is its leading samples in
 // `preparingForShot`, the profile starts at the first sample after them, and
 // nothing in the Preheat counts.
+import { hasMachineGFlow } from '../modules/historical-gflow.js';
 
 /** The least the scale reads, in grams, once coffee has reached the cup. */
 const FIRST_DRIP_GRAMS = 1;
@@ -54,11 +55,13 @@ const millis = value => {
  * A Shot's samples after its Preheat, one for each measurement its machine
  * timed: `seconds` from the start of the profile, the machine's pressure, flow
  * and group temperature, and the scale's weight and weight flow, each null
- * where it was not recorded. The weight flow is the machine's own where it
- * reports one.
+ * where it was not recorded. The weight flow is the machine's own on a record
+ * from a machine that measures one, as on the graph: a DE1 writes a constant 0
+ * there, which is no reading.
  */
 export function shotSamples(measurements) {
     const samples = [];
+    const machineFlow = hasMachineGFlow(measurements);
     let preheat = true;
     let start = null;
     for (const measurement of Array.isArray(measurements) ? measurements : []) {
@@ -73,7 +76,7 @@ export function shotSamples(measurements) {
             flow: number(machine.flow),
             temperature: number(machine.groupTemperature),
             weight: number(measurement.scale?.weight),
-            weightFlow: number(machine.weightFlow) ?? number(measurement.scale?.weightFlow),
+            weightFlow: number(machineFlow ? machine.weightFlow : measurement.scale?.weightFlow),
         });
     }
     return samples;
@@ -90,8 +93,10 @@ export function shotSamples(measurements) {
  * - `weighedDose`: the dose it weighed, and `dose`, that or else the dose its
  *   Workflow set, which is the recipe's as it was pulled.
  * - `ratio`: yield over `dose`.
- * - `targetDose`, `targetYield`, `targetRatio`: what its Workflow set. The
- *   yield is the profile's own target weight where the Workflow sets none.
+ * - `targetDose`, `targetYield`, `targetRatio`: what its Workflow set. A yield
+ *   of 0 is stop-at-weight switched off, so the Shot had no target, whatever
+ *   its profile's target weight. That weight stands in only for a Workflow
+ *   that holds no yield at all. This is Decent Sync's rule too.
  */
 export function shotNumbers(shot) {
     if (!shot) return null;
@@ -104,7 +109,8 @@ export function shotNumbers(shot) {
 
     const context = shot.workflow?.context;
     const targetDose = positive(context?.targetDoseWeight);
-    const targetYield = positive(context?.targetYield) ?? positive(shot.workflow?.profile?.target_weight);
+    const held = number(context?.targetYield);
+    const targetYield = positive(held !== null ? held : shot.workflow?.profile?.target_weight);
     const weighedDose = positive(shot.annotations?.actualDoseWeight);
     const dose = weighedDose ?? targetDose;
     const yielded = positive(shot.annotations?.actualYield) ?? positive(weighed?.weight);

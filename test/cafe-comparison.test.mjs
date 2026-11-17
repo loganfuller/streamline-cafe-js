@@ -41,6 +41,15 @@ test('a Shot is timed from the first sample after its Preheat', () => {
     assert.deepEqual(shotSamples(null), []);
 });
 
+test('the weight flow is the scale\'s, unless the machine measures its own', () => {
+    // A DE1 writes a constant 0 for its own weight flow: no reading.
+    const de1 = [sample(0, 'preinfusion', { weightFlow: 0 }, { weight: 0, weightFlow: 0.4 }), sample(2, 'pouring', { weightFlow: 0 }, { weight: 4, weightFlow: 2 })];
+    assert.deepEqual(shotSamples(de1).map(s => s.weightFlow), [0.4, 2]);
+    const own = [sample(0, 'preinfusion', { weightFlow: 0 }, { weight: 0, weightFlow: 0.4 }), sample(2, 'pouring', { weightFlow: 1.7 }, { weight: 4, weightFlow: 2 })];
+    assert.deepEqual(shotSamples(own).map(s => s.weightFlow), [0, 1.7]);
+    assert.deepEqual(shotSamples([sample(0, 'pouring')]).map(s => s.weightFlow), [null]);
+});
+
 test('a sample the machine did not time is no sample, though it ends the Preheat', () => {
     const samples = shotSamples([
         sample(0, 'preparingForShot'),
@@ -89,8 +98,12 @@ test('the yield is the one the Shot kept, or the scale\'s last reading', () => {
 test('what was set: the Workflow\'s dose and yield, the profile\'s target weight where it sets no yield', () => {
     const numbers = shotNumbers(shot());
     assert.deepEqual([numbers.targetDose, numbers.targetYield, numbers.targetRatio], [18, 36, 2]);
-    const profiles = shotNumbers(shot({ workflow: { context: { targetDoseWeight: 18, targetYield: 0 }, profile: { target_weight: 40 } } }));
+    const profiles = shotNumbers(shot({ workflow: { context: { targetDoseWeight: 18 }, profile: { target_weight: 40 } } }));
     assert.equal(profiles.targetYield, 40);
+    // A yield of 0 is stop-at-weight switched off: the profile's weight does not stand in.
+    const off = shotNumbers(shot({ workflow: { context: { targetDoseWeight: 18, targetYield: 0 }, profile: { target_weight: 40 } } }));
+    assert.deepEqual([off.targetYield, off.targetRatio], [null, null]);
+    assert.equal(restCards({ view: 'targets', shot: off })[2].side.phrase, 'No target');
     const none = shotNumbers(shot({ workflow: { context: {} } }));
     assert.deepEqual([none.targetDose, none.targetYield, none.targetRatio, none.dose], [null, null, null, 18.1]);
 });
