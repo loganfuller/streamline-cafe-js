@@ -520,7 +520,8 @@ function credit(shot) {
 function paintCredit(row, shot) {
     const { time, who } = creditParts(shot);
     setText(el(`cafe-${row}-when`), time);
-    setText(el(`cafe-${row}-who`), who && time ? `· ${who}` : who);
+    // The space before the name is the name's own: see `.cafe-legend-who`.
+    setText(el(`cafe-${row}-who`), who && time ? ` · ${who}` : who);
 }
 
 // The row under the graph: six live cards while a shot runs and until the

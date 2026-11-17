@@ -693,9 +693,13 @@ button.cafe-card {
     flex: 0 1 auto;
 }
 
+/* A name left out altogether takes no room: it gives back the gap that would
+   stand before it, and brings its own space when it shows. */
 .cafe-legend-who {
     flex: 1 1 0;
     max-width: max-content;
+    margin-left: -6px;
+    white-space: pre;
 }
 
 .cafe-legend-when:empty,
