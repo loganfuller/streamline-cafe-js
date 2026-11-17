@@ -36,6 +36,18 @@ test('the page reads Shots and the choice of reference through the Shot seam onl
     assert.deepEqual(filesWith(/from '\.\.\/modules\/idb\.js'/), [], 'Streamline\'s shot cache is not a source');
 });
 
+test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
+    // Decaid's own Shot edit, and its delete, are named by the seam alone.
+    assert.deepEqual(filesWith(/\b(updateShot|deleteShot)\b/), ['shot-seam.js', 'tablet-shots.js']);
+    const tablet = SOURCES.find(({ name }) => name === 'tablet-shots.js').text;
+    assert.doesNotMatch(tablet, /^import .*modules\/api\.js/m, 'the tablet source is handed Decaid\'s edit by the seam');
+    // The plugin's edit is sent by the one module that speaks to the plugin.
+    assert.deepEqual(filesWith(/\bshot\?id=/), ['decent-sync.js']);
+    assert.deepEqual(filesWith(/\beditPluginShot\b/), ['shot-seam.js']);
+    // And the page reaches either only through the seam.
+    assert.deepEqual(filesWith(/\beditShot\b[^;]*from '\.\/shot-seam\.js'/), ['graph.js']);
+});
+
 test('one module speaks to Decent Sync\'s plugin', () => {
     // Its Status request has two readers, the dial-in label and the Shot seam,
     // and its Reference Shot is read and chosen through the seam alone.
@@ -87,7 +99,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

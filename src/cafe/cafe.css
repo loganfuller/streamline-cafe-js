@@ -644,21 +644,28 @@ button.cafe-card {
     height: 44px;
     display: flex;
     align-items: center;
-    gap: 28px;
+    gap: 6px;
     font-size: 18px;
     white-space: nowrap;
     min-width: 0;
 }
 
+/* A Shot's row has no box of its own: its pieces lie in the legend's one row,
+   so what gives way in a narrow legend is chosen across both rows at once.
+   Each row ends with a little room before whatever follows it. */
 .cafe-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
+    display: contents;
+}
+
+.cafe-legend-item::after {
+    content: '';
+    flex: none;
+    width: 8px;
 }
 
 .cafe-legend-swatch {
     flex: none;
+    width: 28px;
 }
 
 .cafe-legend-name {
@@ -669,8 +676,12 @@ button.cafe-card {
     opacity: 0.6;
 }
 
-/* When a Shot was pulled and by whom: the first thing to give way in a narrow row. */
-.cafe-legend-when {
+/* When a Shot was pulled, and by whom. The names are the first thing to give
+   way in a narrow legend: they take only the room the row has to spare,
+   shared between them, so both are cut short, then left out, before either
+   Shot's time loses a pixel. */
+.cafe-legend-when,
+.cafe-legend-who {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -678,7 +689,17 @@ button.cafe-card {
     color: var(--data-card-title-text-color);
 }
 
-.cafe-legend-when:empty {
+.cafe-legend-when {
+    flex: 0 1 auto;
+}
+
+.cafe-legend-who {
+    flex: 1 1 0;
+    max-width: max-content;
+}
+
+.cafe-legend-when:empty,
+.cafe-legend-who:empty {
     display: none;
 }
 
@@ -720,8 +741,7 @@ button.cafe-card {
 .cafe-legend-btn {
     flex: none;
     height: 34px;
-    margin-left: 6px;
-    padding: 0 12px;
+    padding: 0 8px;
     box-sizing: border-box;
     border: 1.5px solid var(--mimoja-blue-v2);
     border-radius: 10px;
@@ -747,6 +767,155 @@ button.cafe-card {
     cursor: default;
 }
 
+/* ── Rating and notes ─────────────────────────────────────────────────────── */
+
+#cafe-legend,
+#cafe-note-dialog {
+    --cafe-star: #b7791f;
+    --cafe-star-empty: #c9ced5;
+}
+
+[data-theme="dark"] #cafe-legend,
+[data-theme="dark"] #cafe-note-dialog {
+    --cafe-star: #e8b84a;
+    --cafe-star-empty: #4a505c;
+}
+
+/* The Shot's five stars. Each is filled from its left as far as the rating
+   reaches, so a rating between two stars is drawn part-filled. */
+#cafe-stars {
+    flex: none;
+    display: inline-flex;
+}
+
+.cafe-star {
+    width: 30px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: linear-gradient(90deg, var(--cafe-star) var(--cafe-star-fill, 0%), var(--cafe-star-empty) var(--cafe-star-fill, 0%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 26px;
+    line-height: 1;
+    text-align: center;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* The reference's rating, "★ 4": read, never tapped. */
+.cafe-rating {
+    flex: none;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--cafe-star);
+}
+
+.cafe-rating:empty {
+    display: none;
+}
+
+/* A Shot's note: a page where it has one, a page with a plus where it has none. */
+.cafe-legend-icon {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-legend-icon .cafe-icon-add,
+.cafe-legend-icon.cafe-has-note .cafe-icon-add {
+    display: none;
+}
+
+#cafe-shot-note:not(.cafe-has-note) .cafe-icon-add {
+    display: block;
+}
+
+#cafe-shot-note:not(.cafe-has-note) .cafe-icon-note {
+    display: none;
+}
+
+/* The note's dialog. With the soft keyboard up it takes the height left above
+   it (src/cafe/note-dialog.js), and the text box gives up what the box lacks. */
+#cafe-note-dialog {
+    height: var(--cafe-note-visible, 100%);
+}
+
+#cafe-note-dialog .cafe-dialog {
+    width: 720px;
+    max-height: calc(var(--cafe-note-visible, 100vh) - 32px);
+}
+
+#cafe-note-dialog h3 {
+    margin-bottom: 6px;
+}
+
+#cafe-note-meta {
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-note-label {
+    margin-bottom: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-note-text {
+    flex: 1 1 220px;
+    min-height: 72px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 20px;
+    line-height: 1.45;
+    resize: none;
+}
+
+/* The reference's note: plain text, with its line breaks. */
+#cafe-note-read {
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--border-primary);
+    border-radius: 14px;
+    font-size: 20px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Why a note could not be saved: the dialog stays open with its text. */
+#cafe-note-error {
+    margin: 12px 0 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--status-red-color);
+}
+
 /* Reference | Targets, at the right of the row. */
 #cafe-view {
     flex: none;
@@ -759,7 +928,7 @@ button.cafe-card {
 
 #cafe-view button {
     height: 34px;
-    padding: 0 14px;
+    padding: 0 10px;
     border: 0;
     background: transparent;
     color: var(--data-card-title-text-color);

@@ -29,12 +29,16 @@ export const legend = page => page.evaluate(() => {
         const element = document.getElementById(id);
         return element && element.offsetParent !== null ? element.textContent.trim() : null;
     };
+    // "Today 14:32 · Ana": the row's time, and the barista's name where it has
+    // one, which the row cuts short or leaves out when it is narrow.
+    const credit = of => [`cafe-${of}-when`, `cafe-${of}-who`].map(id => document.getElementById(id).textContent.trim()).filter(Boolean).join(' ') || null;
     return {
-        label: shown('cafe-shot-label'), when: shown('cafe-shot-when'), make: shown('cafe-make-reference'),
+        label: shown('cafe-shot-label'), when: credit('shot'), make: shown('cafe-make-reference'),
         muted: shown('cafe-make-reference') !== null && document.getElementById('cafe-make-reference').disabled,
-        reference: shown('cafe-legend-reference') === null ? null : shown('cafe-reference-when') || '',
+        // A row has no box of its own: it shows where its name does.
+        reference: document.querySelector('#cafe-legend-reference .cafe-legend-name').offsetParent === null ? null : credit('reference') || '',
         flag: shown('cafe-different-profile'), badge: shown('cafe-reference-badge'), line: shown('cafe-legend-line'),
-        notice: shown('cafe-legend-notice'), targets: shown('cafe-legend-targets'),
+        notice: shown('cafe-legend-notice'), targets: document.querySelector('#cafe-legend-targets .cafe-legend-name').offsetParent === null ? null : document.getElementById('cafe-legend-targets').textContent.trim(),
         view: [...document.querySelectorAll('#cafe-view button')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.view).join(),
     };
 });
@@ -100,3 +104,72 @@ export const stageNames = (page, id = 'plotly-chart') => page.evaluate(async cha
 }, id);
 
 export const REFERENCE_LINES = ['Reference pressure', 'Reference flow', 'Reference weight'];
+
+// The stars and the notes on the legend. `stars` is how much of each star is
+// filled, in percent, or null where the Shot's row has no stars; `note` is
+// which icon the row's note button shows, `note` or `add`, or null with no
+// button; `referenceRating` is the text of the reference's rating, or null; and
+// `referenceNote` whether its note icon shows.
+export const remarks = page => page.evaluate(() => {
+    const shown = id => {
+        const element = document.getElementById(id);
+        return element && element.offsetParent !== null ? element : null;
+    };
+    const button = shown('cafe-shot-note');
+    return {
+        stars: shown('cafe-stars') ? [...document.querySelectorAll('#cafe-stars .cafe-star')].map(star => Math.round(parseFloat(star.style.getPropertyValue('--cafe-star-fill')) || 0)) : null,
+        note: button ? [...button.querySelectorAll('svg')].filter(icon => getComputedStyle(icon).display !== 'none').map(icon => (icon.classList.contains('cafe-icon-add') ? 'add' : 'note')).join() : null,
+        referenceRating: shown('cafe-reference-rating') ? shown('cafe-reference-rating').textContent : null,
+        referenceNote: !!shown('cafe-reference-note'),
+    };
+});
+
+// The note's dialog, or null while it is closed: its title, the line under it,
+// the box's text and placeholder where it is one to write in, the note where it
+// is one to read, the buttons that show, and the line that says a save failed.
+export const noteDialog = page => page.evaluate(() => {
+    const dialog = document.getElementById('cafe-note-dialog');
+    if (!dialog.open) return null;
+    const shown = id => {
+        const element = document.getElementById(id);
+        return element && getComputedStyle(element).display !== 'none' ? element : null;
+    };
+    const box = dialog.querySelector('.cafe-dialog').getBoundingClientRect();
+    return {
+        title: shown('cafe-note-title').textContent,
+        when: shown('cafe-note-when').textContent,
+        rating: shown('cafe-note-rating')?.textContent || '',
+        label: shown('cafe-note-label')?.textContent ?? null,
+        text: shown('cafe-note-text')?.value ?? null,
+        placeholder: shown('cafe-note-text')?.placeholder ?? null,
+        read: shown('cafe-note-read')?.textContent ?? null,
+        buttons: [...dialog.querySelectorAll('button')].filter(button => getComputedStyle(button).display !== 'none').map(button => button.textContent.trim()),
+        error: shown('cafe-note-error')?.textContent ?? null,
+        box: { top: Math.round(box.top), bottom: Math.round(box.bottom) },
+        boxHeight: shown('cafe-note-text') ? Math.round(shown('cafe-note-text').getBoundingClientRect().height) : null,
+    };
+});
+
+// Does the legend's row hold everything it shows? `out` names what runs past
+// its right edge or is cut short, but for when a Shot was pulled and by whom,
+// which give way in a narrow row, the name first. `times` and `names` are how
+// many pixels each time and each name lacks, 0 for one shown whole.
+export const legendFits = page => page.evaluate(() => {
+    const legend = document.getElementById('cafe-legend');
+    const edge = legend.getBoundingClientRect().right + 0.5;
+    const out = [];
+    for (const element of legend.querySelectorAll('span, button, svg')) {
+        const box = element.getBoundingClientRect();
+        if (!box.width) continue;
+        const name = element.id || element.getAttribute('class') || element.tagName;
+        if (box.right > edge) out.push(`${name} runs past the row`);
+        else if (element.scrollWidth > element.clientWidth + 1 && !element.matches('.cafe-legend-when, .cafe-legend-who')) out.push(`${name} is cut short`);
+    }
+    // By the text's own width: a box a tenth of a pixel short already ends in "…".
+    const lacking = selector => [...legend.querySelectorAll(selector)].filter(element => element.textContent).map(element => {
+        const text = document.createRange();
+        text.selectNodeContents(element);
+        return Math.max(0, Math.round((text.getBoundingClientRect().width - element.getBoundingClientRect().width) * 10) / 10);
+    });
+    return { out, times: lacking('.cafe-legend-when'), names: lacking('.cafe-legend-who') };
+});

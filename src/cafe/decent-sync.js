@@ -1,5 +1,5 @@
 // The page's one line to Decent Sync's plugin on this tablet: its Status
-// request, its `reference` request and its `changes` socket
+// request, its `reference` request, its edit of a Shot and its `changes` socket
 // (docs/cafe/DESIGN.md, "Recipes and the strip" and "Shots and the reference").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
@@ -103,4 +103,9 @@ export function readReference(recipeId) {
 /** Asks the plugin to make a Shot a recipe's Reference Shot. Rejects with the refusal. */
 export function chooseReference(recipeId, shotId) {
     return callPluginEndpoint(PLUGIN_ID, reference(recipeId), { shotId }, 'PUT');
+}
+
+/** Asks the plugin to set a Shot's rating, its note or both, as `{ rating?, note? }`. Answers the two as they now are. Rejects with the refusal. */
+export function editShot(shotId, edit) {
+    return callPluginEndpoint(PLUGIN_ID, `shot?id=${encodeURIComponent(shotId)}`, edit, 'PUT');
 }

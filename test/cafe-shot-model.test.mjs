@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
     shotRecipeId, shotsWithRecipe, isUnfinished, shotCurves, shotCredit,
     differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot, sameReference,
-    UNCHANGEABLE_NOTICE, UNREAD_NOTICE,
+    UNCHANGEABLE_NOTICE, UNREAD_NOTICE, isDrawnShot,
 } from '../src/cafe/shot-model.js';
 import { createTabletShots } from '../src/cafe/tablet-shots.js';
 
@@ -260,6 +260,63 @@ test('"Different profile" follows Decent Sync\'s word where it gives one', () =>
     assert.equal(graphModel({ recipe, view: 'reference', shot: shot('a'), reference: otherTitle }).flag, false, 'though the titles differ');
     assert.equal(graphModel({ recipe, view: 'targets', shot: shot('a'), reference: sameTitle }).flag, false, 'the reference has no row in Targets');
     assert.equal(graphModel({ recipe, view: 'reference', shot: shot('b'), reference: sameTitle }).flag, false, 'nor when the Shot is the reference');
+});
+
+// ── Rating and notes on the legend ───────────────────────────────────────────
+
+test('a saved Shot has stars and a note icon, with its rating and note', () => {
+    const recipe = { id: 'r1' };
+    const shot = { id: 'a' };
+    const rated = graphModel({ view: 'reference', recipe, shot, remarks: { rating: 8, note: 'Sweet' } });
+    assert.deepEqual(rated.rate, { rating: 8, note: 'Sweet' });
+    assert.deepEqual(graphModel({ view: 'targets', recipe, shot, remarks: { rating: null, note: null } }).rate, { rating: null, note: null }, 'empty stars and a plus, in Targets too');
+});
+
+test('no stars and no note icon during a live shot, while a finished shot waits to be saved, or with no Shot for the recipe', () => {
+    const recipe = { id: 'r1' };
+    const remarks = { rating: 8, note: 'Sweet' };
+    assert.equal(graphModel({ view: 'reference', recipe, live: true, shot: { id: 'a' }, remarks }).rate, null);
+    assert.equal(graphModel({ view: 'reference', recipe, settling: true, shot: { id: 'a' }, remarks }).rate, null);
+    assert.equal(graphModel({ view: 'reference', recipe, shot: null, remarks }).rate, null);
+    assert.equal(graphModel({ view: 'reference', recipe, shot: undefined, remarks }).rate, null, 'nor before the Shot was read');
+    assert.equal(graphModel({ view: 'reference', recipe: undefined, shot: { id: null }, remarks }).rate, null, 'nor before DYE2 has said which recipe is loaded');
+});
+
+test('"Last shot", with no recipe, is rated once its record is known to be the Shot drawn', () => {
+    const handed = { id: null, timestamp: '2026-11-12T10:00:00.000' };
+    assert.equal(graphModel({ view: 'reference', recipe: null, shot: handed }).rate, null, 'the history module hands over no record');
+    assert.deepEqual(graphModel({ view: 'reference', recipe: null, shot: handed, remarks: { rating: 6, note: null } }).rate, { rating: 6, note: null });
+});
+
+test('a record is the Shot drawn only when their first samples are the same', () => {
+    const measurements = [{ machine: { timestamp: '2026-11-12T10:00:00.250' } }, { machine: { timestamp: '2026-11-12T10:00:00.750' } }];
+    const handed = drawnShot(measurements, null);
+    assert.ok(isDrawnShot({ id: 'a', timestamp: '2026-11-12T10:00:00.000', measurements }, handed));
+    assert.ok(!isDrawnShot({ id: 'b', timestamp: '2026-11-12T10:00:00.000', measurements: [{ machine: { timestamp: '2026-11-12T10:03:10.000' } }] }, handed), 'a newer Shot the module has not drawn yet');
+    assert.ok(!isDrawnShot({ id: 'c', measurements: [] }, handed));
+    assert.ok(!isDrawnShot(null, handed));
+    assert.ok(!isDrawnShot({ id: 'a', measurements }, null));
+    assert.ok(!isDrawnShot({ measurements }, handed), 'a record with no id can\'t be edited');
+});
+
+test('the reference\'s row shows its rating and note only when it has them', () => {
+    const recipe = { id: 'r1' };
+    const shot = { id: 'a' };
+    const both = graphModel({ view: 'reference', recipe, shot, reference: { shot: { id: 'b' }, canChange: true, rating: 7, note: 'Syrupy' } });
+    assert.deepEqual([both.referenceRating, both.referenceNote], [7, 'Syrupy']);
+    const neither = graphModel({ view: 'reference', recipe, shot, reference: { shot: { id: 'b' }, canChange: true, rating: null, note: null } });
+    assert.deepEqual([neither.referenceRating, neither.referenceNote], [null, null]);
+    const live = graphModel({ view: 'reference', recipe, live: true, shot, reference: { shot: { id: 'b' }, canChange: true, rating: 7, note: 'Syrupy' } });
+    assert.deepEqual([live.referenceRating, live.referenceNote], [7, 'Syrupy'], 'the row stays through a shot');
+    const self = graphModel({ view: 'reference', recipe, shot, reference: { shot, canChange: true, rating: 7, note: 'Syrupy' }, remarks: { rating: 7, note: 'Syrupy' } });
+    assert.deepEqual([self.referenceRating, self.referenceNote, self.rate], [null, null, { rating: 7, note: 'Syrupy' }], 'when the latest Shot is the reference they are edited on its own row');
+    const targets = graphModel({ view: 'targets', recipe, shot, reference: { shot: { id: 'b' }, canChange: true, rating: 7, note: 'Syrupy' } });
+    assert.deepEqual([targets.referenceRating, targets.referenceNote], [null, null], 'no reference row in Targets');
+});
+
+test('a change of the reference\'s rating or note is no change to the graph', () => {
+    const a = { shot: { id: 'a' }, canChange: true, rating: 8, note: null };
+    assert.ok(sameReference(a, { ...a, rating: 6, note: 'Changed elsewhere' }), 'the row is written again, and nothing is drawn');
 });
 
 test('two answers for a reference are the same when they name the same Shot and say the same of it', () => {

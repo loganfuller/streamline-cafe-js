@@ -301,21 +301,28 @@
                         </div>
                     </div>
 
-                    <!-- Legend (src/cafe/graph.js): the Shot in the graph, the recipe's reference,
-                         and the Reference | Targets toggle. Streamline's history module still
-                         writes the four lines of its own panel, into the stub at the end. -->
+                    <!-- Legend (src/cafe/graph.js): the Shot in the graph with its stars and its note,
+                         the recipe's reference with its rating and its note to read, and the
+                         Reference | Targets toggle. Streamline's history module still writes the
+                         four lines of its own panel, into the stub at the end. -->
                     <div id="cafe-legend">
                         <div id="cafe-legend-shot" class="cafe-legend-item" aria-live="polite" style="display:none">
                             <svg class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                             <span id="cafe-shot-label" class="cafe-legend-name"></span>
+                            <span id="cafe-stars" role="group" aria-label="Rating" style="display:none"><button type="button" class="cafe-star" data-star="1" aria-label="1 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="2" aria-label="2 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="3" aria-label="3 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="4" aria-label="4 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="5" aria-label="5 of 5 stars" aria-pressed="false">★</button></span>
                             <span id="cafe-shot-when" class="cafe-legend-when"></span>
+                            <span id="cafe-shot-who" class="cafe-legend-who"></span>
+                            <button id="cafe-shot-note" type="button" class="cafe-legend-icon" aria-label="Note" style="display:none"><svg class="cafe-icon-note" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg><svg class="cafe-icon-add" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
                             <button id="cafe-make-reference" type="button" class="cafe-legend-btn" data-cafe-text="Make reference" style="display:none">Make reference</button>
                         </div>
                         <div id="cafe-legend-reference" class="cafe-legend-item" style="display:none">
                             <svg id="cafe-reference-swatch" class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                             <span class="cafe-legend-name" data-cafe-text="Reference">Reference</span>
+                            <span id="cafe-reference-rating" class="cafe-rating" style="display:none"></span>
                             <span id="cafe-reference-when" class="cafe-legend-when"></span>
+                            <span id="cafe-reference-who" class="cafe-legend-who"></span>
                             <span id="cafe-different-profile" class="cafe-legend-flag" data-cafe-text="Different profile" style="display:none">Different profile</span>
+                            <button id="cafe-reference-note" type="button" class="cafe-legend-icon" aria-label="Reference note" style="display:none"><svg class="cafe-icon-note" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg></button>
                         </div>
                         <span id="cafe-reference-badge" class="cafe-legend-flag" data-cafe-text="This shot is the reference" style="display:none">This shot is the reference</span>
                         <span id="cafe-legend-line" class="cafe-legend-line" style="display:none"></span>
@@ -423,6 +430,26 @@
             </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
+
+    <!-- A Shot's note, to write, and the reference's, to read (src/cafe/note-dialog.js).
+         It fits itself above the soft keyboard, so Streamline does not lift the page behind it. -->
+    <dialog id="cafe-note-dialog" class="modal" aria-labelledby="cafe-note-title" data-keyboard-fit="1">
+        <div class="modal-box cafe-dialog">
+            <h3 id="cafe-note-title"></h3>
+            <p id="cafe-note-meta"><span id="cafe-note-when"></span><span id="cafe-note-rating" class="cafe-rating"></span></p>
+            <label id="cafe-note-label" for="cafe-note-text" data-cafe-text="Note">Note</label>
+            <textarea id="cafe-note-text" maxlength="40000" autocomplete="off"></textarea>
+            <p id="cafe-note-read"></p>
+            <p id="cafe-note-error" role="alert" style="display:none"></p>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button id="cafe-note-cancel" class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                    <button id="cafe-note-save" type="button" class="cafe-btn cafe-btn-primary" data-cafe-text="Save note">Save note</button>
+                    <button id="cafe-note-close" class="cafe-btn cafe-btn-primary" value="" data-cafe-text="Close">Close</button>
+                </form>
+            </div>
+        </div>
     </dialog>
 
     <dialog id="profile_modal" class="modal">

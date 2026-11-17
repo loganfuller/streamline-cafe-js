@@ -9,6 +9,7 @@
 // Each request rejects when Decaid can't be asked, so the page keeps what it
 // shows instead of reading a failure as "none".
 import { LATEST_WINDOW, shotsWithRecipe, isUnfinished, chosenShotId, withChosenShot } from './shot-model.js';
+import { shotRemarks, annotationsOf, editReadAgain } from './remarks.js';
 
 /**
  * - `listShots(limit)`: Decaid's newest Shots, newest first, as `{ items }`,
@@ -16,8 +17,10 @@ import { LATEST_WINDOW, shotsWithRecipe, isUnfinished, chosenShotId, withChosenS
  * - `readShot(id)`: one Shot whole, or null when Decaid no longer has it.
  * - `readChoices()`: the stored choices, or null when none were kept.
  * - `writeChoices(choices)`.
+ * - `updateShot(id, body)`: Decaid's own Shot edit, which merges `body` into
+ *   the Shot and answers with the Shot.
  */
-export function createTabletShots({ listShots, readShot, readChoices, writeChoices }) {
+export function createTabletShots({ listShots, readShot, readChoices, writeChoices, updateShot }) {
     const source = {
         /**
          * This machine's latest Shot pulled with a recipe, whole, or null when
@@ -39,12 +42,44 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
 
         /**
          * A recipe's reference: `shot`, whole, or null when none is chosen or
-         * the tablet no longer has the Shot chosen; and `canChange`, whether
-         * another can be chosen now, which on the tablet's own Shots it can.
+         * the tablet no longer has the Shot chosen; `canChange`, whether
+         * another can be chosen now, which on the tablet's own Shots it can;
+         * and with a Shot, its `rating` and `note`, from its own record.
          */
         async referenceShot(recipeId) {
             const id = chosenShotId(await readChoices(), recipeId);
-            return { shot: id ? await readShot(id) : null, canChange: true };
+            const shot = id ? await readShot(id) : null;
+            return { shot, canChange: true, ...(shot ? shotRemarks(shot) : {}) };
+        },
+
+        /**
+         * The tablet's newest Shot, whole, whatever it was pulled with, or
+         * null when it has none. With no recipe loaded the page asks for it to
+         * learn the id, rating and note of the Shot Streamline's history
+         * module drew, which comes with no record.
+         */
+        async newestShot() {
+            const page = await listShots(1);
+            const row = page && Array.isArray(page.items) ? page.items[0] : null;
+            return row && row.id != null ? readShot(row.id) : null;
+        },
+
+        /**
+         * Set a Shot's rating, its note or both, with Decaid's own Shot edit:
+         * `edit` is `{ rating?, note? }`, and only what it names is sent.
+         * Resolves with the Shot's rating and note as they now are.
+         *
+         * An edit Decaid did not answer may have been made, so the Shot is
+         * read again before the edit is called failed (`editReadAgain`).
+         */
+        async editShot(shotId, edit) {
+            let failed;
+            try {
+                return shotRemarks(await updateShot(shotId, annotationsOf(edit)));
+            } catch (error) {
+                failed = error;
+            }
+            return editReadAgain(edit, () => readShot(shotId), failed);
         },
 
         /**

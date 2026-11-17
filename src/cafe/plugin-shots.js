@@ -8,6 +8,7 @@
 //
 // The skin keeps no copy of a reference: the one drawn while the server can't
 // be reached is the plugin's own.
+import { ratingOf, noteOf, editReadAgain } from './remarks.js';
 
 // The server could not be asked. `serverTooOld` is treated as `unreachable`,
 // as the contract asks.
@@ -20,14 +21,20 @@ const NOT_SERVED = ['captureOnly', 'hardwareMismatch'];
  * `shot`, whole, or null where the Recipe has none; `canChange`; `unreachable`,
  * whether the server can't be reached, so this is the tablet's copy; and, with
  * a Shot, `profileDiffers`, Decent Sync's word on whether it was pulled on
- * another Profile than the Recipe's. `referenceShot` below adds `unread`, where
- * the server can't be reached and there was no copy to read either.
+ * another Profile than the Recipe's, and its `rating` and `note`, which are
+ * the answer's own. `referenceShot` below adds `unread`, where the server
+ * can't be reached and there was no copy to read either.
  */
 export function referenceFrom(answer) {
     const reference = answer && typeof answer === 'object' ? answer.reference : null;
     const shot = reference && reference.shot && reference.shot.id != null ? reference.shot : null;
     const copy = !!answer && answer.source === 'tablet';
-    return { shot, canChange: !copy, unreachable: copy, ...(shot ? { profileDiffers: reference.profileDiffers === true } : {}) };
+    return {
+        shot,
+        canChange: !copy,
+        unreachable: copy,
+        ...(shot ? { profileDiffers: reference.profileDiffers === true, rating: ratingOf(reference.rating), note: noteOf(reference.note) } : {}),
+    };
 }
 
 /**
@@ -56,14 +63,16 @@ export function changeOf(data) {
 /**
  * - `readReference(recipeId)`: the plugin's answer to `GET reference`.
  * - `chooseReference(recipeId, shotId)`: its answer to `PUT reference`.
+ * - `editShot(shotId, edit)`: its answer to `PUT shot`, for `{ rating?, note? }`.
  *
- *   Both reject with the refusal: an Error with the refusal's `code` and
+ *   Each rejects with the refusal: an Error with the refusal's `code` and
  *   `message`, and the HTTP `status`. One Decaid answered itself has a `status`
  *   and no `code`; a request that reached nothing has neither.
+ * - `readShot(id)`: one of the tablet's own Shots, whole, from Decaid, or null.
  * - `notServed()`: called when a refusal says the Machine is not served any
  *   more, so the caller can ask the status again.
  */
-export function createPluginShots({ readReference, chooseReference, notServed = () => {} }) {
+export function createPluginShots({ readReference, chooseReference, editShot, readShot, notServed = () => {} }) {
     const source = {
         /**
          * A recipe's reference, as `referenceFrom` gives it.
@@ -115,6 +124,35 @@ export function createPluginShots({ readReference, chooseReference, notServed = 
             try { now = await source.referenceShot(recipeId); } catch (error) { /* not known: the choice is shown as failed */ }
             if (now && now.shot && String(now.shot.id) === String(shotId)) return now;
             throw Object.assign(new Error(refused.message), { code: refused.code, reference: now });
+        },
+
+        /**
+         * Set a Shot's rating, its note or both: `edit` is `{ rating?, note? }`,
+         * and only what it names is sent. Resolves with the Shot's rating and
+         * note as they now are, which is the plugin's answer. The plugin
+         * writes the tablet's own Shot through Decaid, with the server or
+         * without it, and asks the server for any other.
+         *
+         * An edit answered `unreachable`, or by Decaid with no `code`, or not
+         * answered at all, may have been made all the same. So the Shot is
+         * read again, and the edit has failed only if it does not hold what
+         * was asked for. That read is Decaid's: every Shot the page edits
+         * today is the tablet's own. Any other refusal rejects with `refusal`,
+         * its message to show, and changes nothing.
+         */
+        async editShot(shotId, edit) {
+            let refused;
+            try {
+                const answer = await editShot(shotId, edit);
+                return { rating: ratingOf(answer?.rating), note: noteOf(answer?.note) };
+            } catch (error) {
+                refused = error;
+            }
+            if (refused.code !== undefined && !CANT_ASK.includes(refused.code)) {
+                if (NOT_SERVED.includes(refused.code)) notServed();
+                throw Object.assign(new Error(refused.message), { code: refused.code, refusal: refused.message });
+            }
+            return editReadAgain(edit, () => readShot(shotId), refused);
         },
     };
     return source;

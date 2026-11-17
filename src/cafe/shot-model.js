@@ -199,17 +199,25 @@ export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can
  *   `shot` is null with no reference; or null before it was read. On a Machine
  *   Decent Sync serves it may carry `unreachable`, the server can't be reached;
  *   `unread`, so nothing could be read; and `profileDiffers`, Decent Sync's
- *   word on the reference's profile.
+ *   word on the reference's profile. With a Shot it carries the Shot's
+ *   `rating` and `note`.
+ * - `remarks`: the rating and note of the Shot in the graph, `{ rating, note }`,
+ *   or null where its record is not known: with no recipe the Shot comes from
+ *   Streamline's history module with no record, until the page has read one.
  *
  * The answer: `row`, the Shot's row (`label`, a phrase, and `shot`, whose time
  * and barista follow it, or null); `line`, a phrase under no row, or null;
  * `reference`, the Shot the reference row names, or null; `flag`, whether that
  * row says "Different profile"; `badge`, "This shot is the reference";
  * `targets`, the "Profile target" legend; `makeReference`, with `muted` where
- * it is shown and can't act; `notice`, a phrase saying why, or null; and
- * `lines`, whether the reference's lines are drawn.
+ * it is shown and can't act; `notice`, a phrase saying why, or null;
+ * `lines`, whether the reference's lines are drawn; `rate`, the rating and
+ * note the Shot's row shows with its stars and note icon, or null where it has
+ * neither: only a saved Shot is rated, so not while a shot runs or waits to be
+ * saved; and `referenceRating` and `referenceNote`, what the reference's row
+ * shows, each null where the reference has none.
  */
-export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null }) {
+export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null, remarks = null }) {
     const inReference = view !== 'targets';
     const atRest = !live && !settling;
     const referenceShot = recipe && reference ? reference.shot : null;
@@ -249,13 +257,18 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
         muted,
         notice,
         lines: showsReference,
+        rate: atRest && !unknown && !!shot && remarks ? { rating: remarks.rating ?? null, note: remarks.note ?? null } : null,
+        referenceRating: showsReference ? reference.rating ?? null : null,
+        referenceNote: showsReference ? reference.note ?? null : null,
     };
 }
 
 /**
- * Are two of the seam's answers for a reference the same to the page? The same
+ * Are two of the seam's answers for a reference the same to the graph? The same
  * Shot, or none, with the same things said about it. A push may repeat, and
- * the graph is drawn again only for an answer that differs.
+ * the graph is drawn again only for an answer that differs. The Shot's rating
+ * and note are not the graph's: a change of those writes the legend's row
+ * again and draws nothing (`sameRemarks` in remarks.js).
  */
 export function sameReference(a, b) {
     if (!a || !b) return false;
@@ -277,4 +290,17 @@ export function chosenShotId(stored, recipeId) {
 export function withChosenShot(stored, recipeId, shotId) {
     const kept = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
     return { ...kept, [String(recipeId)]: String(shotId) };
+}
+
+/**
+ * Is a Shot's record that of the Shot Streamline's history module handed the
+ * chart? The module hands over no id, so the two are matched by their first
+ * sample's time, which is the handed Shot's `timestamp` (`drawnShot`). Two
+ * Shots never share one, so the stars never act on a Shot other than the one
+ * drawn.
+ */
+export function isDrawnShot(record, drawn) {
+    if (!record || record.id == null || !drawn || !drawn.timestamp) return false;
+    const first = drawnShot(record.measurements, record.workflow);
+    return !!first && first.timestamp === drawn.timestamp;
 }

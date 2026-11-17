@@ -23,7 +23,7 @@ The owner keeps the screen's working design as a mockup, which is not in this re
 - **Grinder, bean, basket and profile.** Dose names the bean and batch, Yield the basket, Grind the grinder and Brew the profile. A tap on one opens a dialog listing what the tablet offers.
 - **Graph.** At full strength: this machine's latest Shot pulled with the loaded recipe. Faded: the recipe's Reference Shot. Both are solid lines; the dotted lines are the profile's targets. A Reference | Targets toggle switches to Streamline's view of the Shot against the profile's targets. The legend says when each Shot was pulled and by whom, and ends the latest Shot's row with Make reference. Each profile stage the Shot reached is named at its line.
 - **Comparison row.** Under the graph, five cards. In Reference: time, first drip, yield, ratio and peak pressure, each beside the reference's with the difference. In Targets: time with first drip, then dose, yield and ratio against what was set, and peak pressure alone. While a shot runs, six live cards take its place: time, weight, weight flow, water flow, pressure and temperature, beside the reference at the same second or beside what the profile asks for.
-- **Rating and notes.** Stars and a note for the Shot in the graph.
+- **Rating and notes.** Five stars and a note icon on the row of the Shot in the graph. A tap on a star rates it, and the icon opens its note to write. The reference's row shows its rating and a note icon that opens its note to read.
 - **Shots list.** Every Shot at the Location with Decent Sync, otherwise this machine's own. A row opens that Shot in the graph.
 - **No recipe loaded.** The title reads "No recipe selected", the dial-in column says it is not saved to a recipe, and the steppers change this machine only.
 - **Gone from Streamline's page.** The P/F/R toggle, the favourite-profile buttons, the DYE button, the shot-history card, the phase table, every row of preset buttons, the steam time and the milk-pitcher steam mode. The settings that configure them stay in the settings page and do nothing here.
@@ -128,10 +128,11 @@ With a recipe loaded, the graph shows this machine's latest Shot pulled with it,
 
 ### The Shot seam
 
-One module, `src/cafe/shot-seam.js`, is asked for three things: a recipe's latest Shot on this machine, a recipe's reference, and to make a Shot a recipe's reference. With no recipe loaded the page asks it nothing. Its answer for a reference says whether it can be changed now. The page reads Shots and the choice no other way, and a test fails if another module does, so which source answers changes no caller. A recipe is named by its DYE2 record id, the one Streamline's apply writes into the Workflow.
+One module, `src/cafe/shot-seam.js`, is asked for five things: a recipe's latest Shot on this machine, a recipe's reference, to make a Shot a recipe's reference, the tablet's newest Shot, and to set a Shot's rating and note. With no recipe loaded the page asks it only for the newest Shot, for its rating and note (see [Rating and notes](#rating-and-notes)). Its answer for a reference says whether it can be changed now. The page reads and changes Shots, and the choice, no other way, and a test fails if another module does, so which source answers changes no caller. A recipe is named by its DYE2 record id, the one Streamline's apply writes into the Workflow.
 
 - **The latest Shot is always the tablet's own,** read from Decaid's Shots (`src/cafe/tablet-shots.js`), with Decent Sync or without. It is this machine's Shot.
 - **The reference has two sources.** Where Decent Sync does not serve the Machine it is a choice kept on the tablet: one of Decaid's Shots, named in the `streamlineCafe` namespace as recipe to Shot. On a Machine Decent Sync serves it is the Recipe's Reference Shot, read and chosen through the plugin (`src/cafe/plugin-shots.js`): see [The reference with Decent Sync](#the-reference-with-decent-sync).
+- **An edit of a Shot's rating or note has the same two routes:** the plugin on a Machine Decent Sync serves, Decaid's own Shot edit otherwise.
 - **Streamline's shot cache is not a source.** It can't hold another machine's Shots: it removes any cached row that Decaid's own list doesn't return.
 
 ### The latest Shot
@@ -155,7 +156,7 @@ One module, `src/cafe/shot-seam.js`, is asked for three things: a recipe's lates
 - **The line-end labels** name the Shot's own lines and never the reference's: a label finds its line by colour on the main chart and by name on the full-screen one, and the reference's colours and names are no line's of Streamline's. One case is left: the renderer gives a line with no label of its colour the label that sits on its last point, so a reference that ends at the Shot's own last second and value takes that label. A simulated machine can pull two such Shots, and a real one does not.
 - **The time axis.** At rest it fits the longer of the two Shots. Where the chart is left to fit its own axis, as after a change of theme, it is given a range only if the reference is the longer. During a live shot, in Reference, it starts at the reference's length and grows only if the shot runs past it, so the whole reference shows from the first second. In Targets it follows live time, as in Streamline.
 - **Reference | Targets,** at the right of the legend. Reference draws the Shot against the reference and no targets. Targets is Streamline's own chart: the Shot against the profile's targets, with the "Profile target" legend, and nothing of the reference. The view is remembered per tablet. It starts on Reference, and neither a recipe load nor a finished shot resets it.
-- **The legend.** The Shot's row reads "Latest", or "Live shot" while one runs, with the day and time in the page's language, "Today" for today, and the barista the Shot recorded. The reference's row reads "Reference" with the same. Neither says which machine.
+- **The legend.** The Shot's row reads "Latest", or "Live shot" while one runs, with the day and time in the page's language, "Today" for today, and the barista the Shot recorded. The reference's row reads "Reference" with the same. Neither says which machine. Where the legend is too narrow for all it holds, the baristas' names give way first, both together, and only then the times: the two rows' pieces lie in the legend's one row, so what gives way is chosen across both. With stars, notes, Make reference and both names, each time is shown whole in every language Streamline has finished; with "Different profile" as well, the times are cut short in the languages with the longest phrases.
 - **"Different profile"** flags a reference pulled on another profile than the recipe's. On a Machine Decent Sync serves it is Decent Sync's word, the answer's `profileDiffers`. Without Decent Sync the skin works it out, by the profiles' titles: Decaid's profile id is a hash of the profile's contents, so a brew temperature stepped on the page gives the same profile another id. It shows nothing when the recipe names no profile.
 - **When the latest Shot is the reference,** a "This shot is the reference" badge takes the reference row's place, the reference's lines are not drawn, and there is no Make reference. Once the next shot starts, that Shot is drawn behind it.
 - **With no Shot for the recipe yet** the reference is drawn alone, and a line says "No shot with this recipe on this machine yet". The line shows in Targets too, where the graph is then empty.
@@ -178,13 +179,15 @@ On a Machine Decent Sync serves, the reference is the Recipe's Reference Shot: t
   - While the server can't be asked (`unreachable`, `serverTooOld`, or Decaid itself not answering), the last answer stands. So a served Machine stays with the plugin through an outage.
   - A plugin Decaid lists and has not loaded yet, as for a moment after Decaid starts and while the plugin is reloaded, says nothing either way, and the last answer stands. Taken as no plugin, that moment would put a served Machine's reference on the tablet. It is asked again every 3 seconds, five times, and then on the timing below. One that never loads, as a plugin that fails to start, leaves a page that has had no answer yet with no reference and no line saying why, until Decaid loads it or it is switched off: the Machine may be served, so the tablet's own choice is not used.
 - **Before any answer has said which,** as when the skin loads before the plugin has connected, the graph shows the latest Shot alone, with no reference and no Make reference. The choice kept on the tablet is not read meanwhile. It is never used on a Machine that may be served, or two tablets could draw different references for one recipe.
-  - Once the plugin has answered that it can't ask its server, a line says "Decent Sync can't be reached, so the reference can't be shown", so the missing reference has a reason.
-  - A page opened while the server is out of reach draws no reference until the server is back, though the plugin holds a copy.
-  - A plugin that never connects, as one installed and never given a server, leaves the tablet with that line and no reference, where the same tablet with no plugin keeps its own.
+  - **Once the plugin itself has answered that it can't ask its server** (`unreachable` or `serverTooOld`), as on a page opened during an outage, the plugin is asked for the reference all the same. It answers from the copy it keeps on the tablet for each Recipe in a slot, and that is drawn as on a served Machine during an outage: Make reference muted, and the line "Decent Sync can't be reached, so the reference can't be changed". The copy came from the server, so it is the Location's Reference Shot, and two tablets can't draw different ones.
+  - **Nothing can be chosen until the status says the Machine is served,** whatever the plugin answers meanwhile.
+  - **Only the plugin's own word starts it.** Where Decaid itself did not answer, or lists the plugin as not loaded yet, nothing is asked.
+  - **A plugin with no copy changes nothing.** One installed and never given a server holds none, and neither does a Recipe in no slot. The request is refused, no reference is drawn, and the line reads "Decent Sync can't be reached, so the reference can't be shown". So a plugin that never connects leaves the tablet with that line and no reference, where the same tablet with no plugin keeps its own.
+  - **A copy may be out of date.** A Machine that turned Capture-only while its plugin was offline draws its old copy until the server is reached, as a page already open does. A refusal that says the Machine is not served has the status asked again.
 - **When the status is asked.** At start-up, when the page comes back into view, after each recipe load, when the plugin's `changes` socket opens, when a push says the plugin's connection to the server came or went, and at once after a read or a choice refused as `captureOnly` or `hardwareMismatch`. While no answer has come either way it is asked again on the timing the dial-in label uses. A Machine that turns Capture-only, or is served again, changes source at the next answer, with no reload.
 - **Reading it.** The plugin's `reference` request, by the loaded recipe's DYE2 record id. The skin keeps no copy of its own, and reads and writes nothing under `streamlineCafe` for the reference on a served Machine.
 - **A choice kept on the tablet is dropped, not carried over.** One made before the plugin was installed, or while the Machine was Capture-only, is not sent to the server. It stays in Decaid's store, unread, and is the reference again only if the Machine stops being served.
-- **The legend** says when the Reference Shot was pulled and by whom, as it does for the tablet's own, and never where, though another Machine or Location may have pulled it.
+- **The legend** says when the Reference Shot was pulled and by whom, as it does for the tablet's own, and never where, though another Machine or Location may have pulled it. Its rating and note are the answer's own.
 - **Choosing it.** Make reference sends the choice to the plugin. The answer is the reference as it now is, and the graph follows it without another read.
   - A choice answered `unreachable` or `serverTooOld`, or by Decaid with no `code`, or not answered at all, may have been made all the same. The reference is read again first. If it is the Shot chosen, the choice was made. If not, the graph follows what the read found, and a toast says the reference could not be saved. Where that read found the server out of reach it could not tell either way, and the server may yet make the choice: there is no toast then, and the line under the legend says the reference can't be changed.
   - Any other refusal shows the refusal's own message, which is the plugin's and in English, and changes nothing on screen.
@@ -194,6 +197,7 @@ On a Machine Decent Sync serves, the reference is the Recipe's Reference Shot: t
   - Where the reference can't be read at all, because the tablet has no copy, as for a recipe in no slot, none is drawn, there is no Make reference, and the line reads "Decent Sync can't be reached, so the reference can't be shown". So too when Decaid answers in the plugin's place.
 - **A reference chosen elsewhere** arrives over the plugin's `changes` socket.
   - A push that names the recipe in the graph has its Shots read again, and the graph is drawn again only if the latest Shot or the reference is another than the one drawn. A push may repeat, as when the Recipe is renamed, and then nothing is drawn.
+  - Decent Sync also pushes when the Reference Shot's rating or note changes. The reference's row is then written again, and the graph is not drawn again.
   - When the socket opens, and when a push says the connection came or went, the status is asked and the reference read after it.
   - A push with a `what` the skin doesn't know is ignored.
   - Only recipes in a slot are pushed. One in no slot is read when it loads.
@@ -201,6 +205,53 @@ On a Machine Decent Sync serves, the reference is the Recipe's Reference Shot: t
 - **The socket** is opened through one export the fork adds to `api.js`, which uses Streamline's own socket helpers. Streamline's `connectPluginPush` keeps one socket for each plugin and gives it to the plugin's `changed` endpoint, so it could not carry this one as well. It opens once, after the plugin has first answered its status, so a tablet with no Decent Sync opens none. It is never closed, and comes back by itself after it drops.
 - **When Decent Sync can't be asked for the reference while Decaid answers,** as for a refusal the skin does not know, the latest Shot is still drawn, and the reference read before stays. One read from the other source does not stay: when the source changes, the reference in the graph is dropped at once, during a shot too, and both Shots are read again. So the tablet's own choice is not left on a Machine Decent Sync has come to serve, whichever read fails next.
 - **A choice still on its way when the source changes** is not drawn when it answers. The read that follows the change is.
+
+### Rating and notes
+
+A barista rates the Shot in the graph and writes a note on it, on the Shot's own row of the legend, and sees the rating and note of the recipe's reference on its row.
+
+- **The Shot's row** has five stars after its label, and a note icon before Make reference. The icon is a page, and a page with a plus where the Shot has no note.
+- **Only a saved Shot has them.** They are hidden while a shot runs, in the seconds before Decaid has saved it, and where the recipe has no Shot on this machine yet.
+- **Nothing says "Tap to rate".** Empty stars beside a Shot say it.
+
+The stars:
+
+- **Whole stars, two points a star,** on Decaid's scale of 0 to 10, where 0 is unrated. A tap writes 2, 4, 6, 8 or 10, as DYE2 and Decent Sync's management interface do.
+- **A tap on the chosen star clears the rating.** Only an exact match clears: on a Shot rated 7, a tap on the fourth star sets 8.
+- **An in-between rating is drawn part-filled,** so 7 is three and a half stars, as the management interface draws it. One Shot then reads the same in both places.
+- **A tap saves at once,** with no confirmation, and the stars change as they are tapped. If the edit fails they go back to what they were, and a toast says so. A tap made while another rating is still on its way is not taken.
+- **Stars, rating and back are worked out in `src/cafe/remarks.js`,** which touches no browser global.
+
+The note:
+
+- **The fork's own dialog, with a plain text box,** not Streamline's notes editor. That one is a full-screen Markdown editor, and DYE2 and the management interface show a note as plain text, so its marks would show raw.
+- It names the Shot as its row does, with when it was pulled and by whom, and has a box labelled "Note", Cancel and "Save note".
+- **The text is trimmed, and an emptied note clears it,** as in DYE2. The box takes at most 40,000 characters, the plugin's limit. A note saved as it was sends nothing.
+- **A note that could not be saved is not lost.** The dialog stays open with its text, and a line in the dialog says why. It is not a toast: the dialog is drawn over everything else on the page, a toast included.
+- **A shot that starts leaves the dialog open,** unlike the page's other dialogs: the note is of a Shot already saved, named by its id, and the text typed so far is not thrown away. Only the taps outside the box that would close it are left out, for the same reason.
+- **A note is text, never markup.** It is written into the page as text.
+- **The soft keyboard.** This is the page's first text field. Streamline lays the page out for the window with no keyboard and lifts its canvas to keep a focused field in view, which does not move a dialog. So the dialog says it fits itself (`data-keyboard-fit`), as Streamline's own full-screen editors do, and takes the height Streamline's scaling reports as left above the keyboard, with the text box giving up what the box lacks. The smoke run can't raise a keyboard, so this is checked by hand on a tablet.
+
+The reference's row:
+
+- **Read only.** Its rating is one star and the number, "★ 4" or "★ 3.5", and its note icon opens the note in a dialog with only a Close button, showing the same when and who, and the rating. Each is hidden when there is none.
+- **Where they come from.** On a Machine Decent Sync serves, the plugin's answer. Otherwise the Shot's own record on the tablet.
+- **When the latest Shot is the reference,** its rating and note are edited on its own row, as for any Shot.
+
+Where an edit goes:
+
+- **The plugin on a Machine Decent Sync serves, Decaid's own Shot edit otherwise,** the rule the reference follows. Before the plugin has said whether the Machine is served, the edit goes to Decaid: the Shot in the graph is then the tablet's own.
+- **Every Shot the page edits today is the tablet's own:** the recipe's latest Shot, or "Last shot" with no recipe. For such a Shot the plugin's call is Decaid's own edit, so it works while the server can't be reached and on a Capture-only Machine. Editing another machine's Shot comes with the Shots list.
+- **Only the field edited is sent,** by either route. A rating leaves the note alone, and the reverse. To clear a rating 0 is sent, and to clear a note empty text. Decaid merges what it is sent into the Shot's annotations key by key, so every other annotation is kept.
+- **An edit that may have been made is read again before it is shown as failed:** one the plugin answered `unreachable` or `serverTooOld`, or Decaid answered with no `code`, or that was not answered at all, and any failure of Decaid's own edit, which does not say why it failed. The Shot is read from Decaid. If it holds what was asked for, the edit was made. If not, the row follows what the read found.
+- **Any other refusal shows its message,** which is the plugin's and in English, as for Make reference, and changes nothing.
+
+Which Shot, and when:
+
+- **"Last shot", with no recipe loaded, is rated and noted too.** Streamline's history module hands the chart that Shot's measurements and Workflow and no record. So the page asks the seam for the tablet's newest Shot, whole, and takes its id, rating and note only if its first sample is the one the chart was handed. Until that read answers, and where the newest Shot is another, the row has no stars: they never act on a Shot other than the one drawn. No hook is added to Streamline's files for it.
+- **An edit made elsewhere shows at the page's next read:** a recipe load, the page coming back into view, or a shot ending. That covers DYE2 on the same tablet and the management interface. Nothing is pushed for a Shot's edit, and there is no timer.
+- **After the page's own edit** the row shows what the edit answered. A read that began before the edit is older than it, and does not put the old rating back.
+- **A change of rating or note never draws the graph again.** Only the legend's rows are written.
 
 ### The comparison row
 

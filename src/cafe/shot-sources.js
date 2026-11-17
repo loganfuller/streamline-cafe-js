@@ -28,18 +28,38 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
         latestShot: recipeId => tablet.latestShot(recipeId),
 
         /**
-         * A recipe's reference: `{ shot, canChange }`, and from the plugin
-         * `unreachable`, `unread` and `profileDiffers` too. Before the source is
-         * known there is none, and none can be chosen: the choice kept on the
-         * tablet is never read on a Machine that may turn out to be served.
-         * Where the plugin has said it can't ask its server, the answer says so,
-         * as the plugin's does for a reference it can't read.
+         * A recipe's reference: `{ shot, canChange }`, with a Shot its `rating`
+         * and `note`, and from the plugin `unreachable`, `unread` and
+         * `profileDiffers` too.
+         *
+         * Before the source is known none can be chosen, and the choice kept
+         * on the tablet is never read: the Machine may turn out to be served.
+         * Where the plugin itself has said it can't ask its server, as on a
+         * page opened during an outage, the plugin is asked all the same: it
+         * answers from the copy it keeps on the tablet, which came from the
+         * server, so it is the Location's Reference Shot. Where it holds no
+         * copy its answer says nothing could be read. Until then, as while
+         * Decaid has not answered or the plugin is still loading, nothing is
+         * asked, and there is no reference.
          */
         async referenceShot(recipeId) {
             if (source === 'plugin') return plugin.referenceShot(recipeId);
             if (source === 'tablet') return tablet.referenceShot(recipeId);
-            return outOfReach ? { shot: null, canChange: false, unreachable: true, unread: true } : { shot: null, canChange: false };
+            if (!outOfReach) return { shot: null, canChange: false };
+            return { ...(await plugin.referenceShot(recipeId)), canChange: false };
         },
+
+        /** The tablet's newest Shot, whole, or null. It is the tablet's own, whatever the source. */
+        newestShot: () => tablet.newestShot(),
+
+        /**
+         * Set a Shot's rating, its note or both, as `{ rating?, note? }`.
+         * Resolves with the two as they now are. The plugin on a Machine
+         * Decent Sync serves, which edits a Shot whichever tablet holds it;
+         * Decaid's own Shot edit otherwise, and before the source is known,
+         * when the Shot in the graph is the tablet's own.
+         */
+        editShot: (shotId, edit) => (source === 'plugin' ? plugin : tablet).editShot(shotId, edit),
 
         /**
          * Make a Shot a recipe's reference. Resolves with the reference as it
