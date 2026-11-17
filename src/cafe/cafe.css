@@ -836,7 +836,7 @@ button.cafe-card {
     flex-direction: column;
     justify-content: center;
     gap: 2px;
-    padding: 0 16px;
+    padding: 0 12px;
     border-left: 1px solid var(--border-primary);
 }
 

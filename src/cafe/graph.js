@@ -9,7 +9,7 @@
 // With none, Streamline's history module draws the tablet's newest Shot, as on
 // Streamline's own page, and the legend names the Shot it handed the chart.
 import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
-import { getTotalTime } from '../modules/shotData.js';
+import { getTotalTime, getCurrentShot } from '../modules/shotData.js';
 import { getScaleReading } from '../modules/api.js';
 import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
@@ -104,9 +104,12 @@ function overlay(traces, layout, mode, chart) {
 // failure here must never cost the chart its draw.
 function readLiveFrame(traces, layout) {
     try {
-        // The scale's weight is no line of the chart's: it is read as the weight
-        // in the title band is.
-        frame = liveFrame(traces, layout.shapes, getScaleReading().weight);
+        // The scale's weight is no line of the chart's. During the shot it is
+        // read as the weight in the title band is. Once the shot has ended the
+        // scale may read a lifted cup, so the weight is the shot's own last.
+        const weights = live ? null : getCurrentShot().weights;
+        const weight = live ? getScaleReading().weight : weights && weights.length ? weights[weights.length - 1] : null;
+        frame = liveFrame(traces, layout.shapes, weight);
         paintCards();
     } catch (error) {
         if (!liveFailed) logger.warn('Cafe: could not write the live cards', error);
@@ -482,7 +485,7 @@ export function initGraph() {
     document.addEventListener('streamline:languagechange', paint);
     document.addEventListener('streamline:unitchange', paintCards);
     // A name measured before its font had loaded was measured in another.
-    document.fonts?.ready.then(() => nameWidths.clear());
+    document.fonts?.addEventListener?.('loadingdone', () => nameWidths.clear());
     // The chart's width, for the stage names: read here and on a resize, never
     // on a live frame.
     const chart = el('plotly-chart');
