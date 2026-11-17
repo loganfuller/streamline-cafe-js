@@ -34,6 +34,7 @@ let settleStep = 0;     // how many looks for that shot have been scheduled
 let settleFrom = null;  // the id of the Shot in the graph before that shot; undefined when none had been read
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
 let handed;             // the Shot the history module last asked the chart to draw; undefined until it asks
+let heldBack = false;   // a request of the history module's was turned down during the running shot
 let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves
 let drawing = null;     // the measurements this module is handing the chart itself
 let overlayKey;         // what the overlay was last set for
@@ -77,7 +78,10 @@ function applyOverlay() {
 function chooseShot(measurements, workflow) {
     if (measurements === drawing) return true;
     handed = drawnShot(measurements, workflow);
-    if (live) return false;
+    if (live) {
+        heldBack = true;
+        return false;
+    }
     if (recipe === undefined) return true;
     if (recipe === null) {
         latest = handed;
@@ -209,6 +213,7 @@ export function showGraphRecipe(next) {
 
 function shotStarted() {
     live = true;
+    heldBack = false;
     settling = false;
     seq += 1;
     clearTimeout(settleTimer);
@@ -223,6 +228,18 @@ function shotStarted() {
 function shotEnded() {
     if (!live) return;
     live = false;
+    // With no recipe, a request turned down during the shot is drawn now: the
+    // module counts it as drawn and will not ask again. It is the shot just
+    // saved, when the end reached the page late, or the newest saved before it,
+    // which the module would show too; a shot saved later is still drawn then.
+    if (!recipe && heldBack) {
+        heldBack = false;
+        latest = handed;
+        settling = false;
+        applyOverlay();
+        draw();
+        return;
+    }
     // A shot stopped before it poured drew nothing and is not saved: the graph
     // still holds the Shot before it. Any other is looked for until Decaid has it.
     if (getTotalTime() > 0) {
