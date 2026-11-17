@@ -835,7 +835,7 @@ try {
         check('with a scale\'s readings: first drip, yield and ratio beside the reference\'s, each with its difference',
             keys(full) === REST_REFERENCE && full.cards.every(card => !card.value.includes('—') && /^Ref /.test(card.side) && SIGNED.test(card.diff))
             && /^\d+\.\d s$/.test(full.cards[1].value) && /^\d+\.\d g$/.test(full.cards[2].value) && /^1:\d+\.\d\d$/.test(full.cards[3].value), JSON.stringify(full));
-        check('the Ratio card names the dose it was worked from', /^Ratio · \d+\.\d g dose$/i.test(full.cards[3].title), full.cards[3].title);
+        check('the Ratio card names the dose it was worked from', /^RATIO · \d+\.\d g DOSE$/.test(full.cards[3].title), full.cards[3].title);
         await shot(wp, 'row-reference-light');
         await paint(wp, 'dark');
         await wp.waitForTimeout(800);
@@ -1066,8 +1066,8 @@ try {
         await lp.locator('#cafe-strip .cafe-card').nth(RECIPES[1].slot - 1).click();
         await lp.locator('#cafe-title').filter({ hasText: RECIPES[1].name }).waitFor({ timeout: 20_000 });
         await lp.waitForTimeout(3000);
-        // The row's titles, as written: the stylesheet draws them in capitals.
-        const ROW_TITLES = { de: 'Dauer | Erster Tropfen | Ertrag | Verhältnis | Spitzendruck', ar: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' };
+        // The row's titles are written in capitals.
+        const ROW_TITLES = { de: 'DAUER | ERSTER TROPFEN | ERTRAG | VERHÄLTNIS | SPITZENDRUCK', ar: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' };
         check('in English nothing overflows its place', (await overflowing(lp)).length === 0, (await overflowing(lp)).join(' | '));
         for (const [code, expected] of [
             ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', row: ROW_TITLES.de, roasted: /geröstet am 28\. Okt/ }],

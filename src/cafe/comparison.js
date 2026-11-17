@@ -23,7 +23,7 @@ export const PHRASES = {
     dose: 'Dose',
     yield: 'Yield',
     ratio: 'Ratio',
-    ratioOf: 'Ratio · {dose} g dose',
+    ratioOf: 'Ratio · {dose} dose',
     peak: 'Peak pressure',
     weight: 'Weight',
     weightFlow: 'Weight flow',
@@ -161,7 +161,14 @@ const UNITS = {
     ratio: { unit: '', places: 2, lead: '1:' },
 };
 
-const shown = (value, kind) => (value === null || value === undefined ? NONE : `${UNITS[kind].lead || ''}${value.toFixed(UNITS[kind].places)}${UNITS[kind].unit}`);
+// A reading a little under nothing, as a scale's is before the first drop, is
+// written "0.0", and a minus is the same mark a difference has.
+function shown(value, kind) {
+    if (value === null || value === undefined) return NONE;
+    const { lead = '', places, unit } = UNITS[kind];
+    const size = Math.abs(value).toFixed(places);
+    return `${lead}${value < 0 && Number(size) !== 0 ? MINUS : ''}${size}${unit}`;
+}
 
 /**
  * The difference between two numbers as they are shown, so it is the
@@ -186,7 +193,7 @@ const REST = {
     time: 'seconds', firstDrip: 'seconds', yield: 'grams', ratio: 'ratio', peak: 'bar', weighedDose: 'grams',
 };
 
-const ratioTitle = numbers => (numbers && numbers.dose !== null ? phrase(PHRASES.ratioOf, { dose: numbers.dose.toFixed(1) }) : phrase(PHRASES.ratio));
+const ratioTitle = numbers => (numbers && numbers.dose !== null ? phrase(PHRASES.ratioOf, { dose: shown(numbers.dose, 'grams') }) : phrase(PHRASES.ratio));
 
 /**
  * The five cards at rest.
@@ -258,7 +265,8 @@ export function liveFrame(traces, shapes, weight) {
         return trace && trace.x.length && lastOf(trace.x) === seconds ? number(lastOf(trace.y)) : null;
     };
     const tenfold = value => (value === null ? null : value * 10); // the chart draws a temperature at a tenth
-    const stages = (Array.isArray(shapes) ? shapes : []).filter(shape => typeof shape.name === 'string' && shape.name.trim());
+    // The last stage line is the step the shot is in: a step with no name has none.
+    const stage = Array.isArray(shapes) && shapes.length ? shapes[shapes.length - 1].name : '';
     return {
         seconds,
         weight: number(weight),
@@ -269,7 +277,7 @@ export function liveFrame(traces, shapes, weight) {
         targetFlow: positive(now('Target Flow')),
         targetPressure: positive(now('Target Pressure')),
         targetTemperature: positive(tenfold(now('Target °C'))),
-        stage: stages.length ? stages[stages.length - 1].name.trim() : '',
+        stage: typeof stage === 'string' ? stage.trim() : '',
     };
 }
 

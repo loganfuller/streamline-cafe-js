@@ -189,6 +189,7 @@ A row of five cards under the graph, for the Shot in the graph. The graph gives 
   - With no Shot for the recipe yet each card reads "No shot yet".
 - **A value the Shot did not record is "—",** with no difference. A difference is the difference of the two numbers as they are shown, so 28.4 s beside 27.9 s is +0.5 s.
 - **With no recipe loaded** the Shot is the one Streamline's history module hands the chart, which comes without the Shot's own record. So its yield is the scale's last reading and its dose is its Workflow's.
+- **A card's title is put into capitals in the code, not by the stylesheet,** so a long one is fitted at the width it is drawn at, and the dose in the Ratio card's title keeps its "g".
 - **Temperatures** follow the page's °C or °F. Numbers are written with a point in every language, as on the rest of the page.
 
 ### The live cards
@@ -203,7 +204,7 @@ While a shot runs, six cards take the row's place: Time, Weight, Weight flow, Wa
   - Where the profile sets no target for a card at that step it says "No target this step", which holds for any profile. A target of zero is a step that sets none.
   - No profile sets a weight flow, so that card reads "No profile target".
 - **The toggle switches the cards** between the two during a shot.
-- **The cards are written when the chart draws a live frame,** so they are repainted exactly as often as the chart is. The chart calls the page's overlay just before it draws, and the page reads the running shot's numbers off the lines the chart is about to draw. A card never says more than the graph shows, and writing the cards asks the chart for nothing. The scale's weight is not one of the chart's lines, and is read from Streamline's shot-data module. A draw made while a finished shot waits to be saved writes them once more, so a shot that ended behind the full-screen chart leaves its last frame on the cards, not the one from when that chart was opened.
+- **The cards are written when the chart draws a live frame,** so they are repainted exactly as often as the chart is. The chart calls the page's overlay just before it draws, and the page reads the running shot's numbers off the lines the chart is about to draw. A card never says more than the graph shows, and writing the cards asks the chart for nothing. The scale's weight is not one of the chart's lines, and is read as the weight in the title band is. A draw made while a finished shot waits to be saved writes them once more, so a shot that ended behind the full-screen chart leaves its last frame on the cards, not the one from when that chart was opened.
 - **The weight in the title band stays,** as the layout slice left it.
 
 ### Stage names

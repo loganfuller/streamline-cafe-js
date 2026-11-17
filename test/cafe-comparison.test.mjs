@@ -141,6 +141,11 @@ test('a sample that recorded no value is passed over', () => {
 
 // ── A difference ─────────────────────────────────────────────────────────────
 
+test('a reading a little under nothing is written without a sign, and a minus is the difference\'s own', () => {
+    const cards = liveCards({ view: 'reference', frame: frame({ weight: -0.04, weightFlow: -0.3 }), reference: null });
+    assert.deepEqual([cards[1].value, cards[2].value], ['0.0 g', '\u22120.3 g/s']);
+});
+
 test('a difference is of the two numbers as shown, with its sign', () => {
     assert.equal(difference(28.4, 27.9, 'seconds'), '+0.5 s');
     assert.equal(difference(27.9, 28.4, 'seconds'), '−0.5 s');
@@ -169,7 +174,7 @@ test('in Reference: five cards, each beside the reference\'s with the difference
         ['ratio', '1:2.01', PHRASES.ref, '1:1.95', '+0.06'],
         ['peak', '9.1 bar', PHRASES.ref, '8.8 bar', '+0.3 bar'],
     ]);
-    assert.deepEqual(cards[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.1' } }, 'the Ratio card names the dose it was worked from');
+    assert.deepEqual(cards[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.1 g' } }, 'the Ratio card names the dose it was worked from');
     assert.deepEqual(cards[0].title, { phrase: PHRASES.time });
 });
 
@@ -228,13 +233,13 @@ test('in Targets: time with first drip, dose, yield and ratio against what was s
         ['ratio', '1:2.01', PHRASES.target, '1:2.00', '+0.01'],
         ['peak', '9.1 bar', null, null, ''],
     ]);
-    assert.deepEqual(cards[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.1' } });
+    assert.deepEqual(cards[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.1 g' } });
 });
 
 test('in Targets: a Shot that weighed no dose, and one with nothing set', () => {
     const unweighed = restCards({ view: 'targets', shot: shotNumbers(shot({ annotations: { actualYield: 36.4 } })) });
     assert.deepEqual(brief(unweighed)[1], ['dose', '—', PHRASES.target, '18.0 g', '']);
-    assert.deepEqual(unweighed[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.0' } });
+    assert.deepEqual(unweighed[3].title, { phrase: PHRASES.ratioOf, vars: { dose: '18.0 g' } });
     const unset = restCards({ view: 'targets', shot: shotNumbers(shot({ workflow: { context: {} } })) });
     assert.deepEqual(brief(unset).slice(1, 4).map(row => row[2]), ['No target', 'No target', 'No target']);
     assert.deepEqual(unset.map(c => c.diff), ['', '', '', '', '']);
@@ -267,6 +272,7 @@ test('a live frame is the last point of each of the chart\'s lines', () => {
     assert.equal(liveFrame(lines({ seconds: [], pressure: [] }), [], null), null, 'before the first frame');
     const bare = liveFrame(lines(), [{ x0: 0 }], undefined);
     assert.deepEqual([bare.weight, bare.stage], [null, ''], 'no scale, and a profile whose steps have no names');
+    assert.equal(liveFrame(lines(), [{ x0: 0, name: 'Preinfusion' }, { x0: 8, name: '' }], 1).stage, '', 'a step with no name does not keep the name of the step before');
 });
 
 test('a target line that has no point at this second is no target', () => {

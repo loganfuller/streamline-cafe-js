@@ -855,7 +855,6 @@ button.cafe-card {
     font-weight: 600;
     line-height: 18px;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     color: var(--data-card-title-text-color);

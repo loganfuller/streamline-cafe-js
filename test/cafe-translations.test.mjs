@@ -128,7 +128,7 @@ test('a phrase a module looks up is named in the call, so the scan sees it', () 
     // The lookups by a variable are the card menu's, whose labels the scan
     // takes from slotMenu() itself, and the comparison row's, whose phrases it
     // takes from PHRASES.
-    const byVariable = { 'strip.js': ['cafeText(item.label)'], 'compare-row.js': ['cafeText(part.phrase, vars)'] };
+    const byVariable = { 'strip.js': ['cafeText(item.label)'], 'compare-row.js': ['cafeText(part.phrase, vars)', 'cafeText(part.phrase)'] };
     for (const { name, text } of SOURCES) {
         if (name === 'text.js') continue; // where the lookup is defined
         const unnamed = [...text.matchAll(/\bcafeText\((?!\s*')[^)]*\)/g)].map(match => match[0]);

@@ -4,6 +4,7 @@
 // nothing, so painting it never makes the chart draw.
 import { fitTextToWidth, getCurrentLanguage } from '../modules/i18n.js';
 import { cafeText } from './text.js';
+import { fillIn } from './translations.js';
 
 // As many cards as the fuller of the two rows has: the sixth is hidden at rest.
 const CARDS = 6;
@@ -57,6 +58,14 @@ function worded(part) {
     return cafeText(part.phrase, vars);
 }
 
+// A title is drawn in capitals. It is put into capitals here, not by the
+// stylesheet, so it is fitted at the width it is drawn at, and so what fills
+// its places, "18.0 g", keeps its own letters.
+function titled(part) {
+    const capitals = cafeText(part.phrase).split(/(\{\w+\})/).map((piece, index) => (index % 2 ? piece : piece.toUpperCase())).join('');
+    return fillIn(capitals, part.vars && /^(ar|he)$/.test(getCurrentLanguage()) ? isolated(part.vars) : part.vars);
+}
+
 /**
  * Write the row. `cards` is `restCards()` or `liveCards()`; `mode` is `rest` or
  * `live`, kept on the row for the stylesheet and the smoke run.
@@ -72,7 +81,7 @@ export function paintRow(cards, mode) {
         if (slot.root.style.display !== display) slot.root.style.display = display;
         if (!shown) return;
         if (slot.root.dataset.card !== shown.key) slot.root.dataset.card = shown.key;
-        write(slot.title, worded(shown.title), true);
+        write(slot.title, titled(shown.title), true);
         write(slot.value, shown.value);
         write(slot.diff, shown.diff);
         write(slot.side, worded(shown.side), !!shown.side && !!shown.side.phrase && !shown.side.vars);
