@@ -548,6 +548,29 @@ test('a choice answered after the source changed is not the reference to draw', 
     assert.equal(kept.reference.shot.id, 'before');
 });
 
+test('the server coming into reach or going out of it has the Shots in the graph read again, without a push', () => {
+    const { sources, calls } = seam();
+    sources.status(SERVED);
+    sources.status({}); // Decaid did not answer: nothing either way
+    assert.deepEqual(calls.changed, [null]);
+    sources.status(UNREACHABLE);
+    sources.status(UNREACHABLE);
+    sources.status(SERVED);
+    assert.deepEqual(calls.changed, [null, null, null], 'once as the server went, once as it came back');
+    assert.deepEqual(calls.moved, [true, false, false]);
+});
+
+test('a choice answered after the Machine moved to another Location is not the reference to draw', async () => {
+    const { sources, hold } = seam();
+    sources.status(AT_CAFE);
+    let release;
+    hold(new Promise(resolve => { release = resolve; }));
+    const made = sources.makeReference('r1', 'b');
+    sources.status({ ...AT_CAFE, location: { id: 'l2', name: 'Sample Annex' } });
+    release();
+    assert.equal(await made, null);
+});
+
 test('a push that names a recipe says to read that recipe\'s reference again', () => {
     const { sources, calls } = seam();
     sources.status(SERVED);
@@ -686,11 +709,17 @@ test('a cursor belongs to the Location that gave it: a Machine moved to another 
     const first = await sources.shotsPage(null, 50);
     sources.status(AT_CAFE);
     assert.deepEqual(calls.moved, [true], 'the same Location again is no move');
+    sources.status({ ...AT_CAFE, location: { id: 'l', name: 'Sample Cafe Renamed' } });
+    assert.deepEqual(calls.moved, [true], 'nor is the same Location renamed');
     sources.status({ ...AT_CAFE, location: { id: 'l2', name: 'Sample Annex' } });
     assert.deepEqual(calls.moved, [true, true], 'a move to another Location is told as a change of source: an open list closes, an opened Shot gives way');
     const later = await sources.shotsPage(first.next, 50);
     assert.deepEqual([later.list.locationId, later.afresh], ['l2', true]);
     assert.deepEqual(pages(calls, 'plugin').map(([, from]) => from), [null, null], 'the first Location\'s cursor is not sent for the second');
+    // A move made through an outage is known when the Machine is served again.
+    sources.status(UNREACHABLE);
+    sources.status({ ...AT_CAFE, location: { id: 'l3', name: 'Sample Kiosk' } });
+    assert.deepEqual(calls.moved, [true, true, false, true], 'the outage reads again; the move is a change of source');
 });
 
 test('a Machine that turns Capture-only, or is served again, changes the list\'s source at the next status, and a later page is read afresh', async () => {

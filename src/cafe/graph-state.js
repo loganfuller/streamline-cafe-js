@@ -94,7 +94,8 @@ const NO_REFERENCE = { shot: null, canChange: false };
  *   (`'noRecipe'`); `late`, the one look left after a recipe change stopped the
  *   others; `locked`, the next read of an opened Shot that can't be changed
  *   because Decent Sync's server could not be asked for it, `lockedTries`
- *   being how many there have been.
+ *   being how many there have been. `lockedAt`: the `openSeq` when it was
+ *   last shown so; a read begun by then can't show it can be changed.
  */
 export function initialGraphState({ live = false } = {}) {
     return {
@@ -118,6 +119,7 @@ export function initialGraphState({ live = false } = {}) {
         lastSeq: 0,
         timers: { refresh: false, settle: null, late: false, locked: false },
         lockedTries: 0,
+        lockedAt: 0,
     };
 }
 
@@ -776,6 +778,7 @@ function shotUnreachable(s, todo, shotId) {
 // The opened Shot can't be changed because the server could not be asked for
 // it: it is read again later, until a read finds the server back.
 function readLockedLater(s, todo) {
+    s.lockedAt = s.openSeq;
     if (s.timers.locked) return;
     s.lockedTries += 1;
     startTimer(s, todo, 'locked', lockedRetryMs(s.lockedTries));
@@ -821,7 +824,10 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, canChange: c
         return;
     }
     const { recipe } = target;
-    const canChange = can !== false;
+    // A read begun before the Shot was last shown as one that can't be
+    // changed, as before an edit found the server out of reach, does not
+    // undo that: only a read begun after it does.
+    const canChange = can !== false && !(before && !before.canChange && seq <= s.lockedAt);
     if (canChange) {
         s.lockedTries = 0;
         stopTimer(s, todo, 'locked');

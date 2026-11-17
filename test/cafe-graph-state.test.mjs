@@ -855,6 +855,18 @@ test('a locked Shot is read again later, more slowly each time, until a read fin
     assert.deepEqual([lockedRetryMs(1), lockedRetryMs(2), lockedRetryMs(20)], [10_000, 20_000, 300_000]);
 });
 
+test('a read begun before the Shot was locked does not unlock it; one begun after does', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    // A read is on its way when an edit finds the server out of reach.
+    const reading = play(base, { type: 'referencePushed', recipeId: null });
+    const locked = play(reading.state, { type: 'shotUnreachable', shotId: GUESTS.id });
+    const stale = openedAnswer(locked.state, reading.effects, GUESTS, chosen(GUEST_REF));
+    assert.equal(inGraph(stale.state).opened.canChange, false);
+    assert.ok(stale.state.timers.locked, 'and it is still read again later');
+    const fired = play(stale.state, { type: 'timer', timer: 'locked' });
+    assert.equal(inGraph(openedAnswer(fired.state, fired.effects, GUESTS, chosen(GUEST_REF)).state).opened.canChange, true);
+});
+
 test('a locked Shot whose read again fails for another reason is read again later all the same', () => {
     const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
     const locked = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id }).state;

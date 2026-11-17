@@ -6,8 +6,11 @@
 import { shotSource, serverOutOfReach, shotsList, shotsListRefused } from './sync-status.js';
 
 // Which Location a list of the Location's Shots is of: its id, or its name
-// where the status gives no id.
-const where = listed => (listed && listed.of === 'location' ? `${listed.locationId ?? ''}|${listed.location ?? ''}` : null);
+// where the status gives no id. A Location renamed is the same one.
+const where = listed => {
+    if (!listed || listed.of !== 'location') return null;
+    return listed.locationId != null ? `id:${listed.locationId}` : `name:${listed.location ?? ''}`;
+};
 
 /**
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
@@ -27,6 +30,16 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
     let outOfReach = false;
     // What the Shots list lists, and why: the status rule's answer.
     let list = shotsList(null, {});
+    // The Location the Machine was last served at, kept through an outage, so
+    // a Machine that comes back served at another is known to have moved.
+    let servedAt = null;
+    // The last word on whether the server can be asked: true where it can't,
+    // false where the Machine is served, null before either. An answer that
+    // says nothing either way leaves it.
+    let heardOut = null;
+    // Counts each change of source and each move to another Location: a
+    // choice answered across one is the other's.
+    let revision = 0;
 
     // A page of the tablet's own Shots, under the header `listed` says. A page
     // read in place of the Location's, because the plugin refused the list,
@@ -150,12 +163,13 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
          */
         async makeReference(recipeId, shotId) {
             const asked = source;
+            const then = revision;
             if (asked === 'unknown') throw new Error('Where the reference is kept is not known yet.');
             try {
                 const made = await (asked === 'plugin' ? plugin : tablet).makeReference(recipeId, shotId);
-                return source === asked ? made : null;
+                return revision === then ? made : null;
             } catch (error) {
-                if (source !== asked) delete error.reference;
+                if (revision !== then) delete error.reference;
                 throw error;
             }
         },
@@ -168,15 +182,25 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             // follows whether the plugin can ask its server.
             const reach = serverOutOfReach(answer);
             const said = next === 'unknown' && reach !== outOfReach;
-            // A Machine moved from one Location to another is told as a
-            // change of source: the references, an opened Shot and the list
-            // were the other Location's.
-            const before = list;
+            // A Machine moved from one Location to another, through an outage
+            // too, is told as a change of source: the references, an opened
+            // Shot and the list were the other Location's.
             list = shotsList(list, answer);
-            const relocated = before.of === 'location' && list.of === 'location' && where(before) !== where(list);
+            const at = where(list);
+            const relocated = at !== null && servedAt !== null && at !== servedAt;
+            if (at !== null) servedAt = at;
+            // The server came into reach or went out of it, which the page
+            // hears as the plugin's connection push too. The Shots in the
+            // graph are read again all the same, so a push missed, or a read
+            // after one that failed, does not leave another Machine's Shot
+            // shown as one that can or can't be changed.
+            const word = answer && answer.served === true ? false : serverOutOfReach(answer) ? true : null;
+            const reached = word !== null && heardOut !== null && word !== heardOut;
+            if (word !== null) heardOut = word;
             source = next;
             outOfReach = reach;
-            const read = moved || relocated || readAfter || said;
+            if (moved || relocated) revision += 1;
+            const read = moved || relocated || reached || readAfter || said;
             readAfter = false;
             if (read) changed(null, moved || relocated);
         },
