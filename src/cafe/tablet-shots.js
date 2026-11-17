@@ -8,8 +8,52 @@
 //
 // Each request rejects when Decaid can't be asked, so the page keeps what it
 // shows instead of reading a failure as "none".
-import { LATEST_WINDOW, shotsWithRecipe, isUnfinished, chosenShotId, withChosenShot } from './shot-model.js';
-import { shotRemarks, annotationsOf, editReadAgain } from './remarks.js';
+import { LATEST_WINDOW, shotsWithRecipe, isUnfinished, chosenShotId, withChosenShot, shotRecipeId, shotCredit } from './shot-model.js';
+import { shotRemarks, annotationsOf, editReadAgain, ratingOf, noteOf } from './remarks.js';
+import { nextPage } from './shot-list.js';
+
+const text = value => (typeof value === 'string' ? value.trim() : '');
+const positive = value => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
+
+/**
+ * A row of Decaid's list as the seam lists a Shot (`shotsPage` in
+ * shot-seam.js), the same thing a row of the Location's list becomes
+ * (`locationRow` in plugin-shots.js). A row of Decaid's carries the Shot's
+ * Workflow and annotations and no measurements, so it has no duration and
+ * does not say whether the Shot is Unfinished; it names its recipe by its
+ * DYE2 record id only; and it is this machine's own.
+ *
+ * `choices` is the choice of reference kept on the tablet, recipe to Shot, or
+ * null where it is not known which Shots are references.
+ */
+export function tabletRow(row, choices = null) {
+    const context = row?.workflow?.context || {};
+    const annotations = row?.annotations || {};
+    const recipeId = shotRecipeId(row?.workflow);
+    const { when, who } = shotCredit(row);
+    const id = String(row.id);
+    const known = !!choices && typeof choices === 'object' && !Array.isArray(choices);
+    return {
+        id,
+        when,
+        recipeId,
+        recipeName: null,
+        bean: text(context.coffeeName),
+        // The dose the Shot weighed, or where it weighed none the one its
+        // Workflow set; the yield Decaid kept, which is the scale's last
+        // reading where the shot was not stopped on weight.
+        dose: positive(annotations.actualDoseWeight) ?? positive(context.targetDoseWeight),
+        yield: positive(annotations.actualYield),
+        duration: null,
+        rating: ratingOf(annotations.enjoyment),
+        barista: who,
+        hasNote: noteOf(annotations.espressoNotes) !== null,
+        unfinished: null,
+        referenceOf: known ? (recipeId !== null && choices[recipeId] === id ? [recipeId] : []) : null,
+        machine: null,
+        thisMachine: true,
+    };
+}
 
 /**
  * - `listShots(limit, offset)`: a page of Decaid's Shots, newest first, as
@@ -67,19 +111,28 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
 
         /**
          * A page of the tablet's Shots for the Shots list, newest first:
-         * `items`, rows of Decaid's list, and `total`, how many Decaid says it
-         * has, or null where it does not say.
+         * `rows`, each as `tabletRow` gives it, and `next`, where the next
+         * page starts, or null on the last. `from` is the page before's
+         * `next`, or null for the first page: Decaid's list is read by offset.
+         * `choices` is the choice of reference kept on the tablet, or null
+         * where it is not known which Shots are references.
          */
-        async shotsPage(offset, limit) {
+        async shotsPage(from, limit, choices = null) {
+            const offset = Number.isInteger(from) && from > 0 ? from : 0;
             const page = await listShots(limit, offset);
-            return {
-                items: page && Array.isArray(page.items) ? page.items.filter(row => row && row.id != null) : [],
-                total: page && typeof page.total === 'number' ? page.total : null,
-            };
+            const items = page && Array.isArray(page.items) ? page.items : [];
+            const { offset: next, done } = nextPage({ offset, read: items.length, asked: limit, total: page && typeof page.total === 'number' ? page.total : null });
+            return { rows: items.filter(row => row && row.id != null).map(row => tabletRow(row, choices)), next: done ? null : next };
         },
 
-        /** One of the tablet's Shots, whole, by its id, or null when Decaid no longer has it. */
-        shotById: id => readShot(id),
+        /**
+         * One of the tablet's Shots by its id: `shot`, whole, or null when
+         * Decaid no longer has it, and `canChange`, which the tablet's own
+         * Shot always can be.
+         */
+        async shotById(id) {
+            return { shot: await readShot(id), canChange: true };
+        },
 
         /** The choices of reference kept on the tablet, recipe to Shot, or null where none were kept. */
         references: () => readChoices(),

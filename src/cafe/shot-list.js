@@ -1,10 +1,10 @@
 // What the Shots list says, row by row, and how its pages join up
 // (docs/cafe/DESIGN.md, "The Shots list"). No browser global is touched.
 //
-// A row is worked out from a row of Decaid's list, which carries the Shot's
-// Workflow and annotations and no measurements, and from DYE2's records, which
-// name the recipe: Decaid's row names it by its DYE2 record id only.
-import { shotRecipeId, shotCredit } from './shot-model.js';
+// A row is worked out from a Shot as the Shot seam lists it, which is the same
+// thing whether Decaid or Decent Sync's plugin listed it, and from DYE2's
+// records, which name the recipe: Decaid's row names it by its DYE2 record id
+// only.
 import { ratingOf, noteOf } from './remarks.js';
 import { recipeName } from './strip-model.js';
 
@@ -21,44 +21,88 @@ export function dayOf(when) {
 }
 
 /**
- * What one row of the list says, from a row of Decaid's list.
+ * What one row of the list says, from a Shot as the seam lists it, which is
+ * the same thing whichever source listed it.
  *
- * - `recipes`: DYE2's records. A Shot whose recipe the tablet no longer holds
- *   lists as a Shot with no recipe.
- * - `references`: recipe to Shot, the choice of reference kept on the tablet,
- *   or null where it is not known which Shots are references.
+ * - `recipes`: DYE2's records, which name a recipe the row names by its record
+ *   id. A recipe this tablet has no record of is named as the row names it,
+ *   and one the row does not name either lists as a Shot with no recipe.
  *
  * The answer: `id`; `when`, a Date or null; `day`, the day it falls under, or
  * null; `recipe`, the DYE2 record or null; `name`, the recipe's name, or null
- * for none; `bean`; `dose` and `yield`, in grams or null; `rating`, null for
- * unrated; `barista`; `hasNote`; and `isReference`.
+ * for none; `bean`; `dose`, `yield`, in grams, and `duration`, in seconds,
+ * each null where it is not known; `rating`, null for unrated; `barista`;
+ * `hasNote`; `unfinished`; `machine`, the name of the Machine that pulled it,
+ * or null, and `thisMachine`; `referenceOf`, the recipes it is the reference
+ * of, or null where that is not known; and `isReference`.
  */
-export function shotRow(row, { recipes = [], references = null } = {}) {
-    const workflow = row?.workflow;
-    const context = workflow?.context || {};
-    const annotations = row?.annotations || {};
-    const recipeId = shotRecipeId(workflow);
-    const recipe = recipeId === null ? null : (Array.isArray(recipes) ? recipes : []).find(r => r && String(r.id) === recipeId) || null;
-    const { when, who } = shotCredit(row);
-    const id = String(row.id);
+export function shotRow(listed, { recipes = [] } = {}) {
+    const records = Array.isArray(recipes) ? recipes : [];
+    const record = id => (id == null ? null : records.find(r => r && String(r.id) === String(id)) || null);
+    const recipe = record(listed.recipeId);
+    const when = listed.when instanceof Date && !Number.isNaN(listed.when.getTime()) ? listed.when : null;
+    const referenceOf = Array.isArray(listed.referenceOf) ? listed.referenceOf : null;
     return {
-        id,
+        id: String(listed.id),
         when,
         day: when ? dayOf(when) : null,
         recipe,
-        name: recipe ? recipeName(recipe) : null,
-        bean: text(context.coffeeName),
-        // The dose the Shot weighed, or where it weighed none the one its
-        // Workflow set; the yield Decaid kept, which is the scale's last
-        // reading where the shot was not stopped on weight.
-        dose: positive(annotations.actualDoseWeight) ?? positive(context.targetDoseWeight),
-        yield: positive(annotations.actualYield),
-        rating: ratingOf(annotations.enjoyment),
-        barista: who,
-        hasNote: noteOf(annotations.espressoNotes) !== null,
-        isReference: !!recipe && !!references && typeof references === 'object' && references[String(recipe.id)] === id,
+        name: recipe ? recipeName(recipe) : text(listed.recipeName) || null,
+        bean: text(listed.bean),
+        dose: positive(listed.dose),
+        yield: positive(listed.yield),
+        duration: positive(listed.duration),
+        rating: ratingOf(listed.rating),
+        barista: text(listed.barista),
+        hasNote: listed.hasNote === true,
+        unfinished: listed.unfinished === true,
+        machine: text(listed.machine) || null,
+        thisMachine: listed.thisMachine === true,
+        referenceOf,
+        isReference: isReferenceOf(referenceOf, record),
     };
 }
+
+// Does a row carry the "Reference" chip? It is the reference of a recipe this
+// tablet holds a record of, or of one it holds none of, which only the
+// Location's list names. A choice kept on the tablet for a recipe the tablet
+// no longer holds is no chip.
+function isReferenceOf(referenceOf, record) {
+    return !!referenceOf && referenceOf.some(id => id === null || record(id) !== null);
+}
+
+/**
+ * What the list says about where it comes from, from the seam's word on what
+ * is listed and why (`shotsList` in sync-status.js):
+ *
+ * - `under`: what stands under the title, `{ text, translate }`, or null: the
+ *   Location's name, which is no phrase, or "This machine only".
+ * - `line`: why only this machine's Shots are listed, `{ text, translate }`,
+ *   or null. A refusal the skin does not know gives its own message, which is
+ *   the plugin's and in English.
+ * - `location`: whether the rows are the Location's, which adds the Machine
+ *   and Time columns and the Unfinished mark.
+ */
+export function listHeader(list) {
+    const only = { text: 'This machine only', translate: true };
+    switch (list && list.why) {
+        case 'served':
+            return { under: list.location ? { text: list.location, translate: false } : null, line: null, location: true };
+        case 'notServed':
+            return { under: only, line: { text: NOT_AT_A_LOCATION, translate: true }, location: false };
+        case 'unreachable':
+            return { under: only, line: { text: LIST_UNREACHABLE, translate: true }, location: false };
+        case 'refused':
+            return { under: only, line: list.message ? { text: list.message, translate: false } : null, location: false };
+        default: // no plugin, or the plugin has not said yet
+            return { under: null, line: null, location: false };
+    }
+}
+
+/** The list's line on a Capture-only Machine, and on the wrong hardware. */
+export const NOT_AT_A_LOCATION = "This machine isn't at a Decent Sync Location, so only its own shots are listed.";
+/** The list's line while Decent Sync's server can't be reached. */
+export const LIST_UNREACHABLE = "Decent Sync can't be reached, so only this machine's shots are listed.";
 
 /**
  * The list with a page added at its end. Decaid's list is ordered by time
@@ -140,11 +184,24 @@ export function withRemarks(row, remarks) {
     return next;
 }
 
-/** The rows with a recipe's reference moved to the Shot `shotId`, or to none. */
+/** "27.3 s", how long a Shot ran, with "—" where the list does not say. */
+export function durationText(row) {
+    return row.duration === null ? '—' : `${row.duration.toFixed(1)} s`;
+}
+
+/**
+ * The rows with a recipe's reference moved to the Shot `shotId`, or to none.
+ * A row that is another recipe's reference too keeps its chip. Rows of a list
+ * that does not know which Shots are references are left alone.
+ */
 export function withReference(rows, recipeId, shotId) {
+    const key = String(recipeId);
     return rows.map(row => {
-        if (!row.recipe || String(row.recipe.id) !== String(recipeId)) return row;
-        const isReference = shotId != null && row.id === String(shotId);
-        return row.isReference === isReference ? row : { ...row, isReference };
+        if (!Array.isArray(row.referenceOf)) return row;
+        const has = row.referenceOf.includes(key);
+        const is = shotId != null && row.id === String(shotId);
+        if (has === is) return row;
+        const referenceOf = is ? [...row.referenceOf, key] : row.referenceOf.filter(id => id !== key);
+        return { ...row, referenceOf, isReference: referenceOf.length > 0 };
     });
 }

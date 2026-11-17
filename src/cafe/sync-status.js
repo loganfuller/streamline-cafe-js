@@ -5,7 +5,8 @@
 // An answer, as decent-sync.js hands it on:
 //
 // - `{ served: true, … }`: the plugin serves this Machine.
-// - `{ code }`: the plugin refused, and the code says why.
+// - `{ code, message }`: the plugin refused, and the code says why. So too
+//   `{ code: 'unreachable' }` where Decaid answered in its place.
 // - `{}`: Decaid itself did not answer; or `{ loading: true }`, Decaid lists
 //   the plugin and has not loaded it yet, as for a moment after Decaid starts
 //   and while the plugin is reloaded.
@@ -88,4 +89,56 @@ export function shotSource(previous, answer) {
     if (answer.served === true) return 'plugin';
     if (!statusUnknown(answer)) return 'tablet';
     return SOURCES.includes(previous) ? previous : 'unknown';
+}
+
+/** The refusals that mean the Machine is not served, for a reason that lasts until someone changes it. */
+export const NOT_SERVED_CODES = ['captureOnly', 'hardwareMismatch'];
+
+/**
+ * What the Shots list lists, and why, from the answers to the Status request:
+ * `{ of, why }`, where `of` is `location`, every Shot at the machine's
+ * Location, through the plugin, or `tablet`, this machine's own Shots, from
+ * Decaid; and `why` is the reason, which is what the list's header says
+ * (`listHeader` in shot-list.js).
+ *
+ * - `{ served: true }`: the Location's Shots (`served`), with `location`, the
+ *   Location's name, `locationId`, its id on the server, which a page's cursor
+ *   belongs to, and `machineId`, this Machine's id on the server, which marks
+ *   its own rows.
+ * - `null`, for no Decent Sync plugin, or one switched off: the tablet's own
+ *   (`noPlugin`).
+ * - `captureOnly` and `hardwareMismatch`: the tablet's own (`notServed`).
+ * - `unreachable` and `serverTooOld`: the tablet's own (`unreachable`). The
+ *   plugin's `shots` request has no copy on the tablet to answer from, as its
+ *   `reference` has.
+ * - Any refusal this skin does not know: the tablet's own (`refused`), with
+ *   the refusal's `message`.
+ * - Decaid itself not answering (`{}`), or a plugin still loading: nothing was
+ *   said either way, so the last answer stands; before any, the tablet's own
+ *   (`unknown`).
+ */
+export function shotsList(previous, answer) {
+    if (!answer) return { of: 'tablet', why: 'noPlugin' };
+    if (answer.served === true) {
+        const name = answer.location && typeof answer.location.name === 'string' ? answer.location.name.trim() : '';
+        const machineId = answer.machine && answer.machine.id != null ? String(answer.machine.id) : null;
+        const locationId = answer.location && answer.location.id != null ? String(answer.location.id) : null;
+        return { of: 'location', why: 'served', location: name || null, locationId, machineId };
+    }
+    if (serverOutOfReach(answer)) return { of: 'tablet', why: 'unreachable' };
+    if (answer.code === undefined) return previous || { of: 'tablet', why: 'unknown' };
+    if (NOT_SERVED_CODES.includes(answer.code)) return { of: 'tablet', why: 'notServed' };
+    return { of: 'tablet', why: 'refused', message: typeof answer.message === 'string' ? answer.message : '' };
+}
+
+/**
+ * The same for a refusal of the plugin's `shots` request itself, which the
+ * status may not have said yet: `code` is the refusal's, or undefined where
+ * Decaid answered in the plugin's place, which is treated as `unreachable`.
+ * Null for a refusal that does not mean "the tablet's own Shots".
+ */
+export function shotsListRefused(code) {
+    if (code === undefined || code === 'unreachable' || code === 'serverTooOld') return { of: 'tablet', why: 'unreachable' };
+    if (NOT_SERVED_CODES.includes(code)) return { of: 'tablet', why: 'notServed' };
+    return null;
 }

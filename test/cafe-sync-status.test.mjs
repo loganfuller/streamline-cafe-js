@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decentSyncSaves, statusUnknown, statusRetryMs, shotSource, serverOutOfReach } from '../src/cafe/sync-status.js';
+import { decentSyncSaves, statusUnknown, statusRetryMs, shotSource, serverOutOfReach, shotsList, shotsListRefused } from '../src/cafe/sync-status.js';
 
 test('Decent Sync saves the dial-in on a Machine it serves', () => {
     assert.equal(decentSyncSaves(false, { connected: true, served: true }), true);
@@ -101,4 +101,48 @@ test('a Machine that turns Capture-only, or is served again, changes source at t
         seen.push(source);
     }
     assert.deepEqual(seen, ['unknown', 'plugin', 'plugin', 'tablet', 'tablet', 'plugin', 'tablet']);
+});
+
+// ── What the Shots list lists ────────────────────────────────────────────────
+
+test('a served Machine lists its Location\'s Shots, under the Location\'s name, and knows its own Machine', () => {
+    assert.deepEqual(shotsList(null, SERVED), { of: 'location', why: 'served', location: 'Sample Cafe', locationId: 'l', machineId: 'm' });
+    assert.deepEqual(shotsList(null, { served: true }), { of: 'location', why: 'served', location: null, locationId: null, machineId: null }, 'a status that names neither');
+});
+
+test('with no plugin at all the list is the tablet\'s own, and says no more', () => {
+    assert.deepEqual(shotsList(shotsList(null, SERVED), null), { of: 'tablet', why: 'noPlugin' });
+});
+
+test('every refusal the plugin\'s contract lists has the tablet\'s own Shots listed, each saying why', () => {
+    for (const code of ['captureOnly', 'hardwareMismatch']) assert.deepEqual(shotsList(null, { code }), { of: 'tablet', why: 'notServed' }, code);
+    for (const code of CANT_ASK) assert.deepEqual(shotsList(shotsList(null, SERVED), { code }), { of: 'tablet', why: 'unreachable' }, code);
+    // A refusal the Status request is never answered with, and one a later release adds.
+    for (const code of [...LASTING.filter(code => !['captureOnly', 'hardwareMismatch'].includes(code)), 'somethingNew']) {
+        assert.deepEqual(shotsList(null, { code, message: 'Sample refusal.' }), { of: 'tablet', why: 'refused', message: 'Sample refusal.' }, code);
+    }
+});
+
+test('an answer with no code says nothing either way: the last answer stands, and before any the list is the tablet\'s own with no line', () => {
+    for (const nothing of [{}, { loading: true }]) {
+        assert.deepEqual(shotsList(null, nothing), { of: 'tablet', why: 'unknown' });
+        const served = shotsList(null, SERVED);
+        assert.equal(shotsList(served, nothing), served);
+        const out = shotsList(null, { code: 'unreachable' });
+        assert.equal(shotsList(out, nothing), out);
+    }
+});
+
+test('a Machine that turns Capture-only, or is served again, changes what is listed at the next answer', () => {
+    let list = shotsList(null, SERVED);
+    list = shotsList(list, { code: 'captureOnly' });
+    assert.equal(list.of, 'tablet');
+    list = shotsList(list, SERVED);
+    assert.equal(list.of, 'location');
+});
+
+test('a refusal of the list itself that means "the tablet\'s own Shots" says which line it is listed under', () => {
+    for (const code of [...CANT_ASK, undefined]) assert.deepEqual(shotsListRefused(code), { of: 'tablet', why: 'unreachable' }, String(code));
+    for (const code of ['captureOnly', 'hardwareMismatch']) assert.deepEqual(shotsListRefused(code), { of: 'tablet', why: 'notServed' }, code);
+    for (const code of ['invalidRequest', 'noSuchShot', 'recipesUnread']) assert.equal(shotsListRefused(code), null, `${code} is a failure, not a fallback`);
 });

@@ -118,20 +118,22 @@ async function readNewest({ seq, edits }) {
 
 // Reads a Shot opened from the list, whole, and its recipe's reference. As for
 // the latest, a reference that can't be read must not cost the graph the Shot.
+// The seam says whether the Shot can be changed now, and where it can't be
+// read, whether that is because Decent Sync's server can't be asked for it.
 async function readOpened({ shotId, recipeId, seq, edits }) {
-    let shot;
+    let found;
     let chosen = null;
     try {
-        [shot, chosen] = await Promise.all([shotById(shotId), recipeId === null ? null : referenceShot(recipeId).catch(error => {
+        [found, chosen] = await Promise.all([shotById(shotId), recipeId === null ? null : referenceShot(recipeId).catch(error => {
             logger.warn('Cafe: could not read the opened Shot\'s reference', error);
             return null;
         })]);
     } catch (error) {
         logger.warn('Cafe: could not read the opened Shot', error);
-        dispatch({ type: 'openedUnread', seq, shotId });
+        dispatch({ type: 'openedUnread', seq, shotId, unreachable: error.unreachable === true });
         return;
     }
-    dispatch({ type: 'openedRead', seq, edits, shotId, shot, chosen });
+    dispatch({ type: 'openedRead', seq, edits, shotId, shot: found ? found.shot : null, canChange: !found || found.canChange !== false, chosen });
 }
 
 // ── What the chart draws ─────────────────────────────────────────────────────
@@ -309,7 +311,11 @@ function paint() {
     }
     show(el('cafe-back'), shown.back);
     // The Shot's stars and its note icon, which is a plus where it has no note.
+    // Another Machine's Shot while Decent Sync can't be reached: the stars
+    // are shown muted and take no tap, and the note opens to read only, so
+    // its icon takes no tap where there is no note to read.
     show(el('cafe-stars'), !!shown.rate);
+    el('cafe-stars')?.classList.toggle('cafe-locked', shown.locked);
     const noteButton = el('cafe-shot-note');
     show(noteButton, !!shown.rate);
     if (shown.rate) {
@@ -317,8 +323,10 @@ function paint() {
         document.querySelectorAll('#cafe-stars .cafe-star').forEach((star, index) => {
             star.style.setProperty('--cafe-star-fill', `${fills[index] * 100}%`);
             star.setAttribute('aria-pressed', String(fills[index] > 0));
+            star.disabled = shown.locked;
         });
         noteButton?.classList.toggle('cafe-has-note', !!shown.rate.note);
+        if (noteButton) noteButton.disabled = shown.locked && !shown.rate.note;
     }
     const make = el('cafe-make-reference');
     show(make, shown.makeReference);
@@ -422,12 +430,24 @@ const followEdit = (shotId, remarks) => {
 };
 const markEdit = (shotId, type) => dispatch({ type, shotId });
 
+// Was an edit not confirmed either way, because Decent Sync's server can't be
+// asked? The server may yet make it, so it is not shown as failed, wherever
+// the graph has gone meanwhile. Where the Shot is the one in the graph it is
+// now shown as one that can't be changed, and the line under the legend says
+// why.
+function cantTell(shotId, error) {
+    if (error.unreachable !== true) return false;
+    dispatch({ type: 'shotUnreachable', shotId });
+    return true;
+}
+
 // A tap on a star: that many stars, or none for a tap on the star chosen. It
 // is saved at once, and the stars change as they are tapped. If the edit fails
 // they go back, to what a read after it found where there was one.
 async function onStar(star) {
     const target = shownRemarks(state);
-    if (rating || !target || !model().rate) return;
+    const shown = model();
+    if (rating || !target || !shown.rate || shown.locked) return;
     const before = target.rating;
     const next = ratingForTap(before, star);
     rating = true;
@@ -438,8 +458,10 @@ async function onStar(star) {
     } catch (error) {
         logger.warn('Cafe: could not save the rating', error);
         followEdit(target.id, editedRemarks({ rating: next }, error.remarks || { rating: before }));
-        // Decent Sync's refusal says why, in its own words.
-        showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
+        // Decent Sync's refusal says why, in its own words. Where nothing is
+        // known either way there is no toast: the line under the legend says
+        // the Shot can't be changed.
+        if (!cantTell(target.id, error)) showToast(error.refusal || cafeText('The rating could not be saved'), 4000, 'error');
     } finally {
         rating = false;
         markEdit(target.id, 'editEnded');
@@ -453,6 +475,11 @@ function onNote() {
     const shown = model();
     const target = shownRemarks(state);
     if (!target || !shown.rate) return;
+    // A Shot that can't be changed now has its note opened to read.
+    if (shown.locked) {
+        if (target.note) readNote({ title: shown.row.label, name: shown.row.name, credit: credit(shown.row.shot), rating: target.rating, note: target.note });
+        return;
+    }
     editNote({
         title: shown.row.label,
         name: shown.row.name,
@@ -467,6 +494,7 @@ function onNote() {
             } catch (error) {
                 logger.warn('Cafe: could not save the note', error);
                 followEdit(target.id, editedRemarks({ note }, error.remarks));
+                if (cantTell(target.id, error)) throw new Error(cafeText('Decent Sync can\'t be reached, so this shot can\'t be changed'));
                 throw new Error(error.refusal || cafeText('The note could not be saved'));
             } finally {
                 markEdit(target.id, 'editEnded');
@@ -486,10 +514,11 @@ function onReferenceNote() {
 
 /**
  * Open a Shot from the Shots list in the latest's place. `recipe` is its own
- * recipe's DYE2 record, or null. The latest's own row goes back to the latest.
+ * recipe's DYE2 record, or null; `name` is the name of a recipe this tablet
+ * has no record of, or null. The latest's own row goes back to the latest.
  */
-export function openShot(shotId, recipe) {
-    dispatch({ type: 'open', shotId, recipe });
+export function openShot(shotId, recipe, name = null) {
+    dispatch({ type: 'open', shotId, recipe, name });
 }
 
 /** The id of the Shot in the graph, for the list's highlight, or null. */

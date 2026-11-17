@@ -5,12 +5,14 @@
 //
 //   node test/cafe-smoke/run-decent-sync.mjs --token=<Decaid's extensions token>
 //   node test/cafe-smoke/run-decent-sync.mjs --token=... --sync=http://127.0.0.1:3999 \
-//       --sync-for-tablet=http://cafe-smoke-sync:3000 --sync-container=cafe-smoke-sync
+//       --sync-for-tablet=http://cafe-smoke-sync:3000 --sync-container=cafe-smoke-sync \
+//       --decaid-2=http://127.0.0.1:8081
 //
-// It changes the Decaid and the server it is pointed at: it makes the server's
-// first Admin, a Location and a Machine, all made up, installs Decent Sync's
-// plugin on the Decaid and connects it, chooses and clears Reference Shots,
-// turns the Machine's sharing off and on, stops and starts the server's
+// It changes the two Decaids and the server it is pointed at: it makes the
+// server's first Admin, a Location and two Machines, all made up, installs
+// Decent Sync's plugin on each Decaid and connects it, installs DYE2 on the
+// second, chooses and clears Reference Shots, rates Shots and writes notes on
+// them, turns a Machine's sharing off and on, stops and starts the server's
 // container, and pulls simulated shots. Point it at throwaway ones only.
 
 import { chromium } from 'playwright';
@@ -21,8 +23,9 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { RECIPES, BARISTAS } from './sample-data.mjs';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog } from './page-helpers.mjs';
-import { DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog, shotsHeader } from './page-helpers.mjs';
+import { DYE2_PLUGIN_ID, MIN_DYE2_VERSION } from '../../src/cafe/dye2-gate.js';
+import { compareVersions } from '../../src/modules/skin-version.js';
 import { shotRecipeId } from '../../src/cafe/shot-model.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -46,16 +49,28 @@ const SYNC_CONTAINER = flag('sync-container', 'cafe-smoke-sync');
 const EMAIL = flag('email', 'admin@smoke.invalid');
 const PASSWORD = flag('password', 'cafe-smoke-password-1');
 
+// The second Machine's Decaid, as this run reaches it, and its extensions
+// token, which is the first's unless `--token-2=` names another.
+const DECAID_2 = flag('decaid-2', 'http://127.0.0.1:8081');
+const TOKEN_2 = flag('token-2', TOKEN);
+
 const PLUGIN = 'decent-sync.reaplugin';
 const PLUGIN_REPO = 'loganfuller/decent-sync';
 const LOCATION = 'Sample Cafe';
 const MACHINE = 'Sample Machine';
+const MACHINE_2 = 'Sample Machine Two';
 const REFERENCES = '/store/streamlineCafe/references';
 const CANT_CHANGE = "Decent Sync can't be reached, so the reference can't be changed";
+const SHOT_CANT_CHANGE = "Decent Sync can't be reached, so this shot can't be changed";
+const LIST_UNREACHABLE = "Decent Sync can't be reached, so only this machine's shots are listed.";
+const LIST_NOT_SERVED = "This machine isn't at a Decent Sync Location, so only its own shots are listed.";
+const TABLET_COLUMNS = 'Pulled|Recipe|Dose → yield|Rating|Barista|Note';
+const LOCATION_COLUMNS = 'Pulled|Machine|Recipe|Dose → yield|Time|Rating|Barista|Note';
 
 const docker = (...command) => promisify(execFile)('docker', command);
 const decaid = decaidClient(`${DECAID}/api/v1`, TOKEN);
 const plugin = path => decaid('GET', `/plugins/${PLUGIN}/${path}`);
+const decaid2 = decaidClient(`${DECAID_2}/api/v1`, TOKEN_2);
 
 // ── Results ──────────────────────────────────────────────────────────────────
 
@@ -106,28 +121,52 @@ async function standUp() {
     }
     const { locations } = await sync('GET', '/locations');
     const location = locations.find(l => l.name === LOCATION) || (await sync('POST', '/locations', { name: LOCATION, timeZone: 'UTC' })).location;
-    const { machines } = await sync('GET', '/machines');
-    let machine = machines.find(m => m.name === MACHINE);
+    return { location, machine: await connect(decaid, MACHINE, location) };
+}
 
-    const status = await plugin('status').catch(() => null);
+// A Machine at the Location, by name, with the plugin on `tablet`, a Decaid,
+// connected as it. Made only where it is missing.
+async function connect(tablet, name, location) {
+    const { machines } = await sync('GET', '/machines');
+    let machine = machines.find(m => m.name === name);
+    const status = await tablet('GET', `/plugins/${PLUGIN}/status`).catch(() => null);
     if (!machine || status?.served !== true || status.machine?.id !== machine.id) {
         // The plugin is not connected as this Machine: give it the Machine's
         // token, a new one where the Machine was made by an earlier run.
-        const issued = machine ? await sync('POST', `/machines/${machine.id}/token`) : await sync('POST', '/machines', { name: MACHINE, locationId: location.id });
+        const issued = machine ? await sync('POST', `/machines/${machine.id}/token`) : await sync('POST', '/machines', { name, locationId: location.id });
         machine = issued.machine;
-        if (!(await decaid('GET', '/plugins')).some(p => p.id === PLUGIN)) {
-            await decaid('POST', '/plugins/install/github-release', { repo: PLUGIN_REPO }, { manage: true });
-            note('installed Decent Sync\'s plugin');
+        if (!(await tablet('GET', '/plugins')).some(p => p.id === PLUGIN)) {
+            await tablet('POST', '/plugins/install/github-release', { repo: PLUGIN_REPO }, { manage: true });
+            note(`installed Decent Sync's plugin for ${name}`);
         }
         const settings = { ServerUrl: SYNC_FOR_TABLET, Token: issued.token, PollSeconds: 5 };
         // Decaid started with no account keeps the token in memory, and its first save can fail.
-        await decaid('POST', `/plugins/${PLUGIN}/settings`, settings, { manage: true }).catch(() => decaid('POST', `/plugins/${PLUGIN}/settings`, settings, { manage: true }));
-        await decaid('POST', `/plugins/${PLUGIN}/enable`, undefined, { manage: true });
+        await tablet('POST', `/plugins/${PLUGIN}/settings`, settings, { manage: true }).catch(() => tablet('POST', `/plugins/${PLUGIN}/settings`, settings, { manage: true }));
+        await tablet('POST', `/plugins/${PLUGIN}/enable`, undefined, { manage: true });
     }
     await sync('PUT', `/machines/${machine.id}/sharing`, { sharing: true });
-    const served = await until(async () => ((await plugin('status')).served === true), { timeout: 60_000 });
-    if (!served) throw new Error('Decent Sync\'s plugin did not come to serve the Machine: is the server reachable from Decaid\'s container?');
-    return { location, machine };
+    const served = await until(async () => ((await tablet('GET', `/plugins/${PLUGIN}/status`)).served === true), { timeout: 60_000 });
+    if (!served) throw new Error(`Decent Sync's plugin did not come to serve ${name}: is the server reachable from Decaid's container?`);
+    return machine;
+}
+
+// The second Machine: another Decaid, with a DYE2 new enough for the skin and
+// Decent Sync's plugin connected as a second Machine at the same Location. Its
+// Shots reach the server as any tablet's do. Answers the Machine, and the id
+// of its own DYE2 record of a Recipe once the Library's Recipes have reached it.
+async function standUpSecond(location, recipe) {
+    const dye2 = (await decaid2('GET', '/plugins')).find(p => p.id === DYE2_PLUGIN_ID);
+    if (!dye2 || compareVersions(dye2.version, MIN_DYE2_VERSION) < 0) {
+        const installed = await decaid2('POST', '/plugins/install/github-release', { repo: 'decentespresso/dye2' }, { manage: true });
+        note(`installed DYE2 ${installed.version} on the second Decaid`);
+    }
+    await decaid2('POST', `/plugins/${DYE2_PLUGIN_ID}/enable`, undefined, { manage: true }).catch(() => {});
+    // Streamline's "DYE2 on" setting, which the skin's page needs on.
+    await decaid2('POST', '/store/streamlineSettings/streamline.dye2Enabled', 'true');
+    const machine = await connect(decaid2, MACHINE_2, location);
+    const record = await until(async () => ((await decaid2('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || []).find(row => row && row.decentSyncId === recipe.id), { timeout: 90_000, every: 1000 });
+    if (!record) throw new Error('The Location\'s Recipes did not reach the second Decaid\'s DYE2 records.');
+    return { machine, recordId: String(record.id) };
 }
 
 // The Location's Recipes by name: the tablet's sample recipes, once they have
@@ -145,21 +184,29 @@ async function libraryRecipes(location) {
 
 const setReference = (recipe, shotId) => sync('PUT', `/recipes/${recipe.id}/reference-shot`, { shotId });
 const referenceOnServer = async recipe => (await sync('GET', `/recipes/${recipe.id}`)).recipe.referenceShot?.id ?? null;
-// The newest of Decaid's Shots pulled with a recipe.
-const newestShotWith = async recordId => ((await decaid('GET', '/shots?limit=100')).items || []).find(item => shotRecipeId(item.workflow) === String(recordId)) || null;
+// The newest of a Decaid's Shots pulled with a recipe.
+const newestShotWith = async (recordId, tablet = decaid) => ((await tablet('GET', '/shots?limit=100')).items || []).find(item => shotRecipeId(item.workflow) === String(recordId)) || null;
 
-async function pullShot(seconds) {
-    await decaid('PUT', '/machine/state/espresso');
+async function pullShot(seconds, tablet = decaid) {
+    await tablet('PUT', '/machine/state/espresso');
     await sleep(seconds * 1000);
-    await decaid('PUT', '/machine/state/idle');
+    await tablet('PUT', '/machine/state/idle');
 }
 
 // ── Browser ──────────────────────────────────────────────────────────────────
 
 const browser = await chromium.launch({ headless: !HEADED });
+// The second Machine's tablet: a browser of its own, in which the first
+// Decaid's address is the second's. The skin calls Decaid on port 8080 of the
+// host that served it, so the same page, served once, is each tablet's own.
+let browser2 = null;
+const secondBrowser = async () => {
+    browser2 = browser2 || await chromium.launch({ headless: !HEADED, args: [`--host-resolver-rules=MAP ${new URL(DECAID).host} ${new URL(DECAID_2).host}`] });
+    return browser2;
+};
 
-async function openPage() {
-    const context = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
+async function openPage(on = browser) {
+    const context = await on.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], sockets: [], loads: 0 };
     page.on('pageerror', error => seen.errors.push(error.message));
@@ -181,11 +228,11 @@ async function load(page, recipe) {
     await page.waitForTimeout(3000);
 }
 // A shot from start to the finished Shot in the graph: its record on the tablet.
-async function shotWith(page, recordId, seconds, barista) {
-    const before = (await newestShotWith(recordId))?.id ?? null;
-    await decaid('PUT', '/workflow', { context: { baristaName: barista } });
-    await pullShot(seconds);
-    const pulled = await until(async () => { const newest = await newestShotWith(recordId); return newest && newest.id !== before ? newest : null; }, { timeout: 30_000 });
+async function shotWith(page, recordId, seconds, barista, tablet = decaid) {
+    const before = (await newestShotWith(recordId, tablet))?.id ?? null;
+    await tablet('PUT', '/workflow', { context: { baristaName: barista } });
+    await pullShot(seconds, tablet);
+    const pulled = await until(async () => { const newest = await newestShotWith(recordId, tablet); return newest && newest.id !== before ? newest : null; }, { timeout: 30_000 });
     await page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(2500);
     return pulled;
@@ -196,6 +243,37 @@ const onServer = async shotId => {
     return { rating: shot.enjoyment || null, note: shot.record?.annotations?.espressoNotes || null };
 };
 const pluginRequests = (seen, method) => seen.requests.filter(r => r.startsWith(`${method} /api/v1/plugins/${PLUGIN}/reference`));
+
+// The Shots list: its rows as they read, and opening and closing it.
+const listRows = page => page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-row')].map(row => {
+    // A cell shows where it has a box: the Machine's name sits in a cell the tablet's own list hides.
+    const visible = selector => { const cell = row.querySelector(selector); return cell && cell.offsetParent !== null ? cell.textContent.trim() : null; };
+    return {
+        id: row.dataset.shotId,
+        current: row.getAttribute('aria-current') === 'true',
+        machine: visible('.cafe-shots-machine-name'),
+        mine: !!row.querySelector('.cafe-shots-this'),
+        name: row.querySelector('.cafe-shots-name').textContent,
+        duration: visible('.cafe-shots-duration'),
+        unfinished: !!row.querySelector('.cafe-shots-unfinished'),
+        chip: !!row.querySelector('.cafe-shots-chip'),
+        stars: [...row.querySelectorAll('.cafe-shots-star')].filter(star => parseFloat(star.style.getPropertyValue('--cafe-star-fill')) > 0).length,
+        note: !!row.querySelector('.cafe-shots-note svg'),
+    };
+}));
+async function openList(page) {
+    await page.locator('#cafe-shots-btn').click();
+    await page.locator('#cafe-shots-dialog[open]').waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(500);
+}
+const closeList = page => page.locator('#cafe-shots-dialog .cafe-shots-head button').click();
+// Tap a row of the open list, and wait for its Shot's row of the legend.
+async function openRow(page, shotId, test) {
+    await page.locator(`#cafe-shots-list .cafe-shots-row[data-shot-id="${shotId}"]`).click();
+    return await waitLegend(page, test, 30_000) || legend(page);
+}
+const starsOff = page => page.locator('#cafe-stars .cafe-star').evaluateAll(stars => stars.every(star => star.disabled));
+const sent = (seen, mark, test) => seen.requests.slice(mark).filter(test);
 const storeRequests = seen => seen.requests.filter(r => r.includes(REFERENCES));
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -436,6 +514,19 @@ try {
     check('there Make reference keeps the choice on the tablet, and asks the plugin nothing',
         !!now && (await decaid('GET', REFERENCES))?.[house.recordId] === second.id && after.some(r => r === `POST /api/v1${REFERENCES}`) && !after.some(r => r.startsWith('PUT /api/v1/plugins/')), after.filter(r => /^(POST|PUT) /.test(r)).join(', '));
     check('and the server\'s Reference Shot is as it was', (await referenceOnServer(house)) === first.id);
+    //    Its Shots list is the tablet's own, and says why.
+    {
+        mark = seen.requests.length;
+        await openList(page);
+        const header = await shotsHeader(page);
+        const shown = await listRows(page);
+        check('on a Capture-only Machine the list is headed "This machine only", with the line that says it is at no Location',
+            header.under === 'This machine only' && header.line === LIST_NOT_SERVED && header.columns.join('|') === TABLET_COLUMNS, JSON.stringify(header));
+        check('and it lists the tablet\'s own Shots, from Decaid, asking the plugin for none', shown.length > 0 && shown.every(r => r.machine === null && r.duration === null && !r.unfinished)
+            && sent(seen, mark, r => r.startsWith('GET /api/v1/shots?limit=50')).length === 1 && sent(seen, mark, r => r.includes(`/plugins/${PLUGIN}/shots`)).length === 0, `${shown.length} rows`);
+        await shot(page, 'sync-shots-capture-only-light');
+        await closeList(page);
+    }
 
     //    Served again: Decent Sync's Reference Shot, and the tablet's choice dropped.
     await sync('PUT', `/machines/${machine.id}/sharing`, { sharing: true });
@@ -446,6 +537,189 @@ try {
     now = await waitLegend(page, l => l.badge === null && l.reference !== null && l.flag === null, 30_000);
     check('served again, the reference is Decent Sync\'s once more, with no reload', !!now && /Sample Barista$/.test(now.reference || '') && seen.loads === loads, JSON.stringify(now || await legend(page)));
     check('and the column reads "saved to the recipe" again', (await label(page)) === 'Dial-in · saved to the recipe', await label(page));
+
+    // 10. The Location's Shots (docs/cafe/DESIGN.md, "The Shots list"): a second
+    //     Machine at the Location, with a Shot of its own that reached the
+    //     server as any tablet's does; the list, another Machine's Shot opened,
+    //     rated, noted and made a reference; and the server stopped.
+    const secondUp = await decaid2('GET', '/plugins').then(() => true, () => false);
+    check(`a second Decaid answers at ${DECAID_2}, for the second Machine`, secondUp, 'see "The second Machine" in docs/cafe/SMOKE.md');
+    if (secondUp) {
+        const two = await standUpSecond(location, house);
+        check('a second Machine is at the sample Location, its tablet holding the Location\'s Recipes', (await decaid2('GET', `/plugins/${PLUGIN}/status`)).machine?.name === MACHINE_2 && two.machine.id !== machine.id);
+        //     Its tablet: the same skin on the second Decaid. A recipe loaded
+        //     there, a shot, and a two-second shot, which is Unfinished.
+        const tablet2 = await openPage(await secondBrowser());
+        await tablet2.page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 });
+        await load(tablet2.page, house);
+        const theirs = await shotWith(tablet2.page, two.recordId, 9, 'Second Barista', decaid2);
+        const before = (await decaid2('GET', '/shots?limit=1')).items?.[0]?.id;
+        await pullShot(2, decaid2);
+        const brief = await until(async () => { const newest = (await decaid2('GET', '/shots?limit=1')).items?.[0]; return newest && newest.id !== before ? newest : null; }, { timeout: 30_000 });
+        check('the second tablet runs the skin, and pulled a Shot and an Unfinished one with the Recipe loaded', !!theirs && !!brief && theirs.id !== brief.id && tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+        await tablet2.close();
+        //     Both reach the server, and the first tablet's plugin lists them.
+        const listedByPlugin = await until(async () => {
+            const { shots } = await plugin('shots?limit=50');
+            const found = [theirs.id, brief.id].map(id => shots.find(s => s.id === id));
+            return found.every(Boolean) ? found : null;
+        }, { timeout: 90_000, every: 1000 });
+        check('the second Machine\'s Shots reached the server the way a tablet\'s do, and the plugin lists them as another Machine\'s',
+            !!listedByPlugin && listedByPlugin.every(s => s.machine.name === MACHINE_2 && s.onThisTablet === false) && listedByPlugin[0].unfinished === false && listedByPlugin[1].unfinished === true, JSON.stringify(listedByPlugin));
+        check('and Decaid on the first tablet holds neither', (await decaid('GET', `/shots/${theirs.id}`).catch(() => null)) === null);
+
+        //     The list on the first tablet: the Location's, through the plugin.
+        await load(page, house);
+        mark = seen.requests.length;
+        await openList(page);
+        let header = await shotsHeader(page);
+        let shown = await listRows(page);
+        const rowOf = id => shown.find(r => r.id === id);
+        check('on a served Machine the list is headed with the Location\'s name, with no line, and adds the Machine and Time columns',
+            header.title === 'Shots' && header.under === LOCATION && header.line === null && header.columns.join('|') === LOCATION_COLUMNS, JSON.stringify(header));
+        check('it is read through the plugin, 50 rows a page, and Decaid\'s own list is not asked',
+            sent(seen, mark, r => r === `GET /api/v1/plugins/${PLUGIN}/shots?limit=50`).length === 1 && sent(seen, mark, r => r.startsWith('GET /api/v1/shots?limit=50')).length === 0,
+            sent(seen, mark, r => /shots\?/.test(r)).join(', '));
+        check('another Machine\'s Shots are listed among this one\'s, each naming its Machine, with this one marked',
+            rowOf(theirs.id)?.machine === MACHINE_2 && rowOf(theirs.id).mine === false && rowOf(second.id)?.machine === MACHINE && rowOf(second.id).mine === true && rowOf(theirs.id).name === house.name,
+            JSON.stringify([rowOf(theirs.id), rowOf(second.id)]));
+        check('a row gives how long its Shot ran, and an Unfinished Shot is marked in the rating\'s place',
+            /^\d+\.\d s$/.test(rowOf(theirs.id)?.duration || '') && rowOf(theirs.id).unfinished === false && rowOf(brief.id)?.unfinished === true && rowOf(brief.id).stars === 0, JSON.stringify([rowOf(theirs.id), rowOf(brief.id)]));
+        check('the "Reference" chip is the row\'s own word: the Recipe\'s Reference Shot on the server', shown.filter(r => r.chip).map(r => r.id).includes(first.id) && rowOf(theirs.id).chip === false, JSON.stringify(shown.filter(r => r.chip).map(r => r.id)));
+        check('the row of the Shot in the graph is highlighted', shown.filter(r => r.current).map(r => r.id).join() === second.id);
+        await shot(page, 'sync-shots-location-light');
+        await paint(page, 'dark');
+        await page.waitForTimeout(500);
+        await shot(page, 'sync-shots-location-dark');
+        await paint(page, 'light');
+
+        //     Another Machine's Shot, opened: read whole through the plugin.
+        mark = seen.requests.length;
+        now = await openRow(page, theirs.id, l => l.label === 'Viewing' && /Second Barista$/.test(l.when || ''));
+        await page.waitForTimeout(1500);
+        const whole = `GET /api/v1/plugins/${PLUGIN}/shot?id=${encodeURIComponent(theirs.id)}`;
+        check('another Machine\'s Shot opens in the graph, read whole through the plugin, one request',
+            now.label === 'Viewing' && sent(seen, mark, r => r === whole).length === 1 && (await page.locator('#cafe-back').isVisible()), `${JSON.stringify(now)} ${sent(seen, mark, r => r.includes('/shot')).join(', ')}`);
+        lines = await chartLines(page);
+        const cards = await row(page);
+        check('with its lines, its recipe\'s Reference Shot behind it, and the comparison row', lines.points[0] > 5 && lines.points[7] > 10 && now.reference !== null && cards.mode === 'rest' && cards.cards.length === 5 && /^\d+\.\d s$/.test(cards.cards[0].value) && /^Ref /.test(cards.cards[0].side), `${JSON.stringify(lines.points)} ${JSON.stringify(cards.cards[0])}`);
+        check('the legend says when it was pulled and who pulled it, and never where', /^Today \d{2}:\d{2}.* · Second Barista$/.test(now.when || '') && !/Sample (Machine|Cafe)/.test(JSON.stringify(now)), JSON.stringify(now));
+        check('it has empty stars, a plus for its note, and Make reference', JSON.stringify((await remarks(page)).stars) === '[0,0,0,0,0]' && (await remarks(page)).note === 'add' && now.make === 'Make reference' && !now.muted && now.notice === null, JSON.stringify(await remarks(page)));
+        await shot(page, 'sync-other-machine-shot-light');
+
+        //     Rated and noted through the plugin: the server has the edit at
+        //     once, and writes it into the Shot on the tablet that holds it.
+        const edits = [];
+        const listen = request => {
+            const url = new URL(request.url());
+            if (request.method() === 'PUT' && /\/shots?(\/|$)/.test(url.pathname)) edits.push(`${url.pathname}${url.search} ${request.postData()}`);
+        };
+        page.on('request', listen);
+        const edit = `/api/v1/plugins/${PLUGIN}/shot?id=${encodeURIComponent(theirs.id)}`;
+        await page.locator('#cafe-stars .cafe-star').nth(3).click();
+        let held = await until(async () => { const at = await onServer(theirs.id); return at.rating === 8 ? at : null; }, { timeout: 45_000 });
+        check('a tap on the fourth star rates another Machine\'s Shot: the stars, and the server', JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]' && held?.rating === 8, JSON.stringify(held || await onServer(theirs.id)));
+        const NOTE_2 = 'Pulled on the other machine.\nA touch fast.';
+        await page.locator('#cafe-shot-note').click();
+        await page.locator('#cafe-note-text').fill(NOTE_2);
+        await page.locator('#cafe-note-save').click();
+        await page.locator('#cafe-note-dialog:not([open])').waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
+        held = await until(async () => { const at = await onServer(theirs.id); return at.note === NOTE_2 ? at : null; }, { timeout: 45_000 });
+        check('its note is saved through the plugin too, and the rating is untouched', (await noteDialog(page)) === null && held?.note === NOTE_2 && held.rating === 8 && (await remarks(page)).note === 'note', JSON.stringify(held || await onServer(theirs.id)));
+        check('each edit was one request to the plugin with only the field edited, and Decaid\'s own Shot edit was sent nothing',
+            edits.length === 2 && edits[0] === `${edit} {"rating":8}` && edits[1] === `${edit} ${JSON.stringify({ note: NOTE_2 })}`, edits.join(' | '));
+        page.off('request', listen);
+        const theirTablet = await until(async () => { const a = (await decaid2('GET', `/shots/${theirs.id}`)).annotations || {}; return a.enjoyment === 8 && a.espressoNotes === NOTE_2 ? a : null; }, { timeout: 60_000, every: 1000 });
+        check('the server writes the edit into the Shot on the tablet that holds it', !!theirTablet, JSON.stringify((await decaid2('GET', `/shots/${theirs.id}`)).annotations));
+        await shot(page, 'sync-other-machine-rated-light');
+
+        //     The list shows them: in the kept list, and when it next opens.
+        mark = seen.requests.length;
+        await openList(page);
+        shown = await listRows(page);
+        check('the list opened again while the Shot is in the graph is where it was left, unread, with the rating and the note in its row',
+            rowOf(theirs.id)?.stars === 4 && rowOf(theirs.id).note === true && rowOf(theirs.id).current === true && sent(seen, mark, r => r.includes(`/plugins/${PLUGIN}/shots`)).length === 0, JSON.stringify(rowOf(theirs.id)));
+        await closeList(page);
+        await page.locator('#cafe-back').click();
+        await waitLegend(page, l => l.label === 'Latest');
+        mark = seen.requests.length;
+        await openList(page);
+        shown = await listRows(page);
+        check('and the list read afresh, the next time it opens, shows them from the server', rowOf(theirs.id)?.stars === 4 && rowOf(theirs.id).note === true && sent(seen, mark, r => r.includes(`/plugins/${PLUGIN}/shots`)).length === 1, JSON.stringify(rowOf(theirs.id)));
+
+        //     Make reference on it sets its own recipe's Reference Shot.
+        now = await openRow(page, theirs.id, l => l.label === 'Viewing' && l.make !== null);
+        mark = seen.requests.length;
+        await page.locator('#cafe-make-reference').click();
+        await page.locator('#cafe-reference-dialog-replace').click({ timeout: 5000 }).catch(() => {});
+        now = await waitLegend(page, l => l.badge !== null) || await legend(page);
+        check('Make reference on another Machine\'s Shot makes it its recipe\'s Reference Shot on the server', (await referenceOnServer(house)) === theirs.id && now.badge === 'This shot is the reference'
+            && sent(seen, mark, r => r.startsWith(`PUT /api/v1/plugins/${PLUGIN}/reference`)).length === 1, `${await referenceOnServer(house)} for ${theirs.id}`);
+        await shot(page, 'sync-other-machine-reference-light');
+        //     Put back: the push for the opened Shot's recipe is followed.
+        await setReference(house, first.id);
+        now = await waitLegend(page, l => l.badge === null && l.reference !== null && l.make !== null);
+        check('a reference chosen elsewhere for the opened Shot\'s recipe is followed, with the Shot still opened', !!now && now.label === 'Viewing' && !now.muted, JSON.stringify(now || await legend(page)));
+
+        //     The server stopped, with another Machine's Shot in the graph.
+        await docker('stop', SYNC_CONTAINER);
+        stopped = true;
+        now = await waitLegend(page, l => l.notice === SHOT_CANT_CHANGE, 60_000) || await legend(page);
+        check('with the server stopped, another Machine\'s Shot in the graph says "Decent Sync can\'t be reached, so this shot can\'t be changed"', now.notice === SHOT_CANT_CHANGE && now.label === 'Viewing' && seen.loads === loads, JSON.stringify(now));
+        check('its stars are shown muted with the rating it has, and Make reference is shown muted', JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]' && (await starsOff(page)) && now.make === 'Make reference' && now.muted === true, JSON.stringify(await remarks(page)));
+        mark = seen.requests.length;
+        await page.locator('#cafe-stars .cafe-star').nth(0).click({ force: true }).catch(() => {});
+        await page.locator('#cafe-make-reference').click({ force: true }).catch(() => {});
+        await page.waitForTimeout(800);
+        check('a tap on a star or on Make reference asks nothing', sent(seen, mark, r => r.startsWith('PUT ')).length === 0 && JSON.stringify((await remarks(page)).stars) === '[100,100,100,100,0]');
+        await page.locator('#cafe-shot-note').click();
+        const locked = await noteDialog(page);
+        check('and its note opens to read only', locked?.read === NOTE_2 && locked.text === null && locked.buttons.join() === 'Close', JSON.stringify(locked));
+        await shot(page, 'sync-other-machine-locked-note-light');
+        await page.locator('#cafe-note-close').click();
+        await page.locator('#cafe-note-dialog:not([open])').waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(500);
+        await shot(page, 'sync-other-machine-locked-light');
+
+        //     The list then: the tablet's own Shots, with its line; and this
+        //     tablet's own Shot is still rated.
+        await page.locator('#cafe-back').click();
+        await waitLegend(page, l => l.label === 'Latest');
+        mark = seen.requests.length;
+        await openList(page);
+        header = await shotsHeader(page);
+        shown = await listRows(page);
+        check('with the server stopped the list is headed "This machine only", with the line that says Decent Sync can\'t be reached',
+            header.under === 'This machine only' && header.line === LIST_UNREACHABLE && header.columns.join('|') === TABLET_COLUMNS, JSON.stringify(header));
+        check('and lists only this machine\'s Shots, from Decaid', shown.length > 0 && !rowOf(theirs.id) && !!rowOf(kept.id) && shown.every(r => r.machine === null) && sent(seen, mark, r => r.startsWith('GET /api/v1/shots?limit=50')).length === 1, `${shown.length} rows`);
+        check('no row carries a chip: the choice kept on the tablet is not read on a served Machine', shown.every(r => !r.chip) && sent(seen, mark, r => r.includes(REFERENCES)).length === 0);
+        await shot(page, 'sync-shots-server-stopped-light');
+        now = await openRow(page, kept.id, l => l.label === other.name);
+        await page.locator('#cafe-stars .cafe-star').nth(1).click();
+        const own = await until(async () => ((await decaid('GET', `/shots/${kept.id}`)).annotations?.enjoyment === 4), { timeout: 15_000 });
+        check('this tablet\'s own Shot, opened from that list, is still rated with the server stopped', !!own && JSON.stringify((await remarks(page)).stars) === '[100,100,0,0,0]' && !(await starsOff(page)), JSON.stringify(await remarks(page)));
+        await page.locator('#cafe-back').click();
+        await waitLegend(page, l => l.label === 'Latest');
+
+        //     The server back: the Location's list again, and the Shot can be changed.
+        await docker('start', SYNC_CONTAINER);
+        stopped = false;
+        await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });
+        header = await until(async () => {
+            await openList(page);
+            const at = await shotsHeader(page);
+            if (at.under === LOCATION) return at;
+            await closeList(page);
+            await page.waitForTimeout(3000);
+            return null;
+        }, { timeout: 120_000, every: 500 });
+        check('with the server back the list is the Location\'s again, with no reload', header?.under === LOCATION && header.line === null && seen.loads === loads, JSON.stringify(header));
+        shown = await listRows(page);
+        now = rowOf(theirs.id) ? await openRow(page, theirs.id, l => l.label === 'Viewing' && l.notice === null) : await legend(page);
+        check('and another Machine\'s Shot can be changed again', now.label === 'Viewing' && now.notice === null && !(await starsOff(page)) && !now.muted, JSON.stringify(now));
+        await page.locator('#cafe-back').click();
+        await waitLegend(page, l => l.label === 'Latest');
+    }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));
     await close();
@@ -460,7 +734,9 @@ try {
     if (stopped) await docker('start', SYNC_CONTAINER).catch(() => {});
     if (sharingOff) await sync('PUT', `/machines/${sharingOff}/sharing`, { sharing: true }).catch(() => {});
     await decaid('PUT', '/workflow', { context: { baristaName: null } }).catch(() => {});
+    await decaid2('PUT', '/workflow', { context: { baristaName: null } }).catch(() => {});
     await browser.close();
+    if (browser2) await browser2.close();
 }
 
 const failed = results.filter(r => !r.ok);
