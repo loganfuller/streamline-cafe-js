@@ -1,16 +1,18 @@
 // The Shot seam: the one place the page asks for a recipe's latest Shot, for
 // its reference, to make a Shot its reference, for the tablet's newest Shot,
-// to set a Shot's rating and note, for a page of the Shots list and for one
-// Shot by its id (docs/cafe/DESIGN.md, "Shots and the reference", "Rating and
-// notes" and "The Shots list"). The page reads and changes Shots, and
-// the choice, no other way, so which source answers changes no caller.
+// to set a Shot's rating and note, for a page of the Shots list, for one Shot
+// by its id and for a grinder's latest Shots (docs/cafe/DESIGN.md, "Shots and
+// the reference", "Rating and notes", "The Shots list" and "What the screen
+// shows"). The page reads and changes Shots, and the choice, no other way, so
+// which source answers changes no caller.
 //
-// It has two sources. The latest and the newest Shot are always the tablet's
-// own (tablet-shots.js). The reference is Decent Sync's on a Machine it serves
-// (plugin-shots.js) and the tablet's otherwise, and an edit goes the same way.
-// So do the Shots list, which on a served Machine is every Shot at its
-// Location, and a Shot read by its id, which may then be another Machine's.
-// What the plugin answers to a status request decides which (shot-sources.js).
+// It has two sources. The latest and the newest Shot, and a grinder's latest
+// Shots, are always the tablet's own (tablet-shots.js). The reference is
+// Decent Sync's on a Machine it serves (plugin-shots.js) and the tablet's
+// otherwise, and an edit goes the same way. So do the Shots list, which on a
+// served Machine is every Shot at its Location, and a Shot read by its id,
+// which may then be another Machine's. What the plugin answers to a status
+// request decides which (shot-sources.js).
 //
 // The status is asked by page.js, at start-up, when the page comes back into
 // view and after each recipe load, and here when the plugin's `changes` socket
@@ -26,7 +28,7 @@ let watcher = () => {};
 
 const sources = createShotSources({
     tablet: createTabletShots({
-        listShots: (limit, offset) => getShots({ limit, offset }),
+        listShots: (limit, offset, filter) => getShots({ limit, offset, ...filter }),
         readShot: getShot,
         readChoices: () => readCafe(REFERENCES_KEY),
         writeChoices: choices => writeCafe(REFERENCES_KEY, choices),
@@ -61,6 +63,14 @@ export const makeReference = (recipeId, shotId) => sources.makeReference(recipeI
 
 /** The tablet's newest Shot, whole, whatever it was pulled with, or null. */
 export const newestShot = () => sources.newestShot();
+
+/**
+ * A grinder's latest Shots on this tablet, at most `limit`, newest first, each
+ * as Decaid lists it, with its Workflow: what the grinder dialog reads the
+ * setting each grinder was last used at from. Always the tablet's own, on a
+ * Machine Decent Sync serves too. Rejects where Decaid can't be asked.
+ */
+export const grinderShots = (grinderId, limit) => sources.grinderShots(grinderId, limit);
 
 /**
  * A page of the Shots list, newest first. `from` is the page before's `next`,

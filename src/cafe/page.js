@@ -1,6 +1,7 @@
-// The cafe page around the strip: the title, what each dial-in row names, the
-// weight during a shot, the scale's battery, and where Settings and Sleep sit
-// (docs/cafe/DESIGN.md, "What the screen shows").
+// The cafe page around the strip: the title, what each dial-in row names and
+// the dialogs those names open, the weight during a shot, the scale's battery,
+// and where Settings and Sleep sit (docs/cafe/DESIGN.md, "What the screen
+// shows").
 //
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
@@ -10,11 +11,12 @@ import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusBu
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
-import { pageHeading, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { decentSyncSaves } from './sync-status.js';
 import { askStatus, onStatus } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
+import { openGrinderDialog } from './grinder-dialog.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -32,6 +34,9 @@ let batch = null;       // the Bean Batch last read, kept while the Workflow sti
 let namesSeq = 0;
 let namesTimer = null;
 let liveTimer = null;
+let loading = false;    // a recipe loads, or the strip is arranged
+let picking = 0;        // choices made in a pick dialog, not yet written
+let picks = Promise.resolve(); // the last of them
 
 const el = id => document.getElementById(id);
 
@@ -170,16 +175,10 @@ function stepSteam(direction, button) {
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Resolves once dial-in edits made before now have reached the Workflow. A
- * stepper writes a moment after its last tap; written after a recipe load
- * instead of before it, that edit would change the recipe just loaded. Rejects
- * when a write is still on the wire after a few seconds: the load is then not
- * made, because nothing says which recipe that write would land on.
- */
-export async function settleDialIn() {
+// The steam flow waiting to be written, and Streamline's own steppers: wait
+// out their debounce and any write on the wire.
+async function settleSteps() {
     await steamFlow.flush();
-    // Streamline's own steppers: wait out their debounce and any write on the wire.
     const giveUpAt = Date.now() + SETTLE_MAX_MS;
     while (msSinceTileInteraction() < SETTLE_QUIET_MS || hasWorkflowWriteInFlight()) {
         if (Date.now() >= giveUpAt) throw new Error('An earlier change has not reached the machine yet.');
@@ -188,12 +187,63 @@ export async function settleDialIn() {
 }
 
 /**
- * A recipe is loading, or has finished. The dial-in rows take no taps in
- * between (cafe.css): a step made while a recipe loads could be written before
- * or after the load, and belongs to neither recipe for certain.
+ * Resolves once dial-in edits made before now have reached the Workflow,
+ * choices made in a pick dialog among them. A stepper writes a moment after
+ * its last tap; written after a recipe load instead of before it, that edit
+ * would change the recipe just loaded. Rejects when a write is still on the
+ * wire after a few seconds: the load is then not made, because nothing says
+ * which recipe that write would land on.
  */
-export function showLoading(loading) {
-    el('main-page')?.classList.toggle('cafe-loading', loading);
+export async function settleDialIn() {
+    await picks;
+    await settleSteps();
+}
+
+// The dial-in rows take no taps (cafe.css) while a recipe loads or a choice is
+// written: a step made then could be written before or after either.
+function keepStill() {
+    el('main-page')?.classList.toggle('cafe-loading', loading || picking > 0);
+}
+
+/**
+ * A recipe is loading, or has finished. The dial-in rows take no taps in
+ * between: a step made while a recipe loads could be written before or after
+ * the load, and belongs to neither recipe for certain.
+ */
+export function showLoading(next) {
+    loading = next;
+    keepStill();
+}
+
+// ── Pick dialogs ─────────────────────────────────────────────────────────────
+
+// Not while a shot runs, a recipe loads, the strip is arranged, or another
+// choice is still being written.
+const mayPick = () => !loading && picking === 0 && !shotRunning();
+
+/**
+ * Write a choice made in a pick dialog: `send()` makes its one Workflow write.
+ * A dial-in change still on its way is written first, and a recipe load tapped
+ * meanwhile waits for the choice (settleDialIn), so the writes land in the
+ * order they were made. Rejects where the change before it never landed, and
+ * nothing is written then.
+ */
+function writePick(send) {
+    picking += 1;
+    keepStill();
+    const run = picks.then(async () => {
+        await settleSteps();
+        return send();
+    });
+    picks = run.catch(() => {});
+    return run.finally(() => {
+        picking -= 1;
+        keepStill();
+    });
+}
+
+function openGrinder() {
+    openGrinderDialog({ mayOpen: mayPick, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
 }
 
 // ── During a shot ────────────────────────────────────────────────────────────
@@ -283,6 +333,11 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     for (const [id, direction] of [['cafe-steam-minus', -1], ['cafe-steam-plus', 1]]) {
         el(id)?.addEventListener('click', event => stepSteam(direction, event.currentTarget));
     }
+    // The Grind row's name and the grinder's under it are one button. Streamline's
+    // own tap on #grind-label, inside it, never fires: cafe.css takes pointer
+    // events off the label, so a tap lands on the button and never passes
+    // through the label.
+    el('cafe-grind-pick')?.addEventListener('click', openGrinder);
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);

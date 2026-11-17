@@ -159,13 +159,20 @@
                 </div>
             </div>
 
-            <!-- #grind-label opens DYE2's grinder page on Streamline (app.js). Here it
-                 takes no taps until the grinder dialog arrives (cafe.css). -->
+            <!-- The row's name and the grinder's under it are one button, which opens the
+                 grinder dialog (src/cafe/grinder-dialog.js). #grind-label, inside it, opens
+                 DYE2's grinder page on Streamline (app.js); here it takes no taps (cafe.css),
+                 so a tap lands on the button and never on the label. -->
             <div id="grind-section" class="cafe-row cafe-row-tall">
-                <div id="grind-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-fit-text data-cafe-text="Grind">Grind</span>
-                    <span id="cafe-grind-desc" class="cafe-row-desc"></span>
-                </div>
+                <button id="cafe-grind-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="grind-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Grind">Grind</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-grind-desc" class="cafe-row-desc"></span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
                 <div class="cafe-stepper">
                     <button id="grind-minus" type="button" aria-label="Decrease Grind"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     <div class="cafe-value" aria-labelledby="grind-label">
@@ -410,6 +417,24 @@
                     <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
                 </form>
             </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+    </dialog>
+
+    <!-- A choice of what a dial-in row names: the grinder (src/cafe/pick-dialog.js). -->
+    <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title">
+        <div class="modal-box cafe-dialog cafe-pick-box">
+            <div class="cafe-pick-head">
+                <div class="cafe-pick-titles">
+                    <h3 id="cafe-pick-title"></h3>
+                    <!-- The recipe's name and whether a choice is saved to it. -->
+                    <p id="cafe-pick-under"></p>
+                </div>
+                <form method="dialog">
+                    <button class="cafe-btn" data-cafe-text="Close">Close</button>
+                </form>
+            </div>
+            <div id="cafe-pick-list" role="group"></div>
         </div>
         <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
     </dialog>

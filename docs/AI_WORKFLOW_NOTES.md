@@ -57,6 +57,7 @@ change.
 | `context.grinderId`, `context.grinderModel`, `context.baristaName`, `context.drinkerName`, `context.extras.basketId`, `context.extras.basketName` | DYE2 apply and pickers, skin recipe apply | The identities. A **recipe** apply clears each one the recipe does not name, as an explicit null (`clearInheritedFields`, #189) — an omission filed the shot under the previously applied item's grinder. A **favourite** carries a `copyMask`, so an unticked field is a deliberate "do not touch" and a favourite stays a pure overlay. |
 | `context.grinderSetting`, `context.targetDoseWeight`, `context.targetYield`, `context.extras.rpm`, `context.extras.feedRate` — **on a recipe apply** | skin recipe apply, DYE2 recipe apply | The same clear, same function, for the numbers: a recipe is the whole shot, not an overlay on the last one, so a number it does not name — or names as `0` — is cleared rather than inherited. `targetYield` is cleared to **`0`, never `null`**: Decaid's `workflow_handler.dart` passes it to `rejectExplicitNulls`, so a null answers `400` and takes the whole apply down, and `0` is its own documented clear (stop-at-weight off). A cleared grind or dose falls back on the tile to the machine's own value, then to a dash. Tiles and profile switches are the row below and are unaffected. |
 | `context.grinderSetting`, `context.targetDoseWeight`, `context.targetYield` | skin tiles, recipe apply | The contested group — #153 and #155 live here. A profile switch sends dose and grind **only** when that profile has a saved override, and otherwise omits them so the live dial-in survives (`profileSwitchDial`, #189); yield is a profile field, so a switch always sends it. Never fill a gap from a skin-local copy of a shared value — no other client updates it. |
+| `context.grinderId`, `context.grinderModel`, `context.grinderSetting`, `context.extras.rpm` — **on a grinder pick** | Streamline Cafe's grinder dialog (`cafe.grinder`) | One write: the grinder, the setting it was last used at (else its own default, else left out so the live one stays) and its RPM (else `null`). Streamline Cafe only; see its `docs/cafe/UPSTREAM_EDITS.md`. |
 | `profile.target_weight` | dose/yield tiles, profile switches | A non-autonomous machine stops on this, not on `context.targetYield`, so the tiles fold the yield into it — alone, never with the rest of the profile. |
 | `steamSettings`, `hotWaterData`, `rinseData` | skin settings page, skin tiles, recipe apply | Full sub-object sends are the defect; send only the changed key (#157). |
 | `profile` | any source | A profile change nulls `recipeId`: the recipe's identity *is* its profile. |
@@ -75,6 +76,7 @@ Defined in `WORKFLOW_WRITERS`. The prefix says which surface owns the write:
 | `beans.*` | the bean picker |
 | `shot.*` | per-shot fields |
 | `dye.*` | DYE2 apply and the Settings off-switch |
+| `cafe.*` | Streamline Cafe's main page (`src/cafe/`), in that fork only |
 
 ## Known gaps
 

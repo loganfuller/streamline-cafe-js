@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { RECIPES, BARISTAS } from './sample-data.mjs';
+import { RECIPES, BARISTAS, GRINDER, SECOND_GRINDER, GRINDER_USE } from './sample-data.mjs';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog, shotsHeader } from './page-helpers.mjs';
 import { DYE2_PLUGIN_ID, MIN_DYE2_VERSION } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
@@ -275,6 +275,94 @@ async function openRow(page, shotId, test) {
 const starsOff = page => page.locator('#cafe-stars .cafe-star').evaluateAll(stars => stars.every(star => star.disabled));
 const sent = (seen, mark, test) => seen.requests.slice(mark).filter(test);
 const storeRequests = seen => seen.requests.filter(r => r.includes(REFERENCES));
+
+// ── The grinder dialog ───────────────────────────────────────────────────────
+
+const grindersOf = async tablet => { const listed = await tablet('GET', '/grinders'); return Array.isArray(listed) ? listed : listed.items || []; };
+const pickDialog = page => page.locator('#cafe-pick-dialog[open]');
+// A tap on the Grind row's name, where a finger lands: the name takes no
+// pointer events itself, so the tap is made at its place.
+async function openGrinders(page) {
+    const box = await page.locator('#grind-section .cafe-row-name').boundingBox();
+    await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + box.height / 2);
+    return pickDialog(page).waitFor({ timeout: 15_000 }).then(() => page.waitForTimeout(500)).then(() => true, () => false);
+}
+async function chooseGrinder(page, model) {
+    await page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: model }) }).click();
+    await page.locator('#cafe-pick-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 });
+}
+const grindRow = async page => ({ name: await page.locator('#cafe-grind-desc').textContent(), value: parseFloat(await page.locator('#grind-value').textContent()) });
+
+// 11. The grinder dialog with Decent Sync (docs/cafe/DESIGN.md, "What the
+//     screen shows"): another of the Location's Grinders, chosen on this
+//     tablet with the Recipe loaded, is one write of the Workflow, which Decent
+//     Sync records as the Recipe's: on the server, in the tablet's record, and
+//     on the second Machine, which has the Recipe loaded too.
+async function grinderWithDecentSync({ page, seen, house, two }) {
+    const mine = await grindersOf(decaid);
+    const chosen = mine.find(g => g.model === SECOND_GRINDER.model);
+    const usual = mine.find(g => g.model === GRINDER.model);
+    const theirs = await until(async () => { const list = await grindersOf(decaid2); return list.some(g => g.model === SECOND_GRINDER.model) ? list : null; }, { timeout: 60_000, every: 1000 });
+    check('grinder: both sample grinders are the Location\'s, on each tablet', !!chosen && !!usual && !!theirs, JSON.stringify((theirs || []).map(g => g.model)));
+    if (!chosen || !usual || !theirs) return;
+    //     A shot on that grinder on this tablet, with no recipe loaded, at the
+    //     setting a choice of it then takes.
+    await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/selection`, {});
+    await decaid('PUT', '/workflow', { context: { grinderId: chosen.id, grinderModel: chosen.model, grinderSetting: GRINDER_USE.second.setting, extras: { rpm: GRINDER_USE.second.rpm } } });
+    const before = (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
+    await pullShot(4);
+    const pulled = await until(async () => { const newest = (await decaid('GET', '/shots?limit=1')).items?.[0]; return newest && newest.id !== before ? newest : null; }, { timeout: 30_000 });
+    check('grinder: a shot was pulled on it', !!pulled);
+    await sleep(5000);
+    //     The second tablet, with the Recipe loaded.
+    const tablet2 = await openPage(await secondBrowser());
+    await tablet2.page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 });
+    await load(tablet2.page, house);
+    check('grinder: the second tablet names the Recipe\'s grinder under Grind', (await grindRow(tablet2.page)).name === GRINDER.model, JSON.stringify(await grindRow(tablet2.page)));
+    const loadsThere = tablet2.seen.loads;
+    //     This tablet: the Recipe loaded, and the dialog.
+    await load(page, house);
+    check('grinder: this tablet names the Recipe\'s grinder under Grind', (await grindRow(page)).name === GRINDER.model, JSON.stringify(await grindRow(page)));
+    const mark = seen.requests.length;
+    check('grinder: the grinder dialog opens', await openGrinders(page));
+    check('grinder: on a served Machine the line under the title says the choice is saved to the recipe',
+        (await page.locator('#cafe-pick-under').textContent()) === `${house.name} · saved to the recipe`, await page.locator('#cafe-pick-under').textContent());
+    const detail = await page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: SECOND_GRINDER.model }) }).locator('.cafe-pick-row-detail').textContent();
+    check('grinder: the grinder\'s row says where it was last used on this tablet', detail.endsWith(`last used at ${GRINDER_USE.second.setting}`), detail);
+    await shot(page, 'sync-grinder-dialog-light');
+    await chooseGrinder(page, SECOND_GRINDER.model);
+    await page.locator('#cafe-grind-desc').filter({ hasText: SECOND_GRINDER.model }).waitFor({ timeout: 10_000 }).catch(() => {});
+    const writes = seen.requests.slice(mark).filter(r => /^PUT \/api\/v1\/workflow$/.test(r));
+    check('grinder: the choice is one write of the Workflow, and the skin writes no DYE2 record',
+        writes.length === 1 && !seen.requests.slice(mark).some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r)), seen.requests.slice(mark).filter(r => /^(PUT|POST)/.test(r)).join(', '));
+    //     Decent Sync records it as the Recipe's, and writes it everywhere.
+    const recordGrinder = async (tablet, grinderId) => {
+        const record = ((await tablet('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || []).find(row => row && row.decentSyncId === house.id);
+        return record && String(record.grinderId ?? record.workflow?.context?.grinderId) === String(grinderId) ? record : null;
+    };
+    //     The Location's Grinder is the one the tablet's grinder carries the id of.
+    const dial = async () => { const { content } = (await sync('GET', `/recipes/${house.id}`)).recipe; return { grinderId: content.grinderId, grindSetting: content.grindSetting, rpm: content.rpm ?? null }; };
+    const onServer = await until(async () => {
+        const now = await dial();
+        return now.grinderId === chosen.extras?.decentSyncId && String(now.grindSetting) === GRINDER_USE.second.setting && now.rpm === GRINDER_USE.second.rpm ? now : null;
+    }, { timeout: 60_000, every: 1000 });
+    check('grinder: the Recipe on the server takes the Location\'s Grinder, with the setting and RPM the choice wrote', !!onServer, JSON.stringify(await dial()));
+    check('grinder: the Recipe\'s record on this tablet names the grinder', !!(await until(() => recordGrinder(decaid, chosen.id), { timeout: 60_000, every: 1000 })));
+    const there = theirs.find(g => g.model === SECOND_GRINDER.model);
+    check('grinder: and the Recipe\'s record on the second tablet', !!(await until(() => recordGrinder(decaid2, there.id), { timeout: 60_000, every: 1000 })));
+    const shown = await until(async () => { const now = await grindRow(tablet2.page); return now.name === SECOND_GRINDER.model ? now : null; }, { timeout: 90_000, every: 1000 });
+    check('grinder: the second Machine shows the grinder and its setting under Grind, with no tap and no reload',
+        !!shown && shown.value === parseFloat(GRINDER_USE.second.setting) && tablet2.seen.loads === loadsThere, JSON.stringify(shown || await grindRow(tablet2.page)));
+    await shot(tablet2.page, 'sync-grinder-second-machine-light');
+    //     The Recipe's own grinder chosen back, as the run found it.
+    await openGrinders(page);
+    await chooseGrinder(page, GRINDER.model);
+    const back = await until(async () => ((await grindRow(tablet2.page)).name === GRINDER.model && (await dial()).grinderId === usual.extras?.decentSyncId ? true : null), { timeout: 90_000, every: 1000 });
+    check('grinder: the grinder chosen back reaches the Recipe and the second Machine too', !!back, `${JSON.stringify(await grindRow(tablet2.page))} ${JSON.stringify(await dial())}`);
+    check('grinder: no page error on either tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+    await tablet2.close();
+    await decaid('DELETE', `/shots/${pulled.id}`).catch(() => {});
+}
 
 // ── The run ──────────────────────────────────────────────────────────────────
 
@@ -719,6 +807,8 @@ try {
         check('and another Machine\'s Shot can be changed again', now.label === 'Viewing' && now.notice === null && !(await starsOff(page)) && !now.muted, JSON.stringify(now));
         await page.locator('#cafe-back').click();
         await waitLegend(page, l => l.label === 'Latest');
+
+        await grinderWithDecentSync({ page, seen, house, two });
     }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));

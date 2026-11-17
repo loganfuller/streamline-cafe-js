@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pageHeading, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
+import { pageHeading, pickSubtitle, dialInNames, roastDay, liveWeightText, stepSteamFlow, STEAM_FLOW_MAX } from '../src/cafe/page-model.js';
 
 test('with a recipe loaded, the title is its name, over its bean and profile', () => {
     const heading = pageHeading({ id: 'a', title: 'House espresso', beanName: 'Sample Blend' }, 'Sample Profile', true);
@@ -99,4 +99,24 @@ test('with no target the weight stands alone, and with no scale nothing is shown
     assert.equal(liveWeightText(24.34, NaN), '24.3 g');
     assert.equal(liveWeightText(null, 36), '');
     assert.equal(liveWeightText(undefined, 36), '');
+});
+
+test('a pick dialog says a choice is saved to the recipe only where Decent Sync saves it', () => {
+    const recipe = { id: 'a', title: 'House espresso', beanName: 'Sample Blend' };
+    // A Machine Decent Sync serves: it records the Recipe's grinder from the Workflow.
+    assert.deepEqual(pickSubtitle(recipe, true), { key: '{recipe} · saved to the recipe', vars: { recipe: 'House espresso' } });
+    // No Decent Sync, or a Capture-only Machine: this machine's until another recipe loads.
+    assert.deepEqual(pickSubtitle(recipe, false), { key: '{recipe} · not saved to the recipe', vars: { recipe: 'House espresso' } });
+    assert.equal(pickSubtitle(recipe).key, '{recipe} · not saved to the recipe', 'not saved until it is known to be');
+    // No recipe loaded: there is nothing to save onto, Decent Sync or not.
+    assert.deepEqual(pickSubtitle(null, true), { key: 'No recipe loaded · changes this machine only' });
+    assert.deepEqual(pickSubtitle(null, false), { key: 'No recipe loaded · changes this machine only' });
+});
+
+test('the pick dialog and the dial-in column say the same', () => {
+    const recipe = { id: 'a', title: 'House espresso' };
+    for (const saved of [true, false]) {
+        const label = pageHeading(recipe, '', saved).dialLabel.replace('Dial-in · ', '');
+        assert.equal(pickSubtitle(recipe, saved).key, `{recipe} · ${label}`);
+    }
 });
