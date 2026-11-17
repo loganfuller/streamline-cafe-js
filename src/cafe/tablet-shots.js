@@ -22,14 +22,11 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
          * the tablet's newest Shots hold none. The newest match is read whole,
          * and the next one tried when it is Unfinished or has gone meanwhile.
          *
-         * With no recipe (null) it is the tablet's newest Shot, whatever it was
-         * pulled with and Unfinished or not, as Streamline shows it.
+         * With no recipe (null) it is null, read from nothing: Streamline's
+         * history module draws the tablet's newest Shot then.
          */
         async latestShot(recipeId) {
-            if (recipeId == null) {
-                const newest = ((await listShots(1)) || {}).items;
-                return Array.isArray(newest) && newest[0] ? readShot(newest[0].id) : null;
-            }
+            if (recipeId == null) return null;
             const page = await listShots(LATEST_WINDOW);
             for (const id of shotsWithRecipe(page && page.items, recipeId)) {
                 const shot = await readShot(id);

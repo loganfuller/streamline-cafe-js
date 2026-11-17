@@ -115,6 +115,20 @@ export function shotCurves(measurements) {
 }
 
 /**
+ * The Shot Streamline's history module asks the chart to draw, from the two
+ * things the chart's chooser is handed, or null when there is nothing to draw.
+ * It carries no id: the module does not hand one over. Its time is its first
+ * sample's, which Decaid takes within a second of the record's own time, so it
+ * reads the same to the minute but at a minute's edge.
+ */
+export function drawnShot(measurements, workflow) {
+    const samples = (Array.isArray(measurements) ? measurements : []).filter(Boolean);
+    if (samples.length === 0) return null;
+    const first = samples[0];
+    return { id: null, timestamp: first.machine?.timestamp ?? first.scale?.timestamp ?? null, workflow: workflow ?? null, measurements };
+}
+
+/**
  * When a Shot was pulled, and by whom, as its record says: a Date or null, and
  * the barista's name or ''. Decaid writes a Shot's time as the tablet's local
  * time, which is how a Date reads a time with no offset.

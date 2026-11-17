@@ -9,6 +9,10 @@ export const BEANS = [
 
 export const GRINDER = { model: 'Sample Grinder 64' };
 
+// The baristas the run's two shots with no recipe loaded record, one each, so
+// the legend is seen to follow each Shot.
+export const BARISTAS = ['Sample Barista', 'Example Barista'];
+
 // `profile` is the title of a profile Decaid ships. `slot` is where the recipe
 // ends up; DYE2 places 1 to 5 itself and the run writes 6 to 9 into its records.
 export const RECIPES = [

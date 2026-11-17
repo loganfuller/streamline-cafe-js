@@ -3,9 +3,10 @@
 // (docs/cafe/DESIGN.md, "Shots and the reference").
 //
 // Streamline's chart still draws everything. This module decides which finished
-// Shot it draws, through the two hooks the fork adds to chart.js, and asks the
-// Shot seam for the Shots: the loaded recipe's latest, or with no recipe loaded
-// the tablet's newest.
+// Shot it draws, through the two hooks the fork adds to chart.js. With a recipe
+// loaded it asks the Shot seam for the recipe's latest Shot and its reference.
+// With none, Streamline's history module draws the tablet's newest Shot, as on
+// Streamline's own page, and the legend names the Shot it handed the chart.
 import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
 import { getTotalTime } from '../modules/shotData.js';
 import { showToast } from '../modules/ui.js';
@@ -13,7 +14,7 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { latestShot, referenceShot, makeReference } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
-import { graphModel, shotCurves, shotCredit, whenText, viewFrom } from './shot-model.js';
+import { graphModel, shotCurves, shotCredit, whenText, viewFrom, drawnShot } from './shot-model.js';
 import { referenceOverlay, referenceColor } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
@@ -32,6 +33,8 @@ let settling = false;   // a shot has ended and Decaid does not have it yet
 let settleStep = 0;     // how many looks for that shot have been scheduled
 let settleFrom = null;  // the id of the Shot in the graph before that shot; undefined when none had been read
 let latest;             // the Shot in the graph, whole; null for none; undefined until read
+let handed;             // the Shot the history module last asked the chart to draw; undefined until it asks
+let heldBack = false;   // a request of the history module's was turned down during the running shot
 let reference = null;   // the seam's answer for the recipe's reference: { shot, canChange }, with the Shot's curves
 let drawing = null;     // the measurements this module is handing the chart itself
 let overlayKey;         // what the overlay was last set for
@@ -63,12 +66,32 @@ function applyOverlay() {
 }
 
 // Streamline's history module asks to draw a finished Shot: the tablet's
-// newest, at start-up, on the way back from another page and, in a Streamline
-// where that works, once a shot has been saved. Which Shot the graph shows is this module's choice, so the
-// request is turned down and taken as a cue to look again. Until DYE2 has said
-// which recipe is loaded it is let through, so the graph is not empty meanwhile.
-function chooseShot(measurements) {
-    if (measurements === drawing || recipe === undefined) return true;
+// newest, at start-up, on the way back from another page and once a shot has
+// been saved. With a recipe loaded the graph shows the recipe's latest instead,
+// so the request is turned down and taken as a cue to look again. With none it
+// is let through, and the legend names the Shot drawn. Until DYE2 has said which
+// recipe is loaded it is let through too, so the graph is not empty meanwhile.
+// Each request is kept, so the graph can go back to it when a recipe is unloaded.
+// While a shot runs every request is turned down: the module may still be
+// waiting for the shot before to be saved, and drawing it would reset the
+// running shot's lines. It asks again once the running shot has been saved.
+function chooseShot(measurements, workflow) {
+    if (measurements === drawing) return true;
+    handed = drawnShot(measurements, workflow);
+    if (live) {
+        heldBack = true;
+        return false;
+    }
+    if (recipe === undefined) {
+        latest = handed; // no row names it until the recipe is known
+        return true;
+    }
+    if (recipe === null) {
+        latest = handed;
+        settling = false;
+        paint();
+        return true;
+    }
     refreshSoon();
     return false;
 }
@@ -92,15 +115,14 @@ function draw() {
 async function refresh() {
     clearTimeout(refreshTimer);
     refreshTimer = null;
-    // A running shot owns the chart's lines: its end asks again.
-    if (live || recipe === undefined) return;
+    // A running shot owns the chart's lines: its end asks again. With no recipe
+    // loaded there is nothing to read: the history module draws.
+    if (live || !recipe) return;
     const mine = ++seq;
-    // With no recipe loaded: the tablet's newest Shot, and no reference.
-    const id = recipe ? recipe.id : null;
     let shot;
     let chosen;
     try {
-        [shot, chosen] = await Promise.all([latestShot(id), recipe ? referenceShot(id) : { shot: null }]);
+        [shot, chosen] = await Promise.all([latestShot(recipe.id), referenceShot(recipe.id)]);
     } catch (error) {
         logger.warn('Cafe: could not read the Shots for the graph', error);
         if (mine !== seq || live) return;
@@ -127,7 +149,7 @@ async function refresh() {
     }
     latest = shot;
     // Kept with no Shot too: the seam's answer still says whether one can be chosen.
-    reference = recipe ? { ...chosen, curves: chosen.shot ? shotCurves(chosen.shot.measurements) : null } : null;
+    reference = { ...chosen, curves: chosen.shot ? shotCurves(chosen.shot.measurements) : null };
     settling = false;
     clearTimeout(settleTimer);
     draw();
@@ -163,7 +185,6 @@ export function showGraphRecipe(next) {
         return;
     }
     seq += 1; // a read for the recipe before is no longer wanted
-    latest = undefined;
     reference = null;
     clearTimeout(settleTimer);
     // A shot had just ended and Decaid may not have it yet. The graph is this
@@ -173,6 +194,18 @@ export function showGraphRecipe(next) {
         clearTimeout(lateTimer);
         lateTimer = setTimeout(() => refresh(), SETTLE_LAST_MS);
     }
+    if (!recipe) {
+        // No recipe: the graph goes back to the Shot the history module last
+        // asked to draw, the tablet's newest, and shows each it asks for after.
+        // A running shot keeps its lines until it ends.
+        latest = handed;
+        settling = false;
+        applyOverlay();
+        if (live) paint();
+        else draw();
+        return;
+    }
+    latest = undefined;
     settling = false;
     applyOverlay();
     paint();
@@ -183,6 +216,7 @@ export function showGraphRecipe(next) {
 
 function shotStarted() {
     live = true;
+    heldBack = false;
     settling = false;
     seq += 1;
     clearTimeout(settleTimer);
@@ -197,10 +231,41 @@ function shotStarted() {
 function shotEnded() {
     if (!live) return;
     live = false;
+    // With no recipe, a request turned down during the shot is drawn now, if it
+    // is not the Shot in the graph already: the module counts it as drawn and
+    // will not ask again. It is the shot just saved, when the end reached the
+    // page late, or the newest saved before it, which the module would show
+    // too; a shot saved later is still drawn then.
+    if (!recipe && heldBack && handed?.timestamp !== latest?.timestamp) {
+        heldBack = false;
+        latest = handed;
+        settling = false;
+        applyOverlay();
+        draw();
+        return;
+    }
     // A shot stopped before it poured drew nothing and is not saved: the graph
     // still holds the Shot before it. Any other is looked for until Decaid has it.
     if (getTotalTime() > 0) {
         settling = true;
+        // With no recipe the history module draws the shot once Decaid has saved
+        // it, and the legend then names it. Until then the row names no time.
+        // A run Decaid never saves is never drawn, so if nothing has been drawn
+        // by the last look a recipe's shot would get, the graph goes back to
+        // the Shot before, as it does with a recipe.
+        if (!recipe) {
+            heldBack = false;
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+                if (!settling || live || recipe) return;
+                settling = false;
+                latest = handed;
+                draw();
+            }, SETTLE_LAST_MS);
+            applyOverlay();
+            paint();
+            return;
+        }
         settleStep = 0;
         settleFrom = latest === undefined ? undefined : latest ? latest.id : null;
         applyOverlay();

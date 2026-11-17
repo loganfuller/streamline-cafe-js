@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
     shotRecipeId, shotsWithRecipe, isUnfinished, shotCurves, shotCredit,
-    differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot,
+    differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot,
 } from '../src/cafe/shot-model.js';
 import { createTabletShots } from '../src/cafe/tablet-shots.js';
 
@@ -95,6 +95,17 @@ test('a Shot is credited with when it was pulled and the barista it recorded', (
     assert.deepEqual(shotCredit(shot), { when: new Date(2026, 10, 12, 10, 0, 0), who: 'Sample Barista' });
     assert.deepEqual(shotCredit({ id: 's', timestamp: 'not a time', workflow: {} }), { when: null, who: '' });
     assert.deepEqual(shotCredit(null), { when: null, who: '' });
+});
+
+test('the Shot the history module hands the chart is credited from its first sample and its Workflow', () => {
+    const workflow = { context: { baristaName: 'Sample Barista' } };
+    const measurements = [sample(0, 'preparingForShot'), sample(1, 'pouring')];
+    const shot = drawnShot(measurements, workflow);
+    assert.deepEqual(shot, { id: null, timestamp: at(0), workflow, measurements });
+    assert.deepEqual(shotCredit(shot), { when: new Date(2026, 10, 12, 10, 0, 0), who: 'Sample Barista' });
+    assert.equal(drawnShot([{ scale: { timestamp: at(2), weight: 0 } }], null).timestamp, at(2), 'a sample the machine did not time gives the scale\'s');
+    assert.equal(drawnShot([sample(0, 'pouring')]).workflow, null);
+    for (const nothing of [undefined, null, [], [null]]) assert.equal(drawnShot(nothing, workflow), null, 'nothing to draw names no Shot');
 });
 
 test('"Different profile" compares titles, and says nothing when either names none', () => {
@@ -238,12 +249,11 @@ test('an Unfinished Shot, or one that has gone, never takes the latest Shot\'s p
     assert.deepEqual(calls.read, ['d', 'c', 'b']);
 });
 
-test('with no recipe the latest Shot is the tablet\'s newest, whatever it was pulled with, Unfinished or not', async () => {
-    const { seam, calls } = tablet({ shots: [whole('d', 'r1', UNFINISHED), whole('c', 'r2', POURED)] });
-    assert.equal((await seam.latestShot(null)).id, 'd');
-    assert.deepEqual([calls.list, calls.read], [[1], ['d']]);
-    assert.equal(await tablet().seam.latestShot(null), null);
-    assert.equal(await tablet({ shots: [whole('d', 'r1', POURED)], gone: ['d'] }).seam.latestShot(null), null);
+test('with no recipe there is no latest Shot, and nothing is read: Streamline\'s history module draws the newest', async () => {
+    const { seam, calls } = tablet({ shots: [whole('d', 'r1', POURED), whole('c', 'r2', POURED)] });
+    assert.equal(await seam.latestShot(null), null);
+    assert.equal(await seam.latestShot(undefined), null);
+    assert.deepEqual([calls.list, calls.read], [[], []]);
 });
 
 test('a recipe with no finished Shot among the newest has no latest Shot', async () => {
