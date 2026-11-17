@@ -1,6 +1,7 @@
 // The "DYE2 is needed" screen: a card that takes the page's place while a
 // check in dye2-gate.js fails. The markup is in index.html; this module fills
-// it in, shows it and wires its three buttons.
+// it in, shows it and wires its three buttons (docs/cafe/DESIGN.md, "Recipes
+// and the strip").
 import { DYE2_ENABLED_KEY } from '../modules/dye2-enabled.js';
 import { loadPage, prefetchSettingsPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';

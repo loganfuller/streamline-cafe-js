@@ -5,7 +5,8 @@
 // Writes never overlap: one waits for the one before it. `flush()` resolves
 // once nothing is waiting and nothing is being written, so a write is never
 // left behind, or still under way, when a recipe is about to load underneath
-// it. The clock is passed in, so this runs under node:test.
+// it (docs/cafe/DESIGN.md, "Recipes and the strip"). The clock is passed in,
+// so this runs under node:test.
 
 export function createPendingWrite({ write, delayMs, setTimer = setTimeout, clearTimer = clearTimeout }) {
     let timer = null;
