@@ -20,8 +20,8 @@ const NEAR_END_PX = 600;
 // graph, so several can be opened one after another; once the graph is back
 // on the latest, the next opening reads it afresh.
 let list = null;         // { rows, recipes, offset, done, failed, scrollTop }
-let loading = false;     // a page is on its way
-let opening = false;     // the first page is on its way
+let loading = null;      // the list a later page is on its way for
+let opening = null;      // the generation a first page is on its way in
 // Counts what ends a list on its way or on screen: a shot starting, the main
 // page hidden behind another, where references are kept changing. A first page
 // read across one is not shown.
@@ -122,7 +122,7 @@ function render() {
 function paintEnd() {
     const end = el('cafe-shots-end');
     if (!end || !list) return;
-    const failed = list.failed && !loading;
+    const failed = list.failed && loading !== list;
     end.textContent = failed ? cafeText('Could not read more shots') : '';
     end.style.display = failed ? '' : 'none';
 }
@@ -134,9 +134,9 @@ const rowsOf = (page, recipes) => page.items.map(item => shotRow(item, { recipes
 
 // The next page, once the list is scrolled near its end.
 async function readMore() {
-    if (!list || list.done || loading) return;
+    if (!list || list.done || loading === list) return;
     const reading = list;
-    loading = true;
+    loading = reading;
     paintEnd();
     try {
         const page = await shotsPage(reading.offset, PAGE_SIZE);
@@ -144,13 +144,14 @@ async function readMore() {
         reading.rows = withPage(reading.rows, rowsOf(page, reading.recipes));
         Object.assign(reading, nextPage({ offset: reading.offset, read: page.items.length, asked: PAGE_SIZE, total: page.total }));
         reading.failed = false;
-        loading = false;
+        loading = null;
         render();
     } catch (error) {
         logger.warn('Cafe: could not read more Shots', error);
         if (list === reading) reading.failed = true;
     } finally {
-        loading = false;
+        // A page for a list read afresh meanwhile leaves that list's reading alone.
+        if (loading === reading) loading = null;
         paintEnd();
     }
 }
@@ -176,14 +177,15 @@ function showDialog() {
 // list opens where it was left; otherwise it is read afresh. A list that
 // can't be read is not an empty list: a toast says so and it does not open.
 async function openList() {
-    if (shotRunning() || opening) return;
+    // A first page read in a generation since ended does not hold up this tap.
+    if (shotRunning() || opening === generation) return;
     if (list && isShotOpened()) {
         showDialog();
         return;
     }
     list = null;
-    opening = true;
     const asked = generation;
+    opening = asked;
     try {
         const [recipes, page] = await Promise.all([getDye2KvArray(RECIPES_KEY), shotsPage(0, PAGE_SIZE)]);
         // A recipe is named from DYE2's records: without them every Shot would
@@ -197,7 +199,7 @@ async function openList() {
         showToast(cafeText('Could not read the shots'), 4000, 'error');
         return;
     } finally {
-        opening = false;
+        if (opening === asked) opening = null;
     }
     // A shot that started while the list was read keeps the screen.
     if (shotRunning()) return;

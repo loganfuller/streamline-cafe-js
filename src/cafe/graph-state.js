@@ -415,14 +415,15 @@ function newestRead(s, todo, { seq, edits: editsThen, record }) {
 // The seam says a recipe's reference should be read again: with null, whichever
 // recipe is in the graph.
 function referencePushed(s, todo, recipeId) {
-    // An opened Shot follows its own recipe's reference. The loaded recipe's
-    // is read again on the way back to the latest.
-    if (s.opened) {
-        // A Shot tapped meanwhile is read in place of the one in the graph.
-        const target = s.opening || s.opened;
-        if (target.recipe && (recipeId == null || String(recipeId) === String(target.recipe.id))) readOpened(s, todo, target);
-        return;
-    }
+    const follows = target => !!target && !!target.recipe && (recipeId == null || String(recipeId) === String(target.recipe.id));
+    // A Shot tapped and still being read follows its own recipe's reference: its
+    // read may have read the reference before the push. An opened Shot follows
+    // its own too; while a tap is on its way, a push for it is read on the tap's
+    // failure, as the opened Shot is read again then.
+    if (follows(s.opening)) readOpened(s, todo, s.opening);
+    else if (!s.opening && follows(s.opened)) readOpened(s, todo, s.opened);
+    // The loaded recipe's is read again on the way back to the latest.
+    if (s.opened) return;
     if (!s.recipe) return;
     if (recipeId != null && String(recipeId) !== String(s.recipe.id)) return;
     refresh(s, todo, { onlyIfChanged: true });
@@ -714,8 +715,11 @@ function open(s, todo, shotId, recipe) {
         return;
     }
     if (s.opened && s.opened.id === id) {
+        // A tap on another row still on its way is dropped. A read of this Shot
+        // on its way is left to answer: it may be the one that draws it again.
+        if (!s.opening) return;
         s.opening = null;
-        s.openSeq += 1;
+        readOpened(s, todo, s.opened);
         return;
     }
     s.opening = { id, recipe: recipe || null };
@@ -755,10 +759,18 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
         // to the latest.
         if (!before) {
             todo.push({ do: 'unopened' });
-            redrawOpened(s, todo);
+            readOpenedAgain(s, todo);
             return;
         }
         backToLatest(s, todo);
+        return;
+    }
+    // A Shot not in the graph when an edit of it ended was not told the edit's
+    // answer, so a read begun before that is older than what was saved: it is
+    // read again.
+    if (!before && editedSince(s, target.id, editsThen)) {
+        s.opening = target;
+        readOpened(s, todo, target);
         return;
     }
     const { recipe } = target;
@@ -803,13 +815,18 @@ function openedUnread(s, todo, { seq, shotId }) {
     if (s.opening && s.opening.id === String(shotId)) {
         s.opening = null;
         todo.push({ do: 'unopened' });
+        readOpenedAgain(s, todo);
+        return;
     }
-    redrawOpened(s, todo);
+    // The Shot in the graph could not be read again. Where that read was to end
+    // in a draw, it is drawn as read before, since the chart may have been
+    // cleared meanwhile.
+    if (s.drawDue && s.opened) draw(s, todo);
 }
 
-// A read that was to end in a draw found nothing new to draw: the Shot already
-// opened is drawn again as it was read before, since the chart may have been
-// cleared meanwhile.
-function redrawOpened(s, todo) {
-    if (s.drawDue && s.opened) draw(s, todo);
+// A Shot tapped while another was opened could not be read, or has gone. The
+// one opened is read again: a read of it, or a push for its recipe, may have
+// been passed over for the tap's, and the chart may have been cleared since.
+function readOpenedAgain(s, todo) {
+    if (s.opened) readOpened(s, todo, s.opened);
 }
