@@ -834,6 +834,18 @@ button.cafe-card {
     touch-action: manipulation;
 }
 
+/* Another Machine's Shot while Decent Sync can't be reached: its stars are
+   shown, and take no tap. So with its note icon where there is none to read. */
+#cafe-stars.cafe-locked,
+.cafe-legend-icon:disabled {
+    opacity: 0.45;
+}
+
+#cafe-stars.cafe-locked .cafe-star,
+.cafe-legend-icon:disabled {
+    cursor: default;
+}
+
 /* The reference's rating, "★ 4": read, never tapped. */
 .cafe-rating {
     flex: none;
@@ -1288,6 +1300,41 @@ button.cafe-card {
     font-size: 32px;
 }
 
+.cafe-shots-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Under the title: the Location's name, or "This machine only". */
+#cafe-shots-under {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+/* Why only this machine's Shots are listed. */
+#cafe-shots-line {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: var(--profile-button-background-color);
+    font-size: 18px;
+    font-weight: 500;
+}
+
+#cafe-shots-line svg {
+    flex: none;
+}
+
 .cafe-shots-head .cafe-btn {
     min-width: 160px;
 }
@@ -1300,6 +1347,57 @@ button.cafe-card {
     align-items: center;
     gap: 16px;
     padding: 0 16px;
+}
+
+/* The Location's list adds the Machine after Pulled, and Time, how long the
+   Shot ran, after Dose → yield. */
+.cafe-shots-location .cafe-shots-columns,
+.cafe-shots-location .cafe-shots-row {
+    grid-template-columns: 110px 180px minmax(0, 1fr) 190px 90px 160px 150px 56px;
+}
+
+#cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-machine,
+#cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-duration {
+    display: none;
+}
+
+.cafe-shots-machine {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cafe-shots-machine-name,
+.cafe-shots-this {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cafe-shots-machine-name {
+    font-weight: 600;
+}
+
+.cafe-shots-this {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-duration {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* In the rating's place, on a Shot in which nothing poured. */
+.cafe-shots-unfinished {
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: var(--profile-button-background-color);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
 }
 
 .cafe-shots-columns {

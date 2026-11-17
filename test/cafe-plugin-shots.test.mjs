@@ -1,11 +1,12 @@
 // The Shot seam's second source, Decent Sync's plugin, and which of the two
-// sources answers (docs/cafe/DESIGN.md, "Shots and the reference"). The
+// sources answers (docs/cafe/DESIGN.md, "Shots and the reference" and "The
+// Shots list"). The
 // plugin's answers are in the shapes "For a Skin's author" in Decent Sync's
 // docs/PLUGIN.md gives. All sample data is made up.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createPluginShots, referenceFrom, changeOf } from '../src/cafe/plugin-shots.js';
+import { createPluginShots, referenceFrom, changeOf, locationRow } from '../src/cafe/plugin-shots.js';
 import { createShotSources } from '../src/cafe/shot-sources.js';
 
 const RECIPE = { id: 'recipe-1', name: 'House espresso', recordId: 'r1' };
@@ -22,8 +23,8 @@ const STATUS = { unreachable: 503, serverTooOld: 503, captureOnly: 409, hardware
 
 // A plugin that answers each request with the next of `reads` or `choices`: an
 // answer, or an Error to reject with.
-function plugin({ reads = [], choices = [] } = {}) {
-    const calls = { read: [], chosen: [], notServed: 0 };
+function plugin({ reads = [], choices = [], pages = [], wholes = [], edits = [], held = {} } = {}) {
+    const calls = { read: [], chosen: [], listed: [], whole: [], decaid: [], edited: [], notServed: 0 };
     const next = list => {
         const value = list.shift();
         if (value === undefined) throw new Error('the plugin was asked more often than the test expects');
@@ -33,6 +34,16 @@ function plugin({ reads = [], choices = [] } = {}) {
     const source = createPluginShots({
         readReference: async recipeId => { calls.read.push(recipeId); return next(reads); },
         chooseReference: async (recipeId, shotId) => { calls.chosen.push([recipeId, shotId]); return next(choices); },
+        // The Location's list, one of its Shots whole, and an edit of one.
+        listShots: async (cursor, limit) => { calls.listed.push([cursor, limit]); return next(pages); },
+        readWhole: async id => { calls.whole.push(id); return next(wholes); },
+        editShot: async (id, edit) => { calls.edited.push([id, edit]); return next(edits); },
+        // Decaid's own Shots: `held` is the ones this tablet holds, by id.
+        readShot: async id => {
+            calls.decaid.push(id);
+            if (held instanceof Error) throw held;
+            return held[id] || null;
+        },
         notServed: () => { calls.notServed += 1; },
     });
     return { source, calls };
@@ -172,6 +183,140 @@ test('a push with a what the skin does not know is ignored, as is anything that 
     }
 });
 
+// ── The Location's Shots ─────────────────────────────────────────────────────
+
+// A row of the plugin's `shots` answer, as docs/PLUGIN.md gives it.
+const listed = (id, fields = {}) => ({
+    id,
+    pulledAt: '2026-11-12T10:41:00.000Z',
+    machine: { id: 'machine-right', name: 'Sample Right' },
+    onThisTablet: false,
+    recipe: RECIPE,
+    bean: { roaster: 'Sample Roaster', name: 'Sample Blend' },
+    dose: 18.2,
+    targetDose: 18,
+    yield: 36.4,
+    targetYield: 36,
+    duration: 27.31,
+    rating: 8,
+    barista: 'Sam',
+    hasNote: true,
+    unfinished: false,
+    referenceOf: [],
+    ...fields,
+});
+
+test('a page of the Location\'s list is the plugin\'s, by its cursor, with the Machine that pulled each Shot', async () => {
+    const { source, calls } = plugin({ pages: [{ shots: [listed('s2'), listed('s1', { machine: { id: 'machine-left', name: 'Sample Left' } })], nextCursor: 'cursor-2' }, { shots: [listed('s0')], nextCursor: null }] });
+    const first = await source.shotsPage(null, 50, 'machine-left');
+    assert.deepEqual(first.rows.map(row => [row.id, row.machine, row.thisMachine]), [['s2', 'Sample Right', false], ['s1', 'Sample Left', true]]);
+    assert.equal(first.next, 'cursor-2');
+    const last = await source.shotsPage(first.next, 50, 'machine-left');
+    assert.deepEqual([last.rows.map(row => row.id), last.next], [['s0'], null]);
+    assert.deepEqual(calls.listed, [[null, 50], ['cursor-2', 50]]);
+    assert.deepEqual([calls.decaid, calls.whole], [[], []], 'no Shot is read whole for the list');
+});
+
+test('a row names its recipe by this tablet\'s DYE2 record id, and the Recipes it is the reference of', () => {
+    const row = locationRow(listed('s1', { referenceOf: [RECIPE, { id: 'recipe-x', name: 'Elsewhere', recordId: null }] }));
+    assert.deepEqual([row.recipeId, row.recipeName, row.referenceOf], ['r1', 'House espresso', ['r1', null]]);
+    assert.deepEqual([locationRow(listed('s1', { recipe: null })).recipeId, locationRow(listed('s1', { recipe: null })).recipeName], [null, null]);
+});
+
+test('a refusal of the list rejects with it, and an answer that is no list is a failure, never an empty list', async () => {
+    for (const code of ['unreachable', 'captureOnly', 'invalidRequest']) {
+        const { source } = plugin({ pages: [refusal(code, STATUS[code])] });
+        await assert.rejects(source.shotsPage(null, 50), error => error.code === code);
+    }
+    for (const odd of ['', null, {}, { shots: 'none' }]) {
+        await assert.rejects(plugin({ pages: [odd] }).source.shotsPage(null, 50), String(JSON.stringify(odd)));
+    }
+    const skipped = await plugin({ pages: [{ shots: [null, { name: 'no id' }, listed('s1')] }] }).source.shotsPage(null, 50);
+    assert.deepEqual([skipped.rows.map(row => row.id), skipped.next], [['s1'], null]);
+});
+
+// ── A Shot whole ─────────────────────────────────────────────────────────────
+
+test('this tablet\'s own Shot is read from Decaid, and the plugin is not asked', async () => {
+    const { source, calls } = plugin({ held: { s1: whole('s1') } });
+    const found = await source.shotById('s1');
+    assert.deepEqual([found.shot.id, found.canChange], ['s1', true]);
+    assert.deepEqual([calls.decaid, calls.whole], [['s1'], []]);
+});
+
+test('another Machine\'s Shot is read whole through the plugin, one request, and can be changed', async () => {
+    const { source, calls } = plugin({ wholes: [{ shot: whole('s2'), recipe: RECIPE, referenceOf: [] }] });
+    const found = await source.shotById('s2');
+    assert.deepEqual([found.shot.id, found.canChange], ['s2', true]);
+    assert.deepEqual([calls.decaid, calls.whole], [['s2'], ['s2']]);
+});
+
+test('a Shot the Location\'s list no longer lists is gone', async () => {
+    const { source } = plugin({ wholes: [refusal('noSuchShot', 404)] });
+    assert.deepEqual(await source.shotById('s2'), { shot: null, canChange: true });
+});
+
+test('with the server out of reach another Machine\'s Shot can\'t be read, and the failure says why', async () => {
+    for (const failure of [refusal('unreachable', 503), refusal('serverTooOld', 503), refusal(undefined, 504)]) {
+        const { source } = plugin({ wholes: [failure] });
+        await assert.rejects(source.shotById('s2'), error => error.unreachable === true, failure.code);
+    }
+    // This tablet's own is still read: Decaid answers with the server or without it.
+    assert.equal((await plugin({ held: { s1: whole('s1') } }).source.shotById('s1')).shot.id, 's1');
+});
+
+test('any other failure to read a Shot rejects and is not an outage; a Machine no longer served has the status asked again', async () => {
+    const lost = plugin({ wholes: [new Error('offline')] });
+    await assert.rejects(lost.source.shotById('s2'), error => error.unreachable === undefined);
+    const capture = plugin({ wholes: [refusal('captureOnly', 409)] });
+    await assert.rejects(capture.source.shotById('s2'), error => error.unreachable === undefined);
+    assert.equal(capture.calls.notServed, 1);
+    await assert.rejects(plugin({ wholes: ['not an answer'] }).source.shotById('s2'));
+    await assert.rejects(plugin({ held: new Error('Decaid is down') }).source.shotById('s2'), /Decaid is down/);
+});
+
+// ── An edit of another Machine's Shot ────────────────────────────────────────
+
+test('another Machine\'s Shot is rated through the plugin, and the answer is the Shot as it now is', async () => {
+    const { source, calls } = plugin({ edits: [{ rating: 8, note: null }] });
+    assert.deepEqual(await source.editShot('s2', { rating: 8 }), { rating: 8, note: null });
+    assert.deepEqual(calls.edited, [['s2', { rating: 8 }]]);
+    assert.deepEqual([calls.decaid, calls.whole], [[], []], 'an edit that was answered reads nothing');
+});
+
+test('an edit of it that may have been made is read again through the plugin before it is called failed', async () => {
+    const made = { shot: { ...whole('s2'), annotations: { enjoyment: 8 } }, recipe: RECIPE, referenceOf: [] };
+    for (const failure of [refusal('unreachable', 503), refusal('serverTooOld', 503), refusal(undefined, 504), new Error('no answer')]) {
+        const { source, calls } = plugin({ edits: [failure], wholes: [made] });
+        assert.deepEqual(await source.editShot('s2', { rating: 8 }), { rating: 8, note: null }, `${failure.code}: the server made it`);
+        assert.deepEqual([calls.decaid, calls.whole], [['s2'], ['s2']], 'Decaid does not hold it, so the read is the plugin\'s');
+        const not = plugin({ edits: [failure], wholes: [{ shot: whole('s2'), recipe: RECIPE, referenceOf: [] }] });
+        await assert.rejects(not.source.editShot('s2', { rating: 8 }), error => error.unreachable === undefined && error.remarks.rating === null && error.refusal === undefined);
+    }
+});
+
+test('where that read can\'t ask the server either, nothing is known either way, and the failure says so', async () => {
+    const { source } = plugin({ edits: [refusal('unreachable', 503)], wholes: [refusal('unreachable', 503)] });
+    await assert.rejects(source.editShot('s2', { rating: 8 }), error => error.unreachable === true && error.remarks === null && error.refusal === undefined);
+    // A read that fails for another reason is a failed edit.
+    const other = plugin({ edits: [refusal('unreachable', 503)], wholes: [refusal('noSuchShot', 404)] });
+    await assert.rejects(other.source.editShot('s2', { rating: 8 }), error => error.unreachable === undefined && error.remarks === null);
+});
+
+test('this tablet\'s own Shot is read again from Decaid, with the server out of reach too', async () => {
+    const { source, calls } = plugin({ edits: [refusal(undefined, 504)], held: { s1: { ...whole('s1'), annotations: { enjoyment: 8 } } } });
+    assert.deepEqual(await source.editShot('s1', { rating: 8 }), { rating: 8, note: null });
+    assert.deepEqual([calls.decaid, calls.whole], [['s1'], []]);
+});
+
+test('any other refusal of an edit shows its message, reads nothing and changes nothing', async () => {
+    for (const code of ['noSuchShot', 'invalidRequest', 'captureOnly']) {
+        const { source, calls } = plugin({ edits: [refusal(code, STATUS[code], `Refused: ${code}.`)] });
+        await assert.rejects(source.editShot('s2', { rating: 8 }), error => error.refusal === `Refused: ${code}.` && error.remarks === undefined);
+        assert.deepEqual([calls.decaid, calls.whole], [[], []], code);
+    }
+});
+
 // ── Which source answers ─────────────────────────────────────────────────────
 
 const SERVED = { connected: true, served: true };
@@ -181,7 +326,7 @@ const CAPTURE_ONLY = { connected: true, served: false, code: 'captureOnly' };
 // The two sources, each counting what it was asked, and what the seam tells its
 // caller. `pluginReference` is what the plugin answers for a reference, or an
 // Error it rejects with, in place of its own Shot.
-function seam({ pluginReference, choicesFail = false } = {}) {
+function seam({ pluginReference, pluginList, choicesFail = false } = {}) {
     const calls = { tablet: [], plugin: [], asked: 0, changed: [], moved: [] };
     let held = null; // a choice waits on this before it answers
     const source = name => ({
@@ -192,8 +337,12 @@ function seam({ pluginReference, choicesFail = false } = {}) {
             if (name === 'plugin' && pluginReference) return pluginReference;
             return { shot: whole(`${name}-reference`), canChange: true };
         },
-        shotsPage: async (offset, limit) => { calls[name].push(['page', offset, limit]); return { items: [{ id: `${name}-row` }], total: 1 }; },
-        shotById: async id => { calls[name].push(['byId', id]); return whole(id); },
+        shotsPage: async (from, limit, extra) => {
+            calls[name].push(['page', from, limit, extra]);
+            if (name === 'plugin' && pluginList instanceof Error) throw pluginList;
+            return { rows: [{ id: `${name}-row` }], next: name === 'plugin' ? 'cursor-2' : 50 };
+        },
+        shotById: async id => { calls[name].push(['byId', id]); return { shot: whole(id), canChange: true }; },
         references: async () => {
             calls[name].push(['references']);
             if (choicesFail) throw new Error('offline');
@@ -400,32 +549,122 @@ test('when the connection comes or goes, or the socket opens, the status is aske
 
 // ── The Shots list ───────────────────────────────────────────────────────────
 
-test('the Shots list and a Shot by its id are the tablet\'s own, whatever the source', async () => {
-    for (const answer of [undefined, null, SERVED]) {
+const AT_CAFE = { ...SERVED, machine: { id: 'machine-left', name: 'Sample Left' }, location: { id: 'l', name: 'Sample Cafe' } };
+const pages = (calls, name) => calls[name].filter(([what]) => what === 'page');
+
+test('on a served Machine the list is the Location\'s, through the plugin, a page at a time by its cursor', async () => {
+    const { sources, calls } = seam();
+    sources.status(AT_CAFE);
+    const first = await sources.shotsPage(null, 50);
+    assert.deepEqual(first.rows, [{ id: 'plugin-row' }]);
+    assert.deepEqual(first.list, { of: 'location', why: 'served', location: 'Sample Cafe', machineId: 'machine-left' });
+    assert.equal(first.afresh, false);
+    const second = await sources.shotsPage(first.next, 50);
+    assert.equal(second.afresh, false);
+    assert.deepEqual(pages(calls, 'plugin'), [['page', null, 50, 'machine-left'], ['page', 'cursor-2', 50, 'machine-left']]);
+    assert.deepEqual(pages(calls, 'tablet'), []);
+    assert.ok(!calls.tablet.some(([what]) => what === 'references'), 'the choice kept on the tablet is never read');
+});
+
+test('with no plugin, on a Capture-only Machine, on the wrong hardware, with the server out of reach and before the plugin has said, the list is the tablet\'s own', async () => {
+    const cases = [
+        [undefined, 'unknown'], [{}, 'unknown'], [{ loading: true }, 'unknown'], [null, 'noPlugin'],
+        [CAPTURE_ONLY, 'notServed'], [{ code: 'hardwareMismatch' }, 'notServed'],
+        [UNREACHABLE, 'unreachable'], [{ code: 'serverTooOld' }, 'unreachable'], [{ code: 'somethingNew', message: 'Sample refusal.' }, 'refused'],
+    ];
+    for (const [answer, why] of cases) {
         const { sources, calls } = seam();
         if (answer !== undefined) sources.status(answer);
-        assert.deepEqual((await sources.shotsPage(50, 50)).items, [{ id: 'tablet-row' }]);
-        assert.equal((await sources.shotById('s1')).id, 's1');
-        assert.deepEqual(calls.plugin, [], 'the plugin is not asked until the Location\'s list comes through it');
-        assert.deepEqual(calls.tablet.filter(([what]) => what !== 'references'), [['page', 50, 50], ['byId', 's1']]);
+        const page = await sources.shotsPage(null, 50);
+        assert.deepEqual([page.rows, page.list.of, page.list.why], [[{ id: 'tablet-row' }], 'tablet', why], why);
+        assert.deepEqual(pages(calls, 'plugin'), [], `${why}: the plugin is not asked for the list`);
+        const next = await sources.shotsPage(page.next, 50);
+        assert.equal(next.afresh, false);
+        assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null, 50]);
+    }
+});
+
+test('a served Machine whose server has gone lists the tablet\'s own Shots, though its reference stays with the plugin', async () => {
+    const { sources, calls } = seam();
+    sources.status(AT_CAFE);
+    sources.status(UNREACHABLE);
+    assert.equal(sources.source(), 'plugin');
+    const page = await sources.shotsPage(null, 50);
+    assert.deepEqual([page.rows, page.list], [[{ id: 'tablet-row' }], { of: 'tablet', why: 'unreachable' }]);
+    assert.deepEqual(pages(calls, 'plugin'), []);
+    assert.ok(!calls.tablet.some(([what]) => what === 'references'), 'and no chip is read from the tablet\'s own choice');
+});
+
+test('a refusal of the list that means "the tablet\'s own Shots" is answered from the tablet, with its line, and the status is asked again', async () => {
+    const lines = { unreachable: 'unreachable', serverTooOld: 'unreachable', captureOnly: 'notServed', hardwareMismatch: 'notServed' };
+    for (const [code, why] of Object.entries(lines)) {
+        const { sources, calls } = seam({ pluginList: refusal(code, STATUS[code]) });
+        sources.status(AT_CAFE);
+        const first = await sources.shotsPage(null, 50);
+        assert.deepEqual([first.rows, first.list, first.afresh], [[{ id: 'tablet-row' }], { of: 'tablet', why }, false], code);
+        assert.equal(calls.asked, 1, code);
+        // On a later page the list is read afresh from the tablet, from its first row.
+        const later = await sources.shotsPage({ of: 'location', at: 'cursor-2' }, 50);
+        assert.deepEqual([later.rows, later.list, later.afresh], [[{ id: 'tablet-row' }], { of: 'tablet', why }, true], code);
+        assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null, null]);
+    }
+    // Decaid answering in the plugin's place is treated as unreachable.
+    const decaid = seam({ pluginList: refusal(undefined, 504) });
+    decaid.sources.status(AT_CAFE);
+    assert.equal((await decaid.sources.shotsPage(null, 50)).list.why, 'unreachable');
+});
+
+test('any other failure of the list rejects: a list that can\'t be read is not the tablet\'s list', async () => {
+    for (const failure of [refusal('invalidRequest', 400), refusal('recipesUnread', 500), new Error('offline')]) {
+        const { sources, calls } = seam({ pluginList: failure });
+        sources.status(AT_CAFE);
+        await assert.rejects(sources.shotsPage(null, 50));
+        assert.deepEqual(pages(calls, 'tablet'), []);
+        assert.equal(calls.asked, 0);
+    }
+});
+
+test('a Machine that turns Capture-only, or is served again, changes the list\'s source at the next status, and a later page is read afresh', async () => {
+    const { sources, calls } = seam();
+    sources.status(AT_CAFE);
+    const first = await sources.shotsPage(null, 50);
+    sources.status(CAPTURE_ONLY);
+    assert.deepEqual(calls.moved.at(-1), true, 'an opened Shot gives way to the latest, and an open list closes');
+    const later = await sources.shotsPage(first.next, 50);
+    assert.deepEqual([later.rows, later.list.why, later.afresh], [[{ id: 'tablet-row' }], 'notServed', true]);
+    assert.deepEqual(pages(calls, 'tablet').map(([, from]) => from), [null], 'the plugin\'s cursor means nothing to Decaid');
+    sources.status(AT_CAFE);
+    const again = await sources.shotsPage(later.next, 50);
+    assert.deepEqual([again.rows, again.list.why, again.afresh], [[{ id: 'plugin-row' }], 'served', true]);
+    assert.deepEqual(pages(calls, 'plugin').at(-1).slice(1, 3), [null, 50]);
+});
+
+test('a Shot by its id is the plugin\'s to read on a served Machine, through an outage too, and the tablet\'s otherwise', async () => {
+    for (const [answers, name] of [[[AT_CAFE], 'plugin'], [[AT_CAFE, UNREACHABLE], 'plugin'], [[null], 'tablet'], [[CAPTURE_ONLY], 'tablet'], [[], 'tablet'], [[UNREACHABLE], 'tablet']]) {
+        const { sources, calls } = seam();
+        for (const answer of answers) sources.status(answer);
+        assert.equal((await sources.shotById('s1')).shot.id, 's1');
+        assert.deepEqual(calls[name].filter(([what]) => what === 'byId'), [['byId', 's1']], JSON.stringify(answers));
     }
 });
 
 test('which listed Shots are references is the choice kept on the tablet, only where that is the source', async () => {
     const own = seam();
     own.sources.status(null); // no plugin: the tablet's own choice
-    assert.deepEqual((await own.sources.shotsPage(0, 50)).references, { r1: 'tablet-row' });
-    for (const answer of [undefined, SERVED, { code: 'unreachable' }]) {
+    await own.sources.shotsPage(null, 50);
+    assert.deepEqual(pages(own.calls, 'tablet')[0][3], { r1: 'tablet-row' });
+    for (const answer of [undefined, { code: 'unreachable' }]) {
         const { sources, calls } = seam();
         if (answer !== undefined) sources.status(answer);
-        assert.equal((await sources.shotsPage(0, 50)).references, null, 'a Machine that is or may be served never reads the tablet\'s choice');
+        await sources.shotsPage(null, 50);
+        assert.equal(pages(calls, 'tablet')[0][3], null, 'a Machine that is or may be served never reads the tablet\'s choice');
         assert.ok(!calls.tablet.some(([what]) => what === 'references'));
     }
 });
 
 test('a choice of reference that can\'t be read leaves the list its rows, without chips', async () => {
-    const { sources } = seam({ choicesFail: true });
+    const { sources, calls } = seam({ choicesFail: true });
     sources.status(null);
-    const page = await sources.shotsPage(0, 50);
-    assert.deepEqual([page.items.length, page.references], [1, null]);
+    const page = await sources.shotsPage(null, 50);
+    assert.deepEqual([page.rows.length, pages(calls, 'tablet')[0][3]], [1, null]);
 });

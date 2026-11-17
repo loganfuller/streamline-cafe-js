@@ -184,6 +184,8 @@ export function viewFrom(stored) {
 
 /** The line under the legend while Decent Sync can't be reached: the tablet's copy is drawn, or says the recipe has none. */
 export const UNCHANGEABLE_NOTICE = "Decent Sync can't be reached, so the reference can't be changed";
+/** The line under the legend while another Machine's Shot is in the graph and Decent Sync can't be reached. */
+export const SHOT_UNCHANGEABLE_NOTICE = "Decent Sync can't be reached, so this shot can't be changed";
 /** The same where nothing could be read: the tablet has no copy, as for a recipe in no slot, or it is not known yet whether Decent Sync serves the Machine. */
 export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can't be shown";
 
@@ -205,9 +207,12 @@ export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can
  * - `remarks`: the rating and note of the Shot in the graph, `{ rating, note }`,
  *   or null where its record is not known: with no recipe the Shot comes from
  *   Streamline's history module with no record, until the page has read one.
- * - `opened`: for a Shot opened from the Shots list, `{ loaded, unfinished }`,
- *   the loaded recipe, null for none, and whether the Shot is Unfinished; null
- *   otherwise. `recipe` is then the Shot's own recipe, null for none, and
+ * - `opened`: for a Shot opened from the Shots list, `{ loaded, unfinished,
+ *   name, canChange }`: the loaded recipe, null for none; whether the Shot is
+ *   Unfinished; the name of its recipe where this tablet holds no record of
+ *   it; and whether it can be changed now, which another Machine's Shot can't
+ *   be while Decent Sync can't be reached. Null otherwise. `recipe` is then
+ *   the Shot's own recipe, null for none or for one named only, and
  *   `reference` that recipe's.
  *
  * The answer: `row`, the Shot's row (`label`, a phrase, or `name`, a recipe's
@@ -220,8 +225,9 @@ export const UNREAD_NOTICE = "Decent Sync can't be reached, so the reference can
  * note the Shot's row shows with its stars and note icon, or null where it has
  * neither: only a saved Shot is rated, so not while a shot runs or waits to be
  * saved; and `referenceRating` and `referenceNote`, what the reference's row
- * shows, each null where the reference has none; and `back`, whether "Back to
- * latest" shows.
+ * shows, each null where the reference has none; `back`, whether "Back to
+ * latest" shows; and `locked`, whether the Shot can't be changed now: its
+ * stars and Make reference are then shown muted, and its note is read only.
  */
 export function graphModel({ recipe, view, live = false, settling = false, shot, reference = null, remarks = null, opened = null }) {
     const inReference = view !== 'targets';
@@ -232,7 +238,7 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
 
     let row = null;
     if (live) row = { label: 'Live shot', shot: null };
-    else if (opened) row = openedRow(recipe, opened.loaded, shot);
+    else if (opened) row = openedRow(recipe, opened.loaded, shot, opened.name);
     else if (!unknown && (settling || shot)) row = { label: recipe ? 'Latest' : 'Last shot', shot: settling ? null : shot };
 
     let line = null;
@@ -248,11 +254,15 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
     const canChange = !reference || reference.canChange !== false;
     // An opened Unfinished Shot is drawn as it is, and is never made a reference.
     const offered = !!recipe && atRest && !!shot && !isReference && !(opened && opened.unfinished);
-    const muted = offered && !canChange && unreachable && !reference.unread;
+    // Another Machine's Shot, opened from the list, while Decent Sync can't be
+    // reached: nothing of it can be changed, and one line says so.
+    const locked = !!opened && opened.canChange === false && !!shot;
+    const muted = offered && (locked || (!canChange && unreachable && !reference.unread));
     // The line stays through a shot: it has a line of its own, and the graph
     // keeps its height.
     let notice = null;
-    if (unreachable) notice = reference.unread ? UNREAD_NOTICE : UNCHANGEABLE_NOTICE;
+    if (locked) notice = SHOT_UNCHANGEABLE_NOTICE;
+    else if (unreachable) notice = reference.unread ? UNREAD_NOTICE : UNCHANGEABLE_NOTICE;
     return {
         row,
         line,
@@ -270,14 +280,15 @@ export function graphModel({ recipe, view, live = false, settling = false, shot,
         referenceRating: showsReference ? reference.rating ?? null : null,
         referenceNote: showsReference ? reference.note ?? null : null,
         back: !!opened && !live,
+        locked,
     };
 }
 
 // An opened Shot's row: "Viewing" for a Shot of the loaded recipe, the
-// recipe's own name for one of another, and "No recipe" for one pulled with
-// none.
-function openedRow(recipe, loaded, shot) {
-    if (!recipe) return { label: 'No recipe', shot };
+// recipe's own name for one of another, as for one this tablet has no record
+// of, and "No recipe" for one pulled with none.
+function openedRow(recipe, loaded, shot, name) {
+    if (!recipe) return name ? { label: null, name, shot } : { label: 'No recipe', shot };
     if (loaded && String(loaded.id) === String(recipe.id)) return { label: 'Viewing', shot };
     return { label: null, name: recipeName(recipe), shot };
 }

@@ -756,10 +756,10 @@ const UNFINISHED = { ...shot('s-unfinished', 35), measurements: [{ machine: { ti
 const lastOpened = effects => did(effects, 'readOpened').at(-1);
 
 // The answer to the last read of an opened Shot.
-function openedAnswer(state, effects, found, ref = null) {
+function openedAnswer(state, effects, found, ref = null, canChange = true) {
     const read = lastOpened(effects);
     assert.ok(read, 'a read of the opened Shot was asked for');
-    return play(state, { type: 'openedRead', seq: read.seq, edits: read.edits, shotId: read.shotId, shot: found, chosen: ref });
+    return play(state, { type: 'openedRead', seq: read.seq, edits: read.edits, shotId: read.shotId, shot: found, canChange, chosen: ref });
 }
 
 // A row tapped, and its Shot read with its recipe's reference.
@@ -787,7 +787,7 @@ test('an opened Shot is drawn with its own recipe\'s reference, while the latest
     assert.equal(shown.recipe, OTHER, 'compared as its own recipe');
     assert.equal(shown.reference.shot, GUEST_REF);
     assert.ok(shown.reference.curves, 'the reference\'s lines are worked out');
-    assert.deepEqual(shown.opened, { loaded: RECIPE, unfinished: false });
+    assert.deepEqual(shown.opened, { loaded: RECIPE, unfinished: false, name: null, canChange: true });
     assert.equal(state.latest, LATEST);
     assert.equal(state.reference.shot, REF, 'the loaded recipe\'s reference is kept');
     assert.equal(shownRemarks(state).id, GUESTS.id);
@@ -801,7 +801,85 @@ test('an opened Shot with no recipe has no reference, and one with no recipe loa
     assert.deepEqual(inGraph(none.state).reference.shot, null);
     const unloaded = opened(withNone(), EARLIER, RECIPE, chosen(REF));
     assert.equal(inGraph(unloaded.state).reference.shot, REF);
-    assert.deepEqual(inGraph(unloaded.state).opened, { loaded: null, unfinished: false });
+    assert.deepEqual(inGraph(unloaded.state).opened, { loaded: null, unfinished: false, name: null, canChange: true });
+});
+
+test('a Shot of a recipe this tablet has no record of opens under that recipe\'s name, with no reference read', () => {
+    const asked = play(withRecipe(), { type: 'open', shotId: GUESTS.id, recipe: null, name: 'Elsewhere espresso' });
+    assert.equal(lastOpened(asked.effects).recipeId, null, 'the plugin reads a reference by DYE2 record id only');
+    const { state } = openedAnswer(asked.state, asked.effects, GUESTS);
+    assert.deepEqual([inGraph(state).recipe, inGraph(state).opened.name, inGraph(state).reference.shot], [null, 'Elsewhere espresso', null]);
+    // A name is only for a Shot with no record: one with a record is named by it.
+    const named = play(withRecipe(), { type: 'open', shotId: GUESTS.id, recipe: OTHER, name: 'Ignored' });
+    assert.equal(named.state.opening.name, null);
+});
+
+// ── Another Machine's Shot, and the server out of reach ──────────────────────
+
+test('an opened Shot the server can\'t be asked for can\'t be changed, and only the legend is written again', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    // The connection went: the seam says to read again, and that read can't reach the server.
+    const pushed = play(base, { type: 'referencePushed', recipeId: null });
+    const read = lastOpened(pushed.effects);
+    const out = play(pushed.state, { type: 'openedUnread', seq: read.seq, shotId: GUESTS.id, unreachable: true });
+    assert.deepEqual(kinds(out.effects), ['paint'], 'nothing is drawn again');
+    assert.equal(inGraph(out.state).opened.canChange, false);
+    assert.equal(inGraph(out.state).shot, GUESTS, 'it stays in the graph, as read before');
+    assert.equal(inGraph(out.state).reference.shot, GUEST_REF);
+    // Told again, nothing more is written.
+    const again = play(out.state, { type: 'referencePushed', recipeId: null });
+    assert.deepEqual(play(again.state, { type: 'openedUnread', seq: lastOpened(again.effects).seq, shotId: GUESTS.id, unreachable: true }).effects, []);
+    // The server is back: the same two Shots, and it can be changed again.
+    const back = openedAnswer(again.state, again.effects, GUESTS, chosen(GUEST_REF));
+    assert.deepEqual(kinds(back.effects), ['paint']);
+    assert.equal(inGraph(back.state).opened.canChange, true);
+});
+
+test('a read that can\'t be made for any other reason leaves an opened Shot as one that can be changed', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const pushed = play(base, { type: 'referencePushed', recipeId: OTHER.id });
+    const failed = play(pushed.state, { type: 'openedUnread', seq: lastOpened(pushed.effects).seq, shotId: GUESTS.id });
+    assert.deepEqual(failed.effects, []);
+    assert.equal(inGraph(failed.state).opened.canChange, true);
+});
+
+test('the way back from another page during an outage draws another Machine\'s Shot as read before, locked', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const seen = play(base, { type: 'inView' }, { type: 'timer', timer: 'refresh' });
+    const out = play(seen.state, { type: 'openedUnread', seq: lastOpened(seen.effects).seq, shotId: GUESTS.id, unreachable: true });
+    assert.deepEqual(kinds(out.effects), ['draw'], 'the draw writes the legend too');
+    assert.equal(inGraph(out.state).opened.canChange, false);
+});
+
+test('a Shot read as one that can\'t be changed is opened so, and a row tapped that the server can\'t be asked for is not opened', () => {
+    const asked = play(withRecipe(), { type: 'open', shotId: GUESTS.id, recipe: OTHER });
+    assert.equal(inGraph(openedAnswer(asked.state, asked.effects, GUESTS, chosen(GUEST_REF), false).state).opened.canChange, false);
+    const failed = play(asked.state, { type: 'openedUnread', seq: lastOpened(asked.effects).seq, shotId: GUESTS.id, unreachable: true });
+    assert.deepEqual(kinds(failed.effects), ['unopened']);
+    assert.equal(failed.state.opened, null);
+    assert.equal(inGraph(failed.state).shot, LATEST);
+});
+
+test('an edit that could not be confirmed either way locks the opened Shot it was of, and no other', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const step = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id });
+    assert.equal(step.allow, true, 'the Shot is in the graph, so the line says why');
+    assert.deepEqual(kinds(step.effects), ['paint']);
+    assert.equal(inGraph(step.state).opened.canChange, false);
+    assert.deepEqual(graphStep(step.state, { type: 'shotUnreachable', shotId: GUESTS.id }).effects, [], 'told again, nothing is written');
+    for (const state of [base, withRecipe()]) {
+        const other = graphStep(state, { type: 'shotUnreachable', shotId: LATEST.id });
+        assert.equal(other.allow, false, 'the graph shows another Shot, so a toast says the edit failed');
+        assert.deepEqual(other.effects, []);
+    }
+});
+
+test('a locked Shot gives way as any opened Shot does, and the next is opened as it is read', () => {
+    const base = opened(withRecipe(), GUESTS, OTHER, chosen(GUEST_REF)).state;
+    const locked = graphStep(base, { type: 'shotUnreachable', shotId: GUESTS.id }).state;
+    assert.equal(play(locked, { type: 'backToLatest' }).state.opened, null);
+    assert.equal(play(locked, { type: 'sourceMoved' }).state.opened, null, 'a Machine that turns Capture-only shows the latest');
+    assert.equal(inGraph(opened(locked, EARLIER).state).opened.canChange, true, 'this tablet\'s own Shot');
 });
 
 test('an opened Unfinished Shot is drawn as it is, and is known to be Unfinished', () => {
@@ -957,8 +1035,12 @@ test('with a Shot opened, a push for its own recipe reads it again; one for anot
     assert.equal(inGraph(moved.state).reference.shot, REF2);
     assert.deepEqual(play(base, { type: 'referencePushed', recipeId: RECIPE.id }).effects, []);
     assert.equal(lastOpened(play(base, { type: 'referencePushed', recipeId: null }).effects).shotId, GUESTS.id);
-    // A Shot with no recipe has no reference to follow.
-    assert.deepEqual(play(opened(withRecipe(), EARLIER, null).state, { type: 'referencePushed', recipeId: null }).effects, []);
+    // A Shot with no recipe has no reference to follow. It is still read again
+    // when the server may have come or gone, which changes whether it can be
+    // changed.
+    const none = opened(withRecipe(), EARLIER, null).state;
+    assert.deepEqual(play(none, { type: 'referencePushed', recipeId: OTHER.id }).effects, []);
+    assert.deepEqual(lastOpened(play(none, { type: 'referencePushed', recipeId: null }).effects).recipeId, null);
 });
 
 test('with a Shot opened, the source changing sends the graph back to the latest', () => {

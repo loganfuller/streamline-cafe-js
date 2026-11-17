@@ -106,7 +106,7 @@ export function editNote({ title, name, credit, note, save: saveWith }) {
     open({ title, name, credit, note, save: saveWith });
 }
 
-/** Open a Shot's note to read, with its rating beside when it was pulled and by whom. */
-export function readNote({ title, credit, rating, note }) {
-    open({ title, credit, rating, note });
+/** Open a Shot's note to read, with its rating beside when it was pulled and by whom. It is named as `editNote` names one. */
+export function readNote({ title, name, credit, rating, note }) {
+    open({ title, name, credit, rating, note });
 }

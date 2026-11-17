@@ -1,8 +1,9 @@
 // Which of the Shot seam's two sources answers (docs/cafe/DESIGN.md, "Shots and
-// the reference"): Decent Sync's plugin on a Machine it serves, the tablet
-// otherwise, and neither before the Status request has said which. No browser
-// global is touched: shot-seam.js hands in the sources and what asks the status.
-import { shotSource, serverOutOfReach } from './sync-status.js';
+// the reference" and "The Shots list"): Decent Sync's plugin on a Machine it
+// serves, the tablet otherwise, and neither before the Status request has said
+// which. No browser global is touched: shot-seam.js hands in the sources and
+// what asks the status.
+import { shotSource, serverOutOfReach, shotsList, shotsListRefused } from './sync-status.js';
 
 /**
  * - `tablet`, `plugin`: the two sources (tablet-shots.js, plugin-shots.js).
@@ -19,6 +20,25 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
     // The plugin said it can't ask its server. Before the source is known,
     // that is why no reference can be shown.
     let outOfReach = false;
+    // What the Shots list lists, and why: the status rule's answer.
+    let list = shotsList(null, {});
+
+    // A page of the tablet's own Shots, under the header `listed` says. Which
+    // Shots are references is read from the choice kept on the tablet where
+    // that is the source, and is not known otherwise: on a Machine that is or
+    // may be served, the choice kept on the tablet is never read. A choice
+    // that can't be read leaves the list without its chips, not its rows.
+    async function tabletPage(from, limit, listed, afresh) {
+        let choices = null;
+        if (source === 'tablet') {
+            try {
+                choices = await tablet.references();
+            } catch (error) { /* the rows stand without their chips */ }
+            if (source !== 'tablet') choices = null;
+        }
+        const page = await tablet.shotsPage(from, limit, choices && typeof choices === 'object' ? choices : null);
+        return { rows: page.rows, next: page.next === null ? null : { of: 'tablet', at: page.next }, list: listed, afresh };
+    }
 
     return {
         /** Where references are kept now: `plugin`, `tablet` or `unknown`. */
@@ -53,30 +73,46 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
         newestShot: () => tablet.newestShot(),
 
         /**
-         * A page of Shots for the Shots list, newest first: `items`, rows of
-         * Decaid's list; `total`, or null; and `references`, recipe to Shot,
-         * or null where it is not known which Shots are references. The rows
-         * are the tablet's own, whatever the source, until the Location's list
-         * comes through the plugin. Which Shots are references is read from
-         * the choice kept on the tablet where that is the source, and is not
-         * known otherwise: on a Machine that may be served, the choice kept on
-         * the tablet is never read. A choice that can't be read leaves the
-         * list without its chips, not without its rows.
+         * A page of Shots for the Shots list, newest first: `rows`, each the
+         * same thing whichever source listed it; `next`, what to ask the next
+         * page with, or null on the last; `list`, what is listed and why
+         * (`shotsList` in sync-status.js); and `afresh`, whether this is a
+         * first page though a later one was asked for.
+         *
+         * On a served Machine the rows are the Location's, through the
+         * plugin. Otherwise, and before the status has said, they are the
+         * tablet's own. A refusal of the plugin's that means "the tablet's
+         * own Shots" is answered from the tablet, under the line that says
+         * why, and has the status asked again. `from` is a page's `next`, or
+         * null for the first page. A `next` the other source gave can't be
+         * followed, so the list is then read afresh, from its first page.
          */
-        async shotsPage(offset, limit) {
-            const page = await tablet.shotsPage(offset, limit);
-            let references = null;
-            if (source === 'tablet') {
-                try {
-                    references = await tablet.references();
-                } catch (error) { /* the rows stand without their chips */ }
-                if (source !== 'tablet') references = null;
+        async shotsPage(from, limit) {
+            const listed = list;
+            const follows = !!from && from.of === listed.of;
+            const afresh = !!from && !follows;
+            if (listed.of !== 'location') return tabletPage(follows ? from.at : null, limit, listed, afresh);
+            try {
+                const page = await plugin.shotsPage(follows ? from.at : null, limit, listed.machineId);
+                return { rows: page.rows, next: page.next === null ? null : { of: 'location', at: page.next }, list: listed, afresh };
+            } catch (error) {
+                // A request that reached nothing says nothing: Decaid can't be
+                // asked for its own Shots either.
+                const refused = error.code !== undefined || error.status !== undefined ? shotsListRefused(error.code) : null;
+                if (!refused) throw error;
+                askStatus();
+                return tabletPage(null, limit, refused, !!from);
             }
-            return { ...page, references: references && typeof references === 'object' ? references : null };
         },
 
-        /** One Shot, whole, by its id, or null where it is gone. The tablet's own, until the Location's list comes through the plugin. */
-        shotById: id => tablet.shotById(id),
+        /**
+         * One Shot by its id: `shot`, whole, or null where it is gone, and
+         * `canChange`, whether it can be changed now. On a Machine Decent
+         * Sync serves, through an outage too, it may be another Machine's,
+         * read through the plugin: that read rejects with `unreachable` where
+         * the server can't be asked. Otherwise it is the tablet's own.
+         */
+        shotById: id => (source === 'plugin' ? plugin : tablet).shotById(id),
 
         /**
          * Set a Shot's rating, its note or both, as `{ rating?, note? }`.
@@ -113,6 +149,7 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
             // follows whether the plugin can ask its server.
             const reach = serverOutOfReach(answer);
             const said = next === 'unknown' && reach !== outOfReach;
+            list = shotsList(list, answer);
             source = next;
             outOfReach = reach;
             const read = moved || readAfter || said;

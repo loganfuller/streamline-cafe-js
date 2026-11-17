@@ -11,6 +11,7 @@ import { pageHeading } from '../src/cafe/page-model.js';
 import { slotMenu } from '../src/cafe/slot-menu.js';
 import { graphModel } from '../src/cafe/shot-model.js';
 import { PHRASES } from '../src/cafe/comparison.js';
+import { listHeader } from '../src/cafe/shot-list.js';
 
 // Streamline's own list says which languages are finished: it is not copied here.
 const FINISHED = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
@@ -97,6 +98,13 @@ function usedKeys() {
     // What the legend says while Decent Sync can't be reached.
     for (const unread of [false, true]) {
         keys.add(graphModel({ view: 'reference', recipe, shot, reference: { shot: null, canChange: false, unreachable: true, unread } }).notice);
+    }
+    // And while another Machine's Shot is in the graph then.
+    keys.add(graphModel({ view: 'reference', recipe, shot, reference: null, opened: { loaded: recipe, unfinished: false, name: null, canChange: false } }).notice);
+    // What the Shots list says about where it comes from.
+    for (const why of ['served', 'notServed', 'unreachable', 'refused', 'noPlugin', 'unknown']) {
+        const { under, line } = listHeader({ of: why === 'served' ? 'location' : 'tablet', why, location: 'Sample Cafe', message: 'Sample refusal.' });
+        for (const said of [under, line]) if (said && said.translate) keys.add(said.text);
     }
     // The comparison row's titles and what each card says beside its number.
     for (const phrase of Object.values(PHRASES)) keys.add(phrase);

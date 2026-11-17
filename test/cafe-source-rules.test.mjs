@@ -50,7 +50,7 @@ test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
     const tablet = SOURCES.find(({ name }) => name === 'tablet-shots.js').text;
     assert.doesNotMatch(tablet, /^import .*modules\/api\.js/m, 'the tablet source is handed Decaid\'s edit by the seam');
     // The plugin's edit is sent by the one module that speaks to the plugin.
-    assert.deepEqual(filesWith(/\bshot\?id=/), ['decent-sync.js']);
+    assert.deepEqual(filesWith(/shot\?id=/), ['decent-sync.js']);
     assert.deepEqual(filesWith(/\beditPluginShot\b/), ['shot-seam.js']);
     // And the page reaches either only through the seam.
     assert.deepEqual(filesWith(/\beditShot\b[^;]*from '\.\/shot-seam\.js'/), ['graph.js']);
@@ -63,6 +63,21 @@ test('one module speaks to Decent Sync\'s plugin', () => {
     assert.deepEqual(filesWith(/\bconnectPluginMessages\b|\bconnectPluginPush\b|\bWebSocket\b/), ['decent-sync.js'], 'and one socket, through api.js');
     assert.deepEqual(filesWith(/from '\.\/decent-sync\.js'/), ['page.js', 'shot-seam.js']);
     assert.deepEqual(filesWith(/\b(readReference|chooseReference|onPush)\b/), ['decent-sync.js', 'plugin-shots.js', 'shot-seam.js']);
+});
+
+test('one module names the plugin\'s `shots` and `shot` requests', () => {
+    // The Location's list and a Shot whole: the endpoints are named in
+    // decent-sync.js alone, and handed to the plugin source by the seam.
+    assert.deepEqual(filesWith(/[`'"]shots?\?/), ['decent-sync.js']);
+    assert.deepEqual(filesWith(/\b(listLocationShots|readLocationShot)\b/), ['shot-seam.js']);
+    const sync = SOURCES.find(({ name }) => name === 'decent-sync.js').text;
+    assert.match(sync, /export function listShots\(cursor, limit\) \{/);
+    assert.match(sync, /export function readShot\(shotId\) \{/);
+    // Whether a row is this machine's or its Location's is asked nowhere above the seam.
+    for (const name of ['shots-dialog.js', 'graph.js', 'graph-state.js']) {
+        const { text } = SOURCES.find(source => source.name === name);
+        assert.doesNotMatch(text, /from '\.\/(tablet-shots|plugin-shots|shot-sources|sync-status|decent-sync)\.js'/, name);
+    }
 });
 
 test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modules', () => {

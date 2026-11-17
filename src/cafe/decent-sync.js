@@ -1,5 +1,6 @@
 // The page's one line to Decent Sync's plugin on this tablet: its Status
-// request, its `reference` request, its edit of a Shot and its `changes` socket
+// request, its `reference` request, its list of the Location's Shots, one of
+// them whole, its edit of a Shot and its `changes` socket
 // (docs/cafe/DESIGN.md, "Recipes and the strip" and "Shots and the reference").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
@@ -103,6 +104,21 @@ export function readReference(recipeId) {
 /** Asks the plugin to make a Shot a recipe's Reference Shot. Rejects with the refusal. */
 export function chooseReference(recipeId, shotId) {
     return callPluginEndpoint(PLUGIN_ID, reference(recipeId), { shotId }, 'PUT');
+}
+
+/**
+ * A page of the Shots at the Machine's Location, newest first: the plugin's
+ * answer, `{ shots, nextCursor }`. `cursor` is the page before's `nextCursor`,
+ * or null for the first page. Rejects with the refusal.
+ */
+export function listShots(cursor, limit) {
+    const query = `limit=${encodeURIComponent(limit)}${cursor == null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
+    return callPluginEndpoint(PLUGIN_ID, `shots?${query}`, null, 'GET');
+}
+
+/** One of the Location's Shots, whole: the plugin's answer, `{ shot, recipe, referenceOf }`. Rejects with the refusal. */
+export function readShot(shotId) {
+    return callPluginEndpoint(PLUGIN_ID, `shot?id=${encodeURIComponent(shotId)}`, null, 'GET');
 }
 
 /** Asks the plugin to set a Shot's rating, its note or both, as `{ rating?, note? }`. Answers the two as they now are. Rejects with the refusal. */

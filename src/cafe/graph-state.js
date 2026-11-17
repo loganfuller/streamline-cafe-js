@@ -62,13 +62,16 @@ const NO_REFERENCE = { shot: null, canChange: false };
  *   note, of }`, where `of` is that Shot as `latest` holds it; null until its
  *   record is known.
  * - `opened`: the Shot opened from the Shots list, or null: `{ id, recipe,
- *   shot, unfinished, reference, remarks }`, where `recipe` is its own
- *   recipe's DYE2 record, or null for a Shot pulled with none or with a recipe
- *   the tablet no longer holds; `shot` is the Shot whole; `reference` is that
- *   recipe's, as `reference` above; and `remarks` its rating and note, as
- *   `remarks` below. `opening`: a Shot asked to be opened whose read has not
- *   answered, `{ id, recipe }`, or null. `openSeq`: the reads of an opened
- *   Shot; only the newest's answer is taken.
+ *   name, shot, unfinished, canChange, reference, remarks }`, where `recipe`
+ *   is its own recipe's DYE2 record, or null for a Shot pulled with none or
+ *   with a recipe this tablet holds no record of, which `name` then names;
+ *   `shot` is the Shot whole; `canChange` is whether it can be rated, noted
+ *   and made a reference now, which another Machine's Shot can't be while
+ *   Decent Sync's server is out of reach; `reference` is that recipe's, as
+ *   `reference` above; and `remarks` its rating and note, as `remarks` below.
+ *   `opening`: a Shot asked to be opened whose read has not answered, `{ id,
+ *   recipe, name }`, or null. `openSeq`: the reads of an opened Shot; only
+ *   the newest's answer is taken.
  * - `edits`: counts each edit of a Shot as it starts and as it ends.
  *   `editedAt`: a Shot's id to that count at its last edit, so a read begun
  *   before it is known to be older than the edit.
@@ -136,8 +139,9 @@ export function shotInGraphId(state) {
  * compared as (its own recipe for an opened Shot, null for none; the loaded
  * recipe otherwise, undefined before DYE2 was read); `shot`; `reference`;
  * `remarks`; `live` and `settling`; and `opened`, null, or for an opened Shot
- * `{ loaded, unfinished }`, the loaded recipe and whether the Shot is
- * Unfinished.
+ * `{ loaded, unfinished, name, canChange }`: the loaded recipe, whether the
+ * Shot is Unfinished, the name of a recipe this tablet has no record of, and
+ * whether the Shot can be changed now.
  */
 export function inGraph(state) {
     const { opened } = state;
@@ -149,7 +153,7 @@ export function inGraph(state) {
             remarks: opened.remarks,
             live: false,
             settling: false,
-            opened: { loaded: state.recipe ?? null, unfinished: opened.unfinished },
+            opened: { loaded: state.recipe ?? null, unfinished: opened.unfinished, name: opened.name, canChange: opened.canChange },
         };
     }
     return { recipe: state.recipe, shot: state.latest, reference: state.reference, remarks: shownRemarks(state), live: state.live, settling: state.settling, opened: null };
@@ -198,12 +202,20 @@ export function referenceParts(shot) {
  *   of a Shot's rating or note started, or ended.
  * - `{ type: 'edited', shotId, remarks }`: what an edit, or a read after one,
  *   left of a Shot's rating or note: only the one the edit was of.
- * - `{ type: 'open', shotId, recipe }`: a row of the Shots list was tapped;
- *   `recipe` is the Shot's own recipe's DYE2 record, or null.
+ * - `{ type: 'open', shotId, recipe, name }`: a row of the Shots list was
+ *   tapped; `recipe` is the Shot's own recipe's DYE2 record, or null, and
+ *   `name` the name of a recipe this tablet has no record of, or null.
  * - `{ type: 'backToLatest' }`: "Back to latest" was tapped.
- * - `{ type: 'openedRead', seq, edits, shotId, shot, chosen }`: a read of an
- *   opened Shot and its recipe's reference answered; `shot` is null where the
- *   Shot is gone. `{ type: 'openedUnread', seq, shotId }`: it could not be read.
+ * - `{ type: 'openedRead', seq, edits, shotId, shot, canChange, chosen }`: a
+ *   read of an opened Shot and its recipe's reference answered; `shot` is null
+ *   where the Shot is gone, and `canChange` is the seam's word on whether it
+ *   can be changed now. `{ type: 'openedUnread', seq, shotId, unreachable }`:
+ *   it could not be read; `unreachable`, because Decent Sync's server can't
+ *   be asked for it.
+ * - `{ type: 'shotUnreachable', shotId }`: an edit of a Shot could not be
+ *   confirmed either way, because Decent Sync's server can't be asked. The
+ *   answer's `allow` says whether that Shot is in the graph, and so now shown
+ *   as one that can't be changed.
  *
  * Things to do, each `{ do }`:
  * - `readShots` (`recipeId`, `seq`, `edits`): read the recipe's latest Shot and
@@ -243,7 +255,8 @@ function handle(s, todo, event) {
         case 'editStarted':
         case 'editEnded': return markEdit(s, event.shotId);
         case 'edited': return edited(s, todo, event.shotId, event.remarks);
-        case 'open': return open(s, todo, event.shotId, event.recipe);
+        case 'open': return open(s, todo, event.shotId, event.recipe, event.name);
+        case 'shotUnreachable': return shotUnreachable(s, todo, event.shotId);
         case 'backToLatest': return backToLatest(s, todo);
         case 'openedRead': return openedRead(s, todo, event);
         case 'openedUnread': return openedUnread(s, todo, event);
@@ -415,7 +428,9 @@ function newestRead(s, todo, { seq, edits: editsThen, record }) {
 // The seam says a recipe's reference should be read again: with null, whichever
 // recipe is in the graph.
 function referencePushed(s, todo, recipeId) {
-    const follows = target => !!target && !!target.recipe && (recipeId == null || String(recipeId) === String(target.recipe.id));
+    // With null the server may have come into reach or gone out of it, which
+    // changes whether an opened Shot can be changed, with a recipe or without.
+    const follows = target => !!target && (recipeId == null || (!!target.recipe && String(recipeId) === String(target.recipe.id)));
     // A Shot tapped and still being read follows its own recipe's reference: its
     // read may have read the reference before the push. An opened Shot follows
     // its own too; while a tap is on its way, a push for it is read on the tap's
@@ -706,7 +721,7 @@ function readOpened(s, todo, { id, recipe }) {
 // A row of the list was tapped. The graph keeps what it shows until the Shot
 // has been read. The latest's own row goes back to the latest. While a shot
 // runs nothing opens: the list does not either.
-function open(s, todo, shotId, recipe) {
+function open(s, todo, shotId, recipe, name = null) {
     if (s.live || shotId == null) return;
     const id = String(shotId);
     if (id === latestShotId(s)) {
@@ -721,8 +736,21 @@ function open(s, todo, shotId, recipe) {
         readOpened(s, todo, s.opened);
         return;
     }
-    s.opening = { id, recipe: recipe || null };
+    s.opening = { id, recipe: recipe || null, name: recipe ? null : name || null };
     readOpened(s, todo, s.opening);
+}
+
+// An edit of a Shot could not be confirmed either way: Decent Sync's server
+// can't be asked. Where that Shot is the one opened, it is shown as one that
+// can't be changed, with the line that says why, until a read finds the
+// server back. Answers whether it is.
+function shotUnreachable(s, todo, shotId) {
+    if (!s.opened || s.opened.id !== String(shotId)) return false;
+    if (s.opened.canChange) {
+        s.opened = { ...s.opened, canChange: false };
+        paint(todo);
+    }
+    return true;
 }
 
 // "Back to latest": the latest is drawn as it was kept, then read again, and
@@ -747,7 +775,7 @@ function openedRemarks(s, before, shot, editsThen) {
     return { ...(keep ? { rating: before.remarks.rating, note: before.remarks.note } : shotRemarks(shot)), id: String(shot.id), of: shot };
 }
 
-function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
+function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, canChange: can, chosen }) {
     if (seq !== s.openSeq || s.live) return;
     const target = s.opening || s.opened;
     if (!target || target.id !== String(shotId)) return;
@@ -765,6 +793,7 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
         return;
     }
     const { recipe } = target;
+    const canChange = can !== false;
     // A reference that could not be read leaves the one read before for this
     // Shot. A Shot with no recipe has none, and none can be chosen.
     const kept = before ? before.reference : null;
@@ -782,17 +811,20 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
     }
     const remarks = openedRemarks(s, before, shot, editsThen);
     if (before && !s.drawDue && sameReference(kept, found)) {
-        // The same two Shots: only a rating or a note can have changed.
-        const rows = !sameRemarks(before.remarks, remarks) || !sameRemarks(kept, found);
-        s.opened = { ...before, remarks: { ...remarks, of: before.shot }, reference: sameRemarks(kept, found) ? kept : { ...kept, rating: found.rating, note: found.note } };
+        // The same two Shots: only a rating or a note can have changed, or
+        // whether the Shot can be changed, as when the server is back.
+        const rows = !sameRemarks(before.remarks, remarks) || !sameRemarks(kept, found) || before.canChange !== canChange;
+        s.opened = { ...before, canChange, remarks: { ...remarks, of: before.shot }, reference: sameRemarks(kept, found) ? kept : { ...kept, rating: found.rating, note: found.note } };
         if (rows) paint(todo);
         return;
     }
     s.opened = {
         id: target.id,
         recipe,
+        name: target.name || null,
         shot,
         unfinished: isUnfinished(shot),
+        canChange,
         reference: found === kept ? kept : { ...found, ...referenceParts(found.shot) },
         remarks,
     };
@@ -807,7 +839,7 @@ function openedRead(s, todo, { seq, edits: editsThen, shotId, shot, chosen }) {
     draw(s, todo);
 }
 
-function openedUnread(s, todo, { seq, shotId }) {
+function openedUnread(s, todo, { seq, shotId, unreachable = false }) {
     if (seq !== s.openSeq || s.live) return;
     // A Shot tapped that could not be read leaves the graph as it was, and
     // says so. One already in the graph stays, as read before.
@@ -817,9 +849,15 @@ function openedUnread(s, todo, { seq, shotId }) {
         readOpenedAgain(s, todo);
         return;
     }
-    // The Shot in the graph could not be read again. Where that read was to end
+    // The Shot in the graph could not be read again. Where that is because
+    // Decent Sync's server can't be asked for it, it is another Machine's, and
+    // can't be changed until the server is back. Where that read was to end
     // in a draw, it is drawn as read before, since the chart may have been
     // cleared meanwhile.
+    if (unreachable && s.opened && s.opened.id === String(shotId) && s.opened.canChange) {
+        s.opened = { ...s.opened, canChange: false };
+        if (!s.drawDue) paint(todo);
+    }
     if (s.drawDue && s.opened) draw(s, todo);
 }
 
