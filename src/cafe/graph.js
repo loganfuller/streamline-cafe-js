@@ -196,9 +196,11 @@ async function refresh({ onlyIfChanged = false } = {}) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
     // A running shot owns the chart's lines: its end asks again. With no recipe
-    // loaded there is nothing to read: the history module draws. And the looks
-    // for a shot that has just ended read the reference too.
-    if (live || !recipe || (onlyIfChanged && settling)) return;
+    // loaded there is nothing to read: the history module draws. While the page
+    // looks for a shot that has just ended, this read is one more look: it takes
+    // the place of a look still on its way, which may have read the reference
+    // before the change that asked for this one.
+    if (live || !recipe) return;
     const mine = ++seq;
     let shot;
     let chosen;
