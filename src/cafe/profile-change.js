@@ -185,16 +185,21 @@ export function afterCheck({ rows, recipeId, record, befores, selection, tapped,
  * - `wait(ms)` waits.
  * - `onChecked(outcome, recipeId)` is told what each check afterwards found.
  *
- * Returns `change(profileId)`, which resolves `{ ok: true, recipeId, name,
- * checked }` or `{ ok: false, reason }`. `recipeId` is the loaded recipe whose
+ * Returns `change(profileId, { recipeId })`, which resolves `{ ok: true,
+ * recipeId, name, checked }` or `{ ok: false, reason }`. `recipeId`, where
+ * given, is the recipe the caller expects loaded, or null for none: the
+ * change is refused (`recipe`) where DYE2 says another is, or one where null
+ * was given. `recipeId` is the loaded recipe whose
  * record took the profile, or null; `name` its new name, or null where it kept
  * its own; `checked` resolves what the check afterwards found, or is null with
  * no recipe loaded. Reasons: `busy` (not now, or the change before it never
  * landed, or a shot started or the strip began to change before anything was
- * written), `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
- * Workflow could not be read), the writer's reasons (`gone`, `unconfirmed`),
+ * written), `recipe` (another recipe is loaded than the caller named),
+ * `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
+ * Workflow could not be read, or they disagree on which recipe is loaded), the writer's reasons (`gone`, `unconfirmed`),
  * and `workflow` (the record took the profile and the Workflow did not: its
- * write failed, or a shot started or the strip began to change first). The
+ * write failed, or a shot started, the strip began to change or DYE2 loaded
+ * another recipe first). The
  * check's outcomes are `afterCheck`'s, and `superseded` (a later change to the
  * same recipe has its own check, which takes over this one's), `lost`, `moved`
  * and `skipped`.
@@ -216,7 +221,7 @@ export function createProfileChange({
     // A write the check must not make now: its turn is tried again later.
     const notNow = () => new Error('not now');
 
-    async function changeNow(profileId, at) {
+    async function changeNow(profileId, at, expected) {
         let record;
         try {
             record = await readProfile(profileId);
@@ -227,15 +232,25 @@ export function createProfileChange({
         if (!record || record.id == null || !Array.isArray(record.profile?.steps) || !record.profile.steps.length) {
             return { ok: false, reason: 'profile' };
         }
-        const selection = await readSelection();
-        if (selection === undefined) return { ok: false, reason: 'unreadable' };
         let workflow;
         try {
             workflow = await readWorkflow();
         } catch (error) {
             return { ok: false, reason: 'unreadable' };
         }
+        // Read last, so nothing is awaited between it and the first write but
+        // the writer's own read of the records.
+        const selection = await readSelection();
+        if (selection === undefined) return { ok: false, reason: 'unreadable' };
         const recipeId = selection && selection.kind === 'recipe' && selection.id != null ? String(selection.id) : null;
+        // The caller said which recipe the change is for (the dialog's line
+        // named it): one loaded since, elsewhere, is not the one it named.
+        if (expected !== undefined && recipeId !== (expected == null ? null : String(expected))) return { ok: false, reason: 'recipe' };
+        // DYE2 derives the selection from the Workflow's mark, and answers no
+        // selection where its own read of the Workflow failed. Where the two
+        // disagree, which recipe is loaded is not known: nothing is written.
+        const mark = workflow?.context?.extras?.dye?.recipeId;
+        if ((mark == null ? null : String(mark)) !== recipeId) return { ok: false, reason: 'unreadable' };
         let before;
         let name = null;
         let generation = null;
@@ -265,9 +280,21 @@ export function createProfileChange({
             const befores = earlier && !earlier.done ? [...earlier.befores, earlier.mine, before] : [before];
             const mine = heldProfile({ profileId: record.id, workflow: { profile: record.profile } });
             latest.set(recipeId, { generation, befores, mine, rewrote: false, done: false });
-            // The record holds the profile; a shot or an arrangement begun
-            // meanwhile gets no Workflow write, as one that failed.
-            if (!settled()) return { ok: false, reason: 'workflow' };
+            // The record holds the profile; another recipe loaded elsewhere
+            // while it was written gets no Workflow write, as one that failed
+            // (the profile would go onto that recipe's Workflow), and nor does a
+            // shot or an arrangement begun meanwhile. The Workflow is read
+            // again for it, not DYE2's selection: DYE2 derives that from the
+            // Workflow's mark, and may answer from a Workflow read before the
+            // load. The new one's yield is the stop weight written. Decaid has
+            // no conditional write, so a load between this read and the write
+            // is the after-check's to find.
+            try {
+                workflow = await readWorkflow();
+            } catch (error) {
+                return { ok: false, reason: 'workflow' };
+            }
+            if (!settled() || String(workflow?.context?.extras?.dye?.recipeId ?? '') !== recipeId) return { ok: false, reason: 'workflow' };
         }
         try {
             await writeWorkflow(workflowPatch(record, workflow));
@@ -380,14 +407,14 @@ export function createProfileChange({
         return 'skipped';
     }
 
-    async function change(profileId) {
+    async function change(profileId, { recipeId: expected } = {}) {
         if (!mayChange()) return { ok: false, reason: 'busy' };
         // From the call: a tap on the strip while the change waits its turn is
         // the barista's too.
         const at = epoch();
         let made;
         try {
-            made = await queue(() => changeNow(profileId, at));
+            made = await queue(() => changeNow(profileId, at, expected));
         } catch (error) {
             return { ok: false, reason: 'busy' };
         }

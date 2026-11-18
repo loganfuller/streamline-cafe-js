@@ -8,6 +8,7 @@
 //       --sync-for-tablet=http://cafe-smoke-sync:3000 --sync-container=cafe-smoke-sync \
 //       --decaid-2=http://127.0.0.1:8081
 //   node test/cafe-smoke/run-decent-sync.mjs --token=... --only=profile   (step 15 alone, after a whole run)
+//   node test/cafe-smoke/run-decent-sync.mjs --token=... --only=profile-dialog   (step 16 alone, after a whole run)
 //
 // It changes the two Decaids and the server it is pointed at: it makes the
 // server's first Admin, a Location and two Machines, all made up, installs
@@ -622,7 +623,7 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
 
 // ── The profile changed from the page, with Decent Sync (#50) ──────────────
 
-// The function the profile dialog (#51) will call, called from the page itself.
+// The function the profile dialog (#51) calls, called from the page itself.
 const changeProfile = (page, profileId) => page.evaluate(async id => {
     const { changeProfile: change } = await import('/src/cafe/profile-changer.js');
     const { checked, ...answer } = await change(id);
@@ -761,23 +762,168 @@ async function profileWithDecentSync({ page, house, two }) {
     }
 }
 
+// ── The profile dialog, with Decent Sync (#51) ──────────────────────────────
+
+// A tap on the Brew row's name, where a finger lands: the name takes no
+// pointer events itself, so the tap is made at its place.
+async function openProfiles(page) {
+    const box = await page.locator('#brew-section .cafe-row-name').boundingBox();
+    await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + box.height / 2);
+    return pickDialog(page).waitFor({ timeout: 15_000 }).then(() => page.waitForTimeout(500)).then(() => true, () => false);
+}
+const profileRows = page => page.evaluate(() => [...document.querySelectorAll('#cafe-pick-side .cafe-pick-side-row')].map(row => ({
+    id: row.dataset.id,
+    name: row.querySelector('.cafe-pick-row-name').textContent,
+    inUse: !!row.querySelector('.cafe-pick-in-use'),
+    highlighted: row.getAttribute('aria-pressed') === 'true',
+})));
+const brewOn = async page => ({ name: (await page.locator('#profile-name').textContent()).trim(), temp: parseFloat(await page.locator('#temp-value').textContent()) });
+
+// 16. The profile dialog with Decent Sync (docs/cafe/DESIGN.md, "The profile
+//     dialog"): with the Recipe loaded on both Machines, the first tablet's
+//     dialog lists the Profiles the Location shows and says the choice is
+//     saved to the recipe; another Profile chosen there reaches the Recipe on
+//     the server, at the profile's own brew temperature, and the second
+//     Machine's Brew row with no tap, the Recipe still loaded on both. Then the
+//     Recipe's own Profile chosen back the same way.
+async function profileDialogWithDecentSync({ page, house, two }) {
+    const shown = await decaid('GET', '/profiles');
+    const byTitle = title => shown.find(p => p.profile?.title === title);
+    const [gentle, usual] = ['Gentle and sweet', house.profile].map(byTitle);
+    const own = record => record.profile.steps[0].temperature;
+    check('profile dialog: the Location shows the profiles the step uses', !!gentle && !!usual);
+    if (!gentle || !usual) return;
+    const listed = shown.filter(p => (p.visibility == null || p.visibility === 'visible') && Array.isArray(p.profile?.steps) && p.profile.steps.length > 0)
+        .map(p => p.profile.title).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    const recipeNow = async () => (await sync('GET', `/recipes/${house.id}`)).recipe;
+    const named = async tablet => { const now = await tablet('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`); return now?.kind === 'recipe' ? String(now.id) : null; };
+    const recordOn = async tablet => ((await tablet('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || []).find(row => row && row.decentSyncId === house.id);
+    const choose = async record => {
+        await openProfiles(page);
+        await page.locator(`#cafe-pick-side .cafe-pick-side-row[data-id="${record.id}"]`).click();
+        await page.waitForTimeout(400);
+        await page.locator('#cafe-pick-pane-use').click();
+        await page.locator('#cafe-pick-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+    };
+    // Step 15 names the Recipe back as it ends, and the name reaches the
+    // tablets' records a moment later: a card loaded under the old name would
+    // be unloaded by the tap that loads it, so the step waits for the name.
+    const namedBack = await until(async () => ((await recordOn(decaid))?.name === house.name && (await recordOn(decaid2))?.name === house.name) || null, { timeout: 90_000, every: 1000 });
+    check('profile dialog: the Recipe has its own name on both tablets', !!namedBack, `${(await recordOn(decaid))?.name} | ${(await recordOn(decaid2))?.name}`);
+    // The Recipe's Profile and brew temperature as the step found them, put
+    // back should the step be cut short.
+    const contentAtStart = (await recipeNow()).content;
+    const tablet2 = await openPage(await secondBrowser());
+    try {
+        for (const view of [tablet2.page, page]) {
+            await view.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 }).catch(() => {});
+        }
+        await load(tablet2.page, house);
+        await load(page, house);
+        check('profile dialog: the Recipe is loaded on both Machines', (await named(decaid)) === String(house.recordId) && (await named(decaid2)) === two.recordId,
+            `${await named(decaid)} | ${await named(decaid2)}`);
+
+        //     The dialog on the first tablet.
+        const opened = await openProfiles(page);
+        const rows = opened ? await profileRows(page) : [];
+        check('profile dialog: it says the choice is saved to the recipe', opened && (await page.locator('#cafe-pick-under').textContent()) === `${house.name} · saved to the recipe`,
+            await page.locator('#cafe-pick-under').textContent());
+        check('profile dialog: it lists the Profiles the Location shows, sorted by title, the Recipe\'s in use',
+            JSON.stringify(rows.map(r => r.name)) === JSON.stringify(listed) && rows.find(r => r.inUse)?.id === String(usual.id),
+            `${rows.length} rows, ${listed.length} shown; in use ${rows.find(r => r.inUse)?.name}`);
+        await page.locator(`#cafe-pick-side .cafe-pick-side-row[data-id="${gentle.id}"]`).click();
+        await page.waitForTimeout(400);
+        await shot(page, 'sync-profile-dialog-1920x1200-light');
+        await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+        await page.waitForTimeout(800);
+
+        //     Another of the Location's Profiles, chosen.
+        const started = Date.now();
+        await choose(gentle);
+        let serverAt = null;
+        let secondAt = null;
+        let setBack = null;
+        // The dialog closes at the tap and the change lands a moment later, so
+        // the first Machine is watched for being set back only once it has it.
+        let mineAt = null;
+        for (let waited = 0; waited < 120_000 && !(serverAt && secondAt); waited += 500) {
+            const mine = await decaid('GET', '/workflow');
+            const holds = mine.profile.title === gentle.profile.title && (await named(decaid)) === String(house.recordId);
+            if (holds && mineAt === null) mineAt = Date.now() - started;
+            if (!holds && mineAt !== null) setBack = setBack || `${mine.profile.title}, ${await named(decaid)}`;
+            const recipe = await recipeNow();
+            if (!serverAt && recipe.content.profileId === gentle.id && recipe.content.brewTemperature === own(gentle)) serverAt = Date.now() - started;
+            const theirs = await brewOn(tablet2.page);
+            if (!secondAt && theirs.name === gentle.profile.title && theirs.temp === own(gentle) && (await named(decaid2)) === two.recordId) secondAt = Date.now() - started;
+            await sleep(500);
+        }
+        note(`profile dialog: the first Machine had the choice ${mineAt === null ? 'never' : `after ${(mineAt / 1000).toFixed(1)} s`}, the server ${serverAt === null ? 'never' : `after ${(serverAt / 1000).toFixed(1)} s`}, the second Machine's Brew row ${secondAt === null ? 'never' : `after ${(secondAt / 1000).toFixed(1)} s`}`);
+        const recipe = await recipeNow();
+        check('profile dialog: the Recipe on the server takes the Profile, at its own brew temperature', !!serverAt, `${recipe.content.profileId} ${recipe.content.brewTemperature}°C`);
+        check('profile dialog: the first Machine kept it, the Recipe loaded, its record holding the Profile',
+            mineAt !== null && setBack === null && (await recordOn(decaid))?.profileId === gentle.id && (await brewOn(page)).name === gentle.profile.title, setBack || '');
+        check('profile dialog: the second Machine\'s Brew row shows it at its own temperature with no tap, the Recipe still loaded', !!secondAt,
+            `${JSON.stringify(await brewOn(tablet2.page))}, ${await named(decaid2)}`);
+        check('profile dialog: the second tablet\'s record holds the Profile', (await recordOn(decaid2))?.profileId === gentle.id, (await recordOn(decaid2))?.profileId);
+        check('profile dialog: the second tablet\'s page was not reloaded', tablet2.seen.loads === 1, `${tablet2.seen.loads} loads`);
+        await shot(page, 'sync-profile-dialog-after-1920x1200-light');
+        await shot(tablet2.page, 'sync-profile-dialog-second-machine-1920x1200-light');
+
+        //     The dialog at 1340 by 800 on a page of the first tablet's own.
+        const small = await openPage(browser, { width: 1340, height: 800 });
+        try {
+            await load(small.page, house);
+            const smallOpened = await openProfiles(small.page);
+            const smallRows = smallOpened ? await profileRows(small.page) : [];
+            check('profile dialog 1340x800: it opens on the Profile just chosen, in use', smallRows.find(r => r.inUse)?.id === String(gentle.id), smallRows.find(r => r.inUse)?.name);
+            await shot(small.page, 'sync-profile-dialog-1340x800-light');
+            check('profile dialog 1340x800: no page error', small.seen.errors.length === 0, small.seen.errors.join(' | '));
+        } finally {
+            await small.close();
+        }
+
+        //     The Recipe's own Profile, chosen back the same way.
+        await choose(usual);
+        const back = await until(async () => {
+            const now = await recipeNow();
+            const theirs = await brewOn(tablet2.page);
+            return (now.content.profileId === usual.id && theirs.name === usual.profile.title && (await named(decaid2)) === two.recordId) || null;
+        }, { timeout: 120_000, every: 1000 });
+        check('profile dialog: the Recipe\'s own Profile chosen back reaches the server and the second Machine', !!back,
+            `${(await recipeNow()).content.profileId}, ${(await brewOn(tablet2.page)).name}`);
+        check('profile dialog: no page error on the second tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+    } finally {
+        await tablet2.close();
+        // A step cut short before the Profile was chosen back: the Recipe's
+        // own put back on the server, outside the dialog this step tries.
+        const contentNow = (await recipeNow().catch(() => null))?.content;
+        if (contentNow?.profileId !== contentAtStart.profileId || contentNow?.brewTemperature !== contentAtStart.brewTemperature) {
+            await sync('PATCH', `/recipes/${house.id}`, {
+                content: { profileId: contentAtStart.profileId, brewTemperature: contentAtStart.brewTemperature ?? null },
+            }).catch(() => {});
+        }
+    }
+}
+
 // ── The run ──────────────────────────────────────────────────────────────────
 
 await mkdir(OUT, { recursive: true });
 let stopped = false;
 let sharingOff = null;
 
-// --only=profile: step 15 alone, on Decaids and a server a whole run has set up.
+// --only=profile (step 15) or --only=profile-dialog (step 16) alone, on
+// Decaids and a server a whole run has set up.
 if (ONLY) {
+    const steps = { profile: profileWithDecentSync, 'profile-dialog': profileDialogWithDecentSync };
     try {
-        if (ONLY !== 'profile') throw new Error(`no step named "${ONLY}": profile`);
+        if (!steps[ONLY]) throw new Error(`no step named "${ONLY}": ${Object.keys(steps).join(', ')}`);
         const { location } = await standUp();
         const library = await until(() => libraryRecipes(location), { timeout: 60_000, every: 1000 });
         if (!library) throw new Error('The tablet\'s sample recipes are not the Location\'s Recipes: run the whole of this run first.');
         const house = { ...RECIPES[0], ...library[RECIPES[0].name] };
         const two = await standUpSecond(location, house);
         const { page, close } = await openPage();
-        await profileWithDecentSync({ page, house, two });
+        await steps[ONLY]({ page, house, two });
         await close();
     } catch (error) {
         check(`the run finished (${error.message.split('\n')[0]})`, false);
@@ -1254,6 +1400,7 @@ try {
         await beanAndBasketWithDecentSync({ page, seen, house, location });
         await unloadWithDecentSync({ house, two, machine });
         await profileWithDecentSync({ page, house, two });
+        await profileDialogWithDecentSync({ page, house, two });
     }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));
