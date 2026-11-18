@@ -16,7 +16,9 @@ let saving = false;
 // lifts the canvas to keep a focused field above one. This dialog is not in
 // the canvas, so it says it fits itself (`data-keyboard-fit`) and takes the
 // height Streamline's scaling reports as left above the keyboard: the box sits
-// in what can be seen, and the text box gives up the height.
+// in what can be seen, and the text box gives up the height. The height is in
+// screen px and goes on the dialog, which is the screen's size; the dialog's
+// canvas (`.cafe-dialog-canvas`) is that height in design px.
 function fit(detail) {
     const dialog = el('cafe-note-dialog');
     if (detail && detail.keyboardUp === true && detail.visibleHeight > 0) {

@@ -256,6 +256,10 @@ export function initScaling() {
         content.style.height = `${canvasHeight}px`;
         content.style.transformOrigin = 'top left';
         content.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${sx}, ${sy})`;
+        // Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): the same factors for the
+        // cafe's dialogs, which draw in the top layer outside this canvas.
+        document.documentElement.style.setProperty('--streamline-scale-x', String(sx));
+        document.documentElement.style.setProperty('--streamline-scale-y', String(sy));
 
         viewport.style.width = `${screenWidth}px`;
         viewport.style.height = `${screenHeight}px`;
