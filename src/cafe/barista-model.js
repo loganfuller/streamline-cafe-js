@@ -1,11 +1,13 @@
 // The barista at the machine: what the title band's button says, which rows its
-// dialog lists, what a typed name becomes, and what a pick and the machine
-// sleeping write (docs/cafe/DESIGN.md, "The barista"). No browser global is
+// dialog lists, what a typed name becomes, what a pick and the machine
+// sleeping write, how long they wait after a shot, and which read of the name
+// the button shows (docs/cafe/DESIGN.md, "The barista"). No browser global is
 // touched: the phrases go through `t`, the time through `when`, and the Shots
-// are handed in.
+// and the clock are handed in.
 //
 // The name is the Workflow's `context.baristaName` and lives nowhere else.
-// Decaid copies it into each Shot as the shot ends. A pick writes that one
+// Decaid copies it into each Shot as it stores the Shot, once the shot has
+// settled, up to its 4 s backstop after the pour ends. A pick writes that one
 // field, a recipe load leaves it as it was, and the page clears it when it
 // sees the machine asleep.
 
@@ -111,6 +113,47 @@ export function baristaPick(name, current, { typed = false } = {}) {
 export function asleep(snapshot) {
     const state = snapshot && typeof snapshot.state === 'object' ? snapshot.state?.state : snapshot?.state;
     return state === 'sleeping';
+}
+
+/**
+ * How long past a shot's end Decaid may still be about to store its Shot: its
+ * 4 s stopping backstop (shot_sequencer.dart), and a second's margin.
+ */
+export const SHOT_STORE_MS = 5000;
+
+/**
+ * How long, in ms, a barista write waits before it is sent, so it neither
+ * renames nor un-names the Shot Decaid is still to store: what is left of
+ * SHOT_STORE_MS since the shot ended at `endedAt` (ms, null for no shot yet),
+ * at `now`. 0 where nothing is left.
+ */
+export function storeWait(endedAt, now) {
+    if (!Number.isFinite(endedAt) || !Number.isFinite(now)) return 0;
+    return Math.max(0, endedAt + SHOT_STORE_MS - now);
+}
+
+/**
+ * Which read of the Workflow's barista the button shows: the newest. Each read
+ * and write takes a ticket as it begins. `see(name)` paints a name a write
+ * made, at once. `look()`, called as a read begins, answers what paints the
+ * name that read finds, unless a write, or a read begun later, has painted one
+ * already: that read is then stale. `paint(name)` draws it.
+ */
+export function baristaStamps(paint) {
+    let issued = 0;
+    let shownAt = 0;
+    const show = (ticket, name) => {
+        if (ticket <= shownAt) return;
+        shownAt = ticket;
+        paint(name);
+    };
+    return {
+        see: name => show(++issued, name),
+        look: () => {
+            const ticket = ++issued;
+            return name => show(ticket, name);
+        },
+    };
 }
 
 /**

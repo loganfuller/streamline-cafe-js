@@ -21,7 +21,7 @@ import { openGrinderDialog } from './grinder-dialog.js';
 import { openBeanDialog } from './bean-dialog.js';
 import { openBasketDialog } from './basket-dialog.js';
 import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
-import { baristaName, asleep } from './barista-model.js';
+import { baristaName, asleep, baristaStamps } from './barista-model.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -36,7 +36,6 @@ let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
-let baristaPaints = 0;  // paints of the barista: a read begun before the last one is stale for it
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
 let namesTimer = null;
@@ -79,20 +78,14 @@ function renderBarista() {
     button.setAttribute('aria-label', barista ? `${cafeText('Barista')}: ${barista}` : cafeText('Barista'));
 }
 
-// A write named the barista, or a read found it: shown at once.
-function seeBarista(name) {
-    baristaPaints += 1;
+// `seeBarista(name)`: a write named the barista, shown at once. `lookBarista()`,
+// as a read of the Workflow begins: what paints the barista it finds, unless a
+// write, or a read begun later, has painted one since. Such a read is stale for
+// the barista, though not for the dial-in's names.
+const { see: seeBarista, look: lookBarista } = baristaStamps(name => {
     barista = name;
     renderBarista();
-}
-
-// For a read of the Workflow begun now: what paints the barista it finds,
-// unless a write, or a read begun later, has painted one since. Such a read is
-// stale for the barista, though not for the dial-in's names.
-function lookBarista() {
-    const at = baristaPaints;
-    return name => { if (at === baristaPaints) seeBarista(name); };
-}
+});
 
 function openBarista() {
     openBaristaDialog({ mayOpen: mayPick, shown: () => barista, look: lookBarista, written: seeBarista, write: writePick });
@@ -417,7 +410,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     el('cafe-dose-pick')?.addEventListener('click', openBean);
     el('cafe-yield-pick')?.addEventListener('click', openBasket);
     // During a shot, or a recipe load, the button shows the name and opens
-    // nothing: Decaid names the Shot from the Workflow as the shot ends.
+    // nothing: Decaid names the Shot from the Workflow as it stores it.
     el('cafe-barista')?.addEventListener('click', openBarista);
     // Each wake starts with no barista: the name is cleared as the machine is
     // seen asleep, going to sleep or in the first frame of a page opened on it

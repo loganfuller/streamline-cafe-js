@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BARISTA_PHRASES, foldBarista, baristaName, baristaRows, typedBarista, baristaPick, sleepClear, asleep } from '../src/cafe/barista-model.js';
+import { BARISTA_PHRASES, foldBarista, baristaName, baristaRows, typedBarista, baristaPick, sleepClear, asleep, storeWait, SHOT_STORE_MS, baristaStamps } from '../src/cafe/barista-model.js';
 import { WORKFLOW_WRITERS, assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
 const t = (phrase, vars = {}) => phrase.replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
@@ -134,4 +134,59 @@ test('what the dialog says is a phrase of its own', () => {
     assert.deepEqual([rows[1].name, rows[1].detail], ['NO BARISTA', 'SHOTS RECORD NO NAME']);
     assert.equal(BARISTA_PHRASES.subtitle, 'Named on this machine\'s shots · cleared when the machine wakes',
         'the same with Decent Sync and without: nothing here is saved to a recipe');
+});
+
+test('a barista write waits out the seconds in which Decaid may still store the Shot just pulled', () => {
+    assert.equal(SHOT_STORE_MS, 5000, 'Decaid\'s 4 s stopping backstop, and a second');
+    assert.equal(storeWait(null, 1_000), 0, 'no shot yet this session');
+    assert.equal(storeWait(10_000, 10_000), 5000, 'at the shot\'s end');
+    assert.equal(storeWait(10_000, 13_500), 1500);
+    assert.equal(storeWait(10_000, 15_000), 0);
+    assert.equal(storeWait(10_000, 60_000), 0, 'long after');
+    assert.equal(storeWait(Number.NaN, 1_000), 0);
+});
+
+test('the button shows the newest read of the barista, and a read begun before a write or a later read paints nothing', () => {
+    const painted = [];
+    const { see, look } = baristaStamps(name => painted.push(name));
+
+    // A read alone paints what it found.
+    look()('Ana');
+    assert.deepEqual(painted, ['Ana']);
+
+    // A read begun before a write, ending after it: stale.
+    let read = look();
+    see('Bo');
+    read('Ana');
+    assert.deepEqual(painted, ['Ana', 'Bo']);
+
+    // Two reads overlapping, the later one ending first: the earlier is stale.
+    const early = look();
+    const late = look();
+    late('Cy');
+    early('Bo');
+    assert.deepEqual(painted, ['Ana', 'Bo', 'Cy']);
+
+    // Two reads overlapping, ending in the order they began: both paint, the
+    // later last.
+    const first = look();
+    const second = look();
+    first('Cy');
+    second('Dee');
+    assert.deepEqual(painted, ['Ana', 'Bo', 'Cy', 'Cy', 'Dee']);
+
+    // A write while a read is out, and a read begun after the write ending
+    // first: the read begun before the write is stale still.
+    const before = look();
+    see('Fay');
+    const after = look();
+    after('Fay');
+    before('Dee');
+    assert.deepEqual(painted.slice(-2), ['Fay', 'Fay']);
+
+    // A read begun after a write paints.
+    see('');
+    read = look();
+    read('Eve');
+    assert.deepEqual(painted.slice(-2), ['', 'Eve']);
 });

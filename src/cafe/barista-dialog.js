@@ -8,17 +8,27 @@
 //
 // The name is the Workflow's alone: nothing here keeps a copy of it. A recipe
 // load leaves it as it was (the hook in dyeStrip.js's applyRecipe).
-import { getWorkflow, updateWorkflow } from '../modules/api.js';
+import { getWorkflow, updateWorkflow, getEspressoEndedAt } from '../modules/api.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { shotsPage } from './shot-seam.js';
 import { PAGE_SIZE } from './shot-list.js';
 import { whenText } from './shot-model.js';
-import { BARISTA_PHRASES, baristaName, baristaRows, typedBarista, baristaPick, sleepClear } from './barista-model.js';
+import { BARISTA_PHRASES, baristaName, baristaRows, typedBarista, baristaPick, sleepClear, storeWait } from './barista-model.js';
 import { choose } from './pick-dialog.js';
 import { cafeText, cafeDateLocale } from './text.js';
 
 let opening = false;
+
+// Decaid stores a Shot, with the Workflow's barista as it is then, once the
+// shot has settled: up to its 4 s backstop after the pour ends. A barista write
+// in those seconds waits them out, so it neither renames nor un-names the Shot
+// just pulled. It waits before `write`, whose check for a shot that started
+// meanwhile then still comes last.
+function shotStored() {
+    const ms = storeWait(getEspressoEndedAt(), Date.now());
+    return ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
+}
 
 // The rows of the seam's first page, newest first: on a Machine Decent Sync
 // serves the Location's Shots, otherwise and while the server can't be reached
@@ -80,6 +90,7 @@ export async function openBaristaDialog({ mayOpen, shown, look, written, write }
         const patch = baristaPick(name, shown(), { typed });
         if (!patch) return; // the barista in use: nothing is written
         try {
+            await shotStored();
             await write(() => updateWorkflow(patch, 'cafe.barista'));
         } catch (error) {
             // The button keeps the name the Workflow holds.
@@ -97,13 +108,15 @@ export async function openBaristaDialog({ mayOpen, shown, look, written, write }
 
 /**
  * The machine was seen asleep: clear the barista, where one is named, so the
- * wake starts with none however the machine is woken. The Workflow is read
+ * wake starts with none however the machine is woken. Put to sleep straight
+ * after a shot, it waits for Decaid to store that Shot first. The Workflow is read
  * once any write still on its way has landed, and written only where it names
  * a barista. A clear that fails says so in the log alone: the screensaver
  * covers the page, and the next sleep clears it.
  */
 export async function clearOnSleep({ write, written }) {
     try {
+        await shotStored();
         const cleared = await write(async () => {
             const patch = sleepClear((await getWorkflow())?.context);
             if (!patch) return false;
