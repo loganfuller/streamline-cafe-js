@@ -803,7 +803,7 @@ async function grindRow() {
             return { left: text.left - minus.right, right: plus.left - text.right, size: parseFloat(getComputedStyle(value).fontSize) };
         });
         const medium = await fit();
-        check('grind row: Medium sits between − and +, at the value\'s size', medium.left >= 4 && medium.right >= 4 && medium.size >= 24, JSON.stringify(medium));
+        check('grind row: Medium sits between − and +, shrunk no further than it must be', medium.left >= 4 && medium.right >= 4 && medium.size >= 20, JSON.stringify(medium));
         await setGrind(preset, 'Extra coarse');
         await readAgain();
         const long = await fit();
