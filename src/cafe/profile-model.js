@@ -59,19 +59,28 @@ export function brewTemp(celsius, unit) {
     return unit === 'F' ? `${celsiusToFahrenheit(celsius).toFixed(0)}°F` : `${celsius.toFixed(0)}°c`;
 }
 
+const stepTemps = profile => JSON.stringify((Array.isArray(profile?.steps) ? profile.steps : []).map(s => s?.temperature ?? null));
+
 /**
  * The listed record that is the profile in use: the one that matches the
  * Workflow's profile as DYE2 compares two profiles (its title, its tank
  * temperature and its steps, each step's temperature left out), so a profile
- * whose temperature was stepped is still the one in use. Where two match, the
- * one `preferId` names (the loaded recipe's profile), else the first. Null
- * where none does, as for a profile hidden or edited since.
+ * whose temperature was stepped is still the one in use. Where several match
+ * (as two of one title that differ only in temperature do): the one
+ * `preferId` names (the loaded recipe's profile), else the one at the
+ * Workflow's own step temperatures (the first, where those are twins, any of
+ * which is the same choice). Null where none matches, as for a profile hidden
+ * or edited since, and where which one is in use can't be told, so that none
+ * is marked in use and each can be chosen.
  */
 export function profileInUse(records, workflowProfile, preferId = null) {
     const fp = profileFingerprint(isObject(workflowProfile) ? workflowProfile : null);
     if (!fp) return null;
     const matches = (records || []).filter(record => profileFingerprint(record.profile) === fp);
-    return matches.find(record => preferId != null && String(record.id) === String(preferId)) || matches[0] || null;
+    if (matches.length < 2) return matches[0] || null;
+    const preferred = matches.find(record => preferId != null && String(record.id) === String(preferId));
+    if (preferred) return preferred;
+    return matches.find(record => stepTemps(record.profile) === stepTemps(workflowProfile)) || null;
 }
 
 const sortName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });

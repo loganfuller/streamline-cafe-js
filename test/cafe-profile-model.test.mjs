@@ -136,6 +136,23 @@ test('two listed profiles that compare the same: the loaded recipe\'s is in use,
     assert.deepEqual(rows.filter(r => r.inUse).map(r => r.id), ['p-twin']);
 });
 
+test('two of one title that differ only in temperature: the one at the Workflow\'s temperatures is in use, and the other can be chosen', () => {
+    const hot = record('p-hot', { ...bloom.profile, steps: [step('bloom', 94), step('pour', 92)] });
+    const records = listedProfiles([hot, bloom]);
+    assert.equal(profileInUse(records, inWorkflow(bloom.profile)), bloom, 'not the first listed');
+    assert.equal(profileInUse(records, inWorkflow(hot.profile)), hot);
+    assert.equal(profileInUse(records, inWorkflow(bloom.profile), 'p-hot'), hot, 'the loaded recipe\'s profile, stepped down');
+    const { rows, pane } = profileView({ records, workflowProfile: inWorkflow(bloom.profile), t });
+    assert.deepEqual(pane(rows.find(r => r.id === 'p-hot')).use, { label: 'Use this profile', note: 'Sets Brew to 94°c' });
+    // Stepped to a temperature neither has: which is in use can't be told, so
+    // neither is marked, both can be chosen, and the Workflow's is described.
+    const between = profileView({ records, workflowProfile: inWorkflow(stepped(bloom.profile, 1)), t });
+    assert.equal(between.rows.some(r => r.inUse || r.highlighted), false);
+    assert.ok(between.rows.every(r => between.pane(r).use));
+    assert.equal(between.opening.inUse, true);
+    assert.equal(between.opening.byline, 'By Sample Author · brews at 93°c');
+});
+
 test('with no profile in the Workflow, it opens on the first row, highlighted and offered', () => {
     const { rows, opening } = view({ workflowProfile: null });
     assert.deepEqual(rows.map(r => r.highlighted), [true, false, false]);

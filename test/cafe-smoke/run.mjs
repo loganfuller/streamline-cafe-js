@@ -2441,6 +2441,7 @@ async function profileDialog() {
             await loadCard(house);
 
             //     A shot that starts closes the dialog, and it does not open during one.
+            const newestBefore = (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
             const openBefore = await openProfiles(page);
             const run = pullShot(6);
             await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
@@ -2452,7 +2453,8 @@ async function profileDialog() {
             await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
             await page.waitForTimeout(4000);
             const during = await decaid('GET', '/shots?limit=1');
-            if (during.items?.[0]) pulled.push(during.items[0].id);
+            // Only a Shot this pour stored is deleted afterwards.
+            if (during.items?.[0] && during.items[0].id !== newestBefore) pulled.push(during.items[0].id);
 
             //     A hidden profile is not listed. In use, it still opens with its
             //     description, read from the Workflow, and no row is highlighted.
