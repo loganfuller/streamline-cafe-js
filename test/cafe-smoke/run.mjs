@@ -1864,6 +1864,12 @@ try {
             });
             check(`${short} px short: back on the page with the keyboard up, the focused button clears it`,
                 back.bottom > 0 && back.bottom <= visible, JSON.stringify(back));
+            //     Shots, at the screen's bottom, focused with the keyboard still
+            //     up: the canvas lifts so it clears the keyboard.
+            await page.locator('#cafe-shots-btn').focus();
+            await page.waitForTimeout(300);
+            const low = await page.locator('#cafe-shots-btn').evaluate(element => Math.round(element.getBoundingClientRect().bottom));
+            check(`${short} px short: Shots focused with the keyboard up is lifted clear of it`, low > 0 && low <= visible, `${low} in ${visible}, canvas "${await transform()}"`);
             await keyboard(short);
             check(`${short} px short: once the keyboard closes the canvas goes back to rest`, (await transform()) === resting, await transform());
         } else {
