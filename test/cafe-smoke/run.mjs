@@ -608,12 +608,15 @@ const openGrinders = async (page, on = '#grind-section .cafe-row-name') => {
 //     each part measures its size at 1920 times the page's scale, within a
 //     pixel, the box fits inside the window, and nothing scrolls sideways. The
 //     Shots box's height is the screen's, less a margin, so it is checked only
-//     to fit. The reference's dialog asks before a choice of reference is
-//     replaced, which needs one already chosen; it is opened here as
-//     `src/cafe/graph.js` opens it, with made-up names in it.
+//     to fit. Every sample recipe is in a slot by now, so one more, in none,
+//     is added for the step, for the recipe list to have a row to measure, and
+//     DYE2's records go back as they were afterwards. The reference's dialog
+//     asks before a choice of reference is replaced, which needs one already
+//     chosen; it is opened here as `src/cafe/graph.js` opens it, with made-up
+//     names in it.
 const DIALOG_SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }, { width: 1280, height: 800 }];
 const DIALOG_PARTS = {
-    'cafe-recipe-dialog': ['h3', '#cafe-recipe-dialog-empty', '.modal-action .cafe-btn'],
+    'cafe-recipe-dialog': ['h3', '.cafe-recipe-row', '.cafe-recipe-row-name', '.modal-action .cafe-btn'],
     'cafe-pick-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
     'cafe-shots-dialog': ['h3', '.cafe-shots-head .cafe-btn', '.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-star'],
     'cafe-reference-dialog': ['h3', '#cafe-reference-dialog-recipe', '.cafe-reference-dialog-shots', '#cafe-reference-dialog-replace'],
@@ -655,6 +658,18 @@ async function eachDialog(page, measure) {
 }
 async function dialogsAtTabletSize() {
     const design = {};
+    const records = await decaid('GET', RECIPE_STORE);
+    const like = records.find(row => row && row.name === RECIPES[0].name);
+    await decaid('POST', RECIPE_STORE, [...records, {
+        ...like, id: 'sample-in-no-slot', name: 'Sample recipe in no slot', title: 'Sample recipe in no slot', stripSlot: null, showOnStreamlineDashboard: false,
+    }]);
+    try {
+        await dialogsAtEachSize(design);
+    } finally {
+        await decaid('POST', RECIPE_STORE, records);
+    }
+}
+async function dialogsAtEachSize(design) {
     for (const viewport of DIALOG_SIZES) {
         const size = `${viewport.width}x${viewport.height}`;
         const view = await openPage({ viewport });
@@ -682,6 +697,8 @@ async function dialogsAtTabletSize() {
                 const off = Object.entries(parts).flatMap(([name, measured]) => {
                     const want = designParts[name];
                     if (!measured || !want) return [`${name}: ${measured ? 'not at 1920' : 'missing'}`];
+                    // A part that isn't drawn measures 0 at every size, and proves nothing.
+                    if ([...measured, ...want].includes(0)) return [`${name}: not drawn (${measured.join(' × ')}, ${want.join(' × ')} at 1920)`];
                     return measured.flatMap((value, axis) => {
                         if (value === null) return [];
                         const expected = want[axis] * (axis === 0 ? drawn.scaleX : drawn.scaleY);
