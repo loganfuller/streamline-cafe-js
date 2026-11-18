@@ -630,7 +630,10 @@ async function eachDialog(page, measure) {
         const shown = await page.locator(`#${id}[open]`).waitFor({ timeout: 10_000 }).then(() => true, () => false);
         await page.waitForTimeout(700);
         await measure(id, shown);
-        await close();
+        // A dialog that didn't open has no button to close it with, and the
+        // rest of the step still runs.
+        if (shown) await close();
+        else await page.keyboard.press('Escape');
         await page.locator(`#${id}:not([open])`).waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(700);
     };
