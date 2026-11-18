@@ -728,7 +728,8 @@ async function profileWithDecentSync({ page, house, two }) {
             const offline = await changeProfile(page, gentle.id);
             const nextName = `Gentle ${house.bean}`;
             check('profile: with the server stopped the change is made on the tablet, the recipe kept loaded',
-                offline.ok && (await named(decaid)) === String(house.recordId) && (await recordOn(decaid))?.profileId === gentle.id && (await decaid('GET', '/workflow')).profile.title === gentle.profile.title,
+                offline.ok && (await named(decaid)) === String(house.recordId) && (await recordOn(decaid))?.profileId === gentle.id && (await decaid('GET', '/workflow')).profile.title === gentle.profile.title
+                    && (await decaid('GET', '/workflow')).profile.steps[0].temperature === own(gentle),
                 JSON.stringify(offline));
             check('profile: and the check afterwards finds it held', ['held', 'rewritten', 'reloaded'].includes(await checkedAfter(page)) && (await named(decaid)) === String(house.recordId));
             await docker('start', SYNC_CONTAINER);
@@ -739,7 +740,8 @@ async function profileWithDecentSync({ page, house, two }) {
             check('profile: once the server is back it takes the change, at the profile\'s own temperature', !!taken, `${(await recipeNow()).content.profileId} ${(await recipeNow()).content.brewTemperature}°C`);
             const followed = await until(async () => { const theirs = await decaid2('GET', '/workflow'); return (theirs.profile.title === gentle.profile.title && theirs.profile.steps[0].temperature === own(gentle) && (await named(decaid2)) === two.recordId) || null; }, { timeout: 120_000, every: 1000 });
             check('profile: and the second Machine takes it, the Recipe still loaded', !!followed, `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
-            check('profile: the first Machine kept it all along', (await decaid('GET', '/workflow')).profile.title === gentle.profile.title && (await named(decaid)) === String(house.recordId));
+            const mineAfter = await decaid('GET', '/workflow');
+            check('profile: the first Machine kept it all along, at the profile\'s own temperature', mineAfter.profile.title === gentle.profile.title && mineAfter.profile.steps[0].temperature === own(gentle) && (await named(decaid)) === String(house.recordId));
         } finally {
             await docker('start', SYNC_CONTAINER).catch(() => {});
             await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });

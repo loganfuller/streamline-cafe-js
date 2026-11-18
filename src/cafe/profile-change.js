@@ -62,15 +62,17 @@ export function withStopWeight(profile, yieldGrams) {
 export const recordProfile = row => (isObject(row?.workflow) && row.workflow.profile) || row?.profileSnapshot || null;
 
 // The recipe's own yield, as its stored Workflow and its numbers hold it: an
-// older record with a ratio and no drink yields its dose times its ratio, as
-// Streamline's apply of such a record works it out (dyeStrip.js
-// `applyRecipeLegacy`).
+// older record with a ratio and no drink at all yields its dose times its
+// ratio, as Streamline's apply of such a record works it out (dyeStrip.js
+// `applyRecipeLegacy`). A yield of 0 is none, as Streamline's profile sends
+// read it: the profile keeps its own stop weight.
 function recipeYield(row) {
     const numbers = row?.dashboardVariables;
+    const stored = positive(row?.workflow?.context?.targetYield) ?? positive(numbers?.drink);
+    if (stored !== null || numbers?.drink != null) return stored;
     const dose = positive(numbers?.dose);
     const ratio = positive(numbers?.ratio);
-    return positive(row?.workflow?.context?.targetYield) ?? positive(numbers?.drink)
-        ?? (dose !== null && ratio !== null ? Math.round(dose * ratio * 10) / 10 : null);
+    return dose !== null && ratio !== null ? Math.round(dose * ratio * 10) / 10 : null;
 }
 
 /**
@@ -108,6 +110,17 @@ export function holdsProfile(row, record) {
 }
 
 const sameId = (row, id) => isObject(row) && String(row.id) === String(id);
+
+/** The profile a record holds, as the check tells it again: its id in Decaid, and DYE2's fingerprint. */
+export const heldProfile = row => ({ id: row?.profileId ?? null, fp: profileFingerprint(recordProfile(row)) });
+
+// Is the record back on one of the profiles `befores` names? By DYE2's
+// comparison, and by the id where the record had one: a record DYE2 wrote back
+// carries its old id with it, and another profile that compares the same does not.
+const backOn = (row, befores) => {
+    const now = heldProfile(row);
+    return befores.some(b => b.fp === now.fp && (b.id == null || (now.id != null && String(now.id) === String(b.id))));
+};
 const namesRecipe = (selection, id) => !!selection && selection.kind === 'recipe' && String(selection.id) === String(id);
 
 /**
@@ -115,7 +128,8 @@ const namesRecipe = (selection, id) => !!selection && selection.kind === 'recipe
  *
  * - `rows`, DYE2's records, or null when they could not be read;
  * - `recipeId`, the recipe whose record took the profile, and `record`, the profile;
- * - `before`, DYE2's fingerprint of the profile the record had before the change;
+ * - `befores`, the profiles the record had before the change (`heldProfile`),
+ *   and before any earlier change whose check this one took over;
  * - `selection`, DYE2's, or undefined when it could not be asked;
  * - `tapped`, whether a tap on the strip has loaded or unloaded a recipe since;
  * - `live`, the Workflow's profile, or null when it could not be read.
@@ -126,13 +140,13 @@ const namesRecipe = (selection, id) => !!selection && selection.kind === 'recipe
  * since says it should not be: no tap, no other recipe loaded, and the machine
  * still on the new profile.
  */
-export function afterCheck({ rows, recipeId, record, before, selection, tapped, live }) {
+export function afterCheck({ rows, recipeId, record, befores, selection, tapped, live }) {
     const none = outcome => ({ outcome, rewrite: false, reload: false });
     if (!rows) return none('unreadable');
     const row = rows.find(r => sameId(r, recipeId));
     if (!row) return none('gone');
     const held = holdsProfile(row, record);
-    const reverted = !held && profileFingerprint(recordProfile(row)) === before;
+    const reverted = !held && backOn(row, befores);
     if (!held && !reverted) return none('moved');
     const answer = (outcome, reload = false) => ({ outcome, rewrite: reverted, reload });
     const settled = reverted ? 'rewritten' : 'held';
@@ -181,16 +195,20 @@ export function afterCheck({ rows, recipeId, record, before, selection, tapped, 
  * and `workflow` (the record took the profile and the Workflow did not: its
  * write failed, or a shot started or the strip began to change first). The
  * check's outcomes are `afterCheck`'s, and `superseded` (a later change to the
- * same recipe has its own check), `lost`, `moved` and `skipped`.
+ * same recipe has its own check, which takes over this one's), `lost`, `moved`
+ * and `skipped`.
  */
 export function createProfileChange({
     mayChange, settled = () => true, queue, readProfile, readSelection, readWorkflow, readRecords,
     saveRecord, writeWorkflow, follow = async () => {}, markLoaded, epoch,
     idle = async () => {}, wait, onChecked = () => {},
 }) {
-    // The latest change made to each recipe's record. A check for an earlier
-    // one is superseded: it would read the later change as its own record set
-    // back (A, then B, then A again) and write B over it.
+    // The latest change made to each recipe's record: `{ generation, befores,
+    // done }`. A check for an earlier one is superseded: it would read the
+    // later change as its own record set back (A, then B, then A again) and
+    // write B over it. The later check takes over the profiles the earlier one
+    // would have known as set back, while that one has not run: a DYE2 save
+    // begun before both may write back the first.
     const latest = new Map();
     let changes = 0;
     // A write the check must not make now: its turn is tried again later.
@@ -224,11 +242,14 @@ export function createProfileChange({
         if (recipeId) {
             let first = true;
             const result = await saveRecord(recipeId, (row, rows) => {
-                if (first) before = profileFingerprint(recordProfile(row));
+                if (first) before = heldProfile(row);
                 first = false;
                 const fields = recordFields(row, rows, record);
                 name = fields.name ?? null;
                 return fields;
+            }, {
+                // Asked again on the writer's own read, just before it writes.
+                unless: () => (settled() ? null : 'busy'),
             });
             // A record write that can't be confirmed writes no Workflow: written
             // alone, the profile would unload the recipe.
@@ -236,7 +257,9 @@ export function createProfileChange({
             // From here the record is this change's, whatever comes of the Workflow.
             changes += 1;
             generation = changes;
-            latest.set(recipeId, generation);
+            const earlier = latest.get(recipeId);
+            const befores = earlier && !earlier.done ? [...earlier.befores, before] : [before];
+            latest.set(recipeId, { generation, befores, done: false });
             // The record holds the profile; a shot or an arrangement begun
             // meanwhile gets no Workflow write, as one that failed.
             if (!settled()) return { ok: false, reason: 'workflow' };
@@ -247,28 +270,48 @@ export function createProfileChange({
             return { ok: false, reason: 'workflow' };
         }
         await follow(record);
-        return { ok: true, recipeId, name, record, before, at, generation };
+        return { ok: true, recipeId, name, record, at, generation };
     }
 
     // The check afterwards, run in its turn as a change is.
-    async function checkNow({ recipeId, record, before, at, generation }) {
-        if (latest.get(recipeId) !== generation) return 'superseded';
+    async function checkNow(change) {
+        const entry = latest.get(change.recipeId);
+        if (!entry || entry.generation !== change.generation) return 'superseded';
+        const outcome = await checkEntry(change, entry.befores);
+        entry.done = true;
+        return outcome;
+    }
+
+    async function checkEntry({ recipeId, record, at }, befores) {
         const [rows, selection, workflow] = await Promise.all([
             readRecords(), readSelection(), readWorkflow().catch(() => null),
         ]);
-        const plan = afterCheck({ rows, recipeId, record, before, selection, tapped: epoch() !== at, live: workflow?.profile ?? null });
+        const plan = afterCheck({ rows, recipeId, record, befores, selection, tapped: epoch() !== at, live: workflow?.profile ?? null });
         if (plan.rewrite) {
             if (!settled()) throw notNow();
             const result = await saveRecord(recipeId, (row, rowsNow) => recordFields(row, rowsNow, record), {
                 // Judged again on the records as the writer reads them: a record
-                // moved on since is someone else's change.
-                unless: (rowsNow, row) => (holdsProfile(row, record) || profileFingerprint(recordProfile(row)) === before ? null : 'moved'),
+                // moved on since is someone else's change, and a shot or an
+                // arrangement begun since gives up the turn.
+                unless: (rowsNow, row) => {
+                    if (!settled()) return 'busy';
+                    return holdsProfile(row, record) || backOn(row, befores) ? null : 'moved';
+                },
             });
+            if (!result.ok && result.reason === 'busy') throw notNow();
             if (!result.ok) return result.reason === 'moved' ? 'moved' : 'lost';
         }
         if (!plan.reload) return plan.outcome;
         // A tap since the read: the strip is the barista's.
         if (epoch() !== at) return 'tapped';
+        if (plan.rewrite) {
+            // The rewrite took a moment: ask DYE2 again what is loaded now.
+            const now = await readSelection();
+            if (namesRecipe(now, recipeId)) return 'rewritten';
+            if (now === undefined) return 'unknown';
+            if (now && now.kind === 'recipe') return 'replaced';
+            if (epoch() !== at) return 'tapped';
+        }
         if (!settled()) throw notNow();
         await markLoaded(recipeId);
         return namesRecipe(await readSelection(), recipeId) ? 'reloaded' : 'unloaded';

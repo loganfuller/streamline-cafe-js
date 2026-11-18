@@ -411,6 +411,7 @@ test('an older record with a ratio and no drink stops at its dose times its rati
     assert.equal(recordFields(row, [], BLOOM).profileSnapshot.target_weight, 45);
     assert.equal(recordFields({ ...row, dashboardVariables: { dose: 18.3, ratio: 2.25 } }, [], BLOOM).profileSnapshot.target_weight, 41.2);
     assert.equal(recordFields({ ...row, dashboardVariables: { dose: 18, ratio: 2.5, drink: 40 } }, [], BLOOM).profileSnapshot.target_weight, 40, 'a drink wins');
+    assert.equal(recordFields({ ...row, dashboardVariables: { dose: 18, ratio: 2.5, drink: 0 } }, [], BLOOM).profileSnapshot.target_weight, 36, 'a drink of 0 is none: the profile keeps its own stop weight, the ratio is not used');
 });
 
 test('the Workflow write without a yield keeps the profile\'s own stop weight', () => {
@@ -430,8 +431,8 @@ test('a profile\'s own temperature is its first step\'s', () => {
 test('the check\'s plan, case by case', () => {
     const held = recipe('r1', 'X', { profileId: BLOOM.id, profileSnapshot: BLOOM.profile, workflow: { profile: BLOOM.profile } });
     const reverted = recipe('r1', 'X');
-    const before = profileFingerprint(TURBO.profile);
-    const base = { recipeId: 'r1', record: BLOOM, before, live: BLOOM.profile, tapped: false };
+    const befores = [{ id: TURBO.id, fp: profileFingerprint(TURBO.profile) }];
+    const base = { recipeId: 'r1', record: BLOOM, befores, live: BLOOM.profile, tapped: false };
     const loaded = { kind: 'recipe', id: 'r1' };
     assert.deepEqual(afterCheck({ ...base, rows: [held], selection: loaded }), { outcome: 'held', rewrite: false, reload: false });
     assert.deepEqual(afterCheck({ ...base, rows: [reverted], selection: loaded }), { outcome: 'rewritten', rewrite: true, reload: false });
@@ -444,6 +445,10 @@ test('the check\'s plan, case by case', () => {
     assert.deepEqual(afterCheck({ ...base, rows: [reverted], selection: { kind: 'recipe', id: 'r2' } }), { outcome: 'replaced', rewrite: true, reload: false }, 'a lost record is still written again');
     assert.deepEqual(afterCheck({ ...base, rows: null }), { outcome: 'unreadable', rewrite: false, reload: false });
     assert.deepEqual(afterCheck({ ...base, rows: [recipe('r2', 'Y')] }), { outcome: 'gone', rewrite: false, reload: false });
+    // Back on a profile that compares the same as the old one, under another id: someone chose it.
+    assert.equal(afterCheck({ ...base, rows: [{ ...reverted, profileId: 'profile:turbo-copy' }], selection: loaded }).outcome, 'moved');
+    // A record that had no id is told by DYE2's comparison alone.
+    assert.equal(afterCheck({ ...base, befores: [{ id: null, fp: befores[0].fp }], rows: [{ ...reverted, profileId: 'profile:any' }], selection: loaded }).outcome, 'rewritten');
     // The id alone is not the profile: DYE2 compares the stored profile.
     assert.equal(afterCheck({ ...base, rows: [{ ...held, workflow: { profile: OTHER.profile } }], selection: loaded }).outcome, 'moved');
 });
@@ -509,9 +514,10 @@ test('a shot or an arrangement begun once the record holds the profile: no Workf
 
 test('the check waits for a load or an arrangement to end, and gives up its turn when one begins as it writes', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
-    // The change asks twice; then the check: unsettled for two looks, settled,
+    // The change asks three times (before the record, on the writer's read,
+    // before the Workflow); then the check: unsettled for two looks, settled,
     // and unsettled again at its rewrite, so its turn is given up and taken again.
-    const answers = [true, true, false, false, true, false];
+    const answers = [true, true, true, false, false, true, false];
     w.settled = () => (answers.length ? answers.shift() : true);
     let turns = 0;
     const queue = w.deps.queue;
@@ -524,4 +530,45 @@ test('the check waits for a load or an arrangement to end, and gives up its turn
     assert.equal(w.get('r1').profileId, BLOOM.id);
     assert.equal(turns, 3, 'the change, the turn given up, and the one that wrote');
     assert.deepEqual(w.waits.filter(ms => ms !== AFTER_CHECK_MS).length, 2, 'two looks while a load or an arrangement was under way');
+});
+
+test('two changes inside the window of a DYE2 save begun before both: the later check writes back the first one\'s loss too', async () => {
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    w.onWait = () => gate;
+    // Turbo to Bloom to Other; then DYE2's save, which read the list on Turbo, writes it back.
+    const first = await w.change(BLOOM.id);
+    const second = await w.change(OTHER.id);
+    w.rows = [copy(original)];
+    release();
+    assert.deepEqual(await Promise.all([first.checked, second.checked]), ['superseded', 'rewritten']);
+    assert.equal(w.get('r1').profileId, OTHER.id);
+    assert.equal(w.recipeId(), 'r1');
+});
+
+test('a shot or an arrangement begun while the writer reads DYE2\'s records: nothing is written', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    let calm = true;
+    w.settled = () => calm;
+    w.failRecords = () => { calm = false; return false; };
+    assert.deepEqual(await w.change(BLOOM.id), { ok: false, reason: 'busy' });
+    assert.deepEqual(w.log, []);
+    assert.deepEqual(w.get('r1'), recipe('r1', 'House espresso'));
+});
+
+test('another recipe loaded while the check writes the record again keeps its marker', async () => {
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original, recipe('r2', 'Decaf', { stripSlot: 2, profileId: BLOOM.id, profileSnapshot: BLOOM.profile, workflow: { profile: BLOOM.profile } })], loaded: 'r1' });
+    // The record lost and the recipe unloaded in DYE2's window; then, as the
+    // check writes the record again, DYE2's own page loads Decaf.
+    w.onWait = world => { world.rows[0] = copy(original); world.workflow.context.extras.dye.recipeId = null; };
+    let writes = 0;
+    w.onRecordWrite = world => { writes += 1; if (writes === 2) world.workflow.context.extras.dye.recipeId = 'r2'; };
+    const answer = await w.change(BLOOM.id);
+    assert.equal(await answer.checked, 'replaced');
+    assert.equal(w.get('r1').profileId, BLOOM.id, 'the record is written again');
+    assert.equal(w.recipeId(), 'r2');
+    assert.equal(w.log.filter(entry => entry.startsWith('mark')).length, 0);
 });
