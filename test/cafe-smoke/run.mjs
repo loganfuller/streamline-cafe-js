@@ -3011,8 +3011,8 @@ try {
         check('during a shot the row reads "Live shot", the reference has its own row, and nothing can be chosen', now.label === 'Live shot' && now.when === null && /^Today /.test(now.reference || '') && now.make === null && now.badge === null, JSON.stringify(now));
         check('a running shot has no stars and no note icon', (await remarks(page)).stars === null && (await remarks(page)).note === null, JSON.stringify(await remarks(page)));
         check('the reference is drawn behind the live shot', lines.points[7] > 10 && lines.points[0] > 5 && lines.names.length === 10, JSON.stringify(lines));
-        check('the time axis shows the whole reference from the start', Math.abs(lines.end - lines.referenceEnd / 0.93) < 0.01, `${lines.end} for a reference of ${lines.referenceEnd} s`);
-        check('no line is labelled during a shot', lines.labelled.length === 0);
+        check('the time axis shows the whole reference from the start, at its length as at rest', Math.abs(lines.end - liveEnd(lines.referenceEnd)) < 0.01, `${lines.end} for a reference of ${lines.referenceEnd} s`);
+        check('during a shot its own four lines are named, and no target or reference line (issue #66)', lines.labelled.join() === OWN_LABELLED, JSON.stringify(lines.labelled));
         cardsNow = await row(page);
         check('live, in Reference: Time says how long the reference ran, and each card sits beside the reference at the same second, with the difference',
             cardsNow.mode === 'live' && keys(cardsNow) === LIVE && /^Ref ran \d+\.\d s$/.test(cardsNow.cards[0].side) && cardsNow.cards[0].diff === ''
