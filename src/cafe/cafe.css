@@ -1617,9 +1617,11 @@ button.cafe-card {
 }
 
 /* The Location's list adds the Machine after Pulled, and Time, how long the
-   Shot ran, after Dose → yield. On a narrower screen the Machine gives up its
-   width before the Recipe goes below 140px: at 1280px wide the two are 128px
-   and 140px. */
+   Shot ran, after Dose → yield. In the full 1560px box the Machine is 230px and
+   the Recipe takes the rest. Should the box be narrower, the Machine gives up
+   its width before the Recipe goes below 140px. At Streamline's default scaling
+   it never is: sizes here are design px, and the dialog's canvas is at least
+   1920 of them wide. A UI zoom above 1 can make it so. */
 .cafe-shots-location .cafe-shots-columns,
 .cafe-shots-location .cafe-shots-row {
     grid-template-columns: 110px minmax(0, 230px) minmax(140px, 1fr) 190px 90px 160px 150px 56px;

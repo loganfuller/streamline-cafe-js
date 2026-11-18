@@ -846,15 +846,17 @@ try {
         await paint(page, 'light');
 
         //     The same list on a tablet's screen (issue #39): its box, and the
-        //     Machine and Time columns in it, are scaled with the page, so a row
-        //     is its width at 1920 times the page's scale and nothing scrolls
-        //     sideways. The window is put back afterwards.
-        const LOCATION_PARTS = ['.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-machine'];
+        //     Machine and Time columns in it, are scaled with the page, so each
+        //     is its size at 1920 times the page's scale, none measures 0, and
+        //     nothing scrolls sideways. The window is put back afterwards.
+        const LOCATION_PARTS = ['.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-machine', '.cafe-shots-duration'];
         const wide = await dialogDrawn(page, 'cafe-shots-dialog', LOCATION_PARTS);
         await page.setViewportSize({ width: 1340, height: 800 });
         await page.waitForTimeout(2500);
         const narrow = await dialogDrawn(page, 'cafe-shots-dialog', LOCATION_PARTS);
+        // A part that isn't drawn measures 0 at both sizes, and proves nothing.
         const scaledAsThePage = !!wide && !!narrow && LOCATION_PARTS.every(part => wide.parts[part] && narrow.parts[part]
+            && [...wide.parts[part], ...narrow.parts[part]].every(value => value > 0)
             && Math.abs(narrow.parts[part][0] - wide.parts[part][0] * narrow.scaleX) <= 1 && Math.abs(narrow.parts[part][1] - wide.parts[part][1] * narrow.scaleY) <= 1);
         check('at 1340 by 800 the Location\'s list, with its Machine and Time columns, is scaled with the page, fits the window and scrolls nothing sideways',
             scaledAsThePage && narrow.sideways.length === 0 && narrow.box.left >= 0 && narrow.box.right <= 1340 && narrow.box.top >= 0 && narrow.box.bottom <= 800,
