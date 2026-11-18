@@ -56,9 +56,10 @@ export function tabletRow(row, choices = null) {
 }
 
 /**
- * - `listShots(limit, offset)`: a page of Decaid's Shots, newest first, as
- *   `{ items, total }`, each with its Workflow and no measurements. With no
- *   offset, the newest.
+ * - `listShots(limit, offset, filter)`: a page of Decaid's Shots, newest
+ *   first, as `{ items, total }`, each with its Workflow and no measurements.
+ *   With no offset, the newest; with a `filter` of `{ grinderId }`, that
+ *   grinder's only.
  * - `readShot(id)`: one Shot whole, or null when Decaid no longer has it.
  * - `readChoices()`: the stored choices, or null when none were kept.
  * - `writeChoices(choices)`.
@@ -107,6 +108,20 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
             const page = await listShots(1);
             const row = page && Array.isArray(page.items) ? page.items[0] : null;
             return row && row.id != null ? readShot(row.id) : null;
+        },
+
+        /**
+         * A grinder's latest Shots on this tablet, newest first, as Decaid
+         * lists them for that grinder, each with its Workflow: what the
+         * setting it was last used at is read from (`lastUse` in
+         * grinder-model.js). Read here on a Machine Decent Sync serves too.
+         * Rejects on an answer with no list of Shots: that is a read that
+         * failed, not a grinder never used.
+         */
+        async grinderShots(grinderId, limit) {
+            const page = await listShots(limit, 0, { grinderId });
+            if (!Array.isArray(page?.items)) throw new Error('Decaid did not answer a list of Shots');
+            return page.items;
         },
 
         /**

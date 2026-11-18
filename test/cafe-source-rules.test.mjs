@@ -44,6 +44,27 @@ test('the Shots list and a Shot by its id are read through the seam only', () =>
     assert.deepEqual(filesWith(/\bopenShot\b[^;]*from '\.\/graph\.js'/), ['shots-dialog.js'], 'and a Shot is opened only by the graph, told by the list');
 });
 
+test('a grinder\'s Shots are read through the seam only, by the grinder dialog', () => {
+    // The setting a grinder was last used at comes from this tablet's own
+    // Shots, on a served Machine too: the seam asks the tablet source alone.
+    assert.deepEqual(filesWith(/\bgrinderShots\b[^;]*from '\.\/shot-seam\.js'/), ['grinder-dialog.js']);
+    assert.deepEqual(filesWith(/\bgrinderShots\b/), ['grinder-dialog.js', 'shot-seam.js', 'shot-sources.js', 'tablet-shots.js']);
+    const sources = SOURCES.find(({ name }) => name === 'shot-sources.js').text;
+    assert.match(sources, /grinderShots: \(grinderId, limit\) => tablet\.grinderShots\(grinderId, limit\),/);
+});
+
+test('a choice in a pick dialog writes the Workflow, through its own writer, and no DYE2 record', () => {
+    // Decent Sync records the Recipe's grinder from the Workflow; the skin
+    // writes nothing onto a recipe for a choice, with Decent Sync or without.
+    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['grinder-dialog.js']);
+    const dialog = SOURCES.find(({ name }) => name === 'grinder-dialog.js').text;
+    assert.deepEqual([...dialog.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]), ["patch, 'cafe.grinder'"]);
+    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'pick-dialog.js']) {
+        const { text } = SOURCES.find(source => source.name === name);
+        assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv/, name);
+    }
+});
+
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
     // Decaid's own Shot edit, and its delete, are named by the seam alone.
     assert.deepEqual(filesWith(/\b(updateShot|deleteShot)\b/), ['shot-seam.js', 'tablet-shots.js']);
@@ -99,7 +120,7 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
 test('no module opens one of DYE2\'s pages', () => {
     // The page never leaves for DYE2's editor: recipes are made, chosen and
     // taken out of a slot here.
-    assert.deepEqual(filesWith(/\bopenPluginOverlay\b|recipe-edit/), []);
+    assert.deepEqual(filesWith(/\bopenPluginOverlay\b|recipe-edit|\bopenGrinderSurface\b|grinder-picker/), []);
 });
 
 test('Streamline\'s strip module is asked for three things only', () => {
@@ -122,7 +143,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'page-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

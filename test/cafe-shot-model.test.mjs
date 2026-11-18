@@ -527,6 +527,19 @@ test('a page Decaid answers oddly is an empty page, and one it does not answer r
     await assert.rejects(createTabletShots({ listShots: async () => { throw new Error('offline'); } }).shotsPage(null, 50));
 });
 
+test('a grinder\'s latest Shots are one filtered read; an answer with no list rejects, an empty list does not', async () => {
+    const asked = [];
+    const shots = [{ id: 's2' }, { id: 's1' }];
+    const seam = createTabletShots({ listShots: async (...args) => { asked.push(args); return { items: shots, total: 2 }; } });
+    assert.deepEqual(await seam.grinderShots('g1', 5), shots);
+    assert.deepEqual(asked, [[5, 0, { grinderId: 'g1' }]]);
+    assert.deepEqual(await createTabletShots({ listShots: async () => ({ items: [], total: 0 }) }).grinderShots('g1', 5), []);
+    // An answer with no list is a read that failed, not a grinder never used.
+    for (const answer of [null, {}, { items: null }]) {
+        await assert.rejects(createTabletShots({ listShots: async () => answer }).grinderShots('g1', 5));
+    }
+});
+
 test('a Shot read by its id is whole and can be changed, or null once the tablet no longer has it', async () => {
     const { seam } = tablet({ shots: [whole('a', 'r1', POURED)], gone: ['b'] });
     const found = await seam.shotById('a');

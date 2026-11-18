@@ -9,6 +9,14 @@ export const BEANS = [
 
 export const GRINDER = { model: 'Sample Grinder 64' };
 
+// The grinder dialog's: a second grinder, with burrs and a step of its own, and
+// one archived, which the dialog does not list. The run pulls a shot on each of
+// the two at a setting of its own (`GRINDER_USE`), which the dialog then says
+// each was last used at and a choice of it takes.
+export const SECOND_GRINDER = { model: 'Sample Grinder 38', burrType: 'conical', settingSmallStep: 0.5, settingBigStep: 2 };
+export const ARCHIVED_GRINDER = { model: 'Sample Retired Grinder' };
+export const GRINDER_USE = { first: { setting: '2.6', rpm: null }, second: { setting: '11.5', rpm: 800 } };
+
 // The baristas the run's two shots with no recipe loaded record, one each, so
 // the legend is seen to follow each Shot.
 export const BARISTAS = ['Sample Barista', 'Example Barista'];

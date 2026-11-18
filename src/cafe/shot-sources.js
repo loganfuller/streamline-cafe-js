@@ -95,6 +95,9 @@ export function createShotSources({ tablet, plugin, askStatus, changed }) {
         /** The tablet's newest Shot, whole, or null. It is the tablet's own, whatever the source. */
         newestShot: () => tablet.newestShot(),
 
+        /** A grinder's latest Shots on this tablet, newest first. The tablet's own, whatever the source. */
+        grinderShots: (grinderId, limit) => tablet.grinderShots(grinderId, limit),
+
         /**
          * A page of Shots for the Shots list, newest first: `rows`, each the
          * same thing whichever source listed it; `next`, what to ask the next

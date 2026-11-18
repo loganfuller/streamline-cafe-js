@@ -365,6 +365,47 @@ button.cafe-card {
     color: var(--data-card-title-text-color);
 }
 
+/* A row whose name opens a dialog (the grinder's): the name and the line under
+   it are one button, as wide as the row. The stepper sits over its end. */
+.cafe-row-pick {
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cafe-row-pick .cafe-row-label {
+    width: 100%;
+}
+
+/* The line under the name, and the chevron that says it opens something. */
+.cafe-row-desc-line {
+    min-width: 0;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-row-desc-line .cafe-row-desc {
+    min-width: 0;
+}
+
+.cafe-row-chevron {
+    flex: none;
+}
+
 /* The stepper sits on the name's line: 15px above the row's middle, which is
    where that line's middle is. */
 .cafe-row-tall .cafe-stepper {
@@ -387,7 +428,10 @@ button.cafe-card {
 }
 
 /* Streamline opens the profile list from #profile-name and DYE2's grinder page
-   from #grind-label, and colours the first by id. Neither is a control here
+   from #grind-label, and colours the first by id. Neither is a control here.
+   #grind-label sits inside the button that opens the grinder dialog: with no
+   pointer events on it, a tap lands on that button and never passes through
+   the label, so Streamline's tap never fires. The profile name takes none
    until its dialog arrives. */
 #main-page #profile-name,
 #main-page #grind-label {
@@ -1275,6 +1319,121 @@ button.cafe-card {
 
 .cafe-dialog .modal-action .cafe-btn {
     min-width: 160px;
+}
+
+/* ── Choosing what a dial-in row names ────────────────────────────────────── */
+
+.cafe-dialog.cafe-pick-box {
+    width: 780px;
+    padding: 32px;
+    gap: 20px;
+}
+
+.cafe-pick-head {
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-pick-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-pick-head h3 {
+    margin: 0;
+    font-size: 32px;
+}
+
+/* Under the title: the recipe's name and whether a choice is saved to it. */
+#cafe-pick-under {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-head .cafe-btn {
+    flex: none;
+    min-width: 160px;
+}
+
+#cafe-pick-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-pick-row {
+    flex: none;
+    min-height: 84px;
+    padding: 10px 20px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* The one in use: outlined in the accent colour, and marked "In use". */
+.cafe-pick-row[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+}
+
+.cafe-pick-row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-pick-row-name {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.cafe-pick-row-detail {
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.75;
+    overflow-wrap: anywhere;
+}
+
+.cafe-pick-row-detail:empty {
+    display: none;
+}
+
+.cafe-pick-in-use {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--mimoja-blue-v2);
+}
+
+[data-theme="dark"] .cafe-pick-row[aria-pressed="true"] {
+    border-color: var(--button-primary-bg);
+}
+
+[data-theme="dark"] .cafe-pick-in-use {
+    color: var(--text-primary);
 }
 
 /* ── The Shots list ───────────────────────────────────────────────────────── */

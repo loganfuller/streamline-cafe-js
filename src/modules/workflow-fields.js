@@ -161,6 +161,11 @@ export const WORKFLOW_WRITERS = {
         'context.baristaName', 'context.drinkerName', 'context.basket',
         'context.extras.rpm', 'context.extras.dye',
     ],
+
+    // --- Streamline Cafe: its main page's dialogs (src/cafe/) ----------------
+    // A grinder chosen in its dialog: the grinder, the setting it was last used
+    // at and its RPM, in one write. Listed in docs/cafe/UPSTREAM_EDITS.md.
+    'cafe.grinder': ['context.grinderId', 'context.grinderModel', 'context.grinderSetting', 'context.extras.rpm'],
 };
 
 // --- what a recipe apply must not inherit (#189) ---------------------------

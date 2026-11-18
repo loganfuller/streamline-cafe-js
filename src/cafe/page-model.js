@@ -30,6 +30,24 @@ export function pageHeading(recipe, profileName, saved = false) {
     };
 }
 
+/**
+ * The line under a pick dialog's title (the grinder's, for now): whether a
+ * choice is saved, as the dial-in column's label says. A translation key, with
+ * the recipe's name in `vars` where one is loaded.
+ *
+ * A choice writes the Workflow only. Where Decent Sync saves (`saved`) it
+ * records the loaded Recipe's grinder from that write; elsewhere a choice is
+ * this machine's until another recipe loads, and with no recipe it changes this
+ * machine only. Through an outage `saved` keeps its last answer, so this does too.
+ */
+export function pickSubtitle(recipe, saved = false) {
+    if (!recipe) return { key: 'No recipe loaded · changes this machine only' };
+    return {
+        key: saved ? '{recipe} · saved to the recipe' : '{recipe} · not saved to the recipe',
+        vars: { recipe: recipeName(recipe) },
+    };
+}
+
 const text = value => (typeof value === 'string' ? value.trim() : '');
 
 /**
