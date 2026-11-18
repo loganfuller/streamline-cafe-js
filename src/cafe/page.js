@@ -364,8 +364,9 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     askStatus();
     // The change of profile waits its turn as a pick does, and keeps the
     // dial-in still while it is written; a recipe load or unload from the strip
-    // moves the epoch, which the check after it reads.
-    initProfileChanger({ mayChange: mayPick, queue: writePick, epoch: () => loads, shotRunning });
+    // moves the epoch, which the check after it reads. A load or an arrangement
+    // of the strip (`loading`) or a shot begun while it reads holds its writes.
+    initProfileChanger({ mayChange: mayPick, settled: () => !loading && !shotRunning(), queue: writePick, epoch: () => loads, shotRunning });
 
     const profile = el('profile-name');
     if (profile) {

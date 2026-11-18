@@ -89,8 +89,10 @@ function tablet({ rows, loaded = null, live = { ...TURBO.profile, target_weight:
             w.onRecordWrite(w);
         },
     });
+    w.settled = () => true;
     w.deps = {
         mayChange: () => !w.busy,
+        settled: () => w.settled(),
         queue: async task => { w.queued += 1; if (w.refuseQueue) throw new Error('refused'); return task(); },
         readProfile: async id => { if (!PROFILES[id]) throw new Error('404'); return copy(PROFILES[id]); },
         readSelection: async () => {
@@ -404,6 +406,13 @@ test('the fields worked out from a row with no stored Workflow, numbers or yield
     assert.equal(recordFields({ ...row, dashboardVariables: { drink: 38 } }, [], BLOOM).profileSnapshot.target_weight, 38);
 });
 
+test('an older record with a ratio and no drink stops at its dose times its ratio, as Streamline\'s apply of it yields', () => {
+    const row = { id: 'r1', name: 'X', profileId: TURBO.id, dashboardVariables: { dose: 18, ratio: 2.5 } };
+    assert.equal(recordFields(row, [], BLOOM).profileSnapshot.target_weight, 45);
+    assert.equal(recordFields({ ...row, dashboardVariables: { dose: 18.3, ratio: 2.25 } }, [], BLOOM).profileSnapshot.target_weight, 41.2);
+    assert.equal(recordFields({ ...row, dashboardVariables: { dose: 18, ratio: 2.5, drink: 40 } }, [], BLOOM).profileSnapshot.target_weight, 40, 'a drink wins');
+});
+
 test('the Workflow write without a yield keeps the profile\'s own stop weight', () => {
     assert.deepEqual(workflowPatch(TURBO, { context: { targetYield: 0 } }), { profile: TURBO.profile });
     assert.deepEqual(workflowPatch(TURBO, null), { profile: TURBO.profile });
@@ -431,7 +440,8 @@ test('the check\'s plan, case by case', () => {
     assert.deepEqual(afterCheck({ ...base, rows: [held], selection: null, tapped: true }), { outcome: 'tapped', rewrite: false, reload: false });
     assert.deepEqual(afterCheck({ ...base, rows: [held], selection: undefined }), { outcome: 'unknown', rewrite: false, reload: false });
     assert.deepEqual(afterCheck({ ...base, rows: [held], selection: null, live: null }), { outcome: 'unloaded', rewrite: false, reload: false });
-    assert.deepEqual(afterCheck({ ...base, rows: [held], selection: { kind: 'recipe', id: 'r2' } }).reload, true, 'another recipe named, with no tap since: DYE2 put it there');
+    assert.deepEqual(afterCheck({ ...base, rows: [held], selection: { kind: 'recipe', id: 'r2' } }), { outcome: 'replaced', rewrite: false, reload: false }, 'another recipe loaded since keeps its marker');
+    assert.deepEqual(afterCheck({ ...base, rows: [reverted], selection: { kind: 'recipe', id: 'r2' } }), { outcome: 'replaced', rewrite: true, reload: false }, 'a lost record is still written again');
     assert.deepEqual(afterCheck({ ...base, rows: null }), { outcome: 'unreadable', rewrite: false, reload: false });
     assert.deepEqual(afterCheck({ ...base, rows: [recipe('r2', 'Y')] }), { outcome: 'gone', rewrite: false, reload: false });
     // The id alone is not the profile: DYE2 compares the stored profile.
@@ -447,4 +457,71 @@ test('a tap on the strip while the change waits its turn counts as the barista\'
     const answer = await w.change(BLOOM.id);
     assert.equal(await answer.checked, 'tapped');
     assert.equal(w.log.filter(entry => entry.startsWith('mark')).length, 0);
+});
+
+test('two changes to the same recipe inside DYE2\'s window: the first one\'s check gives way to the second\'s', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    w.onWait = () => gate;
+    // Turbo to Bloom, then back to Turbo: the first check would read Turbo as its record set back.
+    const first = await w.change(BLOOM.id);
+    const second = await w.change(TURBO.id);
+    assert.equal(first.ok && second.ok, true);
+    release();
+    assert.deepEqual(await Promise.all([first.checked, second.checked]), ['superseded', 'held']);
+    assert.equal(w.get('r1').profileId, TURBO.id, 'the later choice stays on the record');
+    assert.equal(w.recipeId(), 'r1');
+    assert.equal(w.log.filter(entry => entry === 'record').length, 2, 'no record write from the superseded check');
+});
+
+test('another recipe loaded since the change keeps its marker: the check loads nothing', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf', { stripSlot: 2, profileId: BLOOM.id, profileSnapshot: BLOOM.profile, workflow: { profile: BLOOM.profile } })], loaded: 'r1' });
+    w.onWait = world => { world.workflow.context.extras.dye.recipeId = 'r2'; };
+    const answer = await w.change(BLOOM.id);
+    assert.equal(await answer.checked, 'replaced');
+    assert.equal(w.recipeId(), 'r2');
+    assert.equal(w.log.filter(entry => entry.startsWith('mark')).length, 0);
+});
+
+test('a shot or an arrangement begun while DYE2 is read: nothing is written', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    let calm = true;
+    w.settled = () => calm;
+    const read = w.deps.readWorkflow;
+    w.deps.readWorkflow = async () => { calm = false; return read(); };
+    w.change = createProfileChange(w.deps).change;
+    assert.deepEqual(await w.change(BLOOM.id), { ok: false, reason: 'busy' });
+    assert.deepEqual(w.log, []);
+    assert.deepEqual(w.get('r1'), recipe('r1', 'House espresso'));
+});
+
+test('a shot or an arrangement begun once the record holds the profile: no Workflow write, as one that failed', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    let calm = true;
+    w.settled = () => calm;
+    w.onRecordWrite = () => { calm = false; };
+    assert.deepEqual(await w.change(BLOOM.id), { ok: false, reason: 'workflow' });
+    assert.equal(w.get('r1').profileId, BLOOM.id);
+    assert.deepEqual(w.workflowWrites, []);
+    assert.equal(w.recipeId(), 'r1', 'the machine stays on the old profile, the recipe loaded');
+});
+
+test('the check waits for a load or an arrangement to end, and gives up its turn when one begins as it writes', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    // The change asks twice; then the check: unsettled for two looks, settled,
+    // and unsettled again at its rewrite, so its turn is given up and taken again.
+    const answers = [true, true, false, false, true, false];
+    w.settled = () => (answers.length ? answers.shift() : true);
+    let turns = 0;
+    const queue = w.deps.queue;
+    w.deps.queue = async task => { turns += 1; return queue(task); };
+    w.change = createProfileChange(w.deps).change;
+    const original = recipe('r1', 'House espresso');
+    w.onWait = world => { if (world.waits.length === 1) world.rows = [copy(original)]; };
+    const answer = await w.change(BLOOM.id);
+    assert.equal(await answer.checked, 'rewritten');
+    assert.equal(w.get('r1').profileId, BLOOM.id);
+    assert.equal(turns, 3, 'the change, the turn given up, and the one that wrote');
+    assert.deepEqual(w.waits.filter(ms => ms !== AFTER_CHECK_MS).length, 2, 'two looks while a load or an arrangement was under way');
 });

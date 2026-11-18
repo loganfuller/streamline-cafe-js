@@ -694,7 +694,7 @@ async function profileWithDecentSync({ page, house, two }) {
             const recipe = await recipeNow();
             if (!serverAt && recipe.content.profileId === light.id && recipe.content.brewTemperature === own(light) && nameOf(recipe) === expected) serverAt = Date.now() - started;
             const theirs = await decaid2('GET', '/workflow');
-            if (!secondAt && theirs.profile.title === light.profile.title && (await named(decaid2)) === two.recordId) secondAt = Date.now() - started;
+            if (!secondAt && theirs.profile.title === light.profile.title && theirs.profile.steps[0].temperature === own(light) && (await named(decaid2)) === two.recordId) secondAt = Date.now() - started;
             await sleep(500);
         }
         const recipe = await recipeNow();
@@ -702,10 +702,14 @@ async function profileWithDecentSync({ page, house, two }) {
             !!serverAt, `${recipe.content.profileId} ${recipe.content.brewTemperature}°C "${nameOf(recipe)}"`);
         note(`trial: the server had the change ${serverAt === null ? 'never' : `after ${(serverAt / 1000).toFixed(1)} s`}, the second Machine ${secondAt === null ? 'never' : `after ${(secondAt / 1000).toFixed(1)} s`}`);
         check('profile: the first Machine was never set back', setBack === null, setBack || '');
-        check('profile: the second Machine takes the profile and keeps the Recipe loaded', !!secondAt,
+        check('profile: the second Machine takes the profile at its own temperature and keeps the Recipe loaded', !!secondAt,
             `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
         const theirWorkflow = await decaid2('GET', '/workflow');
-        note(`trial: the second Machine brews at ${theirWorkflow.profile.steps[0].temperature}°C, the first at ${(await decaid('GET', '/workflow')).profile.steps[0].temperature}°C, the profile's own ${own(light)}°C`);
+        const myWorkflow = await decaid('GET', '/workflow');
+        note(`trial: the second Machine brews at ${theirWorkflow.profile.steps[0].temperature}°C, the first at ${myWorkflow.profile.steps[0].temperature}°C, the profile's own ${own(light)}°C`);
+        check('profile: both Machines brew at the profile\'s own temperature',
+            theirWorkflow.profile.steps[0].temperature === own(light) && myWorkflow.profile.steps[0].temperature === own(light),
+            `${myWorkflow.profile.steps[0].temperature} | ${theirWorkflow.profile.steps[0].temperature}`);
         check('profile: the first page\'s check afterwards found the recipe held', ['held', 'rewritten', 'reloaded'].includes(await checkedAfter(page)) && (await named(decaid)) === String(house.recordId));
         //     A shot on the new profile, so the reference is not the Shot in the
         //     graph. Long enough to pour: an Unfinished Shot never becomes the
@@ -730,10 +734,10 @@ async function profileWithDecentSync({ page, house, two }) {
             await docker('start', SYNC_CONTAINER);
             await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });
             const back = Date.now();
-            const taken = await until(async () => { const now = await recipeNow(); return now.content.profileId === gentle.id && nameOf(now) === nextName ? now : null; }, { timeout: 120_000, every: 1000 });
+            const taken = await until(async () => { const now = await recipeNow(); return now.content.profileId === gentle.id && now.content.brewTemperature === own(gentle) && nameOf(now) === nextName ? now : null; }, { timeout: 120_000, every: 1000 });
             note(`trial: ${taken ? `${((Date.now() - back) / 1000).toFixed(1)} s after the plugin said it was connected again, the server had the change` : 'the server never had the change'}`);
-            check('profile: once the server is back it takes the change', !!taken, JSON.stringify((await recipeNow()).content.profileId));
-            const followed = await until(async () => ((await decaid2('GET', '/workflow')).profile.title === gentle.profile.title && (await named(decaid2)) === two.recordId) || null, { timeout: 120_000, every: 1000 });
+            check('profile: once the server is back it takes the change, at the profile\'s own temperature', !!taken, `${(await recipeNow()).content.profileId} ${(await recipeNow()).content.brewTemperature}°C`);
+            const followed = await until(async () => { const theirs = await decaid2('GET', '/workflow'); return (theirs.profile.title === gentle.profile.title && theirs.profile.steps[0].temperature === own(gentle) && (await named(decaid2)) === two.recordId) || null; }, { timeout: 120_000, every: 1000 });
             check('profile: and the second Machine takes it, the Recipe still loaded', !!followed, `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
             check('profile: the first Machine kept it all along', (await decaid('GET', '/workflow')).profile.title === gentle.profile.title && (await named(decaid)) === String(house.recordId));
         } finally {

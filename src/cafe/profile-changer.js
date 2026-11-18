@@ -54,13 +54,15 @@ let change = null;
 
 /**
  * Called once, as the page starts, with the page's own: `mayChange()`, as a
- * pick may open; `queue(task)`, the page's write of a choice in its turn;
- * `epoch()`, which a recipe load or unload from the strip moves; and
- * `shotRunning()`.
+ * pick may open; `settled()`, no shot running and no recipe load or
+ * arrangement of the strip under way; `queue(task)`, the page's write of a
+ * choice in its turn; `epoch()`, which a recipe load or unload from the strip
+ * moves; and `shotRunning()`.
  */
-export function initProfileChanger({ mayChange, queue, epoch, shotRunning }) {
+export function initProfileChanger({ mayChange, settled, queue, epoch, shotRunning }) {
     change = createProfileChange({
         mayChange,
+        settled,
         queue,
         readProfile,
         readSelection,
@@ -81,7 +83,7 @@ export function initProfileChanger({ mayChange, queue, epoch, shotRunning }) {
         wait: sleep,
         onChecked(outcome, recipeId) {
             const line = `Cafe: the check after a profile change on recipe ${recipeId}: ${outcome}`;
-            if (outcome === 'held' || outcome === 'rewritten' || outcome === 'reloaded' || outcome === 'tapped') logger.info(line);
+            if (['held', 'rewritten', 'reloaded', 'tapped', 'superseded'].includes(outcome)) logger.info(line);
             else logger.warn(line);
         },
     }).change;
