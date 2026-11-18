@@ -9,8 +9,11 @@ export function initScaling() {
     const designHeight = 1200;
     // The window as it is with no keyboard. The canvas is always laid out for
     // this height, never for the height a keyboard leaves: see trackBaseline.
+    // baselineVisible is the room the screen has with no keyboard, which some
+    // WebViews report a fraction of a pixel, or a system bar, short of the window.
     let baseline = {
         baselineHeight: window.innerHeight, baselineWidth: window.innerWidth,
+        baselineVisible: Math.min(window.innerHeight, window.visualViewport?.height ?? window.innerHeight),
         shrunkSince: 0, keyboardLike: false, shrunk: false,
     };
     let adoptTimer = 0;
@@ -134,9 +137,11 @@ export function initScaling() {
         });
         forceBaseline = false;
         // A shrink that was never typed into becomes the new window size once it
-        // has held; nothing else would re-run this to notice.
+        // has held; nothing else would re-run this to notice. Only while one is
+        // waiting (shrunkSince): a screen that rests short of the window is
+        // `shrunk` for good and has nothing left to adopt.
         clearTimeout(adoptTimer);
-        if (baseline.shrunk && !baseline.keyboardLike) adoptTimer = setTimeout(updateScale, SHRINK_ADOPT_MS + 50);
+        if (baseline.shrunkSince && !baseline.keyboardLike) adoptTimer = setTimeout(updateScale, SHRINK_ADOPT_MS + 50);
         // Always the full window, never what a keyboard left: the canvas does not
         // re-scale for a keyboard, it moves (keyboardShift below).
         const screenHeight = baseline.baselineHeight;
@@ -148,7 +153,13 @@ export function initScaling() {
         // is overflow:hidden and the non-zoomed branch below resets its scrollTop to
         // 0 on every pass, so any scroll it managed was undone a frame later. Lift
         // the whole canvas in the transform instead, by exactly the overlap.
-        keyboardShift = keyboardShrunk && !fitsItself
+        //
+        // Only for a keyboard (keyboardLike: a shrink that appeared while a field
+        // was typed into), and then for whatever has focus, a button too, since
+        // Android often keeps the keyboard up when focus moves off the field.
+        // Never for a screen that is merely short: a button takes focus on
+        // pointer-down, and lifting it then moves it out from under the finger.
+        keyboardShift = baseline.keyboardLike && !fitsItself
             ? keyboardLift(activeEl.getBoundingClientRect(), visibleHeight, keyboardShift)
             : 0;
 

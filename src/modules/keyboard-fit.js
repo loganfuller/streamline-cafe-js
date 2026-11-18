@@ -38,12 +38,29 @@ export const SHRINK_ADOPT_MS = 1500;
 //    resizing the WebView while the user is reading.
 //
 // A shrink that appeared while an editable had focus is a keyboard and stays
-// one until the window grows back, even after the field is blurred: on Android
+// one, even after the field is blurred, until the window grows back or, with
+// nothing typed into, more than half the room it took comes back: on Android
 // the keyboard often stays up when focus moves to a button, and adopting then
 // is exactly the "the page shrank when I tapped the title" bug.
 //
 // Keyed off any shrink at all rather than a 15% one, so a floating or split
 // keyboard cannot fall through and re-scale the canvas.
+//
+// What the state says:
+//
+//  - `shrunk`: the screen has less room than the layout window. A full-screen
+//    overlay fits itself to visibleHeight while this holds.
+//  - `keyboardLike`: a shrink below the resting room appeared while something
+//    was being typed into. Only this lifts the canvas (scaling.js). A lift on
+//    `shrunk` alone moved a button out from under the finger between pointer
+//    down and pointer up on a WebView whose visualViewport sits a fraction of a
+//    pixel, or a system bar, short of the window, so the tap missed.
+//  - `baselineVisible`: the room the screen has with no keyboard, which is less
+//    than the layout window on such a WebView. A shrink is measured from it, so
+//    that gap never counts as a keyboard, and a keyboard that closes clears the
+//    mark even though the screen never gets back to the full window.
+//  - `pendingVisible`: while a shrink waits to be adopted, the room at the last
+//    pass. `keyboardVisible`: while a keyboard is up, the least room it left.
 export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editing, now, force = false }) {
     // The keyboard shows up as either of these, depending on the WebView, so the
     // shorter one decides whether the screen lost room. Only the layout window
@@ -51,27 +68,66 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     // on its own is a keyboard or a pinch, never a smaller window.
     const shortest = Math.min(rawHeight, visibleHeight ?? rawHeight);
     const baseline = state?.baselineHeight || rawHeight;
+    const resting = Math.min(state?.baselineVisible ?? baseline, baseline);
     const widthChanged = state?.baselineWidth !== undefined && rawWidth !== undefined
         && rawWidth !== state.baselineWidth;
     const adopt = () => ({
-        baselineHeight: rawHeight, baselineWidth: rawWidth,
+        baselineHeight: rawHeight, baselineWidth: rawWidth, baselineVisible: shortest,
         shrunkSince: 0, keyboardLike: false, shrunk: shortest < rawHeight,
     });
 
     if (force || widthChanged) return adopt();
-    if (shortest >= baseline) {
+    // Back to the resting room, in a window no shorter than the baseline. A
+    // shorter window whose room still reaches the old resting room is a host
+    // resize, adopted below once it has held, not a grow.
+    if (shortest >= resting && rawHeight >= baseline) {
+        const baselineHeight = Math.max(rawHeight, baseline);
         return {
-            baselineHeight: Math.max(rawHeight, baseline), baselineWidth: rawWidth,
-            shrunkSince: 0, keyboardLike: false, shrunk: false,
+            baselineHeight, baselineWidth: rawWidth, baselineVisible: shortest,
+            shrunkSince: 0, keyboardLike: false, shrunk: shortest < baselineHeight,
         };
     }
 
-    const keyboardLike = !!state?.keyboardLike || editing;
+    // A keyboard has closed once it has given back more than half the room it
+    // took while nothing is typed into, even if the screen is still short of
+    // its resting room: Android may keep a navigation bar up after the
+    // keyboard, or report a fraction of a pixel less than before. That
+    // shortfall then waits to be adopted like any other shrink. Without this
+    // the mark, and the lift with it, stayed until a reload or a rotation.
+    // While a field still has focus a smaller room is a keyboard that changed
+    // size, so the mark holds until focus moves, which runs this again before
+    // anything is lifted. The price: a keyboard that gives back more than half
+    // its room while staying up, then loses focus to a button, reads as closed
+    // and is adopted as the window until it closes. Geometry alone can't tell
+    // that from a keyboard closed into a little less room.
+    const keyboardVisible = state?.keyboardVisible ?? shortest;
+    if (state?.keyboardLike && !editing && shortest - keyboardVisible > (resting - keyboardVisible) / 2) {
+        return {
+            baselineHeight: baseline, baselineWidth: state.baselineWidth ?? rawWidth,
+            baselineVisible: resting, pendingVisible: shortest,
+            shrunkSince: now, keyboardLike: false, shrunk: true,
+        };
+    }
+
+    // A shrink already waiting to be adopted, which nothing was typed into, is
+    // a keyboard only if the screen loses more room while something is typed
+    // into: a gap that appeared just before a field took focus would otherwise
+    // count as a keyboard until the screen got that room back, which a lasting
+    // gap never does. A keyboard opens after its field has focus, so its first
+    // shrink is seen while typing and never waits. "More" is over a pixel, so a
+    // gap whose fraction of a pixel wobbles as a field takes focus is no
+    // keyboard.
+    const waiting = !state?.keyboardLike && state?.shrunkSince > 0;
+    const floor = waiting ? state.pendingVisible ?? Infinity : Infinity;
+    const keyboardLike = !!state?.keyboardLike || (editing && shortest < floor - 1);
     const shrunkSince = state?.shrunkSince || now;
     if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
     return {
         baselineHeight: baseline, baselineWidth: state?.baselineWidth ?? rawWidth,
-        shrunkSince, keyboardLike, shrunk: true,
+        baselineVisible: resting, shrunkSince, keyboardLike, shrunk: true,
+        ...(keyboardLike
+            ? { keyboardVisible: Math.min(state?.keyboardLike ? keyboardVisible : shortest, shortest) }
+            : { pendingVisible: shortest }),
     };
 }
 
