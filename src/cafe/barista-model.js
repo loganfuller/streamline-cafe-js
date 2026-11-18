@@ -137,10 +137,17 @@ export function storeWait(endedAt, now) {
 /**
  * Resolve once Decaid has no Shot still to store: wait what `storeWait` leaves,
  * and again for a shot that ended meanwhile. `endedAt()` and `now()` are read
- * afresh each time round; `sleep(ms)` waits.
+ * afresh each time round; `sleep(ms)` waits. Each shot's end is waited for
+ * once, so a clock stepped back during the wait does not make it wait again.
  */
 export async function waitOutStore(endedAt, now, sleep) {
-    for (let ms = storeWait(endedAt(), now()); ms > 0; ms = storeWait(endedAt(), now())) await sleep(ms);
+    let waited = null;
+    for (let end = endedAt(); end !== waited; end = endedAt()) {
+        const ms = storeWait(end, now());
+        if (ms <= 0) return;
+        waited = end;
+        await sleep(ms);
+    }
 }
 
 /**

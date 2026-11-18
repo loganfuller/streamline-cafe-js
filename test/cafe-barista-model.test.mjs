@@ -162,6 +162,12 @@ test('the wait after a pour is made again for a shot that ends during it', async
     const none = [];
     await waitOutStore(() => null, () => now, async ms => { none.push(ms); });
     assert.deepEqual(none, [], 'no shot this session: no wait');
+
+    // A clock stepped back an hour since the shot ended: one window, not an hour.
+    let clock = 10_000 - 3_600_000;
+    const stepped = [];
+    await waitOutStore(() => 10_000, () => clock, async ms => { stepped.push(ms); clock += ms; });
+    assert.deepEqual(stepped, [5000]);
 });
 
 test('the button shows the newest read of the barista, and a read begun before a write or a later read paints nothing', () => {
