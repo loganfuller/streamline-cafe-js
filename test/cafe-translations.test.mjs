@@ -7,7 +7,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { SUPPORTED_LANGUAGES, parseTranslationColumn } from '../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS, cafeTranslation, fillIn, dateLocale } from '../src/cafe/translations.js';
 import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
-import { pageHeading } from '../src/cafe/page-model.js';
+import { pageHeading, pickSubtitle } from '../src/cafe/page-model.js';
+import { GRINDER_PHRASES } from '../src/cafe/grinder-model.js';
 import { slotMenu } from '../src/cafe/slot-menu.js';
 import { graphModel } from '../src/cafe/shot-model.js';
 import { PHRASES } from '../src/cafe/comparison.js';
@@ -108,6 +109,9 @@ function usedKeys() {
     }
     // The comparison row's titles and what each card says beside its number.
     for (const phrase of Object.values(PHRASES)) keys.add(phrase);
+    // The line under a pick dialog's title, and what a grinder's row says.
+    for (const [loaded, saved] of [[null, false], [recipe, true], [recipe, false]]) keys.add(pickSubtitle(loaded, saved).key);
+    for (const phrase of Object.values(GRINDER_PHRASES)) keys.add(phrase);
     return keys;
 }
 

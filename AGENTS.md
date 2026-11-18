@@ -60,7 +60,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 - Keep the element ids Streamline's modules drive in `index.html`. Where a module needs an element the layout drops, keep a hidden stub instead of editing the module.
 - Load a recipe only through Streamline's `applyRecipe`. Never write Streamline's strip mode setting.
 - Before changing which recipe is loaded any other way (DYE2's `save-recipe`, or clearing its selection), call `forgetAppliedItem()`, the fork's one hook in `src/modules/dyeStrip.js`. Never open one of DYE2's pages from the cafe page.
-- Write DYE2's recipe records only through the fork's one writer module, `src/cafe/recipe-writer.js`.
+- Write DYE2's recipe records only through the fork's one writer module, `src/cafe/recipe-writer.js`. A choice in one of the page's dialogs writes no record: it writes the Workflow, through Streamline's `updateWorkflow` under a `cafe.*` writer declared in `src/modules/workflow-fields.js`.
 - Read Shots and the choice of reference, and set a Shot's rating and note, only through the Shot seam, `src/cafe/shot-seam.js`. Keep the page's own state in the `streamlineCafe` namespace, through `src/cafe/cafe-store.js`.
 - Speak to Decent Sync's plugin only through `src/cafe/decent-sync.js`. On a Machine it serves, never read or write the reference kept on the tablet.
 - Decide which Shot is in the graph, and when the Shots are read again, only in `src/cafe/graph-state.js`. `src/cafe/graph.js` tells it what happened and does what it answers.
@@ -76,7 +76,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 
 Pick a DESIGN.md section by its heading. These areas sit under headings that do not name them:
 
-- The layout, a control, the dial-in column, the grinder, bean or basket dialog, rating and notes, or the Shots list: "What the screen shows".
+- The layout, a control, the dial-in column, rating and notes, or the Shots list: "What the screen shows".
 - The "needs DYE2" screen, the long-press menu, or saving the dial-in: "Recipes and the strip".
 - What a change does with Decent Sync, without it, on a Capture-only Machine, or with its server out of reach: "Who it is for", then the area's own section.
 - The graph's legend, time axis, overlay, or Reference | Targets toggle: "The reference on the graph".
