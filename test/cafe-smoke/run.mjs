@@ -2656,6 +2656,9 @@ async function liveLabels() {
             await page.waitForTimeout(3000);
         } finally {
             feed.pass();
+            // The language is one of Streamline's synced settings, kept in
+            // Decaid: put English back for every page after this one.
+            if (language !== 'en') await setLanguage(page, 'en').catch(() => {});
             await view.close().catch(() => {});
             view = null;
         }
