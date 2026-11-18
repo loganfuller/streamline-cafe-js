@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { RECIPES, BARISTAS, GRINDER, SECOND_GRINDER, GRINDER_USE } from './sample-data.mjs';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog, shotsHeader } from './page-helpers.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { DYE2_PLUGIN_ID, MIN_DYE2_VERSION } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { shotRecipeId } from '../../src/cafe/shot-model.js';
@@ -680,6 +680,24 @@ try {
         await page.waitForTimeout(500);
         await shot(page, 'sync-shots-location-dark');
         await paint(page, 'light');
+
+        //     The same list on a tablet's screen (issue #39): its box, and the
+        //     Machine and Time columns in it, are scaled with the page, so a row
+        //     is its width at 1920 times the page's scale and nothing scrolls
+        //     sideways. The window is put back afterwards.
+        const LOCATION_PARTS = ['.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-machine'];
+        const wide = await dialogDrawn(page, 'cafe-shots-dialog', LOCATION_PARTS);
+        await page.setViewportSize({ width: 1340, height: 800 });
+        await page.waitForTimeout(2500);
+        const narrow = await dialogDrawn(page, 'cafe-shots-dialog', LOCATION_PARTS);
+        const scaledAsThePage = !!wide && !!narrow && LOCATION_PARTS.every(part => wide.parts[part] && narrow.parts[part]
+            && Math.abs(narrow.parts[part][0] - wide.parts[part][0] * narrow.scaleX) <= 1 && Math.abs(narrow.parts[part][1] - wide.parts[part][1] * narrow.scaleY) <= 1);
+        check('at 1340 by 800 the Location\'s list, with its Machine and Time columns, is scaled with the page, fits the window and scrolls nothing sideways',
+            scaledAsThePage && narrow.sideways.length === 0 && narrow.box.left >= 0 && narrow.box.right <= 1340 && narrow.box.top >= 0 && narrow.box.bottom <= 800,
+            JSON.stringify({ wide: wide?.parts, narrow: narrow && { scale: narrow.scaleX, parts: narrow.parts, box: narrow.box, sideways: narrow.sideways } }));
+        await shot(page, 'sync-shots-location-1340x800-light');
+        await page.setViewportSize({ width: 1920, height: 1200 });
+        await page.waitForTimeout(1500);
 
         //     Another Machine's Shot, opened: read whole through the plugin.
         mark = seen.requests.length;

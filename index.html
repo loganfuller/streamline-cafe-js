@@ -408,111 +408,121 @@
 
     <!-- The recipes in no slot, to choose one for a slot (src/cafe/recipe-dialog.js). -->
     <dialog id="cafe-recipe-dialog" class="modal" aria-labelledby="cafe-recipe-dialog-title">
-        <div class="modal-box cafe-dialog">
-            <h3 id="cafe-recipe-dialog-title"></h3>
-            <p id="cafe-recipe-dialog-empty" data-cafe-text="No recipes without a slot">No recipes without a slot</p>
-            <div id="cafe-recipe-list"></div>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
-                </form>
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-recipe-dialog-title"></h3>
+                <p id="cafe-recipe-dialog-empty" data-cafe-text="No recipes without a slot">No recipes without a slot</p>
+                <div id="cafe-recipe-list"></div>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
+                    </form>
+                </div>
             </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>
-        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
     </dialog>
 
     <!-- A choice of what a dial-in row names: the grinder (src/cafe/pick-dialog.js). -->
     <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title">
-        <div class="modal-box cafe-dialog cafe-pick-box">
-            <div class="cafe-pick-head">
-                <div class="cafe-pick-titles">
-                    <h3 id="cafe-pick-title"></h3>
-                    <!-- The recipe's name and whether a choice is saved to it. -->
-                    <p id="cafe-pick-under"></p>
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog cafe-pick-box">
+                <div class="cafe-pick-head">
+                    <div class="cafe-pick-titles">
+                        <h3 id="cafe-pick-title"></h3>
+                        <!-- The recipe's name and whether a choice is saved to it. -->
+                        <p id="cafe-pick-under"></p>
+                    </div>
+                    <form method="dialog">
+                        <button class="cafe-btn" data-cafe-text="Close">Close</button>
+                    </form>
                 </div>
-                <form method="dialog">
-                    <button class="cafe-btn" data-cafe-text="Close">Close</button>
-                </form>
+                <div id="cafe-pick-list" role="group"></div>
             </div>
-            <div id="cafe-pick-list" role="group"></div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>
-        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
     </dialog>
 
     <!-- The Shots list (src/cafe/shots-dialog.js). A row opens that Shot in the graph. -->
     <dialog id="cafe-shots-dialog" class="modal" aria-labelledby="cafe-shots-title">
-        <div class="modal-box cafe-dialog cafe-shots-box">
-            <div class="cafe-shots-head">
-                <div class="cafe-shots-titles">
-                    <h3 id="cafe-shots-title" data-cafe-text="Shots">Shots</h3>
-                    <!-- The Location's name on a Machine Decent Sync serves, or "This machine only". -->
-                    <p id="cafe-shots-under" style="display:none"></p>
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog cafe-shots-box">
+                <div class="cafe-shots-head">
+                    <div class="cafe-shots-titles">
+                        <h3 id="cafe-shots-title" data-cafe-text="Shots">Shots</h3>
+                        <!-- The Location's name on a Machine Decent Sync serves, or "This machine only". -->
+                        <p id="cafe-shots-under" style="display:none"></p>
+                    </div>
+                    <form method="dialog">
+                        <button class="cafe-btn cafe-btn-primary" data-cafe-text="Close">Close</button>
+                    </form>
                 </div>
-                <form method="dialog">
-                    <button class="cafe-btn cafe-btn-primary" data-cafe-text="Close">Close</button>
-                </form>
+                <!-- Why only this machine's Shots are listed. -->
+                <div id="cafe-shots-line" role="status" style="display:none">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                    <span id="cafe-shots-line-text"></span>
+                </div>
+                <div class="cafe-shots-columns" aria-hidden="true">
+                    <span data-cafe-text="Pulled">Pulled</span>
+                    <span class="cafe-shots-machine" data-cafe-text="Machine">Machine</span>
+                    <span data-cafe-text="Recipe">Recipe</span>
+                    <span data-cafe-text="Dose → yield">Dose → yield</span>
+                    <span class="cafe-shots-duration" data-cafe-text="Time">Time</span>
+                    <span data-cafe-text="Rating">Rating</span>
+                    <span data-cafe-text="Barista">Barista</span>
+                    <span class="cafe-shots-note" data-cafe-text="Note">Note</span>
+                </div>
+                <div id="cafe-shots-scroll">
+                    <div id="cafe-shots-list"></div>
+                    <p id="cafe-shots-empty" data-cafe-text="No shots yet" style="display:none">No shots yet</p>
+                    <p id="cafe-shots-end" role="status" style="display:none"></p>
+                </div>
             </div>
-            <!-- Why only this machine's Shots are listed. -->
-            <div id="cafe-shots-line" role="status" style="display:none">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-                <span id="cafe-shots-line-text"></span>
-            </div>
-            <div class="cafe-shots-columns" aria-hidden="true">
-                <span data-cafe-text="Pulled">Pulled</span>
-                <span class="cafe-shots-machine" data-cafe-text="Machine">Machine</span>
-                <span data-cafe-text="Recipe">Recipe</span>
-                <span data-cafe-text="Dose → yield">Dose → yield</span>
-                <span class="cafe-shots-duration" data-cafe-text="Time">Time</span>
-                <span data-cafe-text="Rating">Rating</span>
-                <span data-cafe-text="Barista">Barista</span>
-                <span class="cafe-shots-note" data-cafe-text="Note">Note</span>
-            </div>
-            <div id="cafe-shots-scroll">
-                <div id="cafe-shots-list"></div>
-                <p id="cafe-shots-empty" data-cafe-text="No shots yet" style="display:none">No shots yet</p>
-                <p id="cafe-shots-end" role="status" style="display:none"></p>
-            </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>
-        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
     </dialog>
 
     <!-- Asked before Make reference replaces a recipe's reference (src/cafe/graph.js). -->
     <dialog id="cafe-reference-dialog" class="modal" aria-labelledby="cafe-reference-dialog-title">
-        <div class="modal-box cafe-dialog">
-            <h3 id="cafe-reference-dialog-title" data-cafe-text="Replace the reference?">Replace the reference?</h3>
-            <p id="cafe-reference-dialog-recipe"></p>
-            <dl class="cafe-reference-dialog-shots">
-                <dt data-cafe-text="New reference">New reference</dt>
-                <dd id="cafe-reference-dialog-new"></dd>
-                <dt data-cafe-text="Current reference">Current reference</dt>
-                <dd id="cafe-reference-dialog-old"></dd>
-            </dl>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
-                    <button id="cafe-reference-dialog-replace" class="cafe-btn cafe-btn-primary" value="replace" data-cafe-text="Replace">Replace</button>
-                </form>
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-reference-dialog-title" data-cafe-text="Replace the reference?">Replace the reference?</h3>
+                <p id="cafe-reference-dialog-recipe"></p>
+                <dl class="cafe-reference-dialog-shots">
+                    <dt data-cafe-text="New reference">New reference</dt>
+                    <dd id="cafe-reference-dialog-new"></dd>
+                    <dt data-cafe-text="Current reference">Current reference</dt>
+                    <dd id="cafe-reference-dialog-old"></dd>
+                </dl>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                        <button id="cafe-reference-dialog-replace" class="cafe-btn cafe-btn-primary" value="replace" data-cafe-text="Replace">Replace</button>
+                    </form>
+                </div>
             </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>
-        <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
     </dialog>
 
     <!-- A Shot's note, to write, and the reference's, to read (src/cafe/note-dialog.js).
          It fits itself above the soft keyboard, so Streamline does not lift the page behind it. -->
     <dialog id="cafe-note-dialog" class="modal" aria-labelledby="cafe-note-title" data-keyboard-fit="1">
-        <div class="modal-box cafe-dialog">
-            <h3 id="cafe-note-title"></h3>
-            <p id="cafe-note-meta"><span id="cafe-note-when"></span><span id="cafe-note-rating" class="cafe-rating"></span></p>
-            <label id="cafe-note-label" for="cafe-note-text" data-cafe-text="Note">Note</label>
-            <textarea id="cafe-note-text" maxlength="40000" autocomplete="off"></textarea>
-            <p id="cafe-note-read"></p>
-            <p id="cafe-note-error" role="alert" style="display:none"></p>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button id="cafe-note-cancel" class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
-                    <button id="cafe-note-save" type="button" class="cafe-btn cafe-btn-primary" data-cafe-text="Save note">Save note</button>
-                    <button id="cafe-note-close" class="cafe-btn cafe-btn-primary" value="" data-cafe-text="Close">Close</button>
-                </form>
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-note-title"></h3>
+                <p id="cafe-note-meta"><span id="cafe-note-when"></span><span id="cafe-note-rating" class="cafe-rating"></span></p>
+                <label id="cafe-note-label" for="cafe-note-text" data-cafe-text="Note">Note</label>
+                <textarea id="cafe-note-text" maxlength="40000" autocomplete="off"></textarea>
+                <p id="cafe-note-read"></p>
+                <p id="cafe-note-error" role="alert" style="display:none"></p>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button id="cafe-note-cancel" class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                        <button id="cafe-note-save" type="button" class="cafe-btn cafe-btn-primary" data-cafe-text="Save note">Save note</button>
+                        <button id="cafe-note-close" class="cafe-btn cafe-btn-primary" value="" data-cafe-text="Close">Close</button>
+                    </form>
+                </div>
             </div>
         </div>
     </dialog>

@@ -66,6 +66,8 @@ Three rules keep merges cheap.
 
 Streamline's modules keep running for the work that isn't drawing. Its shot-data module feeds the stop notice and the shot timer, and its history module still reads the tablet's Shots, so both stay even though their panels are gone. With a recipe loaded, which finished Shot the graph draws is the page's choice; with none, the history module draws (see [Shots and the reference](#shots-and-the-reference)). Either way the choice is made in `src/cafe/graph-state.js` (see [The latest Shot](#the-latest-shot)).
 
+**The page's dialogs are scaled as the page is.** Streamline draws the page on a 1920 by 1200 canvas and scales it to the screen, but a `<dialog>` opened as a modal draws above the page, outside that canvas. So each of the page's dialogs holds its own canvas (`.cafe-dialog-canvas` in `cafe.css`), the screen's size in design pixels, scaled by the two factors Streamline's scaling writes for it (`--streamline-scale-x` and `--streamline-scale-y`; see `UPSTREAM_EDITS.md`). Sizes inside a dialog are in design pixels, as on the page, and a limit on a box is a share of its canvas, never of `vw` or `vh`. A new dialog goes inside such a canvas. Streamline's own slot menu and toast, which the page uses, are drawn unscaled, as they are on Streamline's own page.
+
 ## Recipes and the strip
 
 - **The skin owns the strip.** Its own module draws the nine cards and handles taps, long-presses, the loaded highlight and slot placement.
@@ -234,7 +236,7 @@ The note:
 - **A note that could not be saved is not lost.** The dialog stays open with its text, and a line in the dialog says why. It is not a toast: the dialog is drawn over everything else on the page, a toast included.
 - **A shot that starts closes the dialog,** as it closes the page's other dialogs: starting one is the barista's own choice. A note being written then is not saved, and one whose save was already on its way still is. A tap outside the dialog does not close it, so a stray tap does not throw away what was typed.
 - **A note is text, never markup.** It is written into the page as text.
-- **The soft keyboard.** This is the page's first text field. Streamline lays the page out for the window with no keyboard and lifts its canvas to keep a focused field in view, which does not move a dialog. So the dialog says it fits itself (`data-keyboard-fit`), as Streamline's own full-screen editors do, and takes the height Streamline's scaling reports as left above the keyboard, with the text box giving up what the box lacks. The smoke run can't raise a keyboard, so this is checked by hand on a tablet.
+- **The soft keyboard.** This is the page's first text field. Streamline lays the page out for the window with no keyboard and lifts its canvas to keep a focused field in view, which does not move a dialog. So the dialog says it fits itself (`data-keyboard-fit`), as Streamline's own full-screen editors do, and takes the height Streamline's scaling reports as left above the keyboard, with the text box giving up what the box lacks. That height is in screen pixels and is set on the dialog itself, so its canvas turns it into design pixels. The smoke run can't raise a keyboard, so this is checked by hand on a tablet.
 
 The reference's row:
 

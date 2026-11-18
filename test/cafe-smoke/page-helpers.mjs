@@ -188,3 +188,29 @@ export const shotsHeader = page => page.evaluate(() => {
         columns: [...document.querySelectorAll('#cafe-shots-dialog .cafe-shots-columns > span')].filter(span => getComputedStyle(span).display !== 'none').map(span => span.textContent.trim()),
     };
 });
+
+// One of the page's dialogs as drawn, while it is open (issue #39): the page's
+// scale, read off Streamline's canvas; the window; the box; each part's width
+// and height, by the selectors `parts` names (the first match of each); and
+// what shows a sideways scrollbar, the dialog itself included. Sizes are
+// screen px.
+export const dialogDrawn = (page, id, parts) => page.evaluate(({ id, parts }) => {
+    const dialog = document.getElementById(id);
+    if (!dialog?.open) return null;
+    const canvas = document.getElementById('scaled-content');
+    const page = canvas.getBoundingClientRect();
+    const size = rect => [Math.round(rect.width * 10) / 10, Math.round(rect.height * 10) / 10];
+    const box = dialog.querySelector('.cafe-dialog').getBoundingClientRect();
+    const sideways = [dialog, ...dialog.querySelectorAll('*')].filter(element => {
+        const overflow = getComputedStyle(element).overflowX;
+        return (overflow === 'auto' || overflow === 'scroll') && element.scrollWidth > element.clientWidth + 1;
+    }).map(element => element.id || element.className || element.tagName);
+    return {
+        scaleX: page.width / 1920,
+        scaleY: page.height / parseFloat(canvas.style.height),
+        window: [window.innerWidth, window.innerHeight],
+        box: { left: box.left, top: box.top, right: box.right, bottom: box.bottom, size: size(box) },
+        parts: Object.fromEntries(parts.map(selector => [selector, dialog.querySelector(selector) ? size(dialog.querySelector(selector).getBoundingClientRect()) : null])),
+        sideways,
+    };
+}, { id, parts });

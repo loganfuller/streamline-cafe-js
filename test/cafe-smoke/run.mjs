@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
 import { KEYBOARD_GAP } from '../../src/modules/keyboard-fit.js';
-import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader } from './page-helpers.mjs';
+import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
@@ -160,8 +160,8 @@ const browser = await chromium.launch({ headless: !HEADED });
 // that one answer is rewritten on the way in. `decentSync` stands in for Decent
 // Sync's plugin, which this Decaid does not have: its entry in the plugin list
 // and its Status answer, `served` or a refusal's code.
-async function openPage({ theme = 'light', machineButtons = true, decentSync = null, weights = false } = {}) {
-    const context = await browser.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
+async function openPage({ theme = 'light', machineButtons = true, decentSync = null, weights = false, viewport = { width: 1920, height: 1200 } } = {}) {
+    const context = await browser.newContext({ viewport, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], theme };
     page.on('pageerror', error => seen.errors.push(error.message));
@@ -598,6 +598,105 @@ const openGrinders = async (page, on = '#grind-section .cafe-row-name') => {
     // Open, and its fade in over.
     return pickDialog(page).waitFor({ timeout: 10_000 }).then(() => page.waitForTimeout(500)).then(() => true, () => false);
 };
+
+// ── The dialogs at a tablet's size ───────────────────────────────────────────
+
+// 20. The page's dialogs at a tablet's size (issue #39). A modal dialog draws
+//     outside Streamline's scaled canvas, so each carries a canvas of its own.
+//     Each is opened at 1920 by 1200, where the page's scale is 1 and its sizes
+//     are design px, then on pages opened at 1340 by 800 and 1280 by 800: there
+//     each part measures its size at 1920 times the page's scale, within a
+//     pixel, the box fits inside the window, and nothing scrolls sideways. The
+//     Shots box's height is the screen's, less a margin, so it is checked only
+//     to fit. The reference's dialog asks before a choice of reference is
+//     replaced, which needs one already chosen; it is opened here as
+//     `src/cafe/graph.js` opens it, with made-up names in it.
+const DIALOG_SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }, { width: 1280, height: 800 }];
+const DIALOG_PARTS = {
+    'cafe-recipe-dialog': ['h3', '#cafe-recipe-dialog-empty', '.modal-action .cafe-btn'],
+    'cafe-pick-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
+    'cafe-shots-dialog': ['h3', '.cafe-shots-head .cafe-btn', '.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-star'],
+    'cafe-reference-dialog': ['h3', '#cafe-reference-dialog-recipe', '.cafe-reference-dialog-shots', '#cafe-reference-dialog-replace'],
+    'cafe-note-dialog': ['h3', '#cafe-note-meta', '#cafe-note-text', '#cafe-note-save'],
+};
+// Opens each dialog on `page` as a barista would, but for the reference's, and
+// hands each to `measure` while it is open and its fade in is over.
+async function eachDialog(page, measure) {
+    const opened = async (id, open, close) => {
+        await open();
+        const shown = await page.locator(`#${id}[open]`).waitFor({ timeout: 10_000 }).then(() => true, () => false);
+        await page.waitForTimeout(700);
+        await measure(id, shown);
+        await close();
+        await page.locator(`#${id}:not([open])`).waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(700);
+    };
+    // Slot 4 is empty again by now, so its menu's second item is the list.
+    await opened('cafe-recipe-dialog', async () => {
+        await openMenu(page, 4);
+        const items = await menuItems(page);
+        if (items[1] === 'Choose a recipe…') return pick(page, 1);
+        check('slot 4 is empty, so its menu offers the list', false, items.join(' | '));
+        await page.keyboard.press('Escape');
+    },
+        () => page.locator('#cafe-recipe-dialog .modal-action button').click());
+    await opened('cafe-pick-dialog', () => tapAt(page, '#grind-section .cafe-row-name'),
+        () => page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click());
+    await opened('cafe-shots-dialog', () => page.locator('#cafe-shots-btn').click(),
+        () => page.locator('#cafe-shots-dialog .cafe-shots-head .cafe-btn').click());
+    await opened('cafe-reference-dialog', () => page.evaluate(() => {
+        document.getElementById('cafe-reference-dialog-recipe').textContent = 'Sample Espresso';
+        document.getElementById('cafe-reference-dialog-new').textContent = 'Today 09:41 · Sample Barista';
+        document.getElementById('cafe-reference-dialog-old').textContent = 'Yesterday 16:05 · Sample Barista';
+        document.getElementById('cafe-reference-dialog').showModal();
+    }), () => page.locator('#cafe-reference-dialog button', { hasText: 'Cancel' }).click());
+    await opened('cafe-note-dialog', () => page.locator('#cafe-shot-note').click(),
+        () => page.locator('#cafe-note-cancel').click());
+}
+async function dialogsAtTabletSize() {
+    const design = {};
+    for (const viewport of DIALOG_SIZES) {
+        const size = `${viewport.width}x${viewport.height}`;
+        const view = await openPage({ viewport });
+        const { page, seen } = view;
+        try {
+            await waitForPage(page);
+            await page.waitForTimeout(2500);
+            await eachDialog(page, async (id, shown) => {
+                const drawn = shown ? await dialogDrawn(page, id, DIALOG_PARTS[id]) : null;
+                if (!drawn) return check(`${size}: ${id} opens`, false);
+                await shot(page, `dialog-${id.replace(/^cafe-|-dialog$/g, '')}-${size}-light`);
+                const [width, height] = drawn.window;
+                const { box } = drawn;
+                check(`${size}: ${id} fits inside the window`, box.left >= 0 && box.top >= 0 && box.right <= width && box.bottom <= height, JSON.stringify(box));
+                check(`${size}: ${id} shows no sideways scrollbar`, drawn.sideways.length === 0, drawn.sideways.join(', '));
+                if (viewport.width === 1920) {
+                    check(`${size}: the page's scale is 1, so ${id} is in design px`, drawn.scaleX === 1 && drawn.scaleY === 1, `${drawn.scaleX} × ${drawn.scaleY}`);
+                    design[id] = drawn;
+                    return;
+                }
+                const at1920 = design[id];
+                if (!at1920) return check(`${size}: ${id} was measured at 1920 by 1200 first`, false);
+                const parts = { ...drawn.parts, ...(id === 'cafe-shots-dialog' ? { box: [drawn.box.size[0], null] } : { box: drawn.box.size }) };
+                const designParts = { ...at1920.parts, box: at1920.box.size };
+                const off = Object.entries(parts).flatMap(([name, measured]) => {
+                    const want = designParts[name];
+                    if (!measured || !want) return [`${name}: ${measured ? 'not at 1920' : 'missing'}`];
+                    return measured.flatMap((value, axis) => {
+                        if (value === null) return [];
+                        const expected = want[axis] * (axis === 0 ? drawn.scaleX : drawn.scaleY);
+                        return Math.abs(value - expected) <= 1 ? [] : [`${name} ${axis === 0 ? 'width' : 'height'} ${value}, not ${Math.round(expected * 10) / 10}`];
+                    });
+                });
+                check(`${size}: ${id}'s heading, text, rows and buttons are their size at 1920 times the page's scale (${Math.round(drawn.scaleX * 1000) / 1000})`,
+                    off.length === 0, off.join('; ') || JSON.stringify(parts));
+            });
+            check(`${size}: no page error with the dialogs`, seen.errors.length === 0, seen.errors.join(' | '));
+        } finally {
+            await view.close();
+        }
+    }
+}
 const grinderNamed = (grinders, model) => grinders.find(g => g && g.model === model) || null;
 const workflowWrites = page => {
     const writes = [];
@@ -787,7 +886,7 @@ async function grinderDialog() {
     for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
 }
 
-// 20. The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen
+// 21. The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen
 //     shows"): a preset grinder's setting shown by its name, with − and +
 //     writing nothing, and a 0.25-step grinder's setting kept to its places
 //     through a Workflow read and stepped on its own grid.
@@ -2230,6 +2329,7 @@ try {
         await touch.close();
     }
 
+    await dialogsAtTabletSize();
     await grindRow();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
