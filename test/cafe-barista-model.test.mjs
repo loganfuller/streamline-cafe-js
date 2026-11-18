@@ -75,24 +75,32 @@ test('a typed name is trimmed, and one listed but for its case is the listed nam
 
 test('a pick writes the barista name alone, in one write under cafe.barista', () => {
     assert.deepEqual(WORKFLOW_WRITERS['cafe.barista'], ['context.baristaName'], 'a writer declared for that field alone');
-    const named = baristaPick('Ana', { baristaName: 'Bo' });
+    const named = baristaPick('Ana', 'Bo');
     assert.deepEqual(named, { context: { baristaName: 'Ana' } });
     assert.equal(assertDeclaredFields('cafe.barista', named), true);
-    assert.deepEqual(baristaPick('  Eve ', {}), { context: { baristaName: 'Eve' } }, 'a typed name, trimmed');
+    assert.deepEqual(baristaPick('  Eve ', ''), { context: { baristaName: 'Eve' } }, 'a typed name, trimmed');
 });
 
 test('"No barista" clears the name with an explicit null, which the Workflow\'s merge needs', () => {
-    const cleared = baristaPick(null, { baristaName: 'Ana' });
+    const cleared = baristaPick(null, 'Ana');
     assert.deepEqual(cleared, { context: { baristaName: null } });
     assert.equal(assertDeclaredFields('cafe.barista', cleared), true);
 });
 
 test('a tap on the row in use writes nothing', () => {
-    assert.equal(baristaPick('Ana', { baristaName: 'Ana' }), null);
-    assert.equal(baristaPick('ana', { baristaName: ' Ana ' }), null, 'the same barista in another spelling');
-    assert.equal(baristaPick(null, {}), null, '"No barista" with none');
-    assert.equal(baristaPick(null, { baristaName: '  ' }), null, 'a name of spaces is none');
+    assert.equal(baristaPick('Ana', 'Ana'), null);
+    assert.equal(baristaPick('ana', ' Ana '), null, 'the same barista in another spelling');
+    assert.equal(baristaPick(null, ''), null, '"No barista" with none');
+    assert.equal(baristaPick(null, '  '), null, 'a name of spaces is none');
     assert.equal(baristaPick(null, null), null);
+});
+
+test('a typed name is written unless it is spelled as the name in use', () => {
+    // "aNa" typed resolves to the listed "Ana" (typedBarista); with "ANA" in
+    // the Workflow, that listing's spelling is written.
+    assert.deepEqual(baristaPick('Ana', 'ANA', { typed: true }), { context: { baristaName: 'Ana' } });
+    assert.equal(baristaPick(' Ana ', 'Ana', { typed: true }), null, 'the name in use, typed again');
+    assert.equal(baristaPick('Ana', 'ANA'), null, 'a tap on the row in use, in another spelling, still writes nothing');
 });
 
 test('the machine asleep clears a set name, and writes nothing when none is set', () => {

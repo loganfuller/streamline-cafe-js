@@ -38,25 +38,28 @@ async function recentShots() {
  *
  * - `mayOpen()`: may it open now? Not while a shot runs, a recipe loads, the
  *   strip is arranged, or another choice is still being written.
- * - `shown()`: the name the button shows, which stands in for the Workflow's
- *   where the Workflow can't be read.
- * - `seen(name)`: the Workflow's name, as the dialog read it; `written(name)`,
- *   the name a write made, '' for none.
+ * - `shown()`: the name the button shows: the Workflow's as last read or
+ *   written. The list marks it, and a choice is weighed against it as it is
+ *   made, so a name read or written while the dialog was open counts.
+ * - `look()`, called as the Workflow is read: answers what paints the name the
+ *   read finds, unless a write or a later read has painted one since.
+ *   `written(name)`: the name a write made, '' for none.
  * - `write(send)`: makes the write `send` makes, once a dial-in change still on
  *   its way has landed, and resolves once it has (`writePick` in page.js).
  */
-export async function openBaristaDialog({ mayOpen, shown, seen, written, write }) {
+export async function openBaristaDialog({ mayOpen, shown, look, written, write }) {
     if (opening || !mayOpen()) return;
     opening = true;
     try {
+        const paint = look();
         const [shots, workflow] = await Promise.all([recentShots(), getWorkflow().catch(() => null)]);
         // A shot may have started, or a recipe load begun, while they were read.
         if (!mayOpen()) return;
-        const context = workflow ? workflow.context || {} : { baristaName: shown() };
-        if (workflow) seen(baristaName(context));
+        // Where the Workflow can't be read, the name the button shows stands in.
+        if (workflow) paint(baristaName(workflow.context));
         const now = new Date();
         const when = date => whenText(date, now, cafeDateLocale(), cafeText('Today'));
-        const rows = baristaRows(shots, baristaName(context), cafeText, when);
+        const rows = baristaRows(shots, shown(), cafeText, when);
         const answer = await choose({
             title: BARISTA_PHRASES.title,
             subtitle: { key: BARISTA_PHRASES.subtitle },
@@ -74,7 +77,7 @@ export async function openBaristaDialog({ mayOpen, shown, seen, written, write }
         const typed = Object.prototype.hasOwnProperty.call(answer, 'entered');
         const name = typed ? typedBarista(answer.entered, rows) : answer.barista;
         if (typed && name === null) return; // nothing but spaces
-        const patch = baristaPick(name, context);
+        const patch = baristaPick(name, shown(), { typed });
         if (!patch) return; // the barista in use: nothing is written
         try {
             await write(() => updateWorkflow(patch, 'cafe.barista'));

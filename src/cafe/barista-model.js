@@ -92,12 +92,15 @@ export function typedBarista(typed, rows) {
 
 /**
  * The Workflow write that makes `name` the barista, or clears it for null, in
- * one field. Null where it is the barista in use already (`context` is the
- * Workflow's), which writes nothing: the row in use, or "No barista" with none.
+ * one field. Null where it is the barista in use already (`current`, the
+ * Workflow's name), which writes nothing: the row in use, in whatever spelling,
+ * or "No barista" with none. A `typed` name is written unless it is spelled as
+ * the one in use: typing a listed name in another case chooses that listing.
  */
-export function baristaPick(name, context) {
+export function baristaPick(name, current, { typed = false } = {}) {
     const next = text(name);
-    if (foldBarista(next) === foldBarista(baristaName(context))) return null;
+    const now = text(current);
+    if (typed ? next === now : foldBarista(next) === foldBarista(now)) return null;
     return { context: { baristaName: next || null } };
 }
 

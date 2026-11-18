@@ -36,7 +36,7 @@ let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
-let baristaSeq = 0;     // writes of the barista: a read begun before one is stale for it
+let baristaPaints = 0;  // paints of the barista: a read begun before the last one is stale for it
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
 let namesTimer = null;
@@ -79,24 +79,27 @@ function renderBarista() {
     button.setAttribute('aria-label', barista ? `${cafeText('Barista')}: ${barista}` : cafeText('Barista'));
 }
 
+// A write named the barista, or a read found it: shown at once.
 function seeBarista(name) {
+    baristaPaints += 1;
     barista = name;
     renderBarista();
 }
 
-// A write named the barista: a read of the Workflow begun before it is stale
-// for the barista, though not for the dial-in's names.
-function baristaWritten(name) {
-    baristaSeq += 1;
-    seeBarista(name);
+// For a read of the Workflow begun now: what paints the barista it finds,
+// unless a write, or a read begun later, has painted one since. Such a read is
+// stale for the barista, though not for the dial-in's names.
+function lookBarista() {
+    const at = baristaPaints;
+    return name => { if (at === baristaPaints) seeBarista(name); };
 }
 
 function openBarista() {
-    openBaristaDialog({ mayOpen: mayPick, shown: () => barista, seen: seeBarista, written: baristaWritten, write: writePick });
+    openBaristaDialog({ mayOpen: mayPick, shown: () => barista, look: lookBarista, written: seeBarista, write: writePick });
 }
 
 // The machine seen asleep: the name is cleared, so each wake starts with none.
-const clearAsleep = () => clearOnSleep({ write: writePick, written: baristaWritten });
+const clearAsleep = () => clearOnSleep({ write: writePick, written: seeBarista });
 
 // ── Whether the dial-in is saved ─────────────────────────────────────────────
 
@@ -123,7 +126,7 @@ function renderNames() {
 /** Read the Workflow again, and with it the barista, bean, roast date, basket and grinder. */
 export async function refreshNames() {
     const seq = ++namesSeq;
-    const baristaAt = baristaSeq;
+    const paintBarista = lookBarista();
     let workflow;
     try {
         workflow = await getWorkflow();
@@ -131,7 +134,7 @@ export async function refreshNames() {
         return; // Decaid can't be reached: what is shown stays
     }
     if (seq !== namesSeq) return;
-    if (baristaAt === baristaSeq) seeBarista(baristaName(workflow?.context));
+    paintBarista(baristaName(workflow?.context));
     const batchId = workflow?.context?.beanBatchId || null;
     if (!batchId) batch = null;
     else if (!batch || batch.id !== batchId) {

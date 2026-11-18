@@ -37,9 +37,12 @@ function wire(dialog) {
     if (wired) return;
     wired = true;
     // A shot that starts takes the screen back, as from the page's other
-    // dialogs, a name being typed too.
+    // dialogs, a name being typed too. So does the machine going to sleep: a
+    // modal dialog would sit over the screensaver, and a name chosen there
+    // would outlast the sleep's clear.
     const drop = () => { if (dialog.open) dialog.close(); };
     document.addEventListener('streamline:espresso-start', drop);
+    document.addEventListener('streamline:machine-asleep', drop);
     document.addEventListener('streamline:mainpagehidden', drop);
     document.addEventListener('streamline:scaleupdate', event => { if (dialog.open) fit(event.detail); });
 }

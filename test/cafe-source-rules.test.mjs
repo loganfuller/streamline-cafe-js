@@ -171,10 +171,14 @@ test('the machine seen asleep is announced from the one socket, and clears the b
     const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
     assert.match(api, /if \(stateValue === 'sleeping' && previousMachineState !== 'sleeping'\) document\.dispatchEvent\(new Event\('streamline:machine-asleep'\)\);/);
     assert.match(api, /let previousMachineState = null;/);
-    assert.deepEqual(filesWith(/streamline:machine-asleep/), ['page.js']);
+    // page.js clears the name; pick-dialog.js closes an open dialog, which
+    // would sit over the screensaver.
+    assert.deepEqual(filesWith(/streamline:machine-asleep/), ['page.js', 'pick-dialog.js']);
     assert.match(SOURCES.find(({ name }) => name === 'page.js').text,
         /addEventListener\('streamline:machine-asleep', clearAsleep\);[\s\S]*getMachineState\(\).then\(snapshot => \{ if \(asleep\(snapshot\)\) clearAsleep\(\); \}\)/,
         'and the state read once at start, for a page opened on a sleeping machine');
+    assert.match(SOURCES.find(({ name }) => name === 'pick-dialog.js').text,
+        /addEventListener\('streamline:machine-asleep', drop\);/, 'and an open dialog closes, as on a shot');
 });
 
 test('the barista lives in the Workflow alone', () => {
