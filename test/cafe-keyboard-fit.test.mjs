@@ -150,6 +150,57 @@ test('a host resize that leaves a gapped screen its room is adopted as a smaller
     assert.deepEqual([adopted.baselineHeight, adopted.baselineVisible, adopted.shrunk], [780, 780, false]);
 });
 
+// A keyboard that closes into less room than the screen had before it: a gap
+// that came just before it, a fraction of a pixel lost to rounding, a
+// navigation bar that stays up, or a shorter window with the room back. Each
+// used to leave the keyboard mark, and the lift, on for good.
+for (const [name, rest, close] of [
+    ['over a gap that was still waiting to be adopted', { pending: H - 30 }, { visibleHeight: H - 30 }],
+    ['into a fraction of a pixel less room', { resting: H - 0.5 }, { visibleHeight: H - 0.75 }],
+    ['into a window a navigation bar shortened', { resting: H }, { rawHeight: H - 48, visibleHeight: H - 48 }],
+    ['into a shorter window with the room back', { resting: H - 30 }, { rawHeight: 780, visibleHeight: H - 30 }],
+]) {
+    test(`a keyboard that closes ${name} lets go of the lift, and the room left is adopted`, () => {
+        const start = rest.pending
+            ? track(boot(), { visibleHeight: rest.pending })
+            : track(boot(rest.resting), { visibleHeight: rest.resting });
+        const up = track(start, { rawHeight: 440, visibleHeight: 440, editing: true, now: t0 + 300 });
+        assert.equal(up.keyboardLike, true);
+        const button = track(up, { rawHeight: 440, visibleHeight: 440, now: t0 + 600 });
+        assert.ok(liftFor(button, SHOTS_BUTTON, 440) > 0, 'a button is lifted while the keyboard is up');
+
+        const after = { rawHeight: H, ...close };
+        const down = track(button, { ...after, now: t0 + 5000 });
+        assert.equal(down.keyboardLike, false);
+        assert.equal(liftFor(down, SHOTS_BUTTON, after.visibleHeight), 0, 'Shots stays put');
+        assert.ok(down.shrunkSince > 0, 'what is left waits to be adopted');
+        const adopted = track(down, { ...after, now: t0 + 5000 + SHRINK_ADOPT_MS });
+        assert.deepEqual([adopted.baselineHeight, adopted.baselineVisible, adopted.keyboardLike],
+            [after.rawHeight, after.visibleHeight, false]);
+    });
+}
+
+test('a keyboard that gets smaller while a field is typed into is still a keyboard', () => {
+    const up = track(boot(), { visibleHeight: 440, editing: true });
+    const smaller = track(up, { visibleHeight: 700, editing: true, now: t0 + 500 });
+    assert.equal(smaller.keyboardLike, true);
+    assert.equal(track(smaller, { visibleHeight: 700, editing: true, now: t0 + 60_000 }).baselineHeight, H, 'never adopted');
+    // Closed with the back key into a little less room, the field still focused:
+    // the mark holds until focus moves, and the pass focus runs lifts nothing.
+    const back = track(smaller, { visibleHeight: H - 48, editing: true, now: t0 + 61_000 });
+    assert.equal(back.keyboardLike, true);
+    const tapped = track(back, { visibleHeight: H - 48, now: t0 + 62_000 });
+    assert.equal(liftFor(tapped, SHOTS_BUTTON, H - 48), 0);
+});
+
+test('a keyboard is measured from the room at the last pass, not the least ever seen', () => {
+    const shrinking = track(boot(), { visibleHeight: 700 });
+    const partly = track(shrinking, { visibleHeight: 760, now: t0 + 300 });
+    const up = track(partly, { visibleHeight: 720, editing: true, now: t0 + 600 });
+    assert.equal(up.keyboardLike, true, 'less room than a moment ago, while typing');
+    assert.equal(track(up, { visibleHeight: 720, editing: true, now: t0 + 60_000 }).baselineHeight, H, 'never adopted');
+});
+
 test('a keyboard on a screen with no gap still lifts as before', () => {
     const up = track(boot(), { visibleHeight: 440, editing: true });
     assert.equal(up.keyboardLike, true);

@@ -58,7 +58,8 @@ export const SHRINK_ADOPT_MS = 1500;
 //    than the layout window on such a WebView. A shrink is measured from it, so
 //    that gap never counts as a keyboard, and a keyboard that closes clears the
 //    mark even though the screen never gets back to the full window.
-//  - `pendingVisible`: while a shrink waits to be adopted, the least room seen.
+//  - `pendingVisible`: while a shrink waits to be adopted, the room at the last
+//    pass. `keyboardVisible`: while a keyboard is up, the least room it left.
 export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editing, now, force = false }) {
     // The keyboard shows up as either of these, depending on the WebView, so the
     // shorter one decides whether the screen lost room. Only the layout window
@@ -86,6 +87,24 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
         };
     }
 
+    // A keyboard has closed once it has given back more than half the room it
+    // took while nothing is typed into, even if the screen is still short of
+    // its resting room: Android may keep a navigation bar up after the
+    // keyboard, or report a fraction of a pixel less than before. That
+    // shortfall then waits to be adopted like any other shrink. Without this
+    // the mark, and the lift with it, stayed until a reload or a rotation.
+    // While a field still has focus a smaller room is a keyboard that changed
+    // size, so the mark holds until focus moves, which runs this again before
+    // anything is lifted.
+    const keyboardVisible = state?.keyboardVisible ?? shortest;
+    if (state?.keyboardLike && !editing && shortest - keyboardVisible > (resting - keyboardVisible) / 2) {
+        return {
+            baselineHeight: baseline, baselineWidth: state.baselineWidth ?? rawWidth,
+            baselineVisible: resting, pendingVisible: shortest,
+            shrunkSince: now, keyboardLike: false, shrunk: true,
+        };
+    }
+
     // A shrink already waiting to be adopted, which nothing was typed into, is
     // a keyboard only if the screen loses more room while something is typed
     // into: a gap that appeared just before a field took focus would otherwise
@@ -99,8 +118,10 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
     return {
         baselineHeight: baseline, baselineWidth: state?.baselineWidth ?? rawWidth,
-        baselineVisible: resting, pendingVisible: Math.min(floor, shortest),
-        shrunkSince, keyboardLike, shrunk: true,
+        baselineVisible: resting, shrunkSince, keyboardLike, shrunk: true,
+        ...(keyboardLike
+            ? { keyboardVisible: Math.min(state?.keyboardLike ? keyboardVisible : shortest, shortest) }
+            : { pendingVisible: shortest }),
     };
 }
 
