@@ -1,21 +1,25 @@
 // The bean and batch dialog: a tap on the Dose row's name lists the tablet's
 // beans that have a batch on the left and the highlighted bean's batches on
 // the right, and a tap on a batch sets the machine to it (docs/cafe/DESIGN.md,
-// "The grinder, bean and basket dialogs"). What a row says, the line under the
-// title and what a choice writes are bean-model.js's. This module reads what
-// they need, shows the lists (pick-dialog.js) and makes the one Workflow write,
-// through the page, which orders it among the dial-in's other writes.
+// "The grinder, bean and basket dialogs" and "The bean and batch dialog").
+// What a row says, the line under the title and whether a choice writes the
+// recipe are bean-model.js's and bean-change.js's. This module reads what they
+// need and shows the lists (pick-dialog.js); the write itself is
+// `changeBean`'s (bean-changer.js), which takes its turn among the dial-in's
+// other writes. It writes nothing itself.
 //
-// The skin writes no DYE2 record for a choice. On a Machine Decent Sync serves,
-// with a Recipe loaded, Decent Sync records a batch of the Recipe's own Bean
-// from the Workflow; a batch of another Bean stays this machine's, and the
-// Recipe stays loaded. Elsewhere a choice is this machine's until another
-// recipe loads.
-import { getBeans, getBeanBatches, getBeanBatch, getWorkflow, updateWorkflow } from '../modules/api.js';
+// With a recipe loaded, a batch of another bean than the recipe's own becomes
+// the recipe's bean, on every tablet: its DYE2 record first, then the Workflow.
+// A batch of the recipe's own bean, and any batch with no recipe loaded, is
+// the Workflow write alone, which Decent Sync saves where it serves the
+// Machine.
+import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/api.js';
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, beanRows, batchRows, batchPick, beanSubtitle } from './bean-model.js';
+import { writesRecord } from './bean-change.js';
+import { changeBean } from './bean-changer.js';
 import { choose } from './pick-dialog.js';
 import { cafeText, formatRoastDay, todayHere } from './text.js';
 
@@ -59,10 +63,8 @@ async function readBeans(recipe) {
  *   before a change describes the recipe before, so the dialog is not opened.
  * - `recipe()`: the loaded recipe's DYE2 record, or null.
  * - `saved()`: does Decent Sync save this Machine's dial-in onto it?
- * - `write(send)`: makes the write `send` makes, once a dial-in change still on
- *   its way has landed, and resolves once it has (`writePick` in page.js).
  */
-export async function openBeanDialog({ mayOpen, epoch, recipe, saved, write }) {
+export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
     if (opening || !mayOpen()) return;
     opening = true;
     const at = epoch();
@@ -101,12 +103,18 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved, write }) {
                 show: shown => ({ subtitle: beanSubtitle(loaded, isSaved, shown.id, own), rows: batchesOf(shown.id) }),
             } : null,
         });
-        const patch = row && batchPick(row.bean, row.batch, context);
-        if (!patch) return; // closed, or the batch in use tapped: nothing is written
-        try {
-            await write(() => updateWorkflow(patch, 'beans.select'));
-        } catch (error) {
-            logger.warn('Cafe: could not change the bean', error);
+        if (!row) return; // closed
+        // Another bean than the recipe's own is saved onto the recipe, the batch
+        // in use too where it stayed this machine's own before; any other batch
+        // in use writes nothing.
+        const named = writesRecord(loaded, own, row.bean?.id) ? String(loaded.id) : null;
+        if (!named && !batchPick(row.bean, row.batch, context)) return;
+        // The write waits its turn behind a dial-in change still on its way, and
+        // is not made where a shot has begun since, or where DYE2 has another
+        // recipe loaded than the line under the title named.
+        const result = await changeBean({ bean: row.bean, batch: row.batch, recipeId: named });
+        if (!result.ok) {
+            logger.warn(`Cafe: could not change the bean: ${result.reason}`);
             showToast(cafeText('Could not change the bean'), 4000, 'error');
             return;
         }

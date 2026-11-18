@@ -58,16 +58,16 @@ test('a grinder\'s Shots are read through the seam only, by the grinder dialog',
 test('a choice in a pick dialog writes the Workflow, through its own writer, and no DYE2 record', () => {
     // Decent Sync records the Recipe's grinder, and a batch of its own Bean,
     // from the Workflow, and DYE2 saves the basket when the plugin asks it to
-    // save the dial-in; the skin writes nothing onto a recipe for a choice,
-    // with Decent Sync or without.
-    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['barista-dialog.js', 'basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js', 'profile-changer.js']);
+    // save the dial-in; the skin writes nothing onto a recipe for those, with
+    // Decent Sync or without. The profile and another bean are the two choices
+    // that write a record too, each only before its one Workflow write (the
+    // test below).
+    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['barista-dialog.js', 'basket-dialog.js', 'bean-changer.js', 'grinder-dialog.js', 'profile-changer.js']);
     const writes = name => [...SOURCES.find(source => source.name === name).text.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]);
     assert.deepEqual(writes('grinder-dialog.js'), ["patch, 'cafe.grinder'"]);
     // A batch goes through Streamline's own bean writer, as its bean picker writes one.
-    assert.deepEqual(writes('bean-dialog.js'), ["patch, 'beans.select'"]);
+    assert.deepEqual(writes('bean-changer.js'), ["patch, 'beans.select'"]);
     assert.deepEqual(writes('basket-dialog.js'), ["patch, 'cafe.basket'"]);
-    // The profile is the one choice that writes a record too, and only before
-    // its one Workflow write (the test below).
     assert.deepEqual(writes('profile-changer.js'), ["patch, 'cafe.profile'"]);
     // The barista's pick and the clear as the machine sleeps, each through the
     // page's write, which waits for a dial-in change still on its way.
@@ -78,21 +78,41 @@ test('a choice in a pick dialog writes the Workflow, through its own writer, and
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv|setKVValue/, name);
     }
+    assert.doesNotMatch(SOURCES.find(source => source.name === 'bean-dialog.js').text, /\bupdateWorkflow\b/);
 });
 
-test('the profile is the one choice saved onto a DYE2 record, through the one writer', () => {
+test('the profile and another bean are the choices saved onto a DYE2 record, through the one writer', () => {
     // DYE2 unloads a recipe whose Workflow moves to a profile its record does
-    // not hold, so the record takes the profile first (profile-change.js).
-    assert.deepEqual(filesWith(/from '\.\/recipe-writer\.js'/), ['arrange.js', 'profile-changer.js']);
-    const changer = SOURCES.find(({ name }) => name === 'profile-changer.js').text;
-    assert.match(changer, /import \{ setRecipeFields \} from '\.\/recipe-writer\.js';/);
-    assert.match(changer, /saveRecord: setRecipeFields,/);
-    assert.deepEqual(filesWith(/\bsetRecipeFields\b/), ['profile-changer.js', 'recipe-writer.js']);
-    // What it decides is worked out where no browser global is touched (the
+    // not hold, so the record takes the profile first (profile-change.js); and
+    // a batch of another bean becomes the recipe's bean (bean-change.js). Of the
+    // page's modules only these two changers, and arrange.js for the strip, may
+    // ask the writer for anything.
+    assert.deepEqual(filesWith(/from '\.\/recipe-writer\.js'/), ['arrange.js', 'bean-changer.js', 'profile-changer.js']);
+    for (const name of ['profile-changer.js', 'bean-changer.js']) {
+        const changer = SOURCES.find(source => source.name === name).text;
+        assert.match(changer, /import \{ setRecipeFields \} from '\.\/recipe-writer\.js';/, name);
+        assert.match(changer, /saveRecord: setRecipeFields,/, name);
+    }
+    assert.deepEqual(filesWith(/\bsetRecipeFields\b/), ['bean-changer.js', 'profile-changer.js', 'recipe-writer.js']);
+    // What they decide is worked out where no browser global is touched (the
     // modules imported below, at load), and reaches Decaid, DYE2 and Streamline
-    // only through what profile-changer.js hands it.
+    // only through what each changer hands it.
     const model = SOURCES.find(({ name }) => name === 'profile-change.js').text;
     assert.deepEqual([...model.matchAll(/^import .* from '([^']+)';$/gm)].map(match => match[1]), ['../modules/dye-selection.js', './recipe-name.js']);
+    const bean = SOURCES.find(({ name }) => name === 'bean-change.js').text;
+    assert.deepEqual([...bean.matchAll(/^import .* from '([^']+)';$/gm)].map(match => match[1]), ['../modules/bean-selection.js', './recipe-name.js', './profile-change.js']);
+});
+
+test('the bean dialog writes a batch through changeBean alone', () => {
+    // The record first where it is another bean, then the Workflow, both in
+    // bean-changer.js: the dialog adds no write of a DYE2 record or of the Workflow.
+    assert.deepEqual(filesWith(/\bchangeBean\(/), ['bean-changer.js', 'bean-dialog.js']);
+    assert.deepEqual(filesWith(/from '\.\/bean-changer\.js'/), ['bean-dialog.js', 'page.js']);
+    const dialog = SOURCES.find(source => source.name === 'bean-dialog.js').text;
+    assert.deepEqual([...dialog.matchAll(/\bchangeBean\(([^)]*)\)/g)].map(match => match[1]), ['{ bean: row.bean, batch: row.batch, recipeId: named }']);
+    // Whether it writes the record is the same rule the line under the title follows.
+    assert.match(dialog, /const named = writesRecord\(loaded, own, row\.bean\?\.id\) \? String\(loaded\.id\) : null;/);
+    assert.match(SOURCES.find(source => source.name === 'bean-model.js').text, /if \(!writesRecord\(recipe, ownBeanId, highlightedId\)\) return line;/);
 });
 
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
@@ -247,7 +267,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

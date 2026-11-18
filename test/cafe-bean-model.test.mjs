@@ -130,17 +130,22 @@ test('the Recipe\'s own Bean is the one its record names, else its batch\'s', ()
 test('the line under the title follows the bean highlighted on the left', () => {
     const recipe = { id: 'r', title: 'Sample Espresso', beanId: 'bean-house' };
     const vars = { recipe: 'Sample Espresso' };
-    // Served, the Recipe's own Bean highlighted: saved.
+    const changes = { key: "{recipe} · changes the recipe's bean", vars };
+    assert.equal(BEAN_PHRASES.otherBean, changes.key);
+    // The Recipe's own Bean highlighted: as the grinder's line, saved or not.
     assert.deepEqual(beanSubtitle(recipe, true, 'bean-house', 'bean-house'), { key: '{recipe} · saved to the recipe', vars });
-    // Served, another Bean highlighted: this machine only, the Recipe kept loaded.
-    assert.deepEqual(beanSubtitle(recipe, true, 'bean-single', 'bean-house'), { key: BEAN_PHRASES.otherBean, vars });
-    // Served, a Recipe that names no Bean takes any batch with its Bean.
-    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, true, 'bean-single', null), { key: '{recipe} · saved to the recipe', vars });
-    // Not served: nothing is saved, whichever bean.
-    assert.deepEqual(beanSubtitle(recipe, false, 'bean-single', 'bean-house'), { key: '{recipe} · not saved to the recipe', vars });
     assert.deepEqual(beanSubtitle(recipe, false, 'bean-house', 'bean-house'), { key: '{recipe} · not saved to the recipe', vars });
-    // No recipe.
+    // Another Bean highlighted: it changes the recipe's bean, on every tablet.
+    assert.deepEqual(beanSubtitle(recipe, true, 'bean-single', 'bean-house'), changes);
+    assert.deepEqual(beanSubtitle(recipe, false, 'bean-single', 'bean-house'), changes);
+    // A Recipe that names no Bean takes any bean as its first, saved or not.
+    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, true, 'bean-single', null), changes);
+    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, false, 'bean-single', null), changes);
+    // Ids compared as text, as Decaid's and DYE2's may differ in type.
+    assert.deepEqual(beanSubtitle({ ...recipe, beanId: 7 }, true, '7', '7'), { key: '{recipe} · saved to the recipe', vars });
+    // No recipe: this machine only, whichever bean.
     assert.deepEqual(beanSubtitle(null, true, 'bean-single', null), { key: 'No recipe loaded · changes this machine only' });
+    assert.deepEqual(beanSubtitle(null, false, 'bean-single', 'bean-house'), { key: 'No recipe loaded · changes this machine only' });
     // An empty list highlights nothing.
     assert.deepEqual(beanSubtitle(recipe, true, null, 'bean-house'), { key: '{recipe} · saved to the recipe', vars });
 });

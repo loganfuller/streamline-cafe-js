@@ -1,5 +1,6 @@
 // DYE2's name for a recipe, and whether a recipe still has it
-// (docs/cafe/DESIGN.md, "Changing the profile"). No browser global is touched.
+// (docs/cafe/DESIGN.md, "Changing the profile", and "The bean and batch
+// dialog"). No browser global is touched.
 //
 // DYE2 names a recipe it makes from the first word of its profile's title, its
 // bean and any beverage typed for it (`proposeRecipeName` in DYE2's
@@ -94,17 +95,23 @@ export function generatedFrom(row) {
 }
 
 /**
- * The name a record takes when its profile becomes one titled `title`, or null
+ * The name a record takes when its profile, its bean or both change, or null
  * when it keeps the one it has: a name someone gave it, or one the rule gives
- * the same on both profiles. `others` are the other records on the tablet: a
- * name one of them has (its `name`, else its `title`, without case) takes the
- * next free count, as DYE2 does. The record itself never counts against its
- * new name.
+ * the same before and after. `change.title` is the new profile's title and
+ * `change.bean` the new bean's name; one left out stays as the name was made
+ * from. A bean gained drops the day the old name held, as DYE2 adds one only
+ * where there is no bean, and a bean with no name renames nothing. `others`
+ * are the other records on the tablet: a name one of them has (its `name`,
+ * else its `title`, without case) takes the next free count, as DYE2 does.
+ * The record itself never counts against its new name.
  */
-export function renamedFor(row, title, others = []) {
+export function renamedWith(row, change, others = []) {
     const from = generatedFrom(row);
     if (!from) return null;
-    const next = baseName({ title, bean: from.bean, beverage: from.beverage, day: from.day });
+    if ('bean' in change && !text(change.bean)) return null;
+    const title = 'title' in change ? change.title : from.title;
+    const bean = 'bean' in change ? text(change.bean) : from.bean;
+    const next = baseName({ title, bean, beverage: from.beverage, day: from.day });
     const before = baseName(from);
     if (lower(next) === lower(before)) return null;
     const self = other => other === row || (row?.id != null && other?.id != null && String(other.id) === String(row.id));
@@ -113,4 +120,14 @@ export function renamedFor(row, title, others = []) {
     let n = 2;
     while (taken.has(lower(`${next} ${n}`))) n += 1;
     return `${next} ${n}`;
+}
+
+/** The name a record takes when its profile becomes one titled `title` (`renamedWith`). */
+export function renamedFor(row, title, others = []) {
+    return renamedWith(row, { title }, others);
+}
+
+/** The name a record takes when its bean becomes one named `bean` (`renamedWith`). */
+export function renamedForBean(row, bean, others = []) {
+    return renamedWith(row, { bean }, others);
 }

@@ -24,6 +24,7 @@ import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
 import { openProfileDialog } from './profile-dialog.js';
 import { baristaName, asleep, baristaStamps } from './barista-model.js';
 import { initProfileChanger } from './profile-changer.js';
+import { initBeanChanger } from './bean-changer.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -280,7 +281,7 @@ function openGrinder() {
 }
 
 function openBean() {
-    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved, write: writePick });
+    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved });
 }
 
 function openBasket() {
@@ -374,6 +375,8 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // moves the epoch, which the check after it reads. A load or an arrangement
     // of the strip (`loading`) or a shot begun while it reads holds its writes.
     initProfileChanger({ mayChange: mayPick, settled: () => !loading && !shotRunning(), queue: writePick, epoch: () => loads, shotRunning });
+    // A batch, and with it the recipe's bean where it is another, takes its turn the same way.
+    initBeanChanger({ settled: () => !loading && !shotRunning(), queue: writePick, shotRunning });
 
     const profile = el('profile-name');
     if (profile) {
