@@ -488,7 +488,7 @@ Streamline unloads the recipe on every profile switch, and DYE2 unloads a recipe
 - **No wait after a shot's end.** A profile change in the seconds before Decaid stores a Shot changes what that Shot records, as any pick does (`decentespresso/decaid#1199`).
 - **On every tablet.** The choice is saved onto the recipe on a Machine Decent Sync serves, on a Capture-only Machine and on a tablet without Decent Sync. The grinder, bean and basket are different because DYE2 keeps a recipe loaded through them, so saving them can be left to whoever saves the dial-in.
 - **With Decent Sync.** The server takes the record's new `profileId` as an edit of the Recipe's Profile, on its poll, and with it the brew temperature and a new name, then writes the record on every tablet at the Location and the profile into the Workflow of each Machine with that Recipe loaded. During an outage the record and the Workflow change on the tablet, and the server takes the edit once it is back.
-- **The trial.** Both smoke runs call `changeProfile` in the page (`SMOKE.md`, step 25 of the first and step 15 of the second). What they found is in pull request #50's description and on issue #8.
+- **The trial.** Both smoke runs call `changeProfile` in the page (`SMOKE.md`, step 25 of the first and step 15 of the second). What they found is in pull request #55's description and on issue #8: the recipe stayed loaded in every case tried.
 
 ## Translations
 
