@@ -2498,6 +2498,13 @@ const lineLabels = page => page.evaluate(async () => {
     const element = document.getElementById('plotly-chart');
     const chart = echarts.getInstanceByDom(element);
     if (!chart) return null;
+    // The renderer sets each live frame with ECharts' lazyUpdate: the option
+    // holds the new frame at once, the axis it is drawn on only after the next
+    // paint. Measure once the two agree, as the screen shows them.
+    const drawnEnd = () => chart.getModel().getComponent('xAxis', 0).axis.scale.getExtent()[1];
+    for (let tries = 0; tries < 20 && Math.abs(drawnEnd() - chart.getOption().xAxis[0].max) > 1e-9; tries += 1) {
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    }
     const option = chart.getOption();
     const context = document.createElement('canvas').getContext('2d');
     const grid = option.grid[0];
@@ -2517,7 +2524,7 @@ const lineLabels = page => page.evaluate(async () => {
                 right: at[0] + (label.distance || 0) + context.measureText(text).width,
             };
         });
-    return { labels, width: element.clientWidth, plotRight: element.clientWidth - grid.right, end: option.xAxis[0].max };
+    return { labels, width: element.clientWidth, plotRight: element.clientWidth - grid.right, end: option.xAxis[0].max, drawnEnd: drawnEnd() };
 });
 const OWN_LABELLED = 'Pressure,Flow,°C,Weight';
 
@@ -2622,7 +2629,9 @@ async function liveLabels() {
             const times = samples.map(sample => sample?.labels[0]?.coord[0] ?? null);
             check(`live labels (${tag}): they move with the shot`, times.every((t, i) => i === 0 || (t !== null && t >= times[i - 1])) && times.at(-1) > times[0], JSON.stringify(times));
             const reach = samples.map(sample => (sample ? Math.max(...sample.labels.map(l => l.right)) - sample.width : null));
-            check(`live labels (${tag}): no label reaches past the chart's right edge`, reach.every(r => r !== null && r <= 0), JSON.stringify({ reach: reach.map(Math.round), width: lastLive?.width, plotRight: lastLive?.plotRight }));
+            const worst = samples[reach.indexOf(Math.max(...reach))];
+            check(`live labels (${tag}): no label reaches past the chart's right edge`, reach.every(r => r !== null && r <= 0),
+                JSON.stringify({ reach: reach.map(Math.round), width: lastLive?.width, plotRight: lastLive?.plotRight, worst: worst && { end: worst.end, drawnEnd: worst.drawnEnd, labels: worst.labels.map(l => [l.name, l.coord, Math.round(l.x), Math.round(l.right)]) } }));
             check(`live labels (${tag}): the frames were appended, the lines not drawn again in full`, draws && draws.appended > 0 && draws.full === 0, JSON.stringify(draws));
             await shot(page, `${name}-live`);
             // The shot's end, before Decaid has saved it: nothing moves.
