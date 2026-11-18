@@ -672,9 +672,12 @@ async function profileWithDecentSync({ page, house, two }) {
         await loadNamed(page, generated);
         check('profile: the Recipe is loaded on both Machines', (await named(decaid)) === String(house.recordId) && (await named(decaid2)) === two.recordId, `${await named(decaid)} | ${await named(decaid2)}`);
         //     A Reference Shot pulled on the old profile.
-        const old = await shotWith(page, house.recordId, 6, BARISTAS[0]);
+        const old = await shotWith(page, house.recordId, 10, BARISTAS[0]);
+        // Not the reference an earlier step left: this Shot's, or the badge
+        // where the graph's latest is this Shot.
+        const prior = (await legend(page)).reference;
         await setReference(house, old.id);
-        const drawn = await waitLegend(page, l => l.reference !== null);
+        const drawn = await waitLegend(page, l => (l.reference !== null && l.reference !== prior) || l.badge !== null);
         check('profile: the Recipe\'s Reference Shot, pulled on its profile, is drawn with no flag', !!drawn && drawn.flag === null, JSON.stringify(drawn || await legend(page)));
 
         //     The change, on the first Machine.
@@ -704,7 +707,12 @@ async function profileWithDecentSync({ page, house, two }) {
         const theirWorkflow = await decaid2('GET', '/workflow');
         note(`trial: the second Machine brews at ${theirWorkflow.profile.steps[0].temperature}°C, the first at ${(await decaid('GET', '/workflow')).profile.steps[0].temperature}°C, the profile's own ${own(light)}°C`);
         check('profile: the first page\'s check afterwards found the recipe held', ['held', 'rewritten', 'reloaded'].includes(await checkedAfter(page)) && (await named(decaid)) === String(house.recordId));
-        const flagged = await waitLegend(page, l => l.flag !== null, 30_000);
+        //     A shot on the new profile, so the reference is not the Shot in the
+        //     graph. Long enough to pour: an Unfinished Shot never becomes the
+        //     latest, and this profile's preinfusion holds for 13 s at least.
+        const freshBarista = 'Sample Profile Barista';
+        const fresh = await shotWith(page, house.recordId, 30, freshBarista);
+        const flagged = await waitLegend(page, l => (l.when || '').includes(freshBarista) && l.flag !== null, 30_000);
         check('profile: the Reference Shot pulled on the old profile is flagged "Different profile"', flagged?.flag === 'Different profile', JSON.stringify(flagged || await legend(page)));
         await shot(page, 'sync-profile-changed-light');
         await shot(tablet2.page, 'sync-profile-second-machine-light');
@@ -723,7 +731,7 @@ async function profileWithDecentSync({ page, house, two }) {
             await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });
             const back = Date.now();
             const taken = await until(async () => { const now = await recipeNow(); return now.content.profileId === gentle.id && nameOf(now) === nextName ? now : null; }, { timeout: 120_000, every: 1000 });
-            note(`trial: once the server was back it had the change after ${taken ? ((Date.now() - back) / 1000).toFixed(1) : 'never'} s`);
+            note(`trial: ${taken ? `${((Date.now() - back) / 1000).toFixed(1)} s after the plugin said it was connected again, the server had the change` : 'the server never had the change'}`);
             check('profile: once the server is back it takes the change', !!taken, JSON.stringify((await recipeNow()).content.profileId));
             const followed = await until(async () => ((await decaid2('GET', '/workflow')).profile.title === gentle.profile.title && (await named(decaid2)) === two.recordId) || null, { timeout: 120_000, every: 1000 });
             check('profile: and the second Machine takes it, the Recipe still loaded', !!followed, `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
@@ -739,6 +747,7 @@ async function profileWithDecentSync({ page, house, two }) {
         await checkedAfter(page);
         await until(async () => ((await recipeNow()).content.profileId === usual.id) || null, { timeout: 90_000, every: 1000 });
         await decaid('DELETE', `/shots/${old.id}`).catch(() => {});
+        await decaid('DELETE', `/shots/${fresh.id}`).catch(() => {});
     } finally {
         await tablet2.close();
         await sync('PATCH', `/recipes/${house.id}`, { content: { name: house.name } }).catch(() => {});
