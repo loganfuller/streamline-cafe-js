@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES, BARISTAS } from './sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
@@ -744,6 +744,92 @@ async function grinderDialog() {
     }
     // The Shots this step pulled go, so a later run reads its own.
     for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+}
+
+// 20. The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen
+//     shows"): a preset grinder's setting shown by its name, with − and +
+//     writing nothing, and a 0.25-step grinder's setting kept to its places
+//     through a Workflow read and stepped on its own grid.
+async function grindRow() {
+    const listed = await decaid('GET', '/grinders?includeArchived=true');
+    const grinders = Array.isArray(listed) ? listed : listed.items || [];
+    const ensure = async spec => {
+        const found = grinderNamed(grinders, spec.model);
+        if (!found) return decaid('POST', '/grinders', spec);
+        return found.archived ? decaid('PUT', `/grinders/${found.id}`, { ...found, archived: false }) : found;
+    };
+    const preset = await ensure(PRESET_GRINDER);
+    const quarter = await ensure(QUARTER_GRINDER);
+    const plain = grinderNamed(grinders, GRINDER.model);
+    check('grind row: the preset grinder is a preset, the other steps by 0.25',
+        preset?.settingType === 'preset' && quarter?.settingSmallStep === 0.25, JSON.stringify({ preset, quarter }));
+    const setGrind = (grinder, grinderSetting) => decaid('PUT', '/workflow', { context: { grinderId: grinder.id, grinderModel: grinder.model, grinderSetting } });
+    await unloadRecipe();
+    await setGrind(preset, 'Medium');
+    const view = await openPage({ machineButtons: false });
+    const { page, seen } = view;
+    try {
+        await waitForPage(page);
+        await page.waitForTimeout(3000);
+        const writes = workflowWrites(page);
+        const grind = () => page.locator('#grind-value').textContent();
+        // A Workflow read, as the page makes when it comes back into view.
+        const readAgain = async () => { await lookAgain(page); await page.waitForTimeout(1500); };
+        // Past the − and +'s debounce, and Streamline's own read after it.
+        const settle = () => page.waitForTimeout(2500);
+
+        check('grind row: a preset grinder\'s "Medium" shows as Medium', (await grind()) === 'Medium', await grind());
+        await shot(page, 'grind-row-preset-light');
+        await page.locator('#grind-plus').click();
+        await settle();
+        check('grind row: + on a preset writes nothing and leaves Medium', writes.length === 0 && (await grind()) === 'Medium', `${JSON.stringify(writes)} ${await grind()}`);
+        await page.locator('#grind-minus').click();
+        await settle();
+        check('grind row: − on a preset writes nothing and leaves Medium', writes.length === 0 && (await grind()) === 'Medium', `${JSON.stringify(writes)} ${await grind()}`);
+        check('grind row: the Workflow still holds Medium', (await decaid('GET', '/workflow')).context?.grinderSetting === 'Medium');
+
+        await setGrind(quarter, '11.25');
+        await readAgain();
+        check('grind row: a 0.25-step grinder at 11.25 shows 11.25 after a Workflow read', (await grind()) === '11.25', await grind());
+        await page.locator('#grind-plus').click();
+        check('grind row: + steps it to 11.5, written to its places', (await grind()) === '11.50', await grind());
+        await settle();
+        const stepped = await decaid('GET', '/workflow');
+        check('grind row: and writes 11.50 into the Workflow, once', writes.length === 1 && stepped.context?.grinderSetting === '11.50' && stepped.context?.grinderId === quarter.id,
+            `${JSON.stringify(writes)} ${JSON.stringify(stepped.context)}`);
+        await readAgain();
+        check('grind row: still 11.50 after the next Workflow read', (await grind()) === '11.50', await grind());
+        await page.locator('#grind-minus').click();
+        await page.locator('#grind-minus').click();
+        await settle();
+        check('grind row: − twice steps to 11.00 on its grid', (await grind()) === '11' || (await grind()) === '11.00', await grind());
+        check('grind row: and the Workflow holds 11.00', (await decaid('GET', '/workflow')).context?.grinderSetting === '11.00');
+        await setGrind(quarter, '11.75');
+        await readAgain();
+        await shot(page, 'grind-row-quarter-light');
+
+        //    A whole-number and a 0.1-step grinder show as on Streamline's page.
+        if (plain) {
+            await setGrind(plain, '12');
+            await readAgain();
+            check('grind row: a whole number shows whole', (await grind()) === '12', await grind());
+            await setGrind(plain, '2.60');
+            await readAgain();
+            check('grind row: a 0.1-step setting shows to one place', (await grind()) === '2.6', await grind());
+            await page.locator('#grind-plus').click();
+            check('grind row: + steps a 0.1-step grinder to 2.7', (await grind()) === '2.7', await grind());
+            await settle();
+        } else {
+            check('grind row: the sample grinder is there', false);
+        }
+        check('grind row: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+    } finally {
+        await shot(page, 'grind-row-at-end').catch(() => {});
+        await view.close();
+    }
+    // The two grinders go, so the grinder dialog's list on a later run is its own.
+    for (const grinder of [preset, quarter]) await decaid('PUT', `/grinders/${grinder.id}`, { ...grinder, archived: true }).catch(() => {});
+    if (plain) await setGrind(plain, GRINDER_USE.first.setting).catch(() => {});
 }
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -1956,6 +2042,7 @@ try {
     }
 
     await grinderDialog();
+    await grindRow();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

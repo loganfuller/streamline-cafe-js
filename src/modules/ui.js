@@ -16,6 +16,7 @@ import { openContextMenu } from './context-menu.js';
 import { initCalibratedSteam } from './calibrated-steam-ui.js';
 import { logger } from './logger.js';
 import { grindDecimals } from './grinder-sync.js';
+import { grindText, grindNumber } from '../cafe/grind-text.js';
 import { shouldWriteStatus } from './machine-status-render.js';
 import { SETTINGS_RESTORED_EVENT } from './settingsSync.js';
 import * as chart from './chart.js';
@@ -227,6 +228,11 @@ export function setWorkflowGrindRange(range) {
     const bound = v => (Number.isFinite(v) ? v : null);
     workflowGrinderRange = { min: bound(range?.min), max: bound(range?.max) };
 }
+// A plugin `stepsize` on grind wins, then the step the connected grinder declares, then
+// the workflow grinder's settingSmallStep, then the built-in whole-number/0.1 rule.
+// Streamline Cafe: moved here from the Grind tile's setup so updateGrindDisplay formats
+// with the same step (#42; docs/cafe/UPSTREAM_EDITS.md).
+const grindStepNow = () => drawnStepSizes.grinderSetting ? activeStepSize('grinderSetting') : (grinderDeclaredStep ?? workflowGrinderStep ?? grindStep);
 
 // Delivered-steam time for the status line. Folded from every frame in
 // updateMachineStatus and read by the steam branch; the policy, including what
@@ -781,7 +787,10 @@ export function setHotWaterTileMode(mode) {
 // Grind tile's bounds come from whichever grinder the workflow names, and that changes under
 // the page. `max` is last so the eight other call sites keep their positions; a null or
 // absent max means no ceiling, which is how every tile behaved before.
-function setupValueAdjuster(minusBtnId, plusBtnId, valueElId, step, min, formatter, onUpdate, afterUpdate, max) {
+// Streamline Cafe (#42): the trailing `read` turns the tile's text into the number to step
+// from (parseFloat when absent); a tile whose text is no number steps nothing and writes
+// nothing, so a preset grinder's "Medium" is never sent as "NaN".
+function setupValueAdjuster(minusBtnId, plusBtnId, valueElId, step, min, formatter, onUpdate, afterUpdate, max, read) {
     const minusBtn = document.getElementById(minusBtnId);
     const plusBtn = document.getElementById(plusBtnId);
 
@@ -791,6 +800,7 @@ function setupValueAdjuster(minusBtnId, plusBtnId, valueElId, step, min, formatt
     const getMin = () => { const v = typeof min === 'function' ? min() : min; return Number.isFinite(v) ? v : 0; };
     const getMax = () => { const v = typeof max === 'function' ? max() : max; return Number.isFinite(v) ? v : null; };
     const format = (v) => typeof formatter === 'function' ? formatter(v) : v;
+    const readValue = (el) => { const v = typeof read === 'function' ? read(el.textContent) : parseFloat(el.textContent); return Number.isFinite(v) ? v : null; };
 
     let debounceTimer = null;
     const scheduleUpdate = (value) => {
@@ -803,7 +813,8 @@ function setupValueAdjuster(minusBtnId, plusBtnId, valueElId, step, min, formatt
         flashPlusMinusButton(e.currentTarget);
         const valueEl = document.getElementById(valueElId);
         if (!valueEl) return;
-        let currentValue = parseFloat(valueEl.textContent);
+        let currentValue = readValue(valueEl);
+        if (currentValue === null) return;
         const lo = getMin();
         if (currentValue > lo) {
             currentValue = stepValue(currentValue, getStep(), -1, lo);
@@ -817,7 +828,8 @@ function setupValueAdjuster(minusBtnId, plusBtnId, valueElId, step, min, formatt
         flashPlusMinusButton(e.currentTarget);
         const valueEl = document.getElementById(valueElId);
         if (!valueEl) return;
-        let currentValue = parseFloat(valueEl.textContent);
+        let currentValue = readValue(valueEl);
+        if (currentValue === null) return;
         currentValue = stepValue(currentValue, getStep(), 1);
         const hi = getMax();
         if (hi != null && currentValue > hi) currentValue = hi;
@@ -2786,7 +2798,7 @@ export function initUI(callbacks) {
                 value = 0;
             }
             grindStep = Number.isInteger(value) ? 1 : 0.1;
-            grindValueEl.textContent = Number.isInteger(value) ? String(value) : value.toFixed(1);
+            grindValueEl.textContent = grindText(value, grindStepNow());
             updateGrindValue(value);
         });
     }
@@ -2909,15 +2921,12 @@ export function initUI(callbacks) {
         if (ratioYield !== null) { updateDrinkOut(ratioYield); updateDrinkRatio(); }
         syncDrinkOutPresets(fmt);
     });
-    // A plugin `stepsize` on grind wins, then the step the connected grinder declares, then
-    // the workflow grinder's settingSmallStep, then the built-in whole-number/0.1 rule.
-    const grindStepNow = () => drawnStepSizes.grinderSetting ? activeStepSize('grinderSetting') : (grinderDeclaredStep ?? workflowGrinderStep ?? grindStep);
     // The grinder the workflow names declares its own floor and ceiling (DYE2's grinders page
     // writes them); without one the tile keeps its 0 floor and no ceiling.
     setupValueAdjuster('grind-minus', 'grind-plus', 'grind-value', grindStepNow,
         () => workflowGrinderRange.min,
         (val) => Number.isInteger(grindStepNow()) ? String(Math.round(val)) : val.toFixed(grindDecimals(grindStepNow())),
-        updateGrindValue, undefined, () => workflowGrinderRange.max);
+        updateGrindValue, undefined, () => workflowGrinderRange.max, grindNumber);
     setupValueAdjuster('flush-minus', 'flush-plus', 'flush-value', 1, 0, (val) => `${val}s`, (val) => {
         updateFlushValue(val);
         updateFlushDisplay(val);
@@ -3666,8 +3675,8 @@ export function updateGrindDisplay(grinderData) {
     // Prefer grinderSetting over setting (context takes precedence)
     const grindValue = grinderData?.grinderSetting ?? grinderData?.setting;
     if (grindValueEl && grindValue !== undefined) {
-        const parsed = parseFloat(grindValue);
-        grindValueEl.textContent = Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(1);
+        // Streamline Cafe (#42): a preset's name as it is, a number to the step's places.
+        grindValueEl.textContent = grindText(grindValue, grindStepNow());
     }
 }
 

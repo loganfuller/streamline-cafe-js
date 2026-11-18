@@ -117,6 +117,16 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
     assert.match(api, /export function connectPluginMessages\(pluginId, endpoint, onMessage, onOpen\) \{/);
 });
 
+test('the Grind row\'s hook is still in ui.js', () => {
+    // A preset's name shows as it is, a number to the step's places, and − and +
+    // step nothing from a row that holds no number (#42).
+    const ui = readFileSync(new URL('../src/modules/ui.js', import.meta.url), 'utf8');
+    assert.match(ui, /^import \{ grindText, grindNumber \} from '\.\.\/cafe\/grind-text\.js';$/m);
+    assert.match(ui, /export function updateGrindDisplay\(grinderData\) \{[^}]*grindValueEl\.textContent = grindText\(grindValue, grindStepNow\(\)\);/);
+    assert.match(ui, /updateGrindValue, undefined, \(\) => workflowGrinderRange\.max, grindNumber\);/, 'the Grind row reads its number strictly');
+    assert.equal(ui.match(/let currentValue = readValue\(valueEl\);\s*if \(currentValue === null\) return;/g)?.length, 2, 'and − and + both step nothing from no number');
+});
+
 test('no module opens one of DYE2\'s pages', () => {
     // The page never leaves for DYE2's editor: recipes are made, chosen and
     // taken out of a slot here.
