@@ -365,7 +365,7 @@ button.cafe-card {
     color: var(--data-card-title-text-color);
 }
 
-/* A row whose name opens a dialog (the grinder's): the name and the line under
+/* A row whose name opens a dialog (the bean's, the basket's, the grinder's): the name and the line under
    it are one button, as wide as the row. The stepper sits over its end. */
 .cafe-row-pick {
     flex: 1 1 0;
@@ -434,7 +434,9 @@ button.cafe-card {
    the label, so Streamline's tap never fires. The profile name takes none
    until its dialog arrives. */
 #main-page #profile-name,
-#main-page #grind-label {
+#main-page #grind-label,
+#main-page #dose-label,
+#main-page #drink-label {
     pointer-events: none;
 }
 
@@ -1386,12 +1388,63 @@ button.cafe-card {
     min-width: 160px;
 }
 
-#cafe-pick-list {
+/* The bean dialog is wider: its beans on the left, their batches on the right. */
+.cafe-dialog.cafe-pick-box.cafe-pick-wide {
+    width: 1180px;
+}
+
+.cafe-pick-lists {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 28px;
+}
+
+.cafe-pick-column {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-pick-column.cafe-pick-side-column {
+    flex: none;
+    width: 400px;
+}
+
+.cafe-pick-column[hidden],
+.cafe-pick-heading[hidden] {
+    display: none;
+}
+
+/* "Bean" and "Batches" over the two lists. */
+.cafe-pick-heading {
+    flex: none;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-rows {
     min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+/* "No baskets", where a list has no rows. */
+.cafe-pick-empty {
+    margin: 0;
+    padding: 24px 0;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
 }
 
 .cafe-pick-row {
@@ -1452,8 +1505,24 @@ button.cafe-card {
     color: var(--mimoja-blue-v2);
 }
 
+/* The bean whose batches are shown: filled in the accent colour. */
+.cafe-pick-side-row[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+    background: var(--mimoja-blue-v2);
+    color: #fff;
+}
+
+.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-row-detail {
+    opacity: 0.85;
+}
+
 [data-theme="dark"] .cafe-pick-row[aria-pressed="true"] {
     border-color: var(--button-primary-bg);
+}
+
+[data-theme="dark"] .cafe-pick-side-row[aria-pressed="true"] {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text, #fff);
 }
 
 [data-theme="dark"] .cafe-pick-in-use {

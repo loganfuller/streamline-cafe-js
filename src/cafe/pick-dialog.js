@@ -1,10 +1,11 @@
 // The dialog a dial-in row's name opens, to choose what the row names: the
-// grinder's list, and the bean, basket and profile lists after it
-// (docs/cafe/DESIGN.md, "What the screen shows"). A title, a line under it,
-// Close, and rows of a name over a detail, the one in use marked "In use".
-// The markup is in index.html; this module fills it in, shows it and answers
-// with the row that was tapped. What a row says, and what a choice does, are
-// the caller's.
+// grinder, the bean and batch, and the basket, and the profile after them
+// (docs/cafe/DESIGN.md, "The grinder, bean and basket dialogs"). A title, a
+// line under it, Close, and rows of a name over a detail, the one in use
+// marked "In use". The bean's has a second list on the left, whose rows choose
+// nothing: a tap there shows that bean's batches on the right. The markup is
+// in index.html; this module fills it in, shows it and answers with the row
+// that was tapped. What a row says, and what a choice does, are the caller's.
 import { cafeText, setText } from './text.js';
 
 let wired = false;
@@ -32,6 +33,7 @@ function rowButton(row, onPick) {
     button.type = 'button';
     button.className = 'cafe-pick-row';
     button.setAttribute('aria-pressed', String(!!row.inUse));
+    button.dataset.id = row.id ?? '';
     const words = span('cafe-pick-row-text');
     words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
     button.append(words);
@@ -45,6 +47,36 @@ function rowButton(row, onPick) {
     return button;
 }
 
+// A row of the list on the left: a name over a detail, the one shown on the
+// right filled in.
+function sideButton(row, onShow) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'cafe-pick-row cafe-pick-side-row';
+    button.setAttribute('aria-pressed', String(!!row.highlighted));
+    button.dataset.id = row.id ?? '';
+    const words = span('cafe-pick-row-text');
+    words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
+    button.append(words);
+    button.addEventListener('click', () => onShow(row));
+    return button;
+}
+
+// The list's own words where it has no rows ("No baskets"), as a key.
+function emptyLine(key) {
+    const line = document.createElement('p');
+    line.className = 'cafe-pick-empty';
+    setText(line, key, { translate: true });
+    return line;
+}
+
+// A visible heading over a list, or none: `key` is a translation key.
+function heading(element, key) {
+    if (!element) return;
+    element.hidden = !key;
+    if (key) setText(element, key, { translate: true });
+}
+
 /** Is the dialog showing? */
 export function pickOpen() {
     return !!document.getElementById('cafe-pick-dialog')?.open;
@@ -53,27 +85,56 @@ export function pickOpen() {
 /**
  * Show a list to choose from. `title` is a translation key; `subtitle` is
  * `{ key, vars }`, a key and what fills its places; `label` names the list for
- * a screen reader, already in the page's language; `rows` are
- * `{ name, detail, inUse }`, in the order shown. Resolves the row tapped, or
- * null when the dialog was closed without one.
+ * a screen reader, already in the page's language, and `heading`, a key, is
+ * shown over it where given; `rows` are `{ id, name, detail, inUse }`, in the
+ * order shown, and `empty` is the key said where there are none. Resolves the
+ * row tapped, or null when the dialog was closed without one.
+ *
+ * `side`, where given, is the list on the left: `{ heading, rows, show }`,
+ * where `heading` is a key, `rows` are `{ id, name, detail, highlighted }`,
+ * and `show(row)` answers what the dialog shows once that row is tapped:
+ * `{ subtitle, rows }` for the right-hand list.
  */
-export function choose({ title, subtitle, label, rows }) {
+export function choose({ title, subtitle, label, heading: listHeading = null, rows, empty = null, side = null }) {
     const dialog = document.getElementById('cafe-pick-dialog');
     const list = document.getElementById('cafe-pick-list');
+    const sideColumn = document.getElementById('cafe-pick-side-column');
+    const sideList = document.getElementById('cafe-pick-side');
     if (!dialog || !list || typeof dialog.showModal !== 'function' || dialog.open) return Promise.resolve(null);
+    if (side && (!sideColumn || !sideList)) return Promise.resolve(null);
     wire(dialog);
     return new Promise(resolve => {
         let chosen = null;
+        const pick = row => { chosen = row; dialog.close(); };
+        const under = document.getElementById('cafe-pick-under');
+        const fill = (next, line) => {
+            setText(under, line.key, { translate: true, vars: line.vars });
+            list.replaceChildren(...(next.length || !empty ? next.map(row => rowButton(row, pick)) : [emptyLine(empty)]));
+        };
         setText(document.getElementById('cafe-pick-title'), title, { translate: true });
-        setText(document.getElementById('cafe-pick-under'), subtitle.key, { translate: true, vars: subtitle.vars });
+        heading(document.getElementById('cafe-pick-heading'), listHeading);
         list.setAttribute('aria-label', label);
-        list.replaceChildren(...rows.map(row => rowButton(row, picked => { chosen = picked; dialog.close(); })));
+        dialog.querySelector('.cafe-pick-box')?.classList.toggle('cafe-pick-wide', !!side);
+        if (sideColumn) sideColumn.hidden = !side;
+        if (side) {
+            heading(document.getElementById('cafe-pick-side-heading'), side.heading);
+            const show = row => {
+                for (const button of sideList.children) button.setAttribute('aria-pressed', String(button.dataset.id === row.id));
+                const next = side.show(row);
+                fill(next.rows, next.subtitle);
+                list.scrollTop = 0;
+            };
+            sideList.replaceChildren(...side.rows.map(row => sideButton(row, show)));
+        }
+        fill(rows, subtitle);
         dialog.addEventListener('close', () => {
             list.replaceChildren();
+            sideList?.replaceChildren();
             resolve(chosen);
         }, { once: true });
         dialog.showModal();
         // Opened on the row in use, where a long list puts it out of view.
+        sideList?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
         list.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
     });
 }

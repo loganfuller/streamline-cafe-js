@@ -15,8 +15,10 @@ import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow }
 import { decentSyncSaves } from './sync-status.js';
 import { askStatus, onStatus } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
-import { cafeText, cafeDateLocale, setText } from './text.js';
+import { cafeText, formatRoastDay, setText } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
+import { openBeanDialog } from './bean-dialog.js';
+import { openBasketDialog } from './basket-dialog.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -74,16 +76,6 @@ function showStatus(answer) {
 }
 
 // ── What the dial-in rows name ───────────────────────────────────────────────
-
-// "28 Oct", in the page's language. The day is a calendar day, so it is
-// formatted in UTC, where roastDay() read it.
-function formatRoastDay(day) {
-    try {
-        return new Date(`${day}T00:00:00Z`).toLocaleDateString(cafeDateLocale(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    } catch (error) {
-        return day;
-    }
-}
 
 function renderNames() {
     const roasted = names.roastDay ? cafeText('roasted {date}', { date: formatRoastDay(names.roastDay) }) : '';
@@ -250,6 +242,14 @@ function openGrinder() {
     openGrinderDialog({ mayOpen: mayPick, epoch: () => loads, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
 }
 
+function openBean() {
+    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved, write: writePick });
+}
+
+function openBasket() {
+    openBasketDialog({ mayOpen: mayPick, epoch: () => loads, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
+}
+
 // ── During a shot ────────────────────────────────────────────────────────────
 
 function paintLiveWeight() {
@@ -337,11 +337,13 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     for (const [id, direction] of [['cafe-steam-minus', -1], ['cafe-steam-plus', 1]]) {
         el(id)?.addEventListener('click', event => stepSteam(direction, event.currentTarget));
     }
-    // The Grind row's name and the grinder's under it are one button. Streamline's
-    // own tap on #grind-label, inside it, never fires: cafe.css takes pointer
-    // events off the label, so a tap lands on the button and never passes
-    // through the label.
+    // The Grind row's name and the grinder's under it are one button, and so
+    // are Dose's with the bean and Yield's with the basket. Streamline's own tap
+    // on #grind-label, inside it, never fires: cafe.css takes pointer events off
+    // the labels, so a tap lands on the button and never passes through a label.
     el('cafe-grind-pick')?.addEventListener('click', openGrinder);
+    el('cafe-dose-pick')?.addEventListener('click', openBean);
+    el('cafe-yield-pick')?.addEventListener('click', openBasket);
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);
