@@ -24,10 +24,16 @@ let opening = false;
 // shot has settled: up to its 4 s backstop after the pour ends. A barista write
 // in those seconds waits them out, so it neither renames nor un-names the Shot
 // just pulled. It waits before `write`, whose check for a shot that started
-// meanwhile then still comes last.
+// meanwhile then still comes last. The waits end in the order they began, so a
+// sleep's clear never overtakes a pick made before it. Answers whether it waits.
+let stored = Promise.resolve();
 function shotStored() {
     const ms = storeWait(getEspressoEndedAt(), Date.now());
-    return ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
+    if (ms > 0) {
+        const until = Date.now() + ms;
+        stored = stored.then(() => new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()))));
+    }
+    return { waits: ms > 0, done: stored };
 }
 
 // The rows of the seam's first page, newest first: on a Machine Decent Sync
@@ -89,13 +95,18 @@ export async function openBaristaDialog({ mayOpen, shown, look, written, write }
         if (typed && name === null) return; // nothing but spaces
         const patch = baristaPick(name, shown(), { typed });
         if (!patch) return; // the barista in use: nothing is written
+        const wait = shotStored();
+        // Waiting for the Shot just pulled to be stored: the button shows the
+        // choice at once, and is put right from the Workflow if it fails.
+        if (wait.waits) written(patch.context.baristaName || '');
         try {
-            await shotStored();
+            await wait.done;
             await write(() => updateWorkflow(patch, 'cafe.barista'));
         } catch (error) {
-            // The button keeps the name the Workflow holds.
+            // The button shows the name the Workflow holds.
             logger.warn('Cafe: could not change the barista', error);
             showToast(cafeText('Could not change the barista'), 4000, 'error');
+            if (wait.waits) document.dispatchEvent(new Event('streamline:workflow-refresh'));
             return;
         }
         written(patch.context.baristaName || '');
@@ -116,7 +127,7 @@ export async function openBaristaDialog({ mayOpen, shown, look, written, write }
  */
 export async function clearOnSleep({ write, written }) {
     try {
-        await shotStored();
+        await shotStored().done;
         const cleared = await write(async () => {
             const patch = sleepClear((await getWorkflow())?.context);
             if (!patch) return false;
