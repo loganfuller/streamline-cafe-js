@@ -280,6 +280,38 @@ test('a recipe whose Shots were not read yet when its shot stopped in the Prehea
     assert.equal(did(found.effects, 'draw').length, 1);
 });
 
+test('a shot started before the recipe\'s Shots were read reads them for the reference, and draws nothing over the chart', () => {
+    // DYE2 answered after the machine's first frame, on a page opened in a Preheat.
+    const early = play(initialGraphState(), { type: 'shotStarted', profileStarted: false }, { type: 'recipe', recipe: RECIPE });
+    assert.equal(early.state.live, true);
+    const found = answer(early.state, early.effects, LATEST);
+    assert.equal(inGraph(found.state).reference.shot, REF, 'the reference goes behind the running shot');
+    assert.equal(inGraph(found.state).live, true, 'still "Live shot"');
+    assert.deepEqual(kinds(found.effects), ['overlay', 'paint'], 'nothing is drawn over the chart\'s lines');
+    // Stopped in the Preheat: the latest read during the shot is drawn back at once.
+    const stopped = play(found.state, { type: 'shotEnded', poured: false });
+    assert.equal(stopped.state.latest, LATEST);
+    assert.deepEqual(kinds(stopped.effects), ['overlay', 'draw', 'readShots']);
+
+    // The recipe known, its read on the way when the shot started: the read is asked again.
+    const loaded = play(initialGraphState(), { type: 'recipe', recipe: RECIPE });
+    const started = play(loaded.state, { type: 'shotStarted', profileStarted: false });
+    const stale = play(started.state, { type: 'shotsRead', seq: lastRead(loaded.effects).seq, edits: 0, shot: LATEST, chosen: chosen(REF) });
+    assert.equal(stale.effects.length, 0, 'the read from before the shot is dropped');
+    assert.ok(lastRead(started.effects).seq > lastRead(loaded.effects).seq, 'and asked again');
+    const answered = answer(started.state, started.effects, LATEST);
+    assert.equal(inGraph(answered.state).reference.shot, REF);
+    assert.deepEqual(kinds(answered.effects), ['overlay', 'paint']);
+
+    // Poured: the saved shot is told from the latest read during the shot.
+    const poured = play(answered.state, { type: 'shotEnded', poured: true });
+    assert.equal(poured.state.settleFrom, LATEST.id);
+
+    // Once read, a shot reads nothing: its end reads again.
+    assert.ok(!did(play(withRecipe(), { type: 'shotStarted', profileStarted: false }).effects, 'readShots').length);
+    assert.ok(!did(play(answered.state, { type: 'referencePushed', recipeId: RECIPE.id }).effects, 'readShots').length);
+});
+
 test('a shot started over a finished one still waiting stops the looks for it', () => {
     const { state, effects } = play(STATES['a finished shot waiting with a recipe'](), { type: 'shotStarted' });
     assert.equal(state.settling, false);

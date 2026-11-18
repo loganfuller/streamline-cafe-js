@@ -2232,6 +2232,12 @@ const firstTime = (page, name) => page.evaluate(async lineName => {
     const line = chart?.getOption().series.find(series => series && String(series.id).startsWith('trace-') && series.name === lineName);
     return line && line.data.length ? line.data[0][0] : null;
 }, name);
+// Where a chart's time axis starts and ends as drawn, fitted or not.
+const axisExtent = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+    return chart ? chart.getModel().getComponent('xAxis', 0).axis.scale.getExtent() : null;
+}, id);
 // The live axis's end for a reference of `seconds`, as the overlay sets it.
 const liveEnd = seconds => seconds / 0.93;
 const near = (a, b, within = 0.05) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= within;
@@ -2324,6 +2330,8 @@ async function preheatLive() {
         await page.waitForTimeout(800);
         now = { lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
         check('preheat, in Targets: nothing on the graph', now.lines.own === 0 && now.lines.reference === 0 && now.stages.length === 0, JSON.stringify({ lines: now.lines, stages: now.stages }));
+        const targetsAxis = await axisExtent(page);
+        check('preheat, in Targets: the time axis starts at zero and runs a second', JSON.stringify(targetsAxis) === '[0,1]', JSON.stringify(targetsAxis));
         check('preheat, in Targets: the six live cards, with no values and a time of zero', now.row.mode === 'live' && now.row.cards[0].value === '0.0 s' && now.row.cards.slice(1).every(c => c.value === '—'), JSON.stringify(now.row.cards));
         await shot(page, 'preheat-targets-light');
         await page.locator('#cafe-view button[data-view="reference"]').click();
@@ -2344,6 +2352,33 @@ async function preheatLive() {
         // Still the latest after the page looks again.
         await page.waitForTimeout(3000);
         check('stopped in the Preheat: still the latest a moment later', (await legend(page)).when === rest.legend.when && (await ownLines(page)).own === rest.lines.own);
+
+        // The full-screen chart open when the Preheat starts, and when it stops, in both views.
+        for (const graphView of ['reference', 'targets']) {
+            await page.locator(`#cafe-view button[data-view="${graphView}"]`).click();
+            await page.waitForTimeout(800);
+            await page.locator('#plotly-chart').click();
+            await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
+            await page.waitForTimeout(1500);
+            const open = await ownLines(page, 'expanded-chart');
+            feed.fake('espresso', 'preparingForShot');
+            await page.waitForTimeout(1500);
+            const heating = await ownLines(page, 'expanded-chart');
+            const heatingAxis = await axisExtent(page, 'expanded-chart');
+            check(`full-screen open as the Preheat starts, in ${graphView}: the latest's lines leave it${graphView === 'reference' ? ', the reference stays' : ''}, the axis from zero`,
+                open.own > 10 && heating.own === 0 && (graphView === 'reference' ? heating.reference > 10 : heating.reference === 0) && heatingAxis?.[0] === 0,
+                JSON.stringify({ open, heating, heatingAxis }));
+            feed.fake('idle', 'idle');
+            await page.waitForTimeout(1500);
+            feed.pass();
+            await page.waitForTimeout(2000);
+            const back = await ownLines(page, 'expanded-chart');
+            check(`full-screen open as the Preheat stops, in ${graphView}: the latest is back on it`, JSON.stringify(back.points) === JSON.stringify(open.points), JSON.stringify({ back, open }));
+            await page.locator('#expanded-chart').click();
+            await page.waitForTimeout(1000);
+        }
+        await page.locator('#cafe-view button[data-view="reference"]').click();
+        await page.waitForTimeout(800);
 
         // A page opened during a Preheat.
         feed.fake('espresso', 'preparingForShot');
@@ -2383,6 +2418,27 @@ async function preheatLive() {
         check('the shot with a long Preheat was saved', !!third);
         for (let waited = 0; waited < 20_000 && (await legend(page)).when === rest.legend.when; waited += 1000) await sleep(1000);
         check('and once saved it is the latest', (await legend(page)).label === 'Latest' && (await legend(page)).when !== rest.legend.when, JSON.stringify(await legend(page)));
+
+        // The same in Targets: the axis starts at zero through the Preheat and the profile's start.
+        await page.locator('#cafe-view button[data-view="targets"]').click();
+        await page.waitForTimeout(800);
+        let targetsStart = null;
+        feed.hold();
+        const fifth = await pull(4, async () => {
+            await page.waitForTimeout(2500);
+            const extents = [await axisExtent(page)];
+            feed.pass();
+            await page.waitForTimeout(100);
+            for (let i = 0; i < 8; i += 1) { extents.push(await axisExtent(page)); await page.waitForTimeout(100); }
+            targetsStart = { extents, own: (await ownLines(page)).own };
+        });
+        check('in Targets, through a long Preheat and the profile\'s start: the axis starts at zero, and its end only grows',
+            targetsStart && targetsStart.own > 0 && targetsStart.extents.every(extent => extent && extent[0] === 0 && extent[1] >= 1)
+            && targetsStart.extents.every((extent, i) => i === 0 || extent[1] >= targetsStart.extents[i - 1][1]),
+            JSON.stringify(targetsStart));
+        check('the shot in Targets was saved', !!fifth);
+        await page.locator('#cafe-view button[data-view="reference"]').click();
+        await page.waitForTimeout(800);
 
         // A shot with no Preheat frame.
         let noPreheat = null;

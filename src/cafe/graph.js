@@ -23,7 +23,7 @@ import { graphModel, shotCredit, whenText, viewFrom } from './shot-model.js';
 import { graphStep, initialGraphState, shownRemarks, inGraph, shotInGraphId } from './graph-state.js';
 import { starFills, ratingForTap, ratingOf, ratingText, noteToSave, editedRemarks } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
-import { referenceOverlay, referenceColor } from './reference-overlay.js';
+import { referenceOverlay, referenceColor, liveAxis } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
 import { shotNumbers, restCards, liveCards, liveFrame } from './comparison.js';
@@ -168,9 +168,11 @@ function nameWidth(name) {
 function overlay(traces, layout, mode, chart) {
     const { curves, stages } = overlayFor;
     // Through a shot's Preheat the chart is drawn as at rest, empty, and the
-    // time axis is the live one already, so the profile's start moves nothing.
+    // time axis is the live one already, starting at zero in both views, so the
+    // profile's start moves nothing.
     const axis = state.live ? 'live' : mode;
     let drawn = view === 'reference' ? referenceOverlay(traces, layout, axis, { curves, dark: isDark() }) : { traces, layout };
+    if (state.live) drawn = { traces: drawn.traces, layout: liveAxis(traces, drawn.layout) };
     if (chart !== 'main') return drawn;
     let shown = drawn.layout;
     if (stages && !(shown.shapes && shown.shapes.length)) shown = { ...shown, shapes: stageShapes(stages, isDark()) };

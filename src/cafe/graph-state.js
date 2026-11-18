@@ -349,8 +349,21 @@ function refresh(s, todo, { onlyIfChanged = false } = {}) {
         if (!s.live && s.recipe === null) readLast(s, todo);
         return;
     }
+    readShots(s, todo);
+}
+
+function readShots(s, todo) {
     s.seq += 1;
     todo.push({ do: 'readShots', recipeId: s.recipe.id, seq: s.seq, edits: s.edits });
+}
+
+// A shot that started before anything was read for the loaded recipe reads the
+// recipe's Shots, for the reference behind it: at its start, when a read on its
+// way is dropped, and at DYE2's first answer, on a page opened during a shot or
+// its Preheat. Its lines stay the chart's. A recipe loaded once the shot has
+// started is another than the shot's, and is read at its end.
+function readUnread(s, todo) {
+    if (s.recipe && s.latest === undefined) readShots(s, todo);
 }
 
 function refreshSoon(s, todo) {
@@ -381,7 +394,19 @@ function shotsUnread(s, todo, { seq }) {
 }
 
 function shotsRead(s, todo, { seq, edits: editsThen, shot, chosen }) {
-    if (seq !== s.seq || s.live) return;
+    if (seq !== s.seq) return;
+    // Read while a shot runs (`readUnread`): the reference goes behind the
+    // running shot's lines, and the latest is what its end draws or tells the
+    // saved shot from. Nothing is drawn over the chart's own lines.
+    if (s.live) {
+        s.latest = shot;
+        takeRemarks(s, shot, editsThen);
+        const found = chosen || s.reference || NO_REFERENCE;
+        s.reference = { ...found, ...referenceParts(found.shot) };
+        overlay(todo);
+        paint(todo);
+        return;
+    }
     // A shot has just ended and Decaid does not have it yet: the graph keeps
     // its live lines, and the next look is a little later.
     if (s.settling && s.settleStep < SETTLE_GAPS_MS.length) {
@@ -560,6 +585,7 @@ function recipeChanged(s, todo, next) {
     overlay(todo);
     paint(todo);
     refresh(s, todo);
+    if (s.live && before === undefined) readUnread(s, todo);
 }
 
 // ── The history module's requests ────────────────────────────────────────────
@@ -628,6 +654,7 @@ function shotStarted(s, todo, profileStarted = false) {
     overlay(todo);
     if (!profileStarted) todo.push({ do: 'clear' });
     paint(todo);
+    readUnread(s, todo);
 }
 
 function shotEnded(s, todo, poured) {
