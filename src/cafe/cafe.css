@@ -1584,7 +1584,10 @@ button.cafe-card {
     flex: none;
 }
 
+/* Dark: the rows' outline is almost the box's own colour, so the dashes take
+   the border colour the note's text box has. */
 [data-theme="dark"] .cafe-pick-row.cafe-pick-add {
+    border-color: var(--border-primary);
     color: var(--text-primary);
 }
 

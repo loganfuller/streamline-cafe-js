@@ -1510,6 +1510,9 @@ async function baristaAtTheMachine() {
                     await page.locator('#cafe-shots-btn').click();
                     await page.locator(`[data-shot-id="${saved.id}"]`).click({ timeout: 10_000 }).catch(() => {});
                     await page.locator('#cafe-back').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+                    // The list's fade out over, for the screenshot.
+                    await page.locator('#cafe-shots-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+                    await page.waitForTimeout(1200);
                     const viewing = await page.evaluate(() => {
                         const a = document.getElementById('cafe-barista').getBoundingClientRect();
                         const b = document.getElementById('cafe-back').getBoundingClientRect();
