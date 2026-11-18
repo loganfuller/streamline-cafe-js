@@ -60,12 +60,15 @@ test('a choice in a pick dialog writes the Workflow, through its own writer, and
     // from the Workflow, and DYE2 saves the basket when the plugin asks it to
     // save the dial-in; the skin writes nothing onto a recipe for a choice,
     // with Decent Sync or without.
-    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['barista-dialog.js', 'basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js']);
+    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['barista-dialog.js', 'basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js', 'profile-changer.js']);
     const writes = name => [...SOURCES.find(source => source.name === name).text.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]);
     assert.deepEqual(writes('grinder-dialog.js'), ["patch, 'cafe.grinder'"]);
     // A batch goes through Streamline's own bean writer, as its bean picker writes one.
     assert.deepEqual(writes('bean-dialog.js'), ["patch, 'beans.select'"]);
     assert.deepEqual(writes('basket-dialog.js'), ["patch, 'cafe.basket'"]);
+    // The profile is the one choice that writes a record too, and only before
+    // its one Workflow write (the test below).
+    assert.deepEqual(writes('profile-changer.js'), ["patch, 'cafe.profile'"]);
     // The barista's pick and the clear as the machine sleeps, each through the
     // page's write, which waits for a dial-in change still on its way.
     assert.deepEqual(writes('barista-dialog.js'), ["patch, 'cafe.barista'", "patch, 'cafe.barista'"]);
@@ -75,6 +78,21 @@ test('a choice in a pick dialog writes the Workflow, through its own writer, and
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv|setKVValue/, name);
     }
+});
+
+test('the profile is the one choice saved onto a DYE2 record, through the one writer', () => {
+    // DYE2 unloads a recipe whose Workflow moves to a profile its record does
+    // not hold, so the record takes the profile first (profile-change.js).
+    assert.deepEqual(filesWith(/from '\.\/recipe-writer\.js'/), ['arrange.js', 'profile-changer.js']);
+    const changer = SOURCES.find(({ name }) => name === 'profile-changer.js').text;
+    assert.match(changer, /import \{ setRecipeFields \} from '\.\/recipe-writer\.js';/);
+    assert.match(changer, /saveRecord: setRecipeFields,/);
+    assert.deepEqual(filesWith(/\bsetRecipeFields\b/), ['profile-changer.js', 'recipe-writer.js']);
+    // What it decides is worked out where no browser global is touched (the
+    // modules imported below, at load), and reaches Decaid, DYE2 and Streamline
+    // only through what profile-changer.js hands it.
+    const model = SOURCES.find(({ name }) => name === 'profile-change.js').text;
+    assert.deepEqual([...model.matchAll(/^import .* from '([^']+)';$/gm)].map(match => match[1]), ['../modules/dye-selection.js', './recipe-name.js']);
 });
 
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
@@ -148,15 +166,19 @@ test('no module opens one of DYE2\'s pages', () => {
 });
 
 test('DYE2\'s selection is cleared in one place, after Streamline\'s strip module is told', () => {
-    // Every request to DYE2's selection but a read is the unload's, in
-    // arrange.js, which a tap on the loaded card and a recipe leaving its slot
-    // both go through. unloadSelection calls forgetAppliedItem before the post
-    // (test/cafe-recipe-loader.test.mjs); this keeps the post inside it.
+    // Every request to DYE2's selection but a read is in arrange.js: the
+    // unload's, which a tap on the loaded card and a recipe leaving its slot
+    // both go through, and the check after a profile change marking its recipe
+    // loaded again. unloadSelection calls forgetAppliedItem before the post
+    // (test/cafe-recipe-loader.test.mjs); this keeps the post inside it, and
+    // markLoaded's after its own call.
     const posts = SOURCES.flatMap(({ name, text }) => [...text.matchAll(/callPluginEndpoint\(\s*DYE2_PLUGIN_ID\s*,\s*'selection'\s*,([^)]*)\)/g)]
         .filter(match => !/'GET'/.test(match[1])).map(() => name));
-    assert.deepEqual(posts, ['arrange.js']);
+    assert.deepEqual(posts, ['arrange.js', 'arrange.js']);
     const arrange = SOURCES.find(({ name }) => name === 'arrange.js').text;
     assert.match(arrange, /unloadSelection\(\{ forget: forgetAppliedItem, post: \(\) => callPluginEndpoint\(DYE2_PLUGIN_ID, 'selection', \{\}\) \}\)/);
+    assert.match(arrange, /export async function markLoaded\(recipeId\) \{\n    forgetAppliedItem\(\);\n    await callPluginEndpoint\(DYE2_PLUGIN_ID, 'selection', \{ kind: 'recipe', id: recipeId \}\);\n\}/);
+    assert.deepEqual(filesWith(/\bmarkLoaded\b/), ['arrange.js', 'profile-change.js', 'profile-changer.js']);
     assert.deepEqual(filesWith(/\bunloadSelection\b/), ['arrange.js', 'recipe-loader.js']);
     assert.deepEqual(filesWith(/\bclearSelection\b/), ['arrange.js', 'strip.js']);
 });
@@ -212,7 +234,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecipeWriter } from '../src/cafe/recipe-write.js';
+import { createRecipeWriter, rowHolds } from '../src/cafe/recipe-write.js';
 
 const row = (id, stripSlot, over = {}) => ({ id, stripSlot, name: `Recipe ${id}`, showOnStreamlineDashboard: true, ...over });
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -304,4 +304,64 @@ test('an id is matched as DYE2 matches it, number or text', async () => {
     assert.equal(result.ok, true);
     assert.equal(world.rows[0].stripSlot, 6);
     assert.equal(world.rows[0].id, 3);
+});
+
+test('a field named one level down is set inside what the row holds there, and the rest is kept', async () => {
+    const world = store([row('a', 1, { workflow: { context: { targetYield: 40 }, profile: { title: 'Old' } }, dashboardVariables: { dose: 18, brewC: 93 } })]);
+    const result = await world.writer.setFields('a', { 'workflow.profile': { title: 'New' }, 'dashboardVariables.brewC': 88, profileId: 'p2' });
+    assert.equal(result.ok, true);
+    assert.deepEqual(world.get('a').workflow, { context: { targetYield: 40 }, profile: { title: 'New' } });
+    assert.deepEqual(world.get('a').dashboardVariables, { dose: 18, brewC: 88 });
+    assert.equal(world.get('a').profileId, 'p2');
+    assert.equal(world.writes.length, 1);
+});
+
+test('a field one level down on a row that holds nothing there makes the object', async () => {
+    const world = store([row('a', 1)]);
+    await world.writer.setFields('a', { 'dashboardVariables.brewC': 88 });
+    assert.deepEqual(world.get('a').dashboardVariables, { brewC: 88 });
+});
+
+test('fields worked out from the row as read are worked out again for the retry', async () => {
+    // DYE2 writes its older copy back, with a dial-in change, over the first write.
+    const world = store([row('a', 1, { dashboardVariables: { dose: 18 } })], {
+        onWrite(n, w) { if (n === 1) w.rows = [row('a', 1, { dashboardVariables: { dose: 19 } })]; },
+    });
+    const seen = [];
+    const result = await world.writer.setFields('a', r => { seen.push(r.dashboardVariables.dose); return { 'dashboardVariables.brewC': 88 }; });
+    assert.equal(result.ok, true);
+    assert.deepEqual(seen, [18, 19]);
+    assert.deepEqual(world.get('a').dashboardVariables, { dose: 19, brewC: 88 });
+});
+
+test('a store that writes an object back with its keys in another order still confirms', async () => {
+    let rows = [row('a', 1)];
+    const reorder = value => (value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.keys(value).sort().reverse().map(key => [key, reorder(value[key])]))
+        : Array.isArray(value) ? value.map(reorder) : value);
+    let writes = 0;
+    const writer = createRecipeWriter({
+        read: async () => copy(rows),
+        write: async next => { writes += 1; rows = reorder(copy(next)); },
+    });
+    const profile = { title: 'New', steps: [{ pump: 'flow', flow: 2, temperature: 88 }], target_weight: 40 };
+    const result = await writer.setFields('a', { profileSnapshot: profile, 'workflow.profile': profile });
+    assert.equal(result.ok, true);
+    assert.equal(writes, 1);
+});
+
+test('values that differ in a nested array are not confirmed as held', async () => {
+    const world = store([row('a', 1)], {
+        onWrite(n, w) { w.rows[0].profileSnapshot.steps[0].flow = 9; },
+    });
+    const result = await world.writer.setFields('a', { profileSnapshot: { steps: [{ flow: 2 }] } });
+    assert.deepEqual(result, { ok: false, reason: 'unconfirmed' });
+});
+
+test('rowHolds compares named fields, one level down too', () => {
+    const r = row('a', 1, { workflow: { profile: { title: 'X', n: [1, 2] } } });
+    assert.equal(rowHolds(r, { 'workflow.profile': { n: [1, 2], title: 'X' } }), true);
+    assert.equal(rowHolds(r, { 'workflow.profile': { n: [2, 1], title: 'X' } }), false);
+    assert.equal(rowHolds(r, { 'dashboardVariables.brewC': undefined }), true, 'nothing there is nothing');
+    assert.equal(rowHolds(null, {}), false);
 });

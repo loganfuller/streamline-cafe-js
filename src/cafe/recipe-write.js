@@ -8,7 +8,8 @@
 //
 // - reads the records again first, and never writes over a list it could not read;
 // - changes only the named fields of one row, and keeps every field and every
-//   row it does not know;
+//   row it does not know. A field may be named one level down, as
+//   `workflow.profile`: the rest of `workflow` is kept as just read;
 // - gives a slot one holder: the row placed in it takes it from any other;
 // - reads again to confirm, and tries once more when the change is not there.
 
@@ -17,9 +18,50 @@ import { SLOT_COUNT } from './strip-model.js';
 
 const sameId = (row, id) => !!row && typeof row === 'object' && String(row.id) === String(id);
 
-// Stored values are JSON, and a field this module wrote reads back in the order
-// it was written.
-const sameValue = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+
+// Stored values are JSON. Objects are compared whatever the order of their
+// keys, so a store that writes them back in another order still confirms.
+function sameValue(a, b) {
+    if (a === b) return true;
+    if (Array.isArray(a) || Array.isArray(b)) {
+        return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => sameValue(value, b[i]));
+    }
+    if (!isObject(a) || !isObject(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
+}
+
+// `workflow.profile` names `profile` inside `workflow`; a name with no dot
+// names a field of the row itself.
+const pathOf = name => {
+    const dot = name.indexOf('.');
+    return dot < 0 ? [name] : [name.slice(0, dot), name.slice(dot + 1)];
+};
+
+const valueAt = (row, name) => {
+    const [top, inner] = pathOf(name);
+    if (inner === undefined) return row[top];
+    return isObject(row[top]) ? row[top][inner] : undefined;
+};
+
+// The row with `fields` set, a field one level down set inside what the row
+// holds there, and everything else kept.
+function setOn(row, fields) {
+    const next = { ...row };
+    for (const [name, value] of Object.entries(fields)) {
+        const [top, inner] = pathOf(name);
+        if (inner === undefined) next[top] = value;
+        else next[top] = { ...(isObject(next[top]) ? next[top] : {}), [inner]: value };
+    }
+    return next;
+}
+
+/** Does this row hold every one of the named fields? */
+export function rowHolds(row, fields) {
+    return !!row && typeof row === 'object'
+        && Object.entries(fields).every(([name, value]) => sameValue(valueAt(row, name), value));
+}
 
 // A recipe is in a slot when its `stripSlot` names it and it is not hidden from
 // the strip, as DYE2 and Streamline's strip both read it.
@@ -30,7 +72,7 @@ const holdsSlot = (row, slot) => !!row && row.stripSlot === slot && row.showOnSt
 function withFields(rows, id, fields) {
     const slot = fields.stripSlot;
     return rows.map(row => {
-        if (sameId(row, id)) return { ...row, ...fields };
+        if (sameId(row, id)) return setOn(row, fields);
         if (slot != null && row && row.stripSlot === slot) return { ...row, stripSlot: null };
         return row;
     });
@@ -41,7 +83,7 @@ function holdsFields(rows, id, fields) {
     const row = rows.find(r => sameId(r, id));
     if (!row) return false;
     const slot = fields.stripSlot;
-    return Object.keys(fields).every(key => sameValue(row[key], fields[key]))
+    return rowHolds(row, fields)
         && (slot == null || !rows.some(r => r && !sameId(r, id) && r.stripSlot === slot));
 }
 
@@ -64,15 +106,18 @@ function holdsFields(rows, id, fields) {
  */
 export function createRecipeWriter({ read, write }) {
     /**
-     * Set the named fields of one recipe. `unless(rows, row)` may return a reason
-     * not to, judged on the records as just read.
+     * Set the named fields of one recipe. `change` is the fields, or a function
+     * of the row and the records as just read that answers them, so a field is
+     * worked out from what DYE2 holds at the time of each write. `unless(rows,
+     * row)` may return a reason not to, judged on the same read.
      */
-    async function setFields(id, fields, { unless = () => null } = {}) {
+    async function setFields(id, change, { unless = () => null } = {}) {
         for (let attempt = 0; attempt < 2; attempt += 1) {
             const rows = await read();
             if (!rows) return { ok: false, reason: 'unreadable' };
             const row = rows.find(r => sameId(r, id));
             if (!row) return { ok: false, reason: 'gone' };
+            const fields = typeof change === 'function' ? change(row, rows) : change;
             if ('stripSlot' in fields && !rows.some(r => r && typeof r === 'object' && r.stripSlot !== undefined)) {
                 return { ok: false, reason: 'legacy' };
             }

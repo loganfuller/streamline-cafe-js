@@ -33,6 +33,19 @@ const failed = text => showToast(text, 4000, 'error');
 // card unloads through it too (strip.js).
 export const clearSelection = () => unloadSelection({ forget: forgetAppliedItem, post: () => callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', {}) });
 
+/**
+ * Mark a recipe as the loaded one again, and change nothing else: the check
+ * after a profile change, which found DYE2 had dropped the recipe whose record
+ * it had just saved the profile onto (profile-changer.js). DYE2's selection
+ * request writes the marker alone. Streamline's strip module is told first, as
+ * before an unload, so a request of its own still retrying does not name
+ * another recipe after this one.
+ */
+export async function markLoaded(recipeId) {
+    forgetAppliedItem();
+    await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', { kind: 'recipe', id: recipeId });
+}
+
 async function unloadIfLoaded(recipeId) {
     try {
         const selection = await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', null, 'GET');

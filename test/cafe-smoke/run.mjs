@@ -7,6 +7,8 @@
 //   node test/cafe-smoke/run.mjs --token=... --headed
 //   node test/cafe-smoke/run.mjs --token=... --streamline=http://127.0.0.1:13998
 //   node test/cafe-smoke/run.mjs --token=... --timezone=Europe/Berlin   (the container's zone, UTC by default)
+//   node test/cafe-smoke/run.mjs --token=... --only=profile   (step 25 alone, after a whole run)
+//   node test/cafe-smoke/run.mjs --token=... --restart-decaid='<a command that starts Decaid again>'
 //
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
 // switches Streamline's "DYE2 on" setting, writes made-up beans, grinders and
@@ -48,6 +50,10 @@ const HEADED = args.includes('--headed');
 // page reads it in the browser's. On a tablet the two are one clock; here the
 // browser is put in the container's zone, which is UTC unless it was given another.
 const TIMEZONE = flag('timezone', 'UTC');
+// One step alone, by name, on a Decaid a whole run has already set up.
+const ONLY = flag('only', '');
+// A shell command that starts Decaid again, for step 25's check across a restart.
+const RESTART_DECAID = flag('restart-decaid', '');
 const API = `${DECAID}/api/v1`;
 const SETTING = `${API}/store/streamlineSettings/streamline.dye2Enabled`;
 const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
@@ -1854,6 +1860,309 @@ async function baristaAtTheMachine() {
     }
 }
 
+// ── The profile changed from the page (#50) ─────────────────────────────────
+
+// The function the profile dialog (#51) will call, called from the page itself:
+// its answer, and the check afterwards kept in the page to be awaited.
+const changeProfile = (page, profileId) => page.evaluate(async id => {
+    const { changeProfile: change } = await import('/src/cafe/profile-changer.js');
+    const { checked, ...answer } = await change(id);
+    window.__cafeChecked = checked;
+    return answer;
+}, profileId);
+const checkedAfter = page => page.evaluate(() => window.__cafeChecked);
+// Decaid answering again, with DYE2 loaded.
+async function decaidBack() {
+    for (let waited = 0; waited < 120_000; waited += 1000) {
+        const ready = await dye2().then(plugin => !!plugin?.loaded, () => false);
+        if (ready) return true;
+        await sleep(1000);
+    }
+    return false;
+}
+
+// 25. The profile changed from the page, the trial of #50 (docs/cafe/DESIGN.md,
+//     "Changing the profile"): a loaded recipe's DYE2 record takes the profile
+//     first, then the Workflow, and the recipe stays loaded, at once, after
+//     DYE2's window, through a temperature step, a load of another recipe and
+//     back, a shot, DYE2 starting again and, with --restart-decaid=, Decaid
+//     starting again; straight after a dial-in step, and with DYE2 asked to save
+//     the dial-in around the change; with the record written back over the
+//     change in DYE2's window, and the recipe unloaded with it; a recipe DYE2
+//     named takes the new profile's name and one named by hand keeps its own;
+//     and with no recipe loaded no record changes. Nothing on the page calls it
+//     yet: the run calls it from the page.
+async function profileChange() {
+    const [house, single] = RECIPES;
+    const selection = () => decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
+    const loadedId = async () => loadedRecipeId(await selection());
+    const profiles = await decaid('GET', '/profiles');
+    const byTitle = title => profiles.find(p => p.profile?.title === title);
+    // Three of Decaid's profiles, each with a temperature of its own.
+    const [light, gentle, bloom] = ['Best practice (light roast)', 'Gentle and sweet', 'Easy blooming - active pressure decline'].map(byTitle);
+    const own = record => record.profile.steps[0].temperature;
+    check('profile: Decaid holds the three profiles the step uses', !!light && !!gentle && !!bloom);
+    if (!light || !gentle || !bloom) return;
+    note(`profiles: ${light.profile.title} ${own(light)}°C, ${gentle.profile.title} ${own(gentle)}°C, ${bloom.profile.title} ${own(bloom)}°C`);
+    const recordsAtStart = await records();
+    const workflowAtStart = await decaid('GET', '/workflow');
+    await decaid('PUT', '/machine/state/idle').catch(() => {});
+    let view = await openPage();
+    try {
+        await waitForPage(view.page);
+        await view.page.waitForTimeout(2500);
+        const card = recipe => view.page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+        const loadCard = async recipe => {
+            if ((await card(recipe).getAttribute('aria-pressed')) === 'true') return; // a tap would unload it
+            await card(recipe).click();
+            await view.page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+            await view.page.waitForTimeout(3000);
+        };
+        const brewRow = async () => ({ name: (await view.page.locator('#profile-name').textContent()).trim(), temp: parseFloat(await view.page.locator('#temp-value').textContent()) });
+        const writesSince = (mark, test) => view.seen.requests.slice(mark).filter(test);
+        const dialIn = wf => JSON.stringify({ dose: wf.context.targetDoseWeight, yield: wf.context.targetYield, grind: wf.context.grinderSetting });
+
+        //     A loaded recipe, named by hand: the record first, then the Workflow.
+        //     Loaded afresh, as stored, so DYE2 does not call it changed already.
+        if ((await card(house).getAttribute('aria-pressed')) === 'true') {
+            await card(house).click(); // unloads it
+            await view.page.waitForTimeout(2500);
+        }
+        await loadCard(house);
+        // The simulated machine's Workflow reports a flush at 90 °C, whatever
+        // its settings hold, and the sample recipes hold 25 °C, so DYE2 calls
+        // every recipe changed the moment it loads. The record is given the
+        // steam, hot water and flush the Workflow reports (the fixture's
+        // write), so that "not called changed" after the change says something.
+        const machineNow = await decaid('GET', '/workflow');
+        const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
+        await decaid('POST', RECIPE_STORE, (await records()).map(row => {
+            if (!row || row.name !== house.name) return row;
+            const dashboardVariables = { ...row.dashboardVariables };
+            for (const [key, [group, field]] of Object.entries(MACHINE_FIELDS)) {
+                if (dashboardVariables[key] != null && machineNow[group]?.[field] != null) dashboardVariables[key] = machineNow[group][field];
+            }
+            return { ...row, dashboardVariables };
+        }));
+        const before = await recordNamed(house.name);
+        const othersBefore = JSON.stringify((await records()).filter(row => row && row.id !== before.id));
+        const workflowBefore = await decaid('GET', '/workflow');
+        const loadedBefore = await selection();
+        check('profile: the recipe is loaded before the change, and not as changed', loadedRecipeId(loadedBefore) === before.id && loadedBefore.modified === false, JSON.stringify(loadedBefore));
+        await shot(view.page, 'profile-before-1920x1200-light');
+        let mark = view.seen.requests.length;
+        const answer = await changeProfile(view.page, light.id);
+        check('profile: the change answers ok, on the loaded recipe, and keeps its name', answer.ok && answer.recipeId === String(before.id) && answer.name === null, JSON.stringify(answer));
+        const atOnce = await selection();
+        check('profile: at once DYE2\'s selection still names the recipe, and not as changed', loadedRecipeId(atOnce) === before.id && atOnce.modified === false, JSON.stringify(atOnce));
+        const after = await recordNamed(house.name);
+        const stored = { ...light.profile, target_weight: house.yield };
+        check('profile: the record names the profile by its id and title, with its snapshot and in its stored Workflow, stopping at the recipe\'s yield',
+            after.profileId === light.id && after.profileTitle === light.profile.title
+            && JSON.stringify(after.profileSnapshot) === JSON.stringify(stored) && JSON.stringify(after.workflow.profile) === JSON.stringify(stored),
+            `${after.profileId} | ${after.profileTitle} | ${after.workflow?.profile?.target_weight}`);
+        check('profile: the recipe\'s brew temperature is the profile\'s own', after.dashboardVariables.brewC === own(light), `${after.dashboardVariables.brewC}`);
+        const unchanged = row => { const { profileId, profileTitle, profileSnapshot, workflow, dashboardVariables, ...rest } = row; return JSON.stringify({ rest, context: workflow?.context, dv: { ...dashboardVariables, brewC: null } }); };
+        check('profile: every other field of the record, its stored Workflow\'s context among them, is as it was', unchanged(after) === unchanged(before));
+        check('profile: the other records are untouched', JSON.stringify((await records()).filter(row => row && row.id !== before.id)) === othersBefore);
+        const workflowAfter = await decaid('GET', '/workflow');
+        check('profile: the Workflow has the profile, stopping at the yield, at its own temperature',
+            workflowAfter.profile.title === light.profile.title && workflowAfter.profile.target_weight === house.yield && workflowAfter.profile.steps[0].temperature === own(light),
+            `${workflowAfter.profile.title} ${workflowAfter.profile.target_weight}g ${workflowAfter.profile.steps[0].temperature}°C`);
+        check('profile: dose, yield and grind are as they were', dialIn(workflowAfter) === dialIn(workflowBefore), `${dialIn(workflowBefore)} → ${dialIn(workflowAfter)}`);
+        const workflowWrites = writesSince(mark, r => /^PUT .*\/workflow$/.test(r));
+        const recordWrites = writesSince(mark, r => /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r));
+        check('profile: one Workflow write and one record write, and nothing asked of DYE2\'s save or selection',
+            workflowWrites.length === 1 && recordWrites.length === 1 && writesSince(mark, r => /^POST .*dye2\.reaplugin\/(record|save-recipe|selection)$/.test(r)).length === 0,
+            writesSince(mark, r => /^(PUT|POST)/.test(r)).join(', '));
+        await view.page.waitForTimeout(1000);
+        const brew = await brewRow();
+        check('profile: the Brew row names the profile, at its own temperature', brew.name === light.profile.title && brew.temp === own(light), JSON.stringify(brew));
+        check('profile: the dial-in rows show the dose and yield as they were',
+            (await view.page.locator('#dose-in-value').textContent()) === `${house.dose}g` && (await view.page.locator('#drink-out-value').textContent()) === `${house.yield}g`);
+        check('profile: the title band still names the recipe', (await view.page.locator('#cafe-title').textContent()) === house.name);
+        await shot(view.page, 'profile-after-1920x1200-light');
+        const outcome = await checkedAfter(view.page);
+        check('profile: after DYE2\'s window the check finds the record holding the profile, and the recipe still loaded',
+            outcome === 'held' && (await loadedId()) === before.id && (await recordNamed(house.name)).profileId === light.id, `${outcome}, ${await loadedId()}`);
+
+        //     The Brew row takes no taps yet.
+        const urlBefore = view.page.url();
+        await tapAt(view.page, '#profile-name');
+        await view.page.waitForTimeout(1500);
+        check('profile: a tap on the Brew row\'s name opens nothing', (await view.page.locator('dialog[open]').count()) === 0 && view.page.url() === urlBefore && (await view.page.locator('#main-page').isVisible()));
+
+        //     A temperature step afterwards keeps the recipe loaded.
+        mark = view.seen.requests.length;
+        await view.page.locator('#temp-plus').click();
+        await view.page.waitForTimeout(3000);
+        check('profile: a temperature step afterwards keeps the recipe loaded', (await loadedId()) === before.id && writesSince(mark, r => /^PUT .*\/workflow$/.test(r)).length === 1, JSON.stringify(await selection()));
+        await view.page.locator('#temp-minus').click();
+        await view.page.waitForTimeout(3000);
+
+        //     Another recipe loaded, then this one: the new profile comes back at its own temperature.
+        await loadCard(single);
+        await loadCard(house);
+        const again = await decaid('GET', '/workflow');
+        check('profile: loading another recipe and then this one again brings the profile back, at the temperature the change wrote',
+            (await loadedId()) === before.id && again.profile.title === light.profile.title && again.profile.steps[0].temperature === own(light),
+            `${again.profile.title} ${again.profile.steps[0].temperature}°C`);
+
+        //     A shot pulled afterwards names the recipe and the profile.
+        const shotBefore = (await newestShotWith(before.id))?.id ?? null;
+        await pullShot(5);
+        let pulled = null;
+        for (let waited = 0; waited < 30_000 && !pulled; waited += 500) {
+            const newest = await newestShotWith(before.id);
+            pulled = newest && newest.id !== shotBefore ? newest : null;
+            if (!pulled) await sleep(500);
+        }
+        check('profile: a shot pulled afterwards names the recipe and the profile', !!pulled && pulled.workflow?.profile?.title === light.profile.title, pulled ? pulled.workflow?.profile?.title : 'no Shot');
+        await sleep(3000);
+
+        //     DYE2 starting again, which forgets the profile it noted at the load,
+        //     and Decaid starting again where the run is told how.
+        await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/disable`, undefined, { manage: true });
+        await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/enable`, undefined, { manage: true });
+        await decaidBack();
+        await sleep(3000);
+        check('profile: DYE2 started again keeps the recipe loaded', (await loadedId()) === before.id, JSON.stringify(await selection()));
+        if (RESTART_DECAID) {
+            await view.close();
+            execFileSync('sh', ['-c', RESTART_DECAID], { stdio: 'ignore' });
+            await sleep(5000);
+            const back = await decaidBack();
+            await sleep(5000);
+            check('profile: Decaid started again keeps the recipe loaded', back && (await loadedId()) === before.id, JSON.stringify(await selection().catch(error => error.message)));
+            view = await openPage();
+            await waitForPage(view.page);
+            await view.page.waitForTimeout(2500);
+            check('profile: and the page opened afresh shows it loaded on the profile', (await card(house).getAttribute('aria-pressed')) === 'true' && (await brewRow()).name === light.profile.title, JSON.stringify(await brewRow()));
+        } else {
+            note('Decaid was not started again: give --restart-decaid=<command> for that check');
+        }
+        if (pulled) await decaid('DELETE', `/shots/${pulled.id}`).catch(() => {});
+
+        //     Straight after a dial-in step: the change waits for the step's write.
+        const dose = parseFloat(await view.page.locator('#dose-in-value').textContent());
+        await view.page.locator('#dose-in-plus').click();
+        const stepped = await changeProfile(view.page, gentle.id);
+        const steppedWorkflow = await decaid('GET', '/workflow');
+        check('profile: a change straight after a dial-in step keeps the recipe loaded, with the step on the machine',
+            stepped.ok && (await loadedId()) === before.id && steppedWorkflow.profile.title === gentle.profile.title && steppedWorkflow.context.targetDoseWeight > dose,
+            `${JSON.stringify(stepped)}, ${steppedWorkflow.context.targetDoseWeight}g`);
+        const steppedOutcome = await checkedAfter(view.page);
+        note(`trial: straight after a dial-in step the check found "${steppedOutcome}" (held: no write lost; rewritten or reloaded: lost and put back)`);
+        check('profile: and after DYE2\'s window the record holds the profile and the recipe is loaded',
+            (await recordNamed(house.name)).profileId === gentle.id && (await loadedId()) === before.id, steppedOutcome);
+        await view.page.locator('#dose-in-minus').click();
+        await view.page.waitForTimeout(2000);
+
+        //     DYE2 asked to save the dial-in around the change, as Decent Sync's
+        //     plugin asks after every dial-in change: just before, and while it runs.
+        const save = () => decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/record`, {}).catch(error => ({ error: error.message }));
+        const saves = [save()];
+        await sleep(50);
+        const racing = changeProfile(view.page, bloom.id);
+        await sleep(30);
+        saves.push(save());
+        const raced = await racing;
+        const saveAnswers = await Promise.all(saves);
+        check('profile: with DYE2 saving the dial-in around it, the change keeps the recipe loaded', raced.ok && (await loadedId()) === before.id, `${JSON.stringify(raced)}, saves ${JSON.stringify(saveAnswers)}`);
+        const racedOutcome = await checkedAfter(view.page);
+        note(`trial: with DYE2 saving the dial-in around the change the check found "${racedOutcome}"`);
+        check('profile: and after DYE2\'s window the record holds the profile and the recipe is loaded',
+            (await recordNamed(house.name)).profileId === bloom.id && (await loadedId()) === before.id, racedOutcome);
+
+        //     The record written back over the change inside DYE2's window, as a
+        //     save that read the list before the change leaves it: the check
+        //     writes it again. Then with the recipe unloaded too, as DYE2 does
+        //     when it hears the Workflow before the record: written again, and
+        //     loaded again once.
+        const preChange = await recordNamed(house.name);
+        await changeProfile(view.page, light.id);
+        await decaid('POST', RECIPE_STORE, (await records()).map(row => (row && row.id === preChange.id ? preChange : row)));
+        const revertedOutcome = await checkedAfter(view.page);
+        check('profile: a record written back over the change in DYE2\'s window is written again by the check',
+            revertedOutcome === 'rewritten' && (await recordNamed(house.name)).profileId === light.id && (await loadedId()) === before.id, `${revertedOutcome}, ${(await recordNamed(house.name)).profileId}`);
+        const preSecond = await recordNamed(house.name);
+        await changeProfile(view.page, gentle.id);
+        await decaid('POST', RECIPE_STORE, (await records()).map(row => (row && row.id === preSecond.id ? preSecond : row)));
+        await unloadRecipe();
+        const reloadedOutcome = await checkedAfter(view.page);
+        await view.page.waitForTimeout(1500);
+        check('profile: written back and unloaded, the check writes it again and loads the recipe once',
+            reloadedOutcome === 'reloaded' && (await recordNamed(house.name)).profileId === gentle.id && (await loadedId()) === before.id
+            && (await decaid('GET', '/workflow')).profile.title === gentle.profile.title, `${reloadedOutcome}, ${await loadedId()}`);
+        check('profile: and the page shows the recipe loaded again', (await card(house).getAttribute('aria-pressed')) === 'true' && (await view.page.locator('#cafe-title').textContent()) === house.name);
+
+        //     A recipe the barista unloads during DYE2's window is not loaded again.
+        const preThird = await recordNamed(house.name);
+        await changeProfile(view.page, bloom.id);
+        await decaid('POST', RECIPE_STORE, (await records()).map(row => (row && row.id === preThird.id ? preThird : row)));
+        await card(house).click(); // the tap on the loaded card unloads it
+        await view.page.locator('#cafe-title').filter({ hasText: 'No recipe selected' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        const tappedOutcome = await checkedAfter(view.page);
+        check('profile: a recipe unloaded by a tap since the change is not loaded again, though the record is written again',
+            tappedOutcome === 'tapped' && (await loadedId()) === null && (await recordNamed(house.name)).profileId === bloom.id, `${tappedOutcome}, ${await loadedId()}`);
+
+        //     A recipe DYE2 named: the name follows the profile. Made by DYE2's
+        //     own save-recipe from a Workflow on Adaptive v3, in slot 4, which
+        //     DYE2 marks as loaded.
+        const adaptive = byTitle('Adaptive v3');
+        await decaid('PUT', '/workflow', { profile: adaptive.profile, context: { coffeeName: house.bean } });
+        const made = await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/save-recipe`, { slot: 4 });
+        await lookAgain(view.page);
+        await view.page.waitForTimeout(1500);
+        check('profile: DYE2 named the recipe it made from the profile and the bean', made.name === `Adaptive ${house.bean}` && (await loadedId()) === made.id, `${made.name}, ${await loadedId()}`);
+        const renamed = await changeProfile(view.page, light.id);
+        const madeAfter = (await records()).find(row => row && row.id === made.id);
+        check('profile: a recipe DYE2 named takes the name DYE2 gives on the new profile, in the same write',
+            renamed.ok && renamed.name === `Best ${house.bean}` && madeAfter?.name === `Best ${house.bean}` && madeAfter?.title === `Best ${house.bean}` && madeAfter?.profileId === light.id,
+            `${JSON.stringify(renamed)}, ${madeAfter?.name} / ${madeAfter?.title}`);
+        await lookAgain(view.page);
+        await view.page.locator('#cafe-title').filter({ hasText: `Best ${house.bean}` }).waitFor({ timeout: 10_000 }).catch(() => {});
+        check('profile: its card and the title band show the new name', (await cardName(view.page, 4)) === `Best ${house.bean}` && (await view.page.locator('#cafe-title').textContent()) === `Best ${house.bean}`,
+            `${await cardName(view.page, 4)} | ${await view.page.locator('#cafe-title').textContent()}`);
+        await shot(view.page, 'profile-renamed-1920x1200-light');
+        check('profile: the renamed recipe stays loaded through DYE2\'s window', (await checkedAfter(view.page)) === 'held' && (await loadedId()) === made.id);
+        check('profile: and the recipe named by hand kept its own', (await recordNamed(house.name))?.name === house.name);
+
+        //     The list of recipes to choose from names the new profile: the
+        //     recipe made in slot 4 taken out of its slot, and listed for an empty one.
+        await openMenu(view.page, 4);
+        await pick(view.page, 2); // Remove from slot
+        await openMenu(view.page, 4);
+        await menu(view.page).locator('.context-menu__item').nth(1).click(); // Choose a recipe…
+        await dialog(view.page).waitFor({ timeout: 10_000 }).catch(() => {});
+        await view.page.waitForTimeout(500);
+        const listed = await view.page.locator('#cafe-recipe-list .cafe-recipe-row').evaluateAll(rows => rows.map(row => `${row.querySelector('.cafe-recipe-row-name').textContent} | ${row.querySelector('.cafe-recipe-row-detail').textContent}`));
+        check('profile: the list of recipes to choose from names the recipe\'s new profile', listed.includes(`Best ${house.bean} | ${house.bean} · ${light.profile.title}`), listed.join(' / '));
+        await view.page.keyboard.press('Escape');
+        await view.page.waitForTimeout(800);
+
+        //     No recipe loaded: the same Workflow write, and no record changes.
+        await unloadRecipe();
+        await lookAgain(view.page);
+        const recordsUnloaded = JSON.stringify(await records());
+        mark = view.seen.requests.length;
+        const loose = await changeProfile(view.page, gentle.id);
+        await view.page.waitForTimeout(1500);
+        check('profile: with no recipe loaded the profile changes, and no record changes',
+            loose.ok && loose.recipeId === null && (await decaid('GET', '/workflow')).profile.title === gentle.profile.title
+            && JSON.stringify(await records()) === recordsUnloaded && writesSince(mark, r => /\/store\/dye2\.reaplugin\//.test(r) && r.startsWith('POST')).length === 0,
+            JSON.stringify(loose));
+        check('profile: and the Brew row follows', (await brewRow()).name === gentle.profile.title, JSON.stringify(await brewRow()));
+        check('profile: no page error', view.seen.errors.length === 0, view.seen.errors.join(' | '));
+    } finally {
+        await view.close();
+        // DYE2's records and the Workflow as the step found them.
+        await decaid('POST', RECIPE_STORE, recordsAtStart).catch(() => {});
+        await unloadRecipe().catch(() => {});
+        await decaid('PUT', '/workflow', { profile: workflowAtStart.profile }).catch(() => {});
+    }
+}
+
 // ── The run ──────────────────────────────────────────────────────────────────
 
 await mkdir(OUT, { recursive: true });
@@ -1875,6 +2184,24 @@ if (TOKEN.length < 32) {
 if ((await decaid('GET', '/plugins')).some(plugin => plugin.id === 'decent-sync.reaplugin' && plugin.loaded)) {
     console.error('Decent Sync\'s plugin is loaded on this Decaid. Disable it first: see docs/cafe/SMOKE.md.');
     process.exit(2);
+}
+
+// --only=profile: step 25 alone, on a Decaid a whole run has already set up.
+if (ONLY) {
+    const steps = { profile: profileChange };
+    try {
+        if (!steps[ONLY]) throw new Error(`no step named "${ONLY}": ${Object.keys(steps).join(', ')}`);
+        await setSetting(true);
+        await seed();
+        await steps[ONLY]();
+    } catch (error) {
+        check(`the run finished (${error.message.split('\n')[0]})`, false);
+    } finally {
+        await browser.close();
+    }
+    const failed = results.filter(r => !r.ok);
+    console.log(`\n${results.length - failed.length} of ${results.length} checks passed. Screenshots: ${OUT}`);
+    process.exit(failed.length ? 1 : 0);
 }
 
 try {
@@ -3174,6 +3501,7 @@ try {
     await beanAndBasketDialogs();
     await baristaAtTheMachine();
     await unloadByTap();
+    await profileChange();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

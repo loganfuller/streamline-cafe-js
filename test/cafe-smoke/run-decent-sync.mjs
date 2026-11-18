@@ -7,6 +7,7 @@
 //   node test/cafe-smoke/run-decent-sync.mjs --token=... --sync=http://127.0.0.1:3999 \
 //       --sync-for-tablet=http://cafe-smoke-sync:3000 --sync-container=cafe-smoke-sync \
 //       --decaid-2=http://127.0.0.1:8081
+//   node test/cafe-smoke/run-decent-sync.mjs --token=... --only=profile   (step 15 alone, after a whole run)
 //
 // It changes the two Decaids and the server it is pointed at: it makes the
 // server's first Admin, a Location and two Machines, all made up, installs
@@ -53,6 +54,8 @@ const PASSWORD = flag('password', 'cafe-smoke-password-1');
 // token, which is the first's unless `--token-2=` names another.
 const DECAID_2 = flag('decaid-2', 'http://127.0.0.1:8081');
 const TOKEN_2 = flag('token-2', TOKEN);
+// One step alone, by name, on Decaids and a server a whole run has already set up.
+const ONLY = flag('only', '');
 
 const PLUGIN = 'decent-sync.reaplugin';
 const PLUGIN_REPO = 'loganfuller/decent-sync';
@@ -617,11 +620,177 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
     }
 }
 
+// ── The profile changed from the page, with Decent Sync (#50) ──────────────
+
+// The function the profile dialog (#51) will call, called from the page itself.
+const changeProfile = (page, profileId) => page.evaluate(async id => {
+    const { changeProfile: change } = await import('/src/cafe/profile-changer.js');
+    const { checked, ...answer } = await change(id);
+    window.__cafeChecked = checked;
+    return answer;
+}, profileId);
+const checkedAfter = page => page.evaluate(() => window.__cafeChecked);
+
+// 15. The profile changed on one Machine with a Recipe loaded on both, the
+//     trial of #50 with Decent Sync (docs/cafe/DESIGN.md, "Changing the
+//     profile"): the Recipe on the server takes the Profile, its brew
+//     temperature and, for a name DYE2 gave it, the new name, and how long that
+//     took; the first Machine is never set back; the second Machine takes the
+//     profile and keeps the Recipe loaded; the Reference Shot, pulled on the old
+//     profile, is flagged "Different profile"; and the same with the server
+//     stopped, taken once it is back.
+async function profileWithDecentSync({ page, house, two }) {
+    const profiles = await decaid('GET', '/profiles');
+    const byTitle = title => profiles.find(p => p.profile?.title === title);
+    const [light, gentle, usual] = ['Best practice (light roast)', 'Gentle and sweet', house.profile].map(byTitle);
+    const own = record => record.profile.steps[0].temperature;
+    check('profile: Decaid holds the profiles the step uses', !!light && !!gentle && !!usual);
+    if (!light || !gentle || !usual) return;
+    const recipeNow = async () => (await sync('GET', `/recipes/${house.id}`)).recipe;
+    const nameOf = recipe => recipe.name ?? recipe.content?.name;
+    const recordOn = async tablet => ((await tablet('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || []).find(row => row && row.decentSyncId === house.id);
+    const named = async tablet => { const now = await tablet('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`); return now?.kind === 'recipe' ? String(now.id) : null; };
+    // DYE2's name for the Recipe on its own profile and bean: "Sample Blend",
+    // since DYE2 leaves the word "Default" out. Given on the server, as the
+    // management interface would, so the change is to a recipe DYE2 named.
+    const generated = house.bean;
+    await sync('PATCH', `/recipes/${house.id}`, { content: { name: generated } });
+    const renamedThere = await until(async () => ((await recordOn(decaid))?.name === generated && (await recordOn(decaid2))?.name === generated) || null, { timeout: 90_000, every: 1000 });
+    check('profile: the Recipe has the name DYE2 gives it, on both tablets', !!renamedThere, `${(await recordOn(decaid))?.name} | ${(await recordOn(decaid2))?.name}`);
+    const tablet2 = await openPage(await secondBrowser());
+    try {
+        await tablet2.page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: generated }).waitFor({ timeout: 60_000 }).catch(() => {});
+        const loadNamed = async (view, name) => {
+            const card = view.locator('#cafe-strip .cafe-card').nth(house.slot - 1);
+            if ((await card.getAttribute('aria-pressed')) === 'true') return;
+            await card.click();
+            await view.locator('#cafe-title').filter({ hasText: name }).waitFor({ timeout: 20_000 });
+            await view.waitForTimeout(3000);
+        };
+        await loadNamed(tablet2.page, generated);
+        await page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: generated }).waitFor({ timeout: 60_000 }).catch(() => {});
+        await loadNamed(page, generated);
+        check('profile: the Recipe is loaded on both Machines', (await named(decaid)) === String(house.recordId) && (await named(decaid2)) === two.recordId, `${await named(decaid)} | ${await named(decaid2)}`);
+        //     A Reference Shot pulled on the old profile.
+        const old = await shotWith(page, house.recordId, 10, BARISTAS[0]);
+        // Not the reference an earlier step left: this Shot's, or the badge
+        // where the graph's latest is this Shot.
+        const prior = (await legend(page)).reference;
+        await setReference(house, old.id);
+        const drawn = await waitLegend(page, l => (l.reference !== null && l.reference !== prior) || l.badge !== null);
+        check('profile: the Recipe\'s Reference Shot, pulled on its profile, is drawn with no flag', !!drawn && drawn.flag === null, JSON.stringify(drawn || await legend(page)));
+
+        //     The change, on the first Machine.
+        const started = Date.now();
+        const answer = await changeProfile(page, light.id);
+        const expected = `Best ${house.bean}`;
+        check('profile: the change answers ok, and the recipe DYE2 named takes the new profile\'s name', answer.ok && answer.name === expected, JSON.stringify(answer));
+        let setBack = null;
+        let serverAt = null;
+        let secondAt = null;
+        for (let waited = 0; waited < 120_000 && !(serverAt && secondAt); waited += 500) {
+            const mine = await decaid('GET', '/workflow');
+            if (mine.profile.title !== light.profile.title || (await named(decaid)) !== String(house.recordId)) setBack = setBack || `${mine.profile.title}, ${await named(decaid)}`;
+            const recipe = await recipeNow();
+            if (!serverAt && recipe.content.profileId === light.id && recipe.content.brewTemperature === own(light) && nameOf(recipe) === expected) serverAt = Date.now() - started;
+            const theirs = await decaid2('GET', '/workflow');
+            if (!secondAt && theirs.profile.title === light.profile.title && theirs.profile.steps[0].temperature === own(light) && (await named(decaid2)) === two.recordId) secondAt = Date.now() - started;
+            await sleep(500);
+        }
+        const recipe = await recipeNow();
+        check('profile: the Recipe on the server takes the Profile, its brew temperature and its new name',
+            !!serverAt, `${recipe.content.profileId} ${recipe.content.brewTemperature}°C "${nameOf(recipe)}"`);
+        note(`trial: the server had the change ${serverAt === null ? 'never' : `after ${(serverAt / 1000).toFixed(1)} s`}, the second Machine ${secondAt === null ? 'never' : `after ${(secondAt / 1000).toFixed(1)} s`}`);
+        check('profile: the first Machine was never set back', setBack === null, setBack || '');
+        check('profile: the second Machine takes the profile at its own temperature and keeps the Recipe loaded', !!secondAt,
+            `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
+        const theirWorkflow = await decaid2('GET', '/workflow');
+        const myWorkflow = await decaid('GET', '/workflow');
+        note(`trial: the second Machine brews at ${theirWorkflow.profile.steps[0].temperature}°C, the first at ${myWorkflow.profile.steps[0].temperature}°C, the profile's own ${own(light)}°C`);
+        check('profile: both Machines brew at the profile\'s own temperature',
+            theirWorkflow.profile.steps[0].temperature === own(light) && myWorkflow.profile.steps[0].temperature === own(light),
+            `${myWorkflow.profile.steps[0].temperature} | ${theirWorkflow.profile.steps[0].temperature}`);
+        check('profile: the first page\'s check afterwards found the recipe held', ['held', 'rewritten', 'reloaded'].includes(await checkedAfter(page)) && (await named(decaid)) === String(house.recordId));
+        //     A shot on the new profile, so the reference is not the Shot in the
+        //     graph. Long enough to pour: an Unfinished Shot never becomes the
+        //     latest, and this profile's preinfusion holds for 13 s at least.
+        const freshBarista = 'Sample Profile Barista';
+        const fresh = await shotWith(page, house.recordId, 30, freshBarista);
+        const flagged = await waitLegend(page, l => (l.when || '').includes(freshBarista) && l.flag !== null, 30_000);
+        check('profile: the Reference Shot pulled on the old profile is flagged "Different profile"', flagged?.flag === 'Different profile', JSON.stringify(flagged || await legend(page)));
+        await shot(page, 'sync-profile-changed-light');
+        await shot(tablet2.page, 'sync-profile-second-machine-light');
+
+        //     The same with the server stopped: kept on the tablet, taken once it is back.
+        await docker('stop', SYNC_CONTAINER);
+        try {
+            await until(async () => (await plugin('status').catch(() => ({ served: false }))).served !== true || null, { timeout: 30_000, every: 1000 });
+            const offline = await changeProfile(page, gentle.id);
+            const nextName = `Gentle ${house.bean}`;
+            check('profile: with the server stopped the change is made on the tablet, the recipe kept loaded',
+                offline.ok && (await named(decaid)) === String(house.recordId) && (await recordOn(decaid))?.profileId === gentle.id && (await decaid('GET', '/workflow')).profile.title === gentle.profile.title
+                    && (await decaid('GET', '/workflow')).profile.steps[0].temperature === own(gentle),
+                JSON.stringify(offline));
+            check('profile: and the check afterwards finds it held', ['held', 'rewritten', 'reloaded'].includes(await checkedAfter(page)) && (await named(decaid)) === String(house.recordId));
+            await docker('start', SYNC_CONTAINER);
+            await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });
+            const back = Date.now();
+            const taken = await until(async () => { const now = await recipeNow(); return now.content.profileId === gentle.id && now.content.brewTemperature === own(gentle) && nameOf(now) === nextName ? now : null; }, { timeout: 120_000, every: 1000 });
+            note(`trial: ${taken ? `${((Date.now() - back) / 1000).toFixed(1)} s after the plugin said it was connected again, the server had the change` : 'the server never had the change'}`);
+            check('profile: once the server is back it takes the change, at the profile\'s own temperature', !!taken, `${(await recipeNow()).content.profileId} ${(await recipeNow()).content.brewTemperature}°C`);
+            const followed = await until(async () => { const theirs = await decaid2('GET', '/workflow'); return (theirs.profile.title === gentle.profile.title && theirs.profile.steps[0].temperature === own(gentle) && (await named(decaid2)) === two.recordId) || null; }, { timeout: 120_000, every: 1000 });
+            check('profile: and the second Machine takes it, the Recipe still loaded', !!followed, `${(await decaid2('GET', '/workflow')).profile.title}, ${await named(decaid2)}`);
+            const mineAfter = await decaid('GET', '/workflow');
+            check('profile: the first Machine kept it all along, at the profile\'s own temperature', mineAfter.profile.title === gentle.profile.title && mineAfter.profile.steps[0].temperature === own(gentle) && (await named(decaid)) === String(house.recordId));
+        } finally {
+            await docker('start', SYNC_CONTAINER).catch(() => {});
+            await until(async () => (await plugin('status')).served === true, { timeout: 120_000, every: 1000 });
+        }
+        check('profile: no page error on either tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+
+        //     The Recipe as the run found it: its own profile, then its name, and no reference.
+        await changeProfile(page, usual.id);
+        await checkedAfter(page);
+        await until(async () => ((await recipeNow()).content.profileId === usual.id) || null, { timeout: 90_000, every: 1000 });
+        await decaid('DELETE', `/shots/${old.id}`).catch(() => {});
+        await decaid('DELETE', `/shots/${fresh.id}`).catch(() => {});
+    } finally {
+        await tablet2.close();
+        await sync('PATCH', `/recipes/${house.id}`, { content: { name: house.name } }).catch(() => {});
+        await setReference(house, null).catch(() => {});
+    }
+}
+
 // ── The run ──────────────────────────────────────────────────────────────────
 
 await mkdir(OUT, { recursive: true });
 let stopped = false;
 let sharingOff = null;
+
+// --only=profile: step 15 alone, on Decaids and a server a whole run has set up.
+if (ONLY) {
+    try {
+        if (ONLY !== 'profile') throw new Error(`no step named "${ONLY}": profile`);
+        const { location } = await standUp();
+        const library = await until(() => libraryRecipes(location), { timeout: 60_000, every: 1000 });
+        if (!library) throw new Error('The tablet\'s sample recipes are not the Location\'s Recipes: run the whole of this run first.');
+        const house = { ...RECIPES[0], ...library[RECIPES[0].name] };
+        const two = await standUpSecond(location, house);
+        const { page, close } = await openPage();
+        await profileWithDecentSync({ page, house, two });
+        await close();
+    } catch (error) {
+        check(`the run finished (${error.message.split('\n')[0]})`, false);
+        console.log(error.stack);
+    } finally {
+        await docker('start', SYNC_CONTAINER).catch(() => {});
+        await browser.close();
+        if (browser2) await browser2.close();
+    }
+    const failed = results.filter(r => !r.ok);
+    console.log(`\n${results.length - failed.length} of ${results.length} checks passed. Screenshots: ${OUT}`);
+    process.exit(failed.length ? 1 : 0);
+}
 
 try {
     if (TOKEN.length < 32) throw new Error('Give Decaid\'s extensions token with --token=: installing the plugin needs it. See docs/cafe/SMOKE.md.');
@@ -1084,6 +1253,7 @@ try {
         await grinderWithDecentSync({ page, seen, house, two });
         await beanAndBasketWithDecentSync({ page, seen, house, location });
         await unloadWithDecentSync({ house, two, machine });
+        await profileWithDecentSync({ page, house, two });
     }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));

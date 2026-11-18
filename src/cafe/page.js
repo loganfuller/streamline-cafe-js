@@ -22,6 +22,7 @@ import { openBeanDialog } from './bean-dialog.js';
 import { openBasketDialog } from './basket-dialog.js';
 import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
 import { baristaName, asleep, baristaStamps } from './barista-model.js';
+import { initProfileChanger } from './profile-changer.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -361,6 +362,11 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     refreshNames();
     onStatus(showStatus);
     askStatus();
+    // The change of profile waits its turn as a pick does, and keeps the
+    // dial-in still while it is written; a recipe load or unload from the strip
+    // moves the epoch, which the check after it reads. A load or an arrangement
+    // of the strip (`loading`) or a shot begun while it reads holds its writes.
+    initProfileChanger({ mayChange: mayPick, settled: () => !loading && !shotRunning(), queue: writePick, epoch: () => loads, shotRunning });
 
     const profile = el('profile-name');
     if (profile) {

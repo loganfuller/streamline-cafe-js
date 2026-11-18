@@ -19,3 +19,9 @@ export const placeInSlot = writer.placeInSlot;
 
 /** Take a recipe out of the slot the caller saw it in. */
 export const removeFromSlot = writer.removeFromSlot;
+
+/**
+ * Set the named fields of one recipe: the profile and what goes with it, which a
+ * recipe must hold before the Workflow moves to it (profile-changer.js).
+ */
+export const setRecipeFields = writer.setFields;
