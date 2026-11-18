@@ -44,6 +44,20 @@ export const SHRINK_ADOPT_MS = 1500;
 //
 // Keyed off any shrink at all rather than a 15% one, so a floating or split
 // keyboard cannot fall through and re-scale the canvas.
+//
+// What the state says:
+//
+//  - `shrunk`: the screen has less room than the layout window. A full-screen
+//    overlay fits itself to visibleHeight while this holds.
+//  - `keyboardLike`: a shrink below the resting room appeared while something
+//    was being typed into. Only this lifts the canvas (scaling.js). A lift on
+//    `shrunk` alone moved a button out from under the finger between pointer
+//    down and pointer up on a WebView whose visualViewport sits a fraction of a
+//    pixel, or a system bar, short of the window, so the tap missed.
+//  - `baselineVisible`: the room the screen has with no keyboard, which is less
+//    than the layout window on such a WebView. A shrink is measured from it, so
+//    that gap never counts as a keyboard, and a keyboard that closes clears the
+//    mark even though the screen never gets back to the full window.
 export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editing, now, force = false }) {
     // The keyboard shows up as either of these, depending on the WebView, so the
     // shorter one decides whether the screen lost room. Only the layout window
@@ -51,18 +65,20 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     // on its own is a keyboard or a pinch, never a smaller window.
     const shortest = Math.min(rawHeight, visibleHeight ?? rawHeight);
     const baseline = state?.baselineHeight || rawHeight;
+    const resting = Math.min(state?.baselineVisible ?? baseline, baseline);
     const widthChanged = state?.baselineWidth !== undefined && rawWidth !== undefined
         && rawWidth !== state.baselineWidth;
     const adopt = () => ({
-        baselineHeight: rawHeight, baselineWidth: rawWidth,
+        baselineHeight: rawHeight, baselineWidth: rawWidth, baselineVisible: shortest,
         shrunkSince: 0, keyboardLike: false, shrunk: shortest < rawHeight,
     });
 
     if (force || widthChanged) return adopt();
-    if (shortest >= baseline) {
+    if (shortest >= resting) {
+        const baselineHeight = Math.max(rawHeight, baseline);
         return {
-            baselineHeight: Math.max(rawHeight, baseline), baselineWidth: rawWidth,
-            shrunkSince: 0, keyboardLike: false, shrunk: false,
+            baselineHeight, baselineWidth: rawWidth, baselineVisible: shortest,
+            shrunkSince: 0, keyboardLike: false, shrunk: shortest < baselineHeight,
         };
     }
 
@@ -71,7 +87,7 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
     return {
         baselineHeight: baseline, baselineWidth: state?.baselineWidth ?? rawWidth,
-        shrunkSince, keyboardLike, shrunk: true,
+        baselineVisible: resting, shrunkSince, keyboardLike, shrunk: true,
     };
 }
 
