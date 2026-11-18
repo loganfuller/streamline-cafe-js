@@ -32,6 +32,11 @@ export const SECOND_GRINDER = { model: 'Sample Grinder 38', burrType: 'conical',
 export const ARCHIVED_GRINDER = { model: 'Sample Retired Grinder' };
 export const GRINDER_USE = { first: { setting: '2.6', rpm: null }, second: { setting: '11.5', rpm: 800 } };
 
+// The Grind row's (#42): a preset grinder, whose setting is a name, and one
+// whose step is finer than a tenth.
+export const PRESET_GRINDER = { model: 'Sample Preset Grinder', settingType: 'preset', settingValues: ['Fine', 'Medium', 'Coarse'] };
+export const QUARTER_GRINDER = { model: 'Sample Grinder 0.25', settingType: 'numeric', settingSmallStep: 0.25, settingBigStep: 1 };
+
 // The baristas the run's two shots with no recipe loaded record, one each, so
 // the legend is seen to follow each Shot.
 export const BARISTAS = ['Sample Barista', 'Example Barista'];
