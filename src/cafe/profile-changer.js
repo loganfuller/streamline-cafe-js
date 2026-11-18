@@ -2,10 +2,10 @@
 // Streamline (docs/cafe/DESIGN.md, "Changing the profile"). What it decides is
 // worked out in profile-change.js, which touches no browser global.
 //
-// Nothing on the page calls it yet: the profile dialog (issue #51) will. The
-// smoke run calls `changeProfile` from the page itself.
+// The profile dialog (profile-dialog.js) calls it, and nothing else on the page
+// does. The smoke run calls `changeProfile` from the page itself too.
 import { getProfiles, getWorkflow, getDye2KvArray, callPluginEndpoint, updateWorkflow, getEspressoEndedAt } from '../modules/api.js';
-import { setActiveProfile } from '../modules/profileManager.js';
+import { setActiveProfile, availableProfiles, loadAvailableProfiles } from '../modules/profileManager.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { setRecipeFields } from './recipe-writer.js';
@@ -40,7 +40,23 @@ async function readSelection() {
 // also binds the active profile by title and keeps the one set here). Its
 // Workflow watch would get there by itself only after a moment, and a step made
 // meanwhile would be saved onto the old profile.
+//
+// Streamline's list of profiles is read at start. A profile that reached
+// Decaid since, or was shown or changed since (from Decent Sync's Library,
+// say), is read into it first, else the binding by title, which passes over a
+// hidden record, would take another of the same title, and the Brew stepper
+// that one's curve.
+const sameRecord = (a, b) => !!a && (a.visibility ?? null) === (b.visibility ?? null)
+    && JSON.stringify(a.profile ?? null) === JSON.stringify(b.profile ?? null);
+
 async function follow(record) {
+    if (!sameRecord(availableProfiles[record.id], record)) {
+        try {
+            await loadAvailableProfiles();
+        } catch (error) {
+            logger.warn('Cafe: Streamline could not read the profiles again after the profile changed', error);
+        }
+    }
     setActiveProfile(record.id);
     try {
         if (typeof window.loadInitialData === 'function') await window.loadInitialData();
@@ -91,10 +107,12 @@ export function initProfileChanger({ mayChange, settled, queue, epoch, shotRunni
 
 /**
  * Change the profile to Decaid's profile `profileId`, keeping a loaded recipe
- * loaded with the profile saved onto it. See `createProfileChange` in
- * profile-change.js for the answer.
+ * loaded with the profile saved onto it. `options.recipeId`, where given, is
+ * the recipe the caller expects loaded (null for none), and the change is
+ * refused where another is. See `createProfileChange` in profile-change.js for
+ * the answer.
  */
-export function changeProfile(profileId) {
+export function changeProfile(profileId, options) {
     if (!change) return Promise.resolve({ ok: false, reason: 'busy' });
-    return change(profileId);
+    return change(profileId, options);
 }

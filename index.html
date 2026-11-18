@@ -195,14 +195,21 @@
                 </div>
             </div>
 
-            <!-- #profile-name is where Streamline writes, and reads back, the active
-                 profile's name. On Streamline a tap on it opens the profile list; here it
-                 takes no taps until the profile dialog arrives (cafe.css). -->
+            <!-- The row's name and the profile's under it are one button, which opens the
+                 profile dialog (src/cafe/profile-dialog.js). #profile-name is where Streamline
+                 writes, and reads back, the active profile's name, into its first text node; on
+                 Streamline a tap or a hold on it opens the profile list. Here it takes no taps
+                 (cafe.css), so a tap lands on the button and never on the name. -->
             <div id="brew-section" class="cafe-row cafe-row-tall">
-                <div id="brew-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-fit-text data-cafe-text="Brew">Brew</span>
-                    <span id="profile-name" class="cafe-row-desc" aria-live="polite"> </span>
-                </div>
+                <button id="cafe-brew-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="brew-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Brew">Brew</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="profile-name" class="cafe-row-desc" aria-live="polite"> </span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
                 <div class="cafe-stepper">
                     <button id="temp-minus" type="button" aria-label="Decrease Brew Temperature"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     <div class="cafe-value" aria-labelledby="brew-label">
@@ -441,8 +448,8 @@
         </div>
     </dialog>
 
-    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, or the basket, and of the
-         barista at the machine (src/cafe/pick-dialog.js). It fits itself above the soft keyboard, which
+    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, the basket or the profile,
+         and of the barista at the machine (src/cafe/pick-dialog.js). It fits itself above the soft keyboard, which
          only the barista's name field brings up, so Streamline does not lift the page behind it. -->
     <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title" data-keyboard-fit="1">
         <div class="cafe-dialog-canvas">
@@ -458,7 +465,8 @@
                     </form>
                 </div>
                 <div class="cafe-pick-lists">
-                    <!-- The bean dialog's beans: a tap shows that bean's batches on the right. -->
+                    <!-- The bean dialog's beans: a tap shows that bean's batches on the right. The profile
+                         dialog's profiles: a tap shows that profile's description on the right. -->
                     <div id="cafe-pick-side-column" class="cafe-pick-column cafe-pick-side-column" hidden>
                         <p id="cafe-pick-side-heading" class="cafe-pick-heading"></p>
                         <div id="cafe-pick-side" class="cafe-pick-rows" role="group" aria-labelledby="cafe-pick-side-heading"></div>
@@ -471,6 +479,22 @@
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                             <span id="cafe-pick-add-text"></span>
                         </button>
+                    </div>
+                    <!-- The profile dialog's description of the profile highlighted on the left, in place of a
+                         second list: its notes as plain text, scrolling where they are long, and under them the
+                         button that chooses it, or "In use". -->
+                    <div id="cafe-pick-pane" class="cafe-pick-column cafe-pick-pane" hidden>
+                        <p id="cafe-pick-pane-heading" class="cafe-pick-heading"></p>
+                        <div class="cafe-pick-pane-titles">
+                            <h4 id="cafe-pick-pane-title"></h4>
+                            <p id="cafe-pick-pane-byline"></p>
+                        </div>
+                        <p id="cafe-pick-pane-text" class="cafe-pick-pane-text" tabindex="0"></p>
+                        <div class="cafe-pick-pane-actions">
+                            <span id="cafe-pick-pane-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
+                            <span id="cafe-pick-pane-note" hidden></span>
+                            <button id="cafe-pick-pane-use" type="button" class="cafe-btn cafe-btn-primary" hidden></button>
+                        </div>
                     </div>
                 </div>
                 <!-- A barista's name, typed: in the list's place once "New barista" is tapped. -->

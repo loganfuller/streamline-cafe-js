@@ -427,12 +427,11 @@ button.cafe-card {
     transition: opacity 0.15s ease;
 }
 
-/* Streamline opens the profile list from #profile-name and DYE2's grinder page
-   from #grind-label, and colours the first by id. Neither is a control here.
-   #grind-label sits inside the button that opens the grinder dialog: with no
-   pointer events on it, a tap lands on that button and never passes through
-   the label, so Streamline's tap never fires. The profile name takes none
-   until its dialog arrives. */
+/* Streamline opens the profile list from #profile-name, by a tap or a hold,
+   and DYE2's grinder page from #grind-label, and colours the first by id.
+   Neither is a control here. Each sits inside the button that opens the page's
+   own dialog, the profile's and the grinder's: with no pointer events on it, a
+   tap lands on that button and never passes through, so Streamline's never fires. */
 #main-page #profile-name,
 #main-page #grind-label,
 #main-page #dose-label,
@@ -1453,6 +1452,18 @@ button.cafe-card {
     width: 1180px;
 }
 
+/* The profile dialog is wider still, its list a third of it, the description
+   in the rest. Its height is fixed, so the box does not jump as profiles with
+   longer or shorter notes are highlighted: the list and the notes scroll. */
+.cafe-dialog.cafe-pick-box.cafe-pick-described {
+    width: 1320px;
+    height: 900px;
+}
+
+.cafe-pick-described .cafe-pick-column.cafe-pick-side-column {
+    width: 440px;
+}
+
 .cafe-pick-lists {
     flex: 1;
     min-height: 0;
@@ -1621,6 +1632,91 @@ button.cafe-card {
 .cafe-pick-entry-actions .cafe-btn {
     min-width: 160px;
     padding: 0 24px;
+}
+
+/* The profile's description, in place of a second list. */
+.cafe-pick-pane {
+    gap: 14px;
+}
+
+.cafe-pick-pane [hidden] {
+    display: none !important;
+}
+
+.cafe-pick-pane-titles {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#cafe-pick-pane-title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+#cafe-pick-pane-byline {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+    overflow-wrap: anywhere;
+}
+
+/* The notes as their author wrote them, with their line breaks, never as
+   markup; long ones scroll inside the box. */
+.cafe-pick-pane-text {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    overflow-y: auto;
+    padding: 20px 22px;
+    border: 1px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    font-size: 20px;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* "This profile has no description." */
+.cafe-pick-pane-text.cafe-pick-pane-none {
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-pane-actions {
+    flex: none;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+}
+
+.cafe-pick-pane-actions .cafe-pick-in-use {
+    font-size: 18px;
+}
+
+#cafe-pick-pane-note {
+    min-width: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-pick-pane-use {
+    flex: none;
+    min-width: 160px;
+    padding: 0 30px;
+}
+
+/* The highlighted row in use: the mark takes the row's own text colour. */
+.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-in-use {
+    color: inherit;
 }
 
 /* The bean whose batches are shown: filled in the accent colour. */

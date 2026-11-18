@@ -1,14 +1,16 @@
 // The dialog a dial-in row's name opens, to choose what the row names: the
-// grinder, the bean and batch, and the basket, and the profile after them
-// (docs/cafe/DESIGN.md, "The grinder, bean and basket dialogs"), and the one
+// grinder, the bean and batch, the basket and the profile (docs/cafe/DESIGN.md,
+// "The grinder, bean and basket dialogs" and "The profile dialog"), and the one
 // the title band's barista opens ("The barista"). A title, a line under it,
 // Close, and rows of a name over a detail, the one in use marked "In use". The
 // bean's has a second list on the left, whose rows choose nothing: a tap there
-// shows that bean's batches on the right. The barista's has a row set apart
-// under the list that turns the dialog into a text field, for a name to type.
-// The markup is in index.html; this module fills it in, shows it and answers
-// with the row that was tapped, or the text typed. What a row says, and what a
-// choice does, are the caller's.
+// shows that bean's batches on the right. The profile's has the same list on
+// the left and, in place of a second list, a description of the row tapped
+// there, with a button under it that chooses that row. The barista's has a row
+// set apart under the list that turns the dialog into a text field, for a name
+// to type. The markup is in index.html; this module fills it in, shows it and
+// answers with the row that was tapped or confirmed, or the text typed. What a
+// row and a description say, and what a choice does, are the caller's.
 import { cafeText, setText } from './text.js';
 
 let wired = false;
@@ -56,6 +58,15 @@ const span = (className, text) => {
 
 const CHECK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
+// The check and "In use", after a row's words or in the place of the
+// description's button.
+function inUseMark() {
+    const mark = span('cafe-pick-in-use');
+    mark.innerHTML = CHECK; // a fixed icon, not text from Decaid
+    mark.append(cafeText('In use'));
+    return mark;
+}
+
 function rowButton(row, onPick) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -65,18 +76,14 @@ function rowButton(row, onPick) {
     const words = span('cafe-pick-row-text');
     words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
     button.append(words);
-    if (row.inUse) {
-        const mark = span('cafe-pick-in-use');
-        mark.innerHTML = CHECK; // a fixed icon, not text from Decaid
-        mark.append(cafeText('In use'));
-        button.append(mark);
-    }
+    if (row.inUse) button.append(inUseMark());
     button.addEventListener('click', () => onPick(row));
     return button;
 }
 
 // A row of the list on the left: a name over a detail, the one shown on the
-// right filled in.
+// right filled in, and the one in use marked where the row says so (the
+// profile's do; the bean's say nothing of it).
 function sideButton(row, onShow) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -86,8 +93,53 @@ function sideButton(row, onShow) {
     const words = span('cafe-pick-row-text');
     words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
     button.append(words);
+    if (row.inUse) button.append(inUseMark());
     button.addEventListener('click', () => onShow(row));
     return button;
+}
+
+// The parts of the description `pane` adds, or null where the page lacks one.
+function paneParts() {
+    const parts = {
+        column: el('cafe-pick-pane'),
+        heading: el('cafe-pick-pane-heading'),
+        title: el('cafe-pick-pane-title'),
+        byline: el('cafe-pick-pane-byline'),
+        text: el('cafe-pick-pane-text'),
+        inUse: el('cafe-pick-pane-in-use'),
+        note: el('cafe-pick-pane-note'),
+        use: el('cafe-pick-pane-use'),
+    };
+    return Object.values(parts).every(Boolean) ? parts : null;
+}
+
+// One description, as plain text: what a profile's author wrote is never read
+// as markup. `shown` is `{ title, byline, text, placeholder, inUse, use }`, all
+// in the page's language, or null for nothing to describe: `placeholder` says
+// `text` is the dialog's own words where there is no description, and `use`,
+// `{ label, note }` or null, is the button that chooses what is described,
+// with a note beside it.
+function describe(parts, described) {
+    const shown = described || {};
+    parts.title.textContent = shown.title || '';
+    parts.byline.textContent = shown.byline || '';
+    parts.byline.hidden = !shown.byline;
+    parts.text.textContent = shown.text || '';
+    parts.text.classList.toggle('cafe-pick-pane-none', !!shown.placeholder);
+    parts.text.scrollTop = 0;
+    parts.inUse.hidden = !shown.inUse;
+    parts.note.textContent = shown.use?.note || '';
+    parts.note.hidden = !shown.use?.note;
+    parts.use.textContent = shown.use?.label || '';
+    parts.use.hidden = !shown.use;
+}
+
+// The dialog's own list again, with no description and no handler.
+function closePane(parts, listColumn) {
+    if (listColumn) listColumn.hidden = false;
+    if (!parts) return;
+    parts.column.hidden = true;
+    parts.use.onclick = null;
 }
 
 // The list's own words where it has no rows ("No baskets"), as a key.
@@ -146,10 +198,19 @@ function closeEntry(parts) {
  * order shown, and `empty` is the key said where there are none. Resolves the
  * row tapped, or null when the dialog was closed without one.
  *
- * `side`, where given, is the list on the left: `{ heading, rows, show }`,
- * where `heading` is a key, `rows` are `{ id, name, detail, highlighted }`,
- * and `show(row)` answers what the dialog shows once that row is tapped:
- * `{ subtitle, rows }` for the right-hand list.
+ * `side`, where given, is the list on the left: `{ heading, rows, show, empty }`,
+ * where `heading` is a key, `rows` are `{ id, name, detail, highlighted, inUse }`,
+ * `show(row)` answers what the dialog shows once that row is tapped:
+ * `{ subtitle, rows }` for the right-hand list, and `empty`, a key, is said
+ * where it has no rows.
+ *
+ * `pane`, where given with `side`, puts a description in place of the
+ * right-hand list, whose `rows` are then not shown: `{ heading, shown }`, where
+ * `heading` is a key and `shown` the description the dialog opens on (see
+ * `describe`). `show(row)` then answers `{ pane }`, that row's description,
+ * and may answer a `subtitle` too. A tap on the left still chooses nothing: the
+ * description's button resolves the row it describes, which is the one
+ * highlighted, and the dialog opens on the row `highlighted` names, or on none.
  *
  * `entry`, where given, adds a row set apart under the list that turns the
  * dialog into a text field: `{ action, title, label, back, use }`, each a key,
@@ -157,14 +218,16 @@ function closeEntry(parts) {
  * buttons. "Back" shows the list again; the other resolves `{ entered }`, the
  * text as it was typed, once it holds more than spaces.
  */
-export function choose({ title, subtitle, label, heading: listHeading = null, rows, empty = null, side = null, entry = null }) {
+export function choose({ title, subtitle, label, heading: listHeading = null, rows = [], empty = null, side = null, pane = null, entry = null }) {
     const dialog = document.getElementById('cafe-pick-dialog');
     const list = document.getElementById('cafe-pick-list');
     const sideColumn = document.getElementById('cafe-pick-side-column');
     const sideList = document.getElementById('cafe-pick-side');
     const parts = entryParts();
+    const paneEls = paneParts();
+    const described = pane ? paneEls : null;
     if (!dialog || !list || typeof dialog.showModal !== 'function' || dialog.open) return Promise.resolve(null);
-    if (active || (side && (!sideColumn || !sideList)) || (entry && !parts)) return Promise.resolve(null);
+    if (active || (side && (!sideColumn || !sideList)) || (entry && !parts) || (pane && (!side || !described))) return Promise.resolve(null);
     wire(dialog);
     active = true;
     return new Promise(resolve => {
@@ -172,26 +235,51 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         const pick = row => { chosen = row; dialog.close(); };
         const under = document.getElementById('cafe-pick-under');
         const titled = document.getElementById('cafe-pick-title');
+        const listColumn = list.closest('.cafe-pick-column');
+        const say = line => setText(under, line.key, { translate: true, vars: line.vars });
         const fill = (next, line) => {
-            setText(under, line.key, { translate: true, vars: line.vars });
+            say(line);
             list.replaceChildren(...(next.length || !empty ? next.map(row => rowButton(row, pick)) : [emptyLine(empty)]));
         };
+        // The row the description is of, which its button chooses.
+        let describedRow = null;
         setText(titled, title, { translate: true });
         heading(document.getElementById('cafe-pick-heading'), listHeading);
         list.setAttribute('aria-label', label);
-        dialog.querySelector('.cafe-pick-box')?.classList.toggle('cafe-pick-wide', !!side);
+        const box = dialog.querySelector('.cafe-pick-box');
+        box?.classList.toggle('cafe-pick-wide', !!side && !pane);
+        box?.classList.toggle('cafe-pick-described', !!pane);
         if (sideColumn) sideColumn.hidden = !side;
         if (side) {
             heading(document.getElementById('cafe-pick-side-heading'), side.heading);
             const show = row => {
                 for (const button of sideList.children) button.setAttribute('aria-pressed', String(button.dataset.id === row.id));
                 const next = side.show(row);
+                if (pane) {
+                    if (next.subtitle) say(next.subtitle);
+                    describedRow = row;
+                    describe(described, next.pane);
+                    return;
+                }
                 fill(next.rows, next.subtitle);
                 list.scrollTop = 0;
             };
-            sideList.replaceChildren(...side.rows.map(row => sideButton(row, show)));
+            const sideRows = side.rows.map(row => sideButton(row, show));
+            sideList.replaceChildren(...(sideRows.length || !side.empty ? sideRows : [emptyLine(side.empty)]));
         }
-        fill(rows, subtitle);
+        closePane(paneEls, listColumn);
+        if (pane) {
+            say(subtitle);
+            list.replaceChildren();
+            listColumn.hidden = true;
+            described.column.hidden = false;
+            heading(described.heading, pane.heading);
+            describedRow = side.rows.find(row => row.highlighted) || null;
+            describe(described, pane.shown);
+            described.use.onclick = () => { if (describedRow) pick(describedRow); };
+        } else {
+            fill(rows, subtitle);
+        }
         closeEntry(parts);
         if (entry) {
             const typed = () => parts.field.value.trim() !== '';
@@ -222,6 +310,7 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         dialog.addEventListener('close', () => {
             list.replaceChildren();
             sideList?.replaceChildren();
+            closePane(paneEls, listColumn);
             closeEntry(parts);
             fit(null);
             active = false;

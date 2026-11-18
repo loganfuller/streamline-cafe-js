@@ -21,6 +21,7 @@ import { openGrinderDialog } from './grinder-dialog.js';
 import { openBeanDialog } from './bean-dialog.js';
 import { openBasketDialog } from './basket-dialog.js';
 import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
+import { openProfileDialog } from './profile-dialog.js';
 import { baristaName, asleep, baristaStamps } from './barista-model.js';
 import { initProfileChanger } from './profile-changer.js';
 
@@ -286,6 +287,12 @@ function openBasket() {
     openBasketDialog({ mayOpen: mayPick, epoch: () => loads, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
 }
 
+// The profile's choice takes its turn through the changer, which was handed
+// the page's write as it started (initProfileChanger below).
+function openProfile() {
+    openProfileDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe });
+}
+
 // ── During a shot ────────────────────────────────────────────────────────────
 
 function paintLiveWeight() {
@@ -410,12 +417,14 @@ export function initPage({ onProfileChange = () => {} } = {}) {
         el(id)?.addEventListener('click', event => stepSteam(direction, event.currentTarget));
     }
     // The Grind row's name and the grinder's under it are one button, and so
-    // are Dose's with the bean and Yield's with the basket. Streamline's own tap
-    // on #grind-label, inside it, never fires: cafe.css takes pointer events off
+    // are Dose's with the bean, Yield's with the basket and Brew's with the
+    // profile. Streamline's own tap on #grind-label, and its tap and hold on
+    // #profile-name, inside them, never fire: cafe.css takes pointer events off
     // the labels, so a tap lands on the button and never passes through a label.
     el('cafe-grind-pick')?.addEventListener('click', openGrinder);
     el('cafe-dose-pick')?.addEventListener('click', openBean);
     el('cafe-yield-pick')?.addEventListener('click', openBasket);
+    el('cafe-brew-pick')?.addEventListener('click', openProfile);
     // During a shot, or a recipe load, the button shows the name and opens
     // nothing: Decaid names the Shot from the Workflow as it stores it.
     el('cafe-barista')?.addEventListener('click', openBarista);

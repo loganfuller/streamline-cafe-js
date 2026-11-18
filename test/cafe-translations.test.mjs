@@ -12,6 +12,7 @@ import { GRINDER_PHRASES } from '../src/cafe/grinder-model.js';
 import { BEAN_PHRASES } from '../src/cafe/bean-model.js';
 import { BASKET_PHRASES } from '../src/cafe/basket-model.js';
 import { BARISTA_PHRASES } from '../src/cafe/barista-model.js';
+import { PROFILE_PHRASES } from '../src/cafe/profile-model.js';
 import { slotMenu } from '../src/cafe/slot-menu.js';
 import { graphModel } from '../src/cafe/shot-model.js';
 import { PHRASES } from '../src/cafe/comparison.js';
@@ -120,6 +121,8 @@ function usedKeys() {
     for (const phrase of Object.values(BASKET_PHRASES)) keys.add(phrase);
     // And the barista's button, its dialog and its name field.
     for (const phrase of Object.values(BARISTA_PHRASES)) keys.add(phrase);
+    // And the profile dialog's rows and its description.
+    for (const phrase of Object.values(PROFILE_PHRASES)) keys.add(phrase);
     return keys;
 }
 
