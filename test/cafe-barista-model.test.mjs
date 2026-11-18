@@ -144,6 +144,7 @@ test('a barista write waits out the seconds in which Decaid may still store the 
     assert.equal(storeWait(10_000, 15_000), 0);
     assert.equal(storeWait(10_000, 60_000), 0, 'long after');
     assert.equal(storeWait(Number.NaN, 1_000), 0);
+    assert.equal(storeWait(10_000, 7_000), 5000, 'a clock stepped back since the shot ended waits the window, no longer');
 });
 
 test('the wait after a pour is made again for a shot that ends during it', async () => {

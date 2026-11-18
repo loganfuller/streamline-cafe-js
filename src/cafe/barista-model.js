@@ -125,11 +125,13 @@ export const SHOT_STORE_MS = 5000;
  * How long, in ms, a barista write waits before it is sent, so it neither
  * renames nor un-names the Shot Decaid is still to store: what is left of
  * SHOT_STORE_MS since the shot ended at `endedAt` (ms, null for no shot yet),
- * at `now`. 0 where nothing is left.
+ * at `now`. 0 where nothing is left, and never more than SHOT_STORE_MS.
  */
 export function storeWait(endedAt, now) {
     if (!Number.isFinite(endedAt) || !Number.isFinite(now)) return 0;
-    return Math.max(0, endedAt + SHOT_STORE_MS - now);
+    // Never more than the whole window: a clock stepped back since the shot ended
+    // would otherwise hold the write, or the strip, for as long as the step.
+    return Math.min(SHOT_STORE_MS, Math.max(0, endedAt + SHOT_STORE_MS - now));
 }
 
 /**
