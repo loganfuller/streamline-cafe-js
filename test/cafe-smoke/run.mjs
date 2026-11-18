@@ -181,6 +181,9 @@ async function pullShot(seconds) {
 const PAGE_DECAID = `${new URL(BASE).hostname}:8080`;
 const mapTo = host => (host === PAGE_DECAID ? [] : [`--host-resolver-rules=MAP ${PAGE_DECAID} ${host}`]);
 const browser = await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID).host) });
+// A request the run intercepts and sends on itself is sent from Node, past the
+// browser's mapping, so it is pointed at the same Decaid here.
+const sendOn = route => route.fetch({ url: route.request().url().replace(`http://${PAGE_DECAID}/`, `${new URL(DECAID).origin}/`) });
 
 // A page with nothing in its own storage. With `machineButtons: false` the
 // machine reports buttons of its own, which the simulated machine never does, so
@@ -195,20 +198,20 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
     page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
     if (!machineButtons) {
         await page.route('**/api/v1/machine/info', async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
         });
     }
     if (weights) {
         await page.route(/\/api\/v1\/shots\/[^/?]+$/, async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             if (!response.ok()) return route.fulfill({ response });
             return route.fulfill({ response, json: withWeights(await response.json()) });
         });
     }
     if (decentSync) {
         await page.route('**/api/v1/plugins', async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             // In place of the real one, where the second run left it switched off.
             const others = (await response.json()).filter(plugin => plugin.id !== 'decent-sync.reaplugin');
             await route.fulfill({ response, json: [...others, { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, autoLoad: true, api: [] }] });
@@ -273,7 +276,7 @@ async function openTouchPage(short) {
     page.on('pageerror', error => seen.errors.push(error.message));
     page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
     await page.route('**/api/v1/machine/info', async route => {
-        const response = await route.fetch();
+        const response = await sendOn(route);
         await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
     });
     // Sleep is answered here, so the simulated machine stays awake for the run.
@@ -360,7 +363,7 @@ async function ratingAndNotes(page, latest, reference) {
     //    An edit Decaid made and whose answer was lost: it is read again first.
     const lost = async route => {
         if (route.request().method() !== 'PUT') return route.fallback();
-        await route.fetch();
+        await sendOn(route);
         return route.abort();
     };
     await page.route(SHOT_EDIT, lost);
