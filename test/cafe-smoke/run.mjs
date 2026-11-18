@@ -869,7 +869,8 @@ async function grindRow() {
             const value = document.getElementById('grind-value');
             return { text: value.textContent, overflow: getComputedStyle(value).overflowX };
         });
-        check('grind row: a wide number such as 111.25 is shown whole, not cut', wide.text === '111.25' && wide.overflow === 'visible', JSON.stringify(wide));
+        const wideFit = await fit();
+        check('grind row: a wide number such as 111.25 is shown whole, not cut, and clear of − and +', wide.text === '111.25' && wide.overflow === 'visible' && wideFit.left >= 0 && wideFit.right >= 0, JSON.stringify({ ...wide, ...wideFit }));
         await setGrind(preset, 'Medium');
         await readAgain();
 
