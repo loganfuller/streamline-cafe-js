@@ -233,7 +233,7 @@ test('the profile dialog changes the profile through changeProfile alone', () =>
     assert.deepEqual(filesWith(/\bchangeProfile\(/), ['profile-changer.js', 'profile-dialog.js']);
     assert.deepEqual(filesWith(/from '\.\/profile-changer\.js'/), ['page.js', 'profile-dialog.js']);
     const dialog = SOURCES.find(source => source.name === 'profile-dialog.js').text;
-    assert.deepEqual([...dialog.matchAll(/\bchangeProfile\(([^)]*)\)/g)].map(match => match[1]), ['row.id']);
+    assert.deepEqual([...dialog.matchAll(/\bchangeProfile\(([^)]*)\)/g)].map(match => match[1]), ['row.id, { recipeId: named }']);
     for (const name of ['profile-dialog.js', 'profile-model.js']) {
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /\b(updateWorkflow|putWorkflow|sendProfile|setActiveProfile|setRecipeFields|markLoaded|callPluginEndpoint)\b/, name);

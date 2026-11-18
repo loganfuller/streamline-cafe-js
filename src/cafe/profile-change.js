@@ -185,13 +185,17 @@ export function afterCheck({ rows, recipeId, record, befores, selection, tapped,
  * - `wait(ms)` waits.
  * - `onChecked(outcome, recipeId)` is told what each check afterwards found.
  *
- * Returns `change(profileId)`, which resolves `{ ok: true, recipeId, name,
- * checked }` or `{ ok: false, reason }`. `recipeId` is the loaded recipe whose
+ * Returns `change(profileId, { recipeId })`, which resolves `{ ok: true,
+ * recipeId, name, checked }` or `{ ok: false, reason }`. `recipeId`, where
+ * given, is the recipe the caller expects loaded, or null for none: the
+ * change is refused (`recipe`) where DYE2 says another is, or one where null
+ * was given. `recipeId` is the loaded recipe whose
  * record took the profile, or null; `name` its new name, or null where it kept
  * its own; `checked` resolves what the check afterwards found, or is null with
  * no recipe loaded. Reasons: `busy` (not now, or the change before it never
  * landed, or a shot started or the strip began to change before anything was
- * written), `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
+ * written), `recipe` (another recipe is loaded than the caller named),
+ * `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
  * Workflow could not be read), the writer's reasons (`gone`, `unconfirmed`),
  * and `workflow` (the record took the profile and the Workflow did not: its
  * write failed, or a shot started or the strip began to change first). The
@@ -216,7 +220,7 @@ export function createProfileChange({
     // A write the check must not make now: its turn is tried again later.
     const notNow = () => new Error('not now');
 
-    async function changeNow(profileId, at) {
+    async function changeNow(profileId, at, expected) {
         let record;
         try {
             record = await readProfile(profileId);
@@ -236,6 +240,9 @@ export function createProfileChange({
             return { ok: false, reason: 'unreadable' };
         }
         const recipeId = selection && selection.kind === 'recipe' && selection.id != null ? String(selection.id) : null;
+        // The caller said which recipe the change is for (the dialog's line
+        // named it): one loaded since, elsewhere, is not the one it named.
+        if (expected !== undefined && recipeId !== (expected == null ? null : String(expected))) return { ok: false, reason: 'recipe' };
         let before;
         let name = null;
         let generation = null;
@@ -380,14 +387,14 @@ export function createProfileChange({
         return 'skipped';
     }
 
-    async function change(profileId) {
+    async function change(profileId, { recipeId: expected } = {}) {
         if (!mayChange()) return { ok: false, reason: 'busy' };
         // From the call: a tap on the strip while the change waits its turn is
         // the barista's too.
         const at = epoch();
         let made;
         try {
-            made = await queue(() => changeNow(profileId, at));
+            made = await queue(() => changeNow(profileId, at, expected));
         } catch (error) {
             return { ok: false, reason: 'busy' };
         }

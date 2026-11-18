@@ -2375,8 +2375,9 @@ async function profileDialog() {
         check('profile dialog: the Workflow has the profile at its own temperature, with dose, yield and grind as they were',
             workflowAfter.profile.title === light.profile.title && workflowAfter.profile.steps[0].temperature === own(light) && dialIn(workflowAfter) === dialIn(workflowBefore),
             `${workflowAfter.profile.title} ${workflowAfter.profile.steps[0].temperature}°C ${dialIn(workflowBefore)} → ${dialIn(workflowAfter)}`);
+        const changeWrites = writesSince(mark, r => /^PUT .*\/workflow$/.test(r) || /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r));
         check('profile dialog: the change was #50\'s, one record write then one Workflow write, and nothing asked of DYE2\'s save or selection',
-            writesSince(mark, r => /^PUT .*\/workflow$/.test(r)).length === 1 && writesSince(mark, r => /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r)).length === 1
+            changeWrites.length === 2 && /\/store\/dye2\.reaplugin\/recipes$/.test(changeWrites[0]) && /\/workflow$/.test(changeWrites[1])
             && writesSince(mark, r => /^POST .*dye2\.reaplugin\/(record|save-recipe|selection)$/.test(r)).length === 0, writesSince(mark, anyWrite).join(', '));
         const brew = await brewRow();
         check('profile dialog: the Brew row names the new profile at its own temperature', brew.name === light.profile.title && brew.temp === own(light), JSON.stringify(brew));

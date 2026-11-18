@@ -75,8 +75,11 @@ export async function openProfileDialog({ mayOpen, epoch, recipe }) {
         });
         if (!row || row.inUse) return; // closed, or the profile in use: nothing to change
         // The change waits its turn behind a dial-in change still on its way,
-        // and is not made where a shot or a recipe load has begun since.
-        const result = await changeProfile(row.id);
+        // and is not made where a shot or a recipe load has begun since, or
+        // where DYE2 has another recipe loaded than the line under the title
+        // named (one loaded elsewhere while the dialog was open).
+        const named = loaded ? String(loaded.id) : null;
+        const result = await changeProfile(row.id, { recipeId: named });
         if (!result.ok) {
             logger.warn(`Cafe: could not change the profile to ${row.id}: ${result.reason}`);
             showToast(cafeText('Could not change the profile'), 4000, 'error');

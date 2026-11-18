@@ -91,10 +91,12 @@ export function initProfileChanger({ mayChange, settled, queue, epoch, shotRunni
 
 /**
  * Change the profile to Decaid's profile `profileId`, keeping a loaded recipe
- * loaded with the profile saved onto it. See `createProfileChange` in
- * profile-change.js for the answer.
+ * loaded with the profile saved onto it. `options.recipeId`, where given, is
+ * the recipe the caller expects loaded (null for none), and the change is
+ * refused where another is. See `createProfileChange` in profile-change.js for
+ * the answer.
  */
-export function changeProfile(profileId) {
+export function changeProfile(profileId, options) {
     if (!change) return Promise.resolve({ ok: false, reason: 'busy' });
-    return change(profileId);
+    return change(profileId, options);
 }

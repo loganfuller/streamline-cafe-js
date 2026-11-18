@@ -181,6 +181,33 @@ test('with no recipe loaded the same Workflow write is made and no record is wri
     assert.deepEqual(w.waits, []);
 });
 
+test('a change for the recipe the caller named goes ahead; with another loaded since, nothing is written', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf')], loaded: 'r1' });
+    assert.equal((await w.change(BLOOM.id, { recipeId: 'r1' })).ok, true);
+    assert.equal(w.get('r1').profileId, BLOOM.id);
+
+    // The dialog named r1, and r2 was loaded elsewhere while it was open.
+    const moved = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf')], loaded: 'r2' });
+    assert.deepEqual(await moved.change(BLOOM.id, { recipeId: 'r1' }), { ok: false, reason: 'recipe' });
+    assert.deepEqual(moved.log, [], 'no record and no Workflow written');
+    assert.deepEqual(moved.get('r2'), recipe('r2', 'Decaf'));
+
+    // The dialog said no recipe was loaded, and one was loaded since.
+    const loadedSince = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    assert.deepEqual(await loadedSince.change(BLOOM.id, { recipeId: null }), { ok: false, reason: 'recipe' });
+    assert.deepEqual(loadedSince.log, []);
+
+    // And a recipe named that was unloaded since: not "this machine only" either.
+    const unloaded = tablet({ rows: [recipe('r1', 'House espresso')], loaded: null });
+    assert.deepEqual(await unloaded.change(BLOOM.id, { recipeId: 'r1' }), { ok: false, reason: 'recipe' });
+    assert.deepEqual(unloaded.workflowWrites, []);
+
+    // Null named and none loaded: the machine's own change.
+    const none = tablet({ rows: [recipe('r1', 'House espresso')], loaded: null });
+    assert.equal((await none.change(BLOOM.id, { recipeId: null })).ok, true);
+    assert.equal(none.workflowWrites.length, 1);
+});
+
 test('records that can\'t be read change nothing', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failRecords = () => true;
