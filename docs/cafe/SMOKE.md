@@ -115,7 +115,7 @@ In order, it:
 
 The run puts DYE2's records back as they were before it made and moved recipes, so it can be repeated on the same Decaid. It leaves behind what step 22 made, which a repeat finds and uses: Sample Blend's two further batches, DYE2's three sample baskets, and the Workflow with no recipe loaded, set to a batch of Sample Single Origin and the 20 g basket.
 
-Fifteen things are not Decaid's own answers:
+Sixteen things are not Decaid's own answers:
 
 - **A machine with buttons of its own.** The simulated machine always reports none, so for those screenshots the run rewrites that one field of `GET /api/v1/machine/info` in the browser.
 - **The recipes' names and the slots above 5.** DYE2 names a saved recipe after its bean and places only slots 1 to 5, so the run writes the names and slots 7 and 9 into DYE2's records itself. That is the fixture's write. The skin's own writer of those records is a separate module with its own guards.
@@ -139,6 +139,7 @@ Fifteen things are not Decaid's own answers:
 
 - **An unload DYE2 refuses.** Step 24 answers the page's request that clears DYE2's selection with a refusal in the browser, once, for the toast and the card highlighted again.
 - **A record write lost in DYE2's window, and DYE2 dropping the recipe.** DYE2's windows are short on a simulated machine, which answers its settings read at once, so step 25 writes the record's copy from before the change back into DYE2's store itself, as a save that read the list before the change leaves it, and clears DYE2's selection through DYE2's own request, as DYE2 does when it hears the Workflow before the record. The writes the page makes are the page's own.
+- **A recipe DYE2 does not call changed.** The simulated machine's Workflow reports a flush at 90 °C whatever its settings hold, and the sample recipes hold 25 °C, so DYE2 calls each one changed as soon as it loads. Step 25 gives the loaded recipe's record the steam, hot water and flush the Workflow reports before the change, so that a recipe DYE2 does not call changed afterwards shows the change made it no different. The step puts DYE2's records back afterwards.
 - **A recipe DYE2 named.** The seed renames its recipes, so step 25 has DYE2 make one with `save-recipe` from a Workflow it sets first, and keeps DYE2's name. Step 15 of the second run gives the sample Recipe DYE2's name for it ("Sample Blend") through the server's API, as the management interface would, and names it back afterwards.
 - **Decent Sync.** In the first run this Decaid has no Decent Sync plugin. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin that connects a few seconds after the page opens. It answers the plugin's `reference` request too, with no Reference Shot, and as a plugin with no copy while it is not connected, and takes its `changes` socket, on which it sends only the push that says its connection came. Nothing saves a dial-in in that check: it shows the label only. The real plugin is the second run's.
 

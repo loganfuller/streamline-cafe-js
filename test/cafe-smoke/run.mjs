@@ -1923,11 +1923,32 @@ async function profileChange() {
         const dialIn = wf => JSON.stringify({ dose: wf.context.targetDoseWeight, yield: wf.context.targetYield, grind: wf.context.grinderSetting });
 
         //     A loaded recipe, named by hand: the record first, then the Workflow.
+        //     Loaded afresh, as stored, so DYE2 does not call it changed already.
+        if ((await card(house).getAttribute('aria-pressed')) === 'true') {
+            await card(house).click(); // unloads it
+            await view.page.waitForTimeout(2500);
+        }
         await loadCard(house);
+        // The simulated machine's Workflow reports a flush at 90 °C, whatever
+        // its settings hold, and the sample recipes hold 25 °C, so DYE2 calls
+        // every recipe changed the moment it loads. The record is given the
+        // steam, hot water and flush the Workflow reports (the fixture's
+        // write), so that "not called changed" after the change says something.
+        const machineNow = await decaid('GET', '/workflow');
+        const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
+        await decaid('POST', RECIPE_STORE, (await records()).map(row => {
+            if (!row || row.name !== house.name) return row;
+            const dashboardVariables = { ...row.dashboardVariables };
+            for (const [key, [group, field]] of Object.entries(MACHINE_FIELDS)) {
+                if (dashboardVariables[key] != null && machineNow[group]?.[field] != null) dashboardVariables[key] = machineNow[group][field];
+            }
+            return { ...row, dashboardVariables };
+        }));
         const before = await recordNamed(house.name);
         const othersBefore = JSON.stringify((await records()).filter(row => row && row.id !== before.id));
         const workflowBefore = await decaid('GET', '/workflow');
-        check('profile: the recipe is loaded before the change', (await loadedId()) === before.id, JSON.stringify(await selection()));
+        const loadedBefore = await selection();
+        check('profile: the recipe is loaded before the change, and not as changed', loadedRecipeId(loadedBefore) === before.id && loadedBefore.modified === false, JSON.stringify(loadedBefore));
         await shot(view.page, 'profile-before-1920x1200-light');
         let mark = view.seen.requests.length;
         const answer = await changeProfile(view.page, light.id);
