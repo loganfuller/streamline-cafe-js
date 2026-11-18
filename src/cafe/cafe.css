@@ -941,7 +941,7 @@ button.cafe-card {
 
 #cafe-note-dialog .cafe-dialog {
     width: 720px;
-    max-height: calc(var(--cafe-note-visible, 100vh) - 32px);
+    max-height: calc(100% - 32px);
 }
 
 #cafe-note-dialog h3 {
@@ -1241,12 +1241,36 @@ button.cafe-card {
     display: none !important;
 }
 
+/* ── The dialogs' canvas ──────────────────────────────────────────────────── */
+
+/* A dialog opened with showModal() draws in the top layer, outside
+   #scaled-content and its transform, so each cafe dialog carries its own
+   canvas, scaled as the page is (#39). Streamline's scaling.js writes the two
+   factors (they differ on a screen flatter than 1920:1010), and the canvas is
+   the screen's size in design px, so every size inside it, and every limit as
+   a percentage of it, is in design px as on the page. The dialog itself stays
+   the screen's size: the note's dialog takes the height above the soft
+   keyboard in screen px, and its canvas turns that into design px. */
+.cafe-dialog-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% / var(--streamline-scale-x, 1));
+    height: calc(100% / var(--streamline-scale-y, 1));
+    transform-origin: 0 0;
+    transform: scale(var(--streamline-scale-x, 1), var(--streamline-scale-y, 1));
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    justify-items: center;
+    align-items: center;
+}
+
 /* ── Choosing a recipe for a slot ─────────────────────────────────────────── */
 
 .cafe-dialog {
     width: 640px;
-    max-width: calc(100vw - 48px);
-    max-height: calc(100vh - 96px);
+    max-width: calc(100% - 48px);
+    max-height: calc(100% - 96px);
     display: flex;
     flex-direction: column;
     padding: 28px;
@@ -1440,8 +1464,8 @@ button.cafe-card {
 
 .cafe-dialog.cafe-shots-box {
     width: 1560px;
-    height: calc(100vh - 96px);
-    max-width: calc(100vw - 48px);
+    height: calc(100% - 96px);
+    max-width: calc(100% - 48px);
     padding: 28px 32px;
     gap: 12px;
 }
