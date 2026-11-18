@@ -2246,8 +2246,18 @@ async function profileDialog() {
     const workflowAtStart = await decaid('GET', '/workflow');
     const pulled = [];
     const hiddenIds = [];
+    // DYE2's records and the Workflow as the step found them, and its Shots gone.
+    const restore = async () => {
+        await decaid('POST', RECIPE_STORE, recordsAtStart).catch(() => {});
+        await unloadRecipe().catch(() => {});
+        await decaid('PUT', '/workflow', { profile: workflowAtStart.profile }).catch(() => {});
+        for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+    };
     await decaid('PUT', '/machine/state/idle').catch(() => {});
     let view = await openPage();
+    // Set once the first pass ends: one that throws restores the fixture itself,
+    // as the 1340 by 800 pass after it never runs.
+    let firstDone = false;
     try {
         const { page, seen } = view;
         // A tablet's numbers open the numpad, which Streamline decides at start.
@@ -2478,9 +2488,11 @@ async function profileDialog() {
             writesSince(mark, anyWrite).join(', '));
         check('profile dialog: and the Brew row follows, at the profile\'s own temperature', (await brewRow()).name === light.profile.title && (await brewRow()).temp === own(light), JSON.stringify(await brewRow()));
         check('profile dialog: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+        firstDone = true;
     } finally {
         await view.close();
         for (const id of hiddenIds) await decaid('PUT', `/profiles/${encodeURIComponent(id)}/visibility`, { visibility: 'visible' }).catch(() => {});
+        if (!firstDone) await restore();
     }
 
     //     At 1340 by 800, with the recipe loaded: the dialog fits, scaled, and long notes scroll inside it.
@@ -2510,11 +2522,7 @@ async function profileDialog() {
         check('profile dialog 1340x800: no page error', seen.errors.length === 0, seen.errors.join(' | '));
     } finally {
         await view.close();
-        // DYE2's records and the Workflow as the step found them.
-        await decaid('POST', RECIPE_STORE, recordsAtStart).catch(() => {});
-        await unloadRecipe().catch(() => {});
-        await decaid('PUT', '/workflow', { profile: workflowAtStart.profile }).catch(() => {});
-        for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+        await restore();
     }
 }
 

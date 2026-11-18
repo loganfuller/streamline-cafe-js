@@ -278,9 +278,18 @@ export function createProfileChange({
             // The record holds the profile; another recipe loaded elsewhere
             // while it was written gets no Workflow write, as one that failed
             // (the profile would go onto that recipe's Workflow), and nor does a
-            // shot or an arrangement begun meanwhile.
-            const still = await readSelection();
-            if (!settled() || !namesRecipe(still, recipeId)) return { ok: false, reason: 'workflow' };
+            // shot or an arrangement begun meanwhile. The Workflow is read
+            // again for it, not DYE2's selection: DYE2 derives that from the
+            // Workflow's mark, and may answer from a Workflow read before the
+            // load. The new one's yield is the stop weight written. Decaid has
+            // no conditional write, so a load between this read and the write
+            // is the after-check's to find.
+            try {
+                workflow = await readWorkflow();
+            } catch (error) {
+                return { ok: false, reason: 'workflow' };
+            }
+            if (!settled() || String(workflow?.context?.extras?.dye?.recipeId ?? '') !== recipeId) return { ok: false, reason: 'workflow' };
         }
         try {
             await writeWorkflow(workflowPatch(record, workflow));
