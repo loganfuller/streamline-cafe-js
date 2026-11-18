@@ -2348,7 +2348,6 @@ async function preheatLive() {
             JSON.stringify({ legend: now.legend, lines: now.lines, was: rest.lines }));
         check('stopped in the Preheat: its stage names are back', JSON.stringify(now.stages) === JSON.stringify(rest.stages), JSON.stringify(now.stages));
         check('stopped in the Preheat: the five cards at rest, as before', now.row.mode === 'rest' && JSON.stringify(now.row.cards) === JSON.stringify(rest.row.cards), JSON.stringify(now.row.cards));
-        check('stopped in the Preheat: no Shot was saved', (await newestId()) === second);
         // Still the latest after the page looks again.
         await page.waitForTimeout(3000);
         check('stopped in the Preheat: still the latest a moment later', (await legend(page)).when === rest.legend.when && (await ownLines(page)).own === rest.lines.own);

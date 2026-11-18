@@ -588,10 +588,30 @@ test('the source changing drops the reference at once, and reads both Shots to a
     assert.deepEqual(kinds(effects), ['overlay', 'paint', 'readShots']);
 });
 
-test('the source changing while a shot runs drops the reference too, and reads nothing', () => {
-    const { state, effects } = play(STATES['a shot running with a recipe'](), { type: 'sourceMoved' });
+test('the source changing while a shot runs drops the reference too, and reads the other source\'s for behind the shot', () => {
+    const running = STATES['a shot running with a recipe']();
+    const { state, effects } = play(running, { type: 'sourceMoved' });
     assert.equal(state.reference.shot, null);
-    assert.deepEqual(kinds(effects), ['overlay', 'paint']);
+    assert.deepEqual(kinds(effects), ['overlay', 'paint', 'readShots']);
+    const found = answer(state, effects, LATEST, chosen(REF2));
+    assert.equal(inGraph(found.state).reference.shot, REF2);
+    assert.deepEqual(kinds(found.effects), ['overlay', 'paint'], 'nothing is drawn over the chart\'s lines');
+});
+
+test('a page opened in a Preheat: the source known after DYE2 has answered reads the reference again, and a read from the source before is dropped', () => {
+    // DYE2 answered, the read found no reference while the source was unknown.
+    const early = play(initialGraphState(), { type: 'shotStarted', profileStarted: false }, { type: 'recipe', recipe: RECIPE });
+    const none = answer(early.state, early.effects, LATEST, chosen(null));
+    assert.equal(inGraph(none.state).reference.shot, null);
+    // A read from before is on its way when the source becomes known.
+    const again = play(none.state, { type: 'sourceMoved' });
+    assert.ok(lastRead(again.effects), 'the reference is read from the source now known');
+    const stale = play(again.state, { type: 'shotsRead', seq: lastRead(early.effects).seq, edits: 0, shot: LATEST, chosen: chosen(REF2) });
+    assert.equal(stale.effects.length, 0, 'the source before\'s answer is dropped');
+    const found = answer(again.state, again.effects, LATEST, chosen(REF));
+    assert.equal(inGraph(found.state).reference.shot, REF);
+    assert.equal(inGraph(found.state).live, true);
+    assert.deepEqual(kinds(found.effects), ['overlay', 'paint']);
 });
 
 test('the source changing while a finished shot waits drops the reference, and its read is a look', () => {

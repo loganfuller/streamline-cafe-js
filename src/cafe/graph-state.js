@@ -498,6 +498,8 @@ function referencePushed(s, todo, recipeId) {
 // serve, whichever read fails or is overtaken next. The read that follows is a
 // full one. It ends in a draw, and it takes the place of a read still on its
 // way from the source before, as a look for a shot that has just ended may be.
+// While a shot runs it reads the other source's reference for behind the
+// running shot, and draws nothing over the chart's own lines, as `readUnread`.
 function sourceMoved(s, todo) {
     // An opened Shot gives way to the latest: its reference was the source
     // before's too.
@@ -511,7 +513,8 @@ function sourceMoved(s, todo) {
         overlay(todo);
         paint(todo);
     }
-    refresh(s, todo);
+    if (s.live) readShots(s, todo);
+    else refresh(s, todo);
 }
 
 // The next look for a shot that has ended. After the last, what Decaid holds is
