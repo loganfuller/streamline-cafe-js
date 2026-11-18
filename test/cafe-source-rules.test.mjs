@@ -124,6 +124,8 @@ test('the Grind row\'s hook is still in ui.js', () => {
     assert.match(ui, /^import \{ grindText, grindNumber \} from '\.\.\/cafe\/grind-text\.js';$/m);
     assert.match(ui, /export function updateGrindDisplay\(grinderData\) \{[^}]*grindValueEl\.textContent = grindText\(grindValue, grindStepNow\(\)\);/);
     assert.match(ui, /\(val\) => grindText\(val, grindStepNow\(\)\),\s*updateGrindValue, undefined, \(\) => workflowGrinderRange\.max, grindNumber\);/, 'the Grind row\'s − and + paint as a read does, and read its number strictly');
+    assert.match(ui, /export function setGrinderGrindStep\(step\) \{[^}]*repaintGrindNumber\(\); \}/, 'a connected grinder\'s step repaints the number');
+    assert.match(ui, /export function setWorkflowGrindStep\(step\) \{[^}]*repaintGrindNumber\(\); \}/, 'the Workflow grinder\'s step repaints the number');
     assert.equal(ui.match(/let currentValue = readValue\(valueEl\);\s*if \(currentValue === null\) return;/g)?.length, 2, 'and − and + both step nothing from no number');
 });
 

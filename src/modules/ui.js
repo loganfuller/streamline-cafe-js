@@ -215,10 +215,19 @@ export function msSinceTileInteraction() { return Date.now() - lastTileInteracti
 let grindStep = 0.1;
 // The -/+ step a connected grinder declares for its grind setting; null when none is connected.
 let grinderDeclaredStep = null;
-export function setGrinderGrindStep(step) { grinderDeclaredStep = Number.isFinite(step) && step > 0 ? step : null; }
+export function setGrinderGrindStep(step) { grinderDeclaredStep = Number.isFinite(step) && step > 0 ? step : null; repaintGrindNumber(); }
 // The small step of the grinder the workflow names (context.grinderId); null when none or not numeric.
 let workflowGrinderStep = null;
-export function setWorkflowGrindStep(step) { workflowGrinderStep = Number.isFinite(step) && step > 0 ? step : null; }
+export function setWorkflowGrindStep(step) { workflowGrinderStep = Number.isFinite(step) && step > 0 ? step : null; repaintGrindNumber(); }
+// Streamline Cafe (#42): the grinder's step can arrive after its setting was painted
+// (app.js looks the grinder up without waiting), so the row's number is painted again
+// to the new step's places. grindText keeps a number's own places, so nothing is lost.
+function repaintGrindNumber() {
+    const el = typeof document === 'undefined' ? null : document.getElementById('grind-value');
+    if (!el || grindNumber(el.textContent) === null) return;
+    const text = grindText(el.textContent, grindStepNow());
+    if (text !== el.textContent) el.textContent = text;
+}
 // The -/+ bounds that same grinder declares (DYE2 writes them to its `extras`); either may be
 // null, meaning it declares none -- which is what every grinder did before the range existed.
 // The Grind tile's floor falls back to 0, its ceiling to no ceiling at all.

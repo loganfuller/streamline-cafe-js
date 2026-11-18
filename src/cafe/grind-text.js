@@ -25,13 +25,16 @@ const placesOf = n => (String(Number(n.toFixed(2))).split('.')[1] || '').length;
  * own, up to two: the step can still be the last grinder's while a new
  * grinder's setting is painted (the Workflow's grinder is read after its
  * setting), and a setting must not be rounded onto the wrong grid. A setting
- * that is not a number is shown as it is.
+ * that is not a number is shown as it is, and an empty one as "—", as Streamline's
+ * first paint shows a Workflow with no grind.
  */
 export function grindText(setting, step) {
     const text = String(setting ?? '').trim();
+    if (!text) return '—';
     if (!NUMBER.test(text)) return text;
     const n = Number(text);
-    if (Number.isInteger(n)) return String(n);
+    // Whole once kept to the row's two places, so 11.999 reads 12, not 12.00.
+    if (Number.isInteger(Number(n.toFixed(2)))) return String(Math.round(n));
     const stepPlaces = Number.isFinite(step) && step > 0 && !Number.isInteger(step) ? grindDecimals(step) : 1;
     return n.toFixed(Math.min(2, Math.max(stepPlaces, placesOf(n))));
 }

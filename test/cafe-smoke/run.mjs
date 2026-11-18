@@ -861,6 +861,15 @@ async function grindRow() {
             return { left: box.left - minus.right, right: plus.left - box.right, cut: value.scrollWidth > value.clientWidth, overflow: getComputedStyle(value).textOverflow };
         });
         check('grind row: a name too long to fit ends in an ellipsis between − and +', clipped.left >= 0 && clipped.right >= 0 && clipped.cut && clipped.overflow === 'ellipsis', JSON.stringify(clipped));
+        // A number is never cut: the fitting measures digits narrower than the
+        // row's tabular ones, so a wide one is left to show whole.
+        await setGrind(quarter, '111.25');
+        await readAgain();
+        const wide = await page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            return { text: value.textContent, overflow: getComputedStyle(value).overflowX };
+        });
+        check('grind row: a wide number such as 111.25 is shown whole, not cut', wide.text === '111.25' && wide.overflow === 'visible', JSON.stringify(wide));
         await setGrind(preset, 'Medium');
         await readAgain();
 

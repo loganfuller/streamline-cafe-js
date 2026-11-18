@@ -83,3 +83,20 @@ test('a number written with a bare point is still a number', () => {
     assert.equal(plus('.5', 0.1), '0.6');
     for (const text of ['.', '-', '1.2.3', '-.']) assert.equal(grindNumber(text), null, text);
 });
+
+test('an empty setting reads as no setting, and a float tail rounds to whole', () => {
+    assert.equal(grindText('', 0.1), '—');
+    assert.equal(grindText('  ', 0.1), '—');
+    assert.equal(grindText(null, 0.1), '—');
+    assert.equal(grindText('1.005', 0.1), '1');
+    assert.equal(grindText('0.001', 0.1), '0');
+    assert.equal(grindText('11.999', 0.25), '12');
+});
+
+test('painting the row again with another step loses nothing', () => {
+    // The step the Workflow's grinder declares can arrive after its setting was
+    // painted with the last grinder's (ui.js repaintGrindNumber).
+    assert.equal(grindText(grindText('11.50', 0.1), 0.25), '11.50');
+    assert.equal(grindText(grindText('11.50', 0.25), 0.1), '11.5');
+    assert.equal(grindText(grindText('11.25', 1), 0.25), '11.25');
+});
