@@ -198,7 +198,8 @@ export function afterCheck({ rows, recipeId, record, befores, selection, tapped,
  * `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
  * Workflow could not be read), the writer's reasons (`gone`, `unconfirmed`),
  * and `workflow` (the record took the profile and the Workflow did not: its
- * write failed, or a shot started or the strip began to change first). The
+ * write failed, or a shot started, the strip began to change or DYE2 loaded
+ * another recipe first). The
  * check's outcomes are `afterCheck`'s, and `superseded` (a later change to the
  * same recipe has its own check, which takes over this one's), `lost`, `moved`
  * and `skipped`.
@@ -231,14 +232,16 @@ export function createProfileChange({
         if (!record || record.id == null || !Array.isArray(record.profile?.steps) || !record.profile.steps.length) {
             return { ok: false, reason: 'profile' };
         }
-        const selection = await readSelection();
-        if (selection === undefined) return { ok: false, reason: 'unreadable' };
         let workflow;
         try {
             workflow = await readWorkflow();
         } catch (error) {
             return { ok: false, reason: 'unreadable' };
         }
+        // Read last, so nothing is awaited between it and the first write but
+        // the writer's own read of the records.
+        const selection = await readSelection();
+        if (selection === undefined) return { ok: false, reason: 'unreadable' };
         const recipeId = selection && selection.kind === 'recipe' && selection.id != null ? String(selection.id) : null;
         // The caller said which recipe the change is for (the dialog's line
         // named it): one loaded since, elsewhere, is not the one it named.
@@ -272,9 +275,12 @@ export function createProfileChange({
             const befores = earlier && !earlier.done ? [...earlier.befores, earlier.mine, before] : [before];
             const mine = heldProfile({ profileId: record.id, workflow: { profile: record.profile } });
             latest.set(recipeId, { generation, befores, mine, rewrote: false, done: false });
-            // The record holds the profile; a shot or an arrangement begun
-            // meanwhile gets no Workflow write, as one that failed.
-            if (!settled()) return { ok: false, reason: 'workflow' };
+            // The record holds the profile; another recipe loaded elsewhere
+            // while it was written gets no Workflow write, as one that failed
+            // (the profile would go onto that recipe's Workflow), and nor does a
+            // shot or an arrangement begun meanwhile.
+            const still = await readSelection();
+            if (!settled() || !namesRecipe(still, recipeId)) return { ok: false, reason: 'workflow' };
         }
         try {
             await writeWorkflow(workflowPatch(record, workflow));

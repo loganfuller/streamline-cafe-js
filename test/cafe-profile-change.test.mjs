@@ -208,6 +208,25 @@ test('a change for the recipe the caller named goes ahead; with another loaded s
     assert.equal(none.workflowWrites.length, 1);
 });
 
+test('another recipe loaded elsewhere while the change reads the Workflow: the named one is not loaded, and nothing is written', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf')], loaded: 'r1' });
+    const read = w.deps.readWorkflow;
+    w.deps.readWorkflow = async () => { const workflow = await read(); w.workflow.context.extras.dye.recipeId = 'r2'; return workflow; };
+    w.change = createProfileChange(w.deps).change;
+    assert.deepEqual(await w.change(BLOOM.id, { recipeId: 'r1' }), { ok: false, reason: 'recipe' });
+    assert.deepEqual(w.log, []);
+    assert.deepEqual(w.workflowWrites, []);
+});
+
+test('another recipe loaded elsewhere while the record is written: the record keeps the profile, and no Workflow is written', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf')], loaded: 'r1' });
+    w.onRecordWrite = world => { world.workflow.context.extras.dye.recipeId = 'r2'; };
+    assert.deepEqual(await w.change(BLOOM.id, { recipeId: 'r1' }), { ok: false, reason: 'workflow' });
+    assert.equal(w.get('r1').profileId, BLOOM.id, 'the record named took the profile');
+    assert.deepEqual(w.get('r2'), recipe('r2', 'Decaf'));
+    assert.deepEqual(w.workflowWrites, [], 'Decaf\'s Workflow is not given the profile');
+});
+
 test('records that can\'t be read change nothing', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failRecords = () => true;
