@@ -44,9 +44,19 @@ const shown = record => record.visibility == null || record.visibility === 'visi
  * read, which is not an empty list.
  */
 export function listedProfiles(records) {
+    const whole = wholeProfiles(records);
+    return whole && whole.filter(shown);
+}
+
+/**
+ * Every whole profile in Decaid's list, hidden and deleted ones too: what the
+ * profile in use is found among, so that one hidden since is not taken for a
+ * listed one that compares the same. Null where the list could not be read.
+ */
+export function wholeProfiles(records) {
     if (!Array.isArray(records)) return null;
     return records.filter(record => isObject(record) && record.id != null && isObject(record.profile)
-        && Array.isArray(record.profile.steps) && record.profile.steps.length > 0 && shown(record));
+        && Array.isArray(record.profile.steps) && record.profile.steps.length > 0);
 }
 
 /**
@@ -62,16 +72,17 @@ export function brewTemp(celsius, unit) {
 const stepTemps = profile => JSON.stringify((Array.isArray(profile?.steps) ? profile.steps : []).map(s => s?.temperature ?? null));
 
 /**
- * The listed record that is the profile in use: the one that matches the
- * Workflow's profile as DYE2 compares two profiles (its title, its tank
- * temperature and its steps, each step's temperature left out), so a profile
- * whose temperature was stepped is still the one in use. Where several match
- * (as two of one title that differ only in temperature do): the one
- * `preferId` names (the loaded recipe's profile), else the one at the
- * Workflow's own step temperatures (the first, where those are twins, any of
- * which is the same choice). Null where none matches, as for a profile hidden
- * or edited since, and where which one is in use can't be told, so that none
- * is marked in use and each can be chosen.
+ * The record that is the profile in use, from `records` (`wholeProfiles`, or
+ * the listed ones): the one that matches the Workflow's profile as DYE2
+ * compares two profiles (its title, its tank temperature and its steps, each
+ * step's temperature left out), so a profile whose temperature was stepped is
+ * still the one in use. Where several match (two of one title that differ
+ * only in temperature, or a version hidden since): the one `preferId` names
+ * (the loaded recipe's profile), else the one at the Workflow's own step
+ * temperatures, else the one listed, a listed one winning each tie, as
+ * Streamline's own binding never takes a hidden record over a shown one. Null
+ * where none matches, as for a profile edited since, and where which one is in
+ * use can't be told, so that none is marked in use and each can be chosen.
  */
 export function profileInUse(records, workflowProfile, preferId = null) {
     const fp = profileFingerprint(isObject(workflowProfile) ? workflowProfile : null);
@@ -80,14 +91,20 @@ export function profileInUse(records, workflowProfile, preferId = null) {
     if (matches.length < 2) return matches[0] || null;
     const preferred = matches.find(record => preferId != null && String(record.id) === String(preferId));
     if (preferred) return preferred;
-    return matches.find(record => stepTemps(record.profile) === stepTemps(workflowProfile)) || null;
+    const listedFirst = list => list.find(shown) || list[0] || null;
+    const exact = matches.filter(record => stepTemps(record.profile) === stepTemps(workflowProfile));
+    if (exact.length) return listedFirst(exact);
+    const listed = matches.filter(shown);
+    return listed.length === 1 ? listed[0] : null;
 }
 
 const sortName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 
 /**
- * What the dialog shows, from the listed records (`listedProfiles`), the
- * Workflow's profile, the loaded recipe's profile id where one is loaded
+ * What the dialog shows, from the listed records (`listedProfiles`), every
+ * whole profile (`known`, `wholeProfiles` of the same list, which the profile
+ * in use is found among; the listed records where not given), the Workflow's
+ * profile, the loaded recipe's profile id where one is loaded
  * (`preferId`, which breaks a tie between two profiles that compare the same),
  * the temperature `unit` ('C' or 'F'), `t` and `titleOf`.
  *
@@ -108,7 +125,7 @@ const sortName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: tr
  * with "Sets Brew to" and the temperature beside it, or null on the profile in
  * use, which reads "In use".
  */
-export function profileView({ records, workflowProfile, preferId = null, unit = 'C', t, titleOf = title => title }) {
+export function profileView({ records, known = records, workflowProfile, preferId = null, unit = 'C', t, titleOf = title => title }) {
     const name = profile => {
         const title = text(profile?.title);
         return title ? titleOf(title) : t(PROFILE_PHRASES.untitled);
@@ -131,7 +148,10 @@ export function profileView({ records, workflowProfile, preferId = null, unit = 
             use: inUse ? null : { label: t(PROFILE_PHRASES.use), note: degrees ? t(PROFILE_PHRASES.sets, { temp: degrees }) : '' },
         };
     };
-    const using = profileInUse(records, workflowProfile, preferId);
+    // Found among every whole profile, hidden ones too: one hidden since is
+    // in use but not listed, and a listed one like it is not the one in use.
+    const found = profileInUse(known, workflowProfile, preferId);
+    const using = found && (records || []).includes(found) ? found : null;
     const rows = (records || []).map(record => {
         const author = text(record.profile.author);
         return {

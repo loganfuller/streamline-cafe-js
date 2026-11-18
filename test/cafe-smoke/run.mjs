@@ -2246,8 +2246,18 @@ async function profileDialog() {
     const workflowAtStart = await decaid('GET', '/workflow');
     const pulled = [];
     const hiddenIds = [];
+    // The step's pour, and the newest Shot before it, for a pour cut short.
+    let pour = null;
+    let newestBefore = null;
     // DYE2's records and the Workflow as the step found them, and its Shots gone.
     const restore = async () => {
+        if (pour) {
+            // A pour the step never saw end may still store its Shot.
+            await pour.catch(() => {});
+            await sleep(4000);
+            const newest = (await decaid('GET', '/shots?limit=1').catch(() => null))?.items?.[0]?.id ?? null;
+            if (newest != null && newest !== newestBefore && !pulled.includes(newest)) pulled.push(newest);
+        }
         await decaid('POST', RECIPE_STORE, recordsAtStart).catch(() => {});
         await unloadRecipe().catch(() => {});
         await decaid('PUT', '/workflow', { profile: workflowAtStart.profile }).catch(() => {});
@@ -2441,9 +2451,10 @@ async function profileDialog() {
             await loadCard(house);
 
             //     A shot that starts closes the dialog, and it does not open during one.
-            const newestBefore = (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
+            newestBefore = (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
             const openBefore = await openProfiles(page);
             const run = pullShot(6);
+            pour = run;
             await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
             check('profile dialog: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
             await tapAt(page, '#brew-section .cafe-row-name');

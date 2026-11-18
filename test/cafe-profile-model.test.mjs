@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PROFILE_PHRASES, listedProfiles, brewTemp, profileInUse, profileView, profileSubtitle } from '../src/cafe/profile-model.js';
+import { PROFILE_PHRASES, listedProfiles, wholeProfiles, brewTemp, profileInUse, profileView, profileSubtitle } from '../src/cafe/profile-model.js';
 
 const t = (phrase, vars = {}) => phrase.replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
 
@@ -151,6 +151,27 @@ test('two of one title that differ only in temperature: the one at the Workflow\
     assert.ok(between.rows.every(r => between.pane(r).use));
     assert.equal(between.opening.inUse, true);
     assert.equal(between.opening.byline, 'By Sample Author · brews at 93°c');
+});
+
+test('a version hidden since, still in use: no listed row is in use, and the visible one like it can be chosen', () => {
+    // The owner changed the curve's temperatures under the same title and hid
+    // the old version, which the loaded recipe still runs.
+    const old = record('p-old', { ...bloom.profile, steps: [step('bloom', 94), step('pour', 92)] }, 'hidden');
+    const all = [old, bloom, lever];
+    const shownView = live => profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: live, t, preferId: 'p-old' });
+    const { rows, pane, opening } = shownView(inWorkflow(old.profile));
+    assert.equal(rows.some(r => r.inUse || r.highlighted), false);
+    assert.deepEqual(pane(rows.find(r => r.id === 'p-bloom')).use, { label: 'Use this profile', note: 'Sets Brew to 92°c' });
+    assert.equal(opening.byline, 'By Sample Author · brews at 94°c', 'the Workflow\'s, as for any profile not listed');
+    // With no recipe loaded, at the old version's own temperatures: the same.
+    const loose = profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: inWorkflow(old.profile), t });
+    assert.equal(loose.rows.some(r => r.inUse), false);
+    // The visible version, at its own temperatures or stepped: it is in use, as
+    // a superseded version Streamline's editor hid never wins over it.
+    for (const live of [inWorkflow(bloom.profile), inWorkflow(stepped(bloom.profile, 1))]) {
+        const { rows: now } = profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: live, t });
+        assert.deepEqual(now.filter(r => r.inUse).map(r => r.id), ['p-bloom']);
+    }
 });
 
 test('with no profile in the Workflow, it opens on the first row, highlighted and offered', () => {

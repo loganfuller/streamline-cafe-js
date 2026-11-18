@@ -5,7 +5,7 @@
 // The profile dialog (profile-dialog.js) calls it, and nothing else on the page
 // does. The smoke run calls `changeProfile` from the page itself too.
 import { getProfiles, getWorkflow, getDye2KvArray, callPluginEndpoint, updateWorkflow, getEspressoEndedAt } from '../modules/api.js';
-import { setActiveProfile } from '../modules/profileManager.js';
+import { setActiveProfile, availableProfiles, loadAvailableProfiles } from '../modules/profileManager.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { setRecipeFields } from './recipe-writer.js';
@@ -40,7 +40,21 @@ async function readSelection() {
 // also binds the active profile by title and keeps the one set here). Its
 // Workflow watch would get there by itself only after a moment, and a step made
 // meanwhile would be saved onto the old profile.
+//
+// Streamline's list of profiles is read at start. A profile that reached
+// Decaid since (from Decent Sync's Library, say) is read into it first, else
+// the binding by title would take an older one of the same title, and the Brew
+// stepper that one's curve.
+const sameSteps = (a, b) => JSON.stringify(a?.profile?.steps ?? null) === JSON.stringify(b?.profile?.steps ?? null);
+
 async function follow(record) {
+    if (!sameSteps(availableProfiles[record.id], record)) {
+        try {
+            await loadAvailableProfiles();
+        } catch (error) {
+            logger.warn('Cafe: Streamline could not read the profiles again after the profile changed', error);
+        }
+    }
     setActiveProfile(record.id);
     try {
         if (typeof window.loadInitialData === 'function') await window.loadInitialData();

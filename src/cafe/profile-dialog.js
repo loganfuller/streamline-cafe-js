@@ -11,18 +11,20 @@ import { showToast } from '../modules/ui.js';
 import { getTranslation } from '../modules/i18n.js';
 import { getTempUnit } from '../modules/units.js';
 import { logger } from '../modules/logger.js';
-import { PROFILE_PHRASES, listedProfiles, profileView, profileSubtitle } from './profile-model.js';
+import { PROFILE_PHRASES, listedProfiles, wholeProfiles, profileView, profileSubtitle } from './profile-model.js';
 import { changeProfile } from './profile-changer.js';
 import { choose } from './pick-dialog.js';
 import { cafeText } from './text.js';
 
 let opening = false;
 
-// The profiles Decaid shows. Rejects where the list can't be read.
+// The profiles Decaid shows, and every whole one it holds, hidden ones too.
+// Rejects where the list can't be read.
 async function readProfiles() {
-    const records = listedProfiles(await getProfiles());
+    const all = await getProfiles();
+    const records = listedProfiles(all);
     if (!records) throw new Error('Decaid did not answer a list of profiles');
-    return records;
+    return { records, known: wholeProfiles(all) };
 }
 
 /**
@@ -39,10 +41,10 @@ export async function openProfileDialog({ mayOpen, epoch, recipe }) {
     opening = true;
     const at = epoch();
     try {
-        let records;
+        let profiles;
         let workflow;
         try {
-            [records, workflow] = await Promise.all([readProfiles(), getWorkflow()]);
+            [profiles, workflow] = await Promise.all([readProfiles(), getWorkflow()]);
         } catch (error) {
             // A list that can't be read is not an empty list.
             logger.warn('Cafe: could not read the profiles', error);
@@ -54,7 +56,8 @@ export async function openProfileDialog({ mayOpen, epoch, recipe }) {
         if (!mayOpen() || epoch() !== at) return;
         const loaded = recipe();
         const view = profileView({
-            records,
+            records: profiles.records,
+            known: profiles.known,
             workflowProfile: workflow?.profile,
             preferId: loaded?.profileId ?? null,
             unit: getTempUnit(),
