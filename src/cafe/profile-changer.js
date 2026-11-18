@@ -42,13 +42,15 @@ async function readSelection() {
 // meanwhile would be saved onto the old profile.
 //
 // Streamline's list of profiles is read at start. A profile that reached
-// Decaid since (from Decent Sync's Library, say) is read into it first, else
-// the binding by title would take an older one of the same title, and the Brew
-// stepper that one's curve.
-const sameSteps = (a, b) => JSON.stringify(a?.profile?.steps ?? null) === JSON.stringify(b?.profile?.steps ?? null);
+// Decaid since, or was shown or changed since (from Decent Sync's Library,
+// say), is read into it first, else the binding by title, which passes over a
+// hidden record, would take another of the same title, and the Brew stepper
+// that one's curve.
+const sameRecord = (a, b) => !!a && (a.visibility ?? null) === (b.visibility ?? null)
+    && JSON.stringify(a.profile ?? null) === JSON.stringify(b.profile ?? null);
 
 async function follow(record) {
-    if (!sameSteps(availableProfiles[record.id], record)) {
+    if (!sameRecord(availableProfiles[record.id], record)) {
         try {
             await loadAvailableProfiles();
         } catch (error) {

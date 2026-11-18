@@ -69,7 +69,14 @@ export function brewTemp(celsius, unit) {
     return unit === 'F' ? `${celsiusToFahrenheit(celsius).toFixed(0)}°F` : `${celsius.toFixed(0)}°c`;
 }
 
-const stepTemps = profile => JSON.stringify((Array.isArray(profile?.steps) ? profile.steps : []).map(s => s?.temperature ?? null));
+const temps = profile => (Array.isArray(profile?.steps) ? profile.steps : []).map(s => (typeof s?.temperature === 'number' ? s.temperature : null));
+const stepTemps = profile => JSON.stringify(temps(profile));
+// Each step's temperature less the first's: what a Brew step, which shifts
+// every step alike, leaves as it was.
+const stepShape = profile => {
+    const all = temps(profile);
+    return JSON.stringify(all.map(c => (c == null || all[0] == null ? null : Math.round((c - all[0]) * 10) / 10)));
+};
 
 /**
  * The record that is the profile in use, from `records` (`wholeProfiles`, or
@@ -77,24 +84,30 @@ const stepTemps = profile => JSON.stringify((Array.isArray(profile?.steps) ? pro
  * compares two profiles (its title, its tank temperature and its steps, each
  * step's temperature left out), so a profile whose temperature was stepped is
  * still the one in use. Where several match (two of one title that differ
- * only in temperature, or a version hidden since): the one `preferId` names
- * (the loaded recipe's profile), else the one at the Workflow's own step
- * temperatures, else the one listed, a listed one winning each tie, as
- * Streamline's own binding never takes a hidden record over a shown one. Null
- * where none matches, as for a profile edited since, and where which one is in
- * use can't be told, so that none is marked in use and each can be chosen.
+ * only in temperature, or a version hidden since), the temperatures tell them
+ * apart: the one at the Workflow's own step temperatures; else, of those a
+ * Brew step could have made the Workflow's (the same steps between steps),
+ * the one `preferId` names (the loaded recipe's profile), else the one listed.
+ * A listed record wins each tie, as Streamline's own binding never takes a
+ * hidden record over a shown one. Null where none matches, as for a profile
+ * edited since, and where which one is in use can't be told, so that none is
+ * marked in use and each can be chosen.
  */
 export function profileInUse(records, workflowProfile, preferId = null) {
     const fp = profileFingerprint(isObject(workflowProfile) ? workflowProfile : null);
     if (!fp) return null;
     const matches = (records || []).filter(record => profileFingerprint(record.profile) === fp);
     if (matches.length < 2) return matches[0] || null;
-    const preferred = matches.find(record => preferId != null && String(record.id) === String(preferId));
-    if (preferred) return preferred;
-    const listedFirst = list => list.find(shown) || list[0] || null;
+    const named = list => list.find(record => preferId != null && String(record.id) === String(preferId));
+    const listedFirst = list => named(list.filter(shown)) || list.find(shown) || named(list) || list[0] || null;
     const exact = matches.filter(record => stepTemps(record.profile) === stepTemps(workflowProfile));
     if (exact.length) return listedFirst(exact);
-    const listed = matches.filter(shown);
+    const shaped = matches.filter(record => stepShape(record.profile) === stepShape(workflowProfile));
+    const pool = shaped.length ? shaped : matches;
+    if (pool.length === 1) return pool[0];
+    const preferred = named(pool);
+    if (preferred) return preferred;
+    const listed = pool.filter(shown);
     return listed.length === 1 ? listed[0] : null;
 }
 

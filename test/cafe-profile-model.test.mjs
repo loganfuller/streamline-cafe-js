@@ -141,7 +141,10 @@ test('two of one title that differ only in temperature: the one at the Workflow\
     const records = listedProfiles([hot, bloom]);
     assert.equal(profileInUse(records, inWorkflow(bloom.profile)), bloom, 'not the first listed');
     assert.equal(profileInUse(records, inWorkflow(hot.profile)), hot);
-    assert.equal(profileInUse(records, inWorkflow(bloom.profile), 'p-hot'), hot, 'the loaded recipe\'s profile, stepped down');
+    // The recipe's profile stepped down to the other's exact temperatures, or
+    // a record write whose Workflow write failed: the curve the machine has wins.
+    assert.equal(profileInUse(records, inWorkflow(bloom.profile), 'p-hot'), bloom);
+    assert.equal(profileInUse(records, inWorkflow(stepped(bloom.profile, 1)), 'p-hot'), hot, 'stepped to neither: the recipe\'s');
     const { rows, pane } = profileView({ records, workflowProfile: inWorkflow(bloom.profile), t });
     assert.deepEqual(pane(rows.find(r => r.id === 'p-hot')).use, { label: 'Use this profile', note: 'Sets Brew to 94°c' });
     // Stepped to a temperature neither has: which is in use can't be told, so
@@ -172,6 +175,19 @@ test('a version hidden since, still in use: no listed row is in use, and the vis
         const { rows: now } = profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: live, t });
         assert.deepEqual(now.filter(r => r.inUse).map(r => r.id), ['p-bloom']);
     }
+});
+
+test('two of one title whose steps differ by other amounts: a stepped one is told apart by the steps between its steps', () => {
+    // 94 then 90, stepped down to 93 then 89, and then hidden; 92 then 90 visible.
+    const steep = record('p-steep', { ...bloom.profile, steps: [step('bloom', 94), step('pour', 90)] }, 'hidden');
+    const all = [steep, bloom];
+    const live = inWorkflow(stepped(steep.profile, -1));
+    assert.equal(profileInUse(wholeProfiles(all), live), steep);
+    const { rows, pane } = profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: live, t });
+    assert.equal(rows.some(r => r.inUse), false);
+    assert.ok(pane(rows.find(r => r.id === 'p-bloom')).use, 'the visible one can be chosen');
+    // And the visible one stepped: it is the one in use.
+    assert.equal(profileInUse(wholeProfiles(all), inWorkflow(stepped(bloom.profile, 3))), bloom);
 });
 
 test('with no profile in the Workflow, it opens on the first row, highlighted and offered', () => {

@@ -891,6 +891,11 @@ async function profileDialogWithDecentSync({ page, house, two }) {
         check('profile dialog: no page error on the second tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
     } finally {
         await tablet2.close();
+        // A step cut short before the Profile was chosen back: the Recipe's
+        // own put back on the server, outside the dialog this step tries.
+        if ((await recipeNow().catch(() => null))?.content?.profileId !== usual.id) {
+            await sync('PATCH', `/recipes/${house.id}`, { content: { profileId: usual.id } }).catch(() => {});
+        }
     }
 }
 
