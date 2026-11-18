@@ -362,14 +362,24 @@ test('records that can\'t be read afterwards are not written; the check says so'
 });
 
 test('a check whose turn finds a shot started tries once more after it', async () => {
-    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original], loaded: 'r1' });
     let turns = 0;
     const queue = w.deps.queue;
     w.deps.queue = async task => { turns += 1; if (turns === 2) throw new Error('a shot started'); return queue(task); };
     w.change = createProfileChange(w.deps).change;
+    // A record lost in the window, so the check has something to write and takes a turn.
+    w.onWait = world => { world.rows = [copy(original)]; };
+    const answer = await w.change(BLOOM.id);
+    assert.equal(await answer.checked, 'rewritten');
+    assert.equal(w.log.filter(entry => entry === 'idle').length, 2);
+});
+
+test('a check that finds the record held takes no turn, so the dial-in rows are not kept still', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     const answer = await w.change(BLOOM.id);
     assert.equal(await answer.checked, 'held');
-    assert.equal(w.log.filter(entry => entry === 'idle').length, 2);
+    assert.equal(w.queued, 1, 'the change alone took a turn');
 });
 
 test('a temperature step after the change keeps the recipe loaded', async () => {
@@ -571,4 +581,23 @@ test('another recipe loaded while the check writes the record again keeps its ma
     assert.equal(w.get('r1').profileId, BLOOM.id, 'the record is written again');
     assert.equal(w.recipeId(), 'r2');
     assert.equal(w.log.filter(entry => entry.startsWith('mark')).length, 0);
+});
+
+test('a DYE2 save that read the record after an earlier change writes that change\'s profile back: the later check writes its own again', async () => {
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    w.onWait = () => gate;
+    // Turbo to Other; a save reads the list on Other, while an older one writes Turbo back.
+    const first = await w.change(OTHER.id);
+    const onOther = copy(w.rows);
+    w.rows = [copy(original)];
+    // Then Bloom, from Turbo; then the save that read Other writes it back.
+    const second = await w.change(BLOOM.id);
+    w.rows = onOther;
+    release();
+    assert.deepEqual(await Promise.all([first.checked, second.checked]), ['superseded', 'rewritten']);
+    assert.equal(w.get('r1').profileId, BLOOM.id);
+    assert.equal(w.recipeId(), 'r1');
 });

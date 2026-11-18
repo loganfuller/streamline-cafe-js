@@ -257,9 +257,12 @@ export function createProfileChange({
             // From here the record is this change's, whatever comes of the Workflow.
             changes += 1;
             generation = changes;
+            // A DYE2 save begun before an earlier change still unchecked may
+            // write back what that change found or what it wrote.
             const earlier = latest.get(recipeId);
-            const befores = earlier && !earlier.done ? [...earlier.befores, before] : [before];
-            latest.set(recipeId, { generation, befores, done: false });
+            const befores = earlier && !earlier.done ? [...earlier.befores, earlier.mine, before] : [before];
+            const mine = heldProfile({ profileId: record.id, workflow: { profile: record.profile } });
+            latest.set(recipeId, { generation, befores, mine, done: false });
             // The record holds the profile; a shot or an arrangement begun
             // meanwhile gets no Workflow write, as one that failed.
             if (!settled()) return { ok: false, reason: 'workflow' };
@@ -273,20 +276,44 @@ export function createProfileChange({
         return { ok: true, recipeId, name, record, at, generation };
     }
 
-    // The check afterwards, run in its turn as a change is.
-    async function checkNow(change) {
+    // The change's entry while it is the latest for its recipe, else null.
+    const entryOf = change => {
         const entry = latest.get(change.recipeId);
-        if (!entry || entry.generation !== change.generation) return 'superseded';
-        const outcome = await checkEntry(change, entry.befores);
-        entry.done = true;
-        return outcome;
-    }
+        return entry && entry.generation === change.generation ? entry : null;
+    };
 
-    async function checkEntry({ recipeId, record, at }, befores) {
+    async function readPlan({ recipeId, record, at }, befores) {
         const [rows, selection, workflow] = await Promise.all([
             readRecords(), readSelection(), readWorkflow().catch(() => null),
         ]);
-        const plan = afterCheck({ rows, recipeId, record, befores, selection, tapped: epoch() !== at, live: workflow?.profile ?? null });
+        return afterCheck({ rows, recipeId, record, befores, selection, tapped: epoch() !== at, live: workflow?.profile ?? null });
+    }
+
+    // A look first, outside the page's turn, so the dial-in rows are kept
+    // still only where something is to be written: the outcome where nothing
+    // is, else null.
+    async function lookNow(change) {
+        const entry = entryOf(change);
+        if (!entry) return 'superseded';
+        const plan = await readPlan(change, entry.befores);
+        if (plan.rewrite || plan.reload) return null;
+        entry.done = true;
+        return plan.outcome;
+    }
+
+    // The check, in its turn as a change is: read again, and act on what it finds.
+    async function checkNow(change) {
+        const entry = entryOf(change);
+        if (!entry) return 'superseded';
+        const plan = await readPlan(change, entry.befores);
+        const outcome = await act(change, entry.befores, plan);
+        // A rewrite says a DYE2 save wrote the old list back, and another may
+        // yet: a later change keeps what this one knew as set back.
+        if (!plan.rewrite) entry.done = true;
+        return outcome;
+    }
+
+    async function act({ recipeId, record, at }, befores, plan) {
         if (plan.rewrite) {
             if (!settled()) throw notNow();
             const result = await saveRecord(recipeId, (row, rowsNow) => recordFields(row, rowsNow, record), {
@@ -335,6 +362,8 @@ export function createProfileChange({
         // find a shot or an arrangement begun meanwhile: then twice more, after it.
         for (let attempt = 0; attempt < 3; attempt += 1) {
             await untilSettled();
+            const look = await lookNow(change);
+            if (look) return look;
             try {
                 return await queue(() => checkNow(change));
             } catch (error) {
