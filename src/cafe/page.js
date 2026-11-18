@@ -227,14 +227,16 @@ const mayPick = () => !loading && picking === 0 && !shotRunning() && !isSubPage(
  * Write a choice made in a pick dialog: `send()` makes its one Workflow write.
  * A dial-in change still on its way is written first, and a recipe load tapped
  * meanwhile waits for the choice (settleDialIn), so the writes land in the
- * order they were made. Rejects where the change before it never landed, and
- * nothing is written then.
+ * order they were made. Rejects where the change before it never landed, or a
+ * shot started while it waited, and nothing is written then.
  */
 function writePick(send) {
     picking += 1;
     keepStill();
     const run = picks.then(async () => {
         await settleSteps();
+        // A shot that starts takes the screen back, a choice waiting to be written too.
+        if (shotRunning()) throw new Error('A shot started before the choice was written.');
         return send();
     });
     picks = run.catch(() => {});
