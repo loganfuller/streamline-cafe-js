@@ -335,13 +335,20 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     }
     // A preset grinder's setting is a name, which can be wider than the value's
     // box: Streamline writes the Grind value, and the page fits it each time. Only
-    // a name is cut with an ellipsis: the fitting measures digits narrower than
-    // the row's tabular ones, so a number such as 111.25 would be cut too.
+    // a name is cut with an ellipsis. Streamline's fitting measures digits
+    // narrower than the row's tabular ones, so a number it thinks fits can still
+    // be wider than the box (111.25 at 30 px, into the +): such a number is
+    // shrunk by what is left over, measured in layout pixels, as the canvas's
+    // scaling would skew a measured rectangle.
     const grind = el('grind-value');
     if (grind) {
         const fitGrind = () => {
-            grind.classList.toggle('cafe-grind-name', grindNumber(grind.textContent) === null);
+            const name = grindNumber(grind.textContent) === null;
+            grind.classList.toggle('cafe-grind-name', name);
             fitTextToWidth(grind);
+            if (name || grind.scrollWidth <= grind.clientWidth) return;
+            const size = parseFloat(getComputedStyle(grind).fontSize);
+            grind.style.fontSize = `${Math.max(8, Math.floor(size * (grind.clientWidth - 8) / grind.scrollWidth))}px`;
         };
         new MutationObserver(fitGrind).observe(grind, { characterData: true, childList: true, subtree: true });
         fitGrind();
