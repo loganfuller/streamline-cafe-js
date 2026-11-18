@@ -130,11 +130,19 @@
         <aside id="shot-settings" aria-label="Dial-in">
             <p id="cafe-dial-label" class="cafe-eyebrow" data-fit-text data-cafe-text="Dial-in · not saved to a recipe">Dial-in · not saved to a recipe</p>
 
+            <!-- The row's name and the bean's under it are one button, which opens the
+                 bean and batch dialog (src/cafe/bean-dialog.js); Yield's opens the basket
+                 dialog (src/cafe/basket-dialog.js). The labels inside take no taps (cafe.css). -->
             <div id="dose-section" class="cafe-row cafe-row-tall">
-                <div id="dose-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-fit-text data-cafe-text="Dose">Dose</span>
-                    <span id="cafe-dose-desc" class="cafe-row-desc"></span>
-                </div>
+                <button id="cafe-dose-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="dose-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Dose">Dose</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-dose-desc" class="cafe-row-desc"></span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
                 <div class="cafe-stepper">
                     <button id="dose-in-minus" type="button" aria-label="Decrease Dose"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     <div class="cafe-value" aria-labelledby="dose-label">
@@ -145,10 +153,15 @@
             </div>
 
             <div id="drink-section" class="cafe-row cafe-row-tall">
-                <div id="drink-label" class="cafe-row-label">
-                    <span class="cafe-row-name" data-fit-text data-cafe-text="Yield">Yield</span>
-                    <span id="cafe-yield-desc" class="cafe-row-desc"></span>
-                </div>
+                <button id="cafe-yield-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="drink-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Yield">Yield</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-yield-desc" class="cafe-row-desc"></span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
                 <div class="cafe-stepper">
                     <button id="drink-out-minus" type="button" aria-label="Decrease Yield"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     <div class="cafe-value" aria-labelledby="drink-label">
@@ -423,7 +436,7 @@
         </div>
     </dialog>
 
-    <!-- A choice of what a dial-in row names: the grinder (src/cafe/pick-dialog.js). -->
+    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, or the basket (src/cafe/pick-dialog.js). -->
     <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title">
         <div class="cafe-dialog-canvas">
             <div class="modal-box cafe-dialog cafe-pick-box">
@@ -437,7 +450,17 @@
                         <button class="cafe-btn" data-cafe-text="Close">Close</button>
                     </form>
                 </div>
-                <div id="cafe-pick-list" role="group"></div>
+                <div class="cafe-pick-lists">
+                    <!-- The bean dialog's beans: a tap shows that bean's batches on the right. -->
+                    <div id="cafe-pick-side-column" class="cafe-pick-column cafe-pick-side-column" hidden>
+                        <p id="cafe-pick-side-heading" class="cafe-pick-heading"></p>
+                        <div id="cafe-pick-side" class="cafe-pick-rows" role="group" aria-labelledby="cafe-pick-side-heading"></div>
+                    </div>
+                    <div class="cafe-pick-column">
+                        <p id="cafe-pick-heading" class="cafe-pick-heading" hidden></p>
+                        <div id="cafe-pick-list" class="cafe-pick-rows" role="group"></div>
+                    </div>
+                </div>
             </div>
             <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>

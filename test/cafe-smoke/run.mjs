@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS, MORE_BATCHES, BASKETS } from './sample-data.mjs';
 import { KEYBOARD_GAP } from '../../src/modules/keyboard-fit.js';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
@@ -78,6 +78,9 @@ async function seed() {
     const recipesNow = (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || [];
     if (RECIPES.every(r => recipesNow.some(row => row && row.name === r.name))) {
         note('the sample recipes are already there');
+        // A Decaid seeded before the bean and basket dialogs has no second
+        // batch and no baskets with ids, and step 20 measures those dialogs.
+        await beanAndBasketFixtures();
         return;
     }
     const profiles = await decaid('GET', '/profiles');
@@ -87,8 +90,10 @@ async function seed() {
         const batch = await decaid('POST', `/beans/${made.id}/batches`, { roastDate: bean.roastDate });
         batches[bean.name] = { id: batch.id, roaster: bean.roaster };
     }
+    await beanAndBasketFixtures();
     const grinder = await decaid('POST', '/grinders', GRINDER);
     const ids = {};
+    const basketNamed = name => BASKETS.find(basket => basket.name === name);
     for (const recipe of RECIPES) {
         const profile = profiles.find(p => p.profile?.title === recipe.profile)?.profile;
         if (!profile) throw new Error(`Decaid has no profile titled "${recipe.profile}"`);
@@ -98,7 +103,7 @@ async function seed() {
                 targetDoseWeight: recipe.dose, targetYield: recipe.yield,
                 coffeeName: recipe.bean, coffeeRoaster: batches[recipe.bean].roaster, beanBatchId: batches[recipe.bean].id,
                 grinderId: grinder.id, grinderModel: grinder.model, grinderSetting: recipe.grind,
-                extras: { basketName: recipe.basket || null },
+                extras: { basketId: basketNamed(recipe.basket)?.id || null, basketName: recipe.basket || null },
             },
         });
         const saved = await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/save-recipe`, recipe.slot <= 5 ? { slot: recipe.slot } : {});
@@ -113,6 +118,26 @@ async function seed() {
         : row));
     await decaid('POST', `/store/${DYE2_PLUGIN_ID}/recipes`, next);
     note(`seeded ${RECIPES.length} recipes`);
+}
+
+// The bean and batch dialog's batches, and DYE2's baskets with ids, where they
+// are missing: the seed makes them, on a fresh Decaid and on one seeded before
+// they were added, and step 22 makes sure of them again. DYE2's basket list is the fixture's write, as DYE2's
+// own basket page would make it; the skin writes no basket.
+async function beanAndBasketFixtures() {
+    const beans = await decaid('GET', '/beans?includeArchived=true');
+    for (const extra of MORE_BATCHES) {
+        const bean = (Array.isArray(beans) ? beans : beans.items || []).find(b => b && b.name === extra.bean);
+        if (!bean) continue; // the seed makes the beans before it asks for these
+        const batches = await decaid('GET', `/beans/${bean.id}/batches?includeArchived=true`);
+        const list = Array.isArray(batches) ? batches : batches.items || [];
+        if (list.some(batch => batch && String(batch.roastDate || '').slice(0, 10) === extra.roastDate.slice(0, 10))) continue;
+        const made = await decaid('POST', `/beans/${bean.id}/batches`, { roastDate: extra.roastDate });
+        if (extra.archived) await decaid('PUT', `/bean-batches/${made.id}`, { ...made, archived: true });
+    }
+    const baskets = (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/baskets`)) || [];
+    const missing = BASKETS.filter(basket => !(Array.isArray(baskets) ? baskets : []).some(row => row && row.id === basket.id));
+    if (missing.length) await decaid('POST', `/store/${DYE2_PLUGIN_ID}/baskets`, [...(Array.isArray(baskets) ? baskets : []), ...missing]);
 }
 
 const unloadRecipe = () => decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/selection`, {});
@@ -153,7 +178,15 @@ async function pullShot(seconds) {
 
 // ── Browser ──────────────────────────────────────────────────────────────────
 
-const browser = await chromium.launch({ headless: !HEADED });
+// The page calls Decaid on port 8080 of the host that served it. A Decaid
+// given elsewhere with --decaid= is reached by mapping that address to it in
+// the browser, so runs from two checkouts can each have a Decaid of their own.
+const PAGE_DECAID = `${new URL(BASE).hostname}:8080`;
+const mapTo = host => (host === PAGE_DECAID ? [] : [`--host-resolver-rules=MAP ${PAGE_DECAID} ${host}`]);
+const browser = await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID).host) });
+// A request the run intercepts and sends on itself is sent from Node, past the
+// browser's mapping, so it is pointed at the same Decaid here.
+const sendOn = route => route.fetch({ url: route.request().url().replace(`http://${PAGE_DECAID}/`, `${new URL(DECAID).origin}/`) });
 
 // A page with nothing in its own storage. With `machineButtons: false` the
 // machine reports buttons of its own, which the simulated machine never does, so
@@ -168,20 +201,20 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
     page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
     if (!machineButtons) {
         await page.route('**/api/v1/machine/info', async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
         });
     }
     if (weights) {
         await page.route(/\/api\/v1\/shots\/[^/?]+$/, async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             if (!response.ok()) return route.fulfill({ response });
             return route.fulfill({ response, json: withWeights(await response.json()) });
         });
     }
     if (decentSync) {
         await page.route('**/api/v1/plugins', async route => {
-            const response = await route.fetch();
+            const response = await sendOn(route);
             // In place of the real one, where the second run left it switched off.
             const others = (await response.json()).filter(plugin => plugin.id !== 'decent-sync.reaplugin');
             await route.fulfill({ response, json: [...others, { id: 'decent-sync.reaplugin', name: 'Decent Sync', version: '1.10.0', loaded: true, autoLoad: true, api: [] }] });
@@ -246,7 +279,7 @@ async function openTouchPage(short) {
     page.on('pageerror', error => seen.errors.push(error.message));
     page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
     await page.route('**/api/v1/machine/info', async route => {
-        const response = await route.fetch();
+        const response = await sendOn(route);
         await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
     });
     // Sleep is answered here, so the simulated machine stays awake for the run.
@@ -333,7 +366,7 @@ async function ratingAndNotes(page, latest, reference) {
     //    An edit Decaid made and whose answer was lost: it is read again first.
     const lost = async route => {
         if (route.request().method() !== 'PUT') return route.fallback();
-        await route.fetch();
+        await sendOn(route);
         return route.abort();
     };
     await page.route(SHOT_EDIT, lost);
@@ -615,21 +648,25 @@ const openGrinders = async (page, on = '#grind-section .cafe-row-name') => {
 //     chosen; it is opened here as `src/cafe/graph.js` opens it, with made-up
 //     names in it.
 const DIALOG_SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }, { width: 1280, height: 800 }];
+// Keyed by name: the grinder, the bean and the basket share one <dialog>.
 const DIALOG_PARTS = {
     'cafe-recipe-dialog': ['h3', '.cafe-recipe-row', '.cafe-recipe-row-name', '.modal-action .cafe-btn'],
     'cafe-pick-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
+    'cafe-bean-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '#cafe-pick-side-heading', '.cafe-pick-side-row', '#cafe-pick-list .cafe-pick-row'],
+    'cafe-basket-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
     'cafe-shots-dialog': ['h3', '.cafe-shots-head .cafe-btn', '.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-star'],
     'cafe-reference-dialog': ['h3', '#cafe-reference-dialog-recipe', '.cafe-reference-dialog-shots', '#cafe-reference-dialog-replace'],
     'cafe-note-dialog': ['h3', '#cafe-note-meta', '#cafe-note-text', '#cafe-note-save'],
 };
 // Opens each dialog on `page` as a barista would, but for the reference's, and
-// hands each to `measure` while it is open and its fade in is over.
+// hands each to `measure`, by its name and its element's id, while it is open
+// and its fade in is over.
 async function eachDialog(page, measure) {
-    const opened = async (id, open, close) => {
+    const opened = async (name, open, close, id = name) => {
         await open();
         const shown = await page.locator(`#${id}[open]`).waitFor({ timeout: 10_000 }).then(() => true, () => false);
         await page.waitForTimeout(700);
-        await measure(id, shown);
+        await measure(name, id, shown);
         // A dialog that didn't open has no button to close it with, and the
         // rest of the step still runs.
         if (shown) await close();
@@ -646,8 +683,10 @@ async function eachDialog(page, measure) {
         await page.keyboard.press('Escape');
     },
         () => page.locator('#cafe-recipe-dialog .modal-action button').click());
-    await opened('cafe-pick-dialog', () => tapAt(page, '#grind-section .cafe-row-name'),
-        () => page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click());
+    const closePick = () => page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+    await opened('cafe-pick-dialog', () => tapAt(page, '#grind-section .cafe-row-name'), closePick);
+    await opened('cafe-bean-dialog', () => tapAt(page, '#dose-section .cafe-row-name'), closePick, 'cafe-pick-dialog');
+    await opened('cafe-basket-dialog', () => tapAt(page, '#drink-section .cafe-row-name'), closePick, 'cafe-pick-dialog');
     await opened('cafe-shots-dialog', () => page.locator('#cafe-shots-btn').click(),
         () => page.locator('#cafe-shots-dialog .cafe-shots-head .cafe-btn').click());
     await opened('cafe-reference-dialog', () => page.evaluate(() => {
@@ -680,8 +719,9 @@ async function dialogsAtEachSize(design) {
         try {
             await waitForPage(page);
             await page.waitForTimeout(2500);
-            await eachDialog(page, async (id, shown) => {
-                const drawn = shown ? await dialogDrawn(page, id, DIALOG_PARTS[id]) : null;
+            await eachDialog(page, async (name, element, shown) => {
+                const id = name;
+                const drawn = shown ? await dialogDrawn(page, element, DIALOG_PARTS[name]) : null;
                 if (!drawn) return check(`${size}: ${id} opens`, false);
                 await shot(page, `dialog-${id.replace(/^cafe-|-dialog$/g, '')}-${size}-light`);
                 const [width, height] = drawn.window;
@@ -1035,6 +1075,260 @@ async function grindRow() {
     // The two grinders go, so the grinder dialog's list on a later run is its own.
     for (const grinder of [preset, quarter]) await decaid('PUT', `/grinders/${grinder.id}`, { ...grinder, archived: true }).catch(() => {});
     if (plain) await setGrind(plain, GRINDER_USE.first.setting).catch(() => {});
+}
+
+// ── The bean and batch dialog, and the basket dialog ─────────────────────────
+
+const sideRows = page => page.locator('#cafe-pick-side .cafe-pick-row').evaluateAll(rows => rows.map(row => ({
+    name: row.querySelector('.cafe-pick-row-name').textContent,
+    detail: row.querySelector('.cafe-pick-row-detail').textContent,
+    highlighted: row.getAttribute('aria-pressed') === 'true',
+})));
+const sideRow = (page, name) => page.locator('#cafe-pick-side .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+const pickUnder = page => page.locator('#cafe-pick-under').textContent();
+const openBeans = (page, on = '#dose-section .cafe-row-name') => openGrinders(page, on);
+const openBaskets = (page, on = '#drink-section .cafe-row-name') => openGrinders(page, on);
+// What the batch rows should say of a roast day: the days from it to the
+// browser's own today, as the page counts them.
+const daysOff = (page, day) => page.evaluate(day => {
+    const now = new Date();
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.max(0, Math.round((today - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
+    return days === 1 ? '1 day off roast' : `${days} days off roast`;
+}, day);
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const sorted = value => (value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sorted(value[key])])) : value);
+
+// 22. The bean and batch dialog and the basket dialog (docs/cafe/DESIGN.md,
+//     "The grinder, bean and basket dialogs"), without Decent Sync: a tap on
+//     Dose's name lists the beans with a batch beside the highlighted bean's
+//     batches, a tap on Yield's lists DYE2's baskets, and a choice writes the
+//     Workflow and nothing else, with a recipe loaded and with none. The
+//     grinder's own choices, with a recipe and without, are step 18's.
+async function beanAndBasketDialogs() {
+    await beanAndBasketFixtures();
+    const beansListed = await decaid('GET', '/beans');
+    const beanOf = name => (Array.isArray(beansListed) ? beansListed : beansListed.items || []).find(b => b && b.name === name);
+    const batchesOf = async name => {
+        const listed = await decaid('GET', `/beans/${beanOf(name).id}/batches`);
+        return (Array.isArray(listed) ? listed : listed.items || []).filter(b => !b.archived);
+    };
+    const blend = await batchesOf('Sample Blend');
+    const blendNew = blend.find(b => String(b.roastDate).startsWith('2026-11-02'));
+    const blendOld = blend.find(b => String(b.roastDate).startsWith('2026-10-15'));
+    const [decaf] = await batchesOf('Example Decaf');
+    const [single] = await batchesOf('Sample Single Origin');
+    check('bean: Sample Blend has two batches not archived, and Example Decaf one', !!blendNew && !!blendOld && blend.length === 2 && !!decaf,
+        blend.map(b => b.roastDate).join(', '));
+    const house = RECIPES[0];
+    const other = RECIPES[2];
+    const recordsBefore = await records();
+    const pulled = [];
+    const view = await openPage();
+    const { page, seen } = view;
+    try {
+        await page.addInitScript(() => { window._forceNumpadMobile = true; });
+        await page.reload();
+        await waitForPage(page);
+        const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+        const loadCard = async recipe => {
+            await card(recipe).click();
+            await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+            await page.waitForTimeout(3000);
+        };
+        const dose = () => page.locator('#cafe-dose-desc').textContent();
+        const basket = () => page.locator('#cafe-yield-desc').textContent();
+        await loadCard(house);
+        const writes = workflowWrites(page);
+        const record = await recordNamed(house.name);
+        check('bean: the loaded recipe names its bean and roast date under Dose, and its basket under Yield',
+            /^Sample Blend · roasted .*2/.test(await dose()) && (await basket()) === house.basket, `${await dose()} | ${await basket()}`);
+
+        //    Each value still opens the numpad.
+        for (const value of ['#dose-in-value', '#drink-out-value']) {
+            await page.locator(value).click();
+            const numpad = await page.locator('#numpad-modal-overlay').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
+            check(`bean and basket: a tap on ${value} opens the numpad, and no dialog`, numpad && !(await pickDialog(page).count()));
+            if (numpad) await page.locator('#numpad-cancel').click();
+            await page.waitForTimeout(800);
+        }
+
+        //    The bean and batch dialog.
+        check('bean: a tap on the Dose row\'s name opens the bean and batch dialog', await openBeans(page));
+        check('bean: the dialog is titled "Bean and batch", its lists "Bean" and "Batches"',
+            (await page.locator('#cafe-pick-title').textContent()) === 'Bean and batch'
+            && (await page.locator('#cafe-pick-side-heading').textContent()) === 'Bean' && (await page.locator('#cafe-pick-heading').textContent()) === 'Batches'
+            && await page.locator('#cafe-pick-side-heading').isVisible() && await page.locator('#cafe-pick-heading').isVisible());
+        check('bean: with a recipe loaded and no Decent Sync, the line under it says the choice is not saved to the recipe',
+            (await pickUnder(page)) === `${house.name} · not saved to the recipe`, await pickUnder(page));
+        const beans = await sideRows(page);
+        check('bean: the left list is the beans with a batch, sorted by name, each over its roaster and its count of batches',
+            sameJson(beans.map(b => `${b.name}: ${b.detail}`), ['Example Decaf: Example Coffee Co · 1 batch', 'Sample Blend: Sample Roasters · 2 batches', 'Sample Single Origin: Sample Roasters · 1 batch']),
+            beans.map(b => `${b.name}: ${b.detail}`).join(' | '));
+        check('bean: it opens on the bean in use', sameJson(beans.filter(b => b.highlighted).map(b => b.name), ['Sample Blend']));
+        let rows = await pickRows(page);
+        check('bean: the right list is that bean\'s batches not archived, newest roast first, the one in use marked',
+            rows.length === 2 && /^Roasted .*2/.test(rows[0].name) && /^Roasted .*15/.test(rows[1].name) && rows[0].inUse && !rows[1].inUse,
+            JSON.stringify(rows));
+        check('bean: each batch says its days off roast', rows[0].detail === await daysOff(page, '2026-11-02') && rows[1].detail === await daysOff(page, '2026-10-15'),
+            rows.map(r => r.detail).join(' | '));
+        await shot(page, 'bean-dialog-light');
+        await sideRow(page, 'Sample Single Origin').click();
+        await page.waitForTimeout(500);
+        rows = await pickRows(page);
+        check('bean: a tap on a bean shows its batches, and chooses nothing',
+            rows.length === 1 && !rows[0].inUse && (await pickDialog(page).count()) === 1 && writes.length === 0
+            && sameJson((await sideRows(page)).filter(b => b.highlighted).map(b => b.name), ['Sample Single Origin']), JSON.stringify(rows));
+        check('bean: without Decent Sync, the line stays "not saved" whichever bean', (await pickUnder(page)) === `${house.name} · not saved to the recipe`);
+        await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+        check('bean: Close closes it, and nothing was written', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
+        check('bean: a tap on the bean\'s name under Dose opens it too', await openBeans(page, '#cafe-dose-desc'));
+        await pickRow(page, 'Roasted').first().click();
+        await page.waitForTimeout(1500);
+        check('bean: a tap on the batch in use closes the dialog and writes nothing', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
+
+        //    A batch of the same bean: one write, of its name, roaster and the batch.
+        await openBeans(page);
+        await page.locator('#cafe-pick-list .cafe-pick-row').nth(1).click();
+        await pickClosed(page);
+        await page.locator('#cafe-dose-desc').filter({ hasText: /15/ }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        check('bean: a batch is one write of the bean\'s name, its roaster and the batch\'s id',
+            writes.length === 1 && sameJson(sorted(writes[0]), sorted({ context: { beanBatchId: blendOld.id, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } })),
+            JSON.stringify(writes));
+        let workflow = await decaid('GET', '/workflow');
+        check('bean: the Workflow holds it, and the recipe stays loaded',
+            workflow.context.beanBatchId === blendOld.id && workflow.context.extras?.dye?.recipeId === record.id, JSON.stringify(workflow.context));
+        check('bean: Dose names the bean with the new batch\'s roast date', /^Sample Blend · roasted .*15/.test(await dose()), await dose());
+
+        //    A batch of another bean.
+        await openBeans(page);
+        await sideRow(page, 'Example Decaf').click();
+        await page.waitForTimeout(400);
+        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await pickClosed(page);
+        await page.locator('#cafe-dose-desc').filter({ hasText: 'Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        workflow = await decaid('GET', '/workflow');
+        check('bean: a batch of another bean is written as one, and the recipe stays loaded',
+            writes.length === 2 && workflow.context.beanBatchId === decaf.id && workflow.context.coffeeName === 'Example Decaf'
+            && workflow.context.extras?.dye?.recipeId === record.id && /^Example Decaf · roasted .*20/.test(await dose()), `${await dose()} ${JSON.stringify(workflow.context)}`);
+
+        //    The basket dialog.
+        check('basket: a tap on the Yield row\'s name opens the basket dialog', await openBaskets(page));
+        check('basket: the dialog is titled "Basket", with no heading over its list',
+            (await page.locator('#cafe-pick-title').textContent()) === 'Basket' && !(await page.locator('#cafe-pick-heading').isVisible()) && !(await page.locator('#cafe-pick-side-column').isVisible()));
+        check('basket: the line under it says the choice is not saved to the recipe', (await pickUnder(page)) === `${house.name} · not saved to the recipe`);
+        rows = await pickRows(page);
+        const heldId = workflow.context.extras?.basketId;
+        check('basket: it lists DYE2\'s baskets not archived, each with its size and diameter',
+            sameJson(rows.map(r => `${r.name}: ${r.detail}`), ['18 g sample basket: Double · 58 mm', '20 g sample basket: Double · 58 mm']), JSON.stringify(rows));
+        check('basket: the basket in use, and only it, is marked', heldId === 'bskt-sample-18' ? rows[0].inUse && !rows[1].inUse : rows.every(r => !r.inUse),
+            `${heldId}: ${JSON.stringify(rows)}`);
+        await shot(page, 'basket-dialog-light');
+        check('basket: a tap on the basket\'s name under Yield opens it too', await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click().then(() => pickClosed(page)).then(() => openBaskets(page, '#cafe-yield-desc')));
+        await pickRow(page, '20 g sample basket').click();
+        await pickClosed(page);
+        await page.locator('#cafe-yield-desc').filter({ hasText: '20 g sample basket' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        check('basket: a choice is one write of its id and its name',
+            writes.length === 3 && sameJson(writes[2], { context: { extras: { basketId: 'bskt-sample-20', basketName: '20 g sample basket' } } }), JSON.stringify(writes.slice(2)));
+        workflow = await decaid('GET', '/workflow');
+        check('basket: the Workflow holds it, Yield names it, and the recipe stays loaded',
+            workflow.context.extras?.basketId === 'bskt-sample-20' && (await basket()) === '20 g sample basket' && workflow.context.extras?.dye?.recipeId === record.id,
+            JSON.stringify(workflow.context.extras));
+        check('bean and basket: the recipe\'s DYE2 record is unchanged by the choices', sameJson(await recordNamed(house.name), record));
+        check('bean and basket: the skin asked DYE2 to save nothing, and wrote none of its records',
+            !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r)));
+        await lookAgain(page);
+        check('bean and basket: Dose and Yield name the choices after the page goes out of view and comes back',
+            /^Example Decaf/.test(await dose()) && (await basket()) === '20 g sample basket', `${await dose()} | ${await basket()}`);
+        {
+            const again = await openPage();
+            await waitForPage(again.page);
+            await again.page.waitForTimeout(3000);
+            check('bean and basket: and on a page opened afresh',
+                /^Example Decaf · roasted/.test(await again.page.locator('#cafe-dose-desc').textContent()) && (await again.page.locator('#cafe-yield-desc').textContent()) === '20 g sample basket');
+            await again.close();
+        }
+
+        //    Another recipe, then this one again: the recipe's own bean and basket are back.
+        await loadCard(other);
+        await loadCard(house);
+        workflow = await decaid('GET', '/workflow');
+        check('bean and basket: loading another recipe and this one again brings the recipe\'s own bean and basket back',
+            workflow.context.beanBatchId === record.beanBatchId && /^Sample Blend · roasted .*2/.test(await dose()) && (await basket()) === house.basket,
+            `${await dose()} | ${await basket()} | ${workflow.context.beanBatchId}`);
+
+        //    Lists that can't be read are not empty lists.
+        for (const [what, pattern, open] of [['beans', /\/api\/v1\/beans(\?|$)/, '#dose-section .cafe-row-name'], ['baskets', /\/store\/dye2\.reaplugin\/baskets$/, '#drink-section .cafe-row-name']]) {
+            await page.route(pattern, route => route.abort());
+            await tapAt(page, open);
+            await page.locator('#app-toast').filter({ hasText: `Could not read the ${what}` }).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            check(`bean and basket: ${what} that can't be read are a toast, and no dialog`,
+                (await page.locator('#app-toast-message').textContent()) === `Could not read the ${what}` && !(await pickDialog(page).count()));
+            await page.unroute(pattern);
+            await page.waitForTimeout(4500);
+        }
+
+        //    A shot that starts closes the dialog, and neither opens during one.
+        const openBefore = await openBeans(page);
+        const run = pullShot(6);
+        await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+        check('bean: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
+        for (const open of ['#dose-section .cafe-row-name', '#drink-section .cafe-row-name']) await tapAt(page, open);
+        await page.waitForTimeout(1500);
+        check('bean and basket: neither dialog opens during a shot', !(await pickDialog(page).count()));
+        await run;
+        await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+        await page.waitForTimeout(4000);
+        const during = await decaid('GET', '/shots?limit=1');
+        if (during.items?.[0]) pulled.push(during.items[0].id);
+
+        //    With no recipe loaded a choice changes this machine only.
+        await unloadRecipe();
+        await page.reload();
+        await waitForPage(page);
+        await page.waitForTimeout(3000);
+        const before = writes.length;
+        await openBeans(page);
+        check('bean: with no recipe loaded, the line says the choice changes this machine only',
+            (await pickUnder(page)) === 'No recipe loaded · changes this machine only', await pickUnder(page));
+        await sideRow(page, 'Sample Single Origin').click();
+        await page.waitForTimeout(400);
+        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await page.locator('#cafe-dose-desc').filter({ hasText: 'Sample Single Origin' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await openBaskets(page);
+        check('basket: with no recipe loaded, the line says the choice changes this machine only',
+            (await pickUnder(page)) === 'No recipe loaded · changes this machine only', await pickUnder(page));
+        await shot(page, 'basket-dialog-no-recipe-light');
+        await pickRow(page, '20 g sample basket').click();
+        await page.locator('#cafe-yield-desc').filter({ hasText: '20 g sample basket' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        const loose = await decaid('GET', '/workflow');
+        check('bean and basket: with no recipe loaded, each choice writes the Workflow and its row names it',
+            writes.length === before + 2 && loose.context.beanBatchId === single.id && loose.context.extras?.basketId === 'bskt-sample-20'
+            && /^Sample Single Origin · roasted/.test(await dose()) && (await basket()) === '20 g sample basket', `${writes.length - before} writes, ${JSON.stringify(loose.context)}`);
+        check('bean and basket: no recipe\'s DYE2 record changed', sameJson(await records(), recordsBefore));
+        check('bean and basket: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+    } finally {
+        await shot(page, 'bean-basket-at-end').catch(() => {});
+        await view.close();
+    }
+    {
+        const dark = await openPage({ theme: 'dark' });
+        await waitForPage(dark.page, 'dark');
+        await dark.page.waitForTimeout(2500);
+        await openBeans(dark.page);
+        await shot(dark.page, 'bean-dialog-dark');
+        await dark.page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+        await pickClosed(dark.page);
+        await openBaskets(dark.page);
+        await shot(dark.page, 'basket-dialog-dark');
+        await dark.close();
+    }
+    for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
 }
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -2351,6 +2645,7 @@ try {
 
     await dialogsAtTabletSize();
     await grindRow();
+    await beanAndBasketDialogs();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

@@ -33,6 +33,24 @@ export function cafeDateLocale() {
     return dateLocale(language);
 }
 
+/**
+ * A calendar day, YYYY-MM-DD, as "28 Oct" in the page's language. It is
+ * formatted in UTC, where roastDay() in page-model.js read it.
+ */
+export function formatRoastDay(day) {
+    try {
+        return new Date(`${day}T00:00:00Z`).toLocaleDateString(cafeDateLocale(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    } catch (error) {
+        return day;
+    }
+}
+
+/** The tablet's calendar day today, YYYY-MM-DD, in its own time zone. */
+export function todayHere(now = new Date()) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function paint(element) {
     let vars;
     try { vars = element.hasAttribute(VARS) ? JSON.parse(element.getAttribute(VARS)) : undefined; } catch (error) { /* shown unfilled */ }

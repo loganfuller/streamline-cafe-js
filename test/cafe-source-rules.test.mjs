@@ -54,14 +54,19 @@ test('a grinder\'s Shots are read through the seam only, by the grinder dialog',
 });
 
 test('a choice in a pick dialog writes the Workflow, through its own writer, and no DYE2 record', () => {
-    // Decent Sync records the Recipe's grinder from the Workflow; the skin
-    // writes nothing onto a recipe for a choice, with Decent Sync or without.
-    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['grinder-dialog.js']);
-    const dialog = SOURCES.find(({ name }) => name === 'grinder-dialog.js').text;
-    assert.deepEqual([...dialog.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]), ["patch, 'cafe.grinder'"]);
-    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'pick-dialog.js']) {
+    // Decent Sync records the Recipe's grinder, and a batch of its own Bean,
+    // from the Workflow, and DYE2 saves the basket when the plugin asks it to
+    // save the dial-in; the skin writes nothing onto a recipe for a choice,
+    // with Decent Sync or without.
+    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js']);
+    const writes = name => [...SOURCES.find(source => source.name === name).text.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]);
+    assert.deepEqual(writes('grinder-dialog.js'), ["patch, 'cafe.grinder'"]);
+    // A batch goes through Streamline's own bean writer, as its bean picker writes one.
+    assert.deepEqual(writes('bean-dialog.js'), ["patch, 'beans.select'"]);
+    assert.deepEqual(writes('basket-dialog.js'), ["patch, 'cafe.basket'"]);
+    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'bean-dialog.js', 'bean-model.js', 'basket-dialog.js', 'basket-model.js', 'pick-dialog.js']) {
         const { text } = SOURCES.find(source => source.name === name);
-        assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv/, name);
+        assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv|setKVValue/, name);
     }
 });
 
@@ -155,7 +160,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'page-model.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'page-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

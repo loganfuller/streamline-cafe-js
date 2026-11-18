@@ -166,6 +166,10 @@ export const WORKFLOW_WRITERS = {
     // A grinder chosen in its dialog: the grinder, the setting it was last used
     // at and its RPM, in one write. Listed in docs/cafe/UPSTREAM_EDITS.md.
     'cafe.grinder': ['context.grinderId', 'context.grinderModel', 'context.grinderSetting', 'context.extras.rpm'],
+    // A basket chosen in its dialog: its id and its name, in one write, as
+    // DYE2's own picker writes them. A batch chosen there is written by
+    // `beans.select`, above. Listed in docs/cafe/UPSTREAM_EDITS.md.
+    'cafe.basket': ['context.extras.basketId', 'context.extras.basketName'],
 };
 
 // --- what a recipe apply must not inherit (#189) ---------------------------

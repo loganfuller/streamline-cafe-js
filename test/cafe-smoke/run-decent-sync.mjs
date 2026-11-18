@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { RECIPES, BARISTAS, GRINDER, SECOND_GRINDER, GRINDER_USE } from './sample-data.mjs';
+import { RECIPES, BARISTAS, GRINDER, SECOND_GRINDER, GRINDER_USE, BASKETS } from './sample-data.mjs';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, sides, remarks, noteDialog, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { DYE2_PLUGIN_ID, MIN_DYE2_VERSION } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
@@ -195,13 +195,18 @@ async function pullShot(seconds, tablet = decaid) {
 
 // ── Browser ──────────────────────────────────────────────────────────────────
 
-const browser = await chromium.launch({ headless: !HEADED });
+// The page calls Decaid on port 8080 of the host that served it. A Decaid
+// given elsewhere with --decaid= is reached by mapping that address to it in
+// the browser, so runs from two checkouts can each have a Decaid of their own.
+const PAGE_DECAID = `${new URL(BASE).hostname}:8080`;
+const mapTo = host => (host === PAGE_DECAID ? [] : [`--host-resolver-rules=MAP ${PAGE_DECAID} ${host}`]);
+const browser = await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID).host) });
 // The second Machine's tablet: a browser of its own, in which the first
 // Decaid's address is the second's. The skin calls Decaid on port 8080 of the
 // host that served it, so the same page, served once, is each tablet's own.
 let browser2 = null;
 const secondBrowser = async () => {
-    browser2 = browser2 || await chromium.launch({ headless: !HEADED, args: [`--host-resolver-rules=MAP ${new URL(DECAID).host} ${new URL(DECAID_2).host}`] });
+    browser2 = browser2 || await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID_2).host) });
     return browser2;
 };
 
@@ -362,6 +367,165 @@ async function grinderWithDecentSync({ page, seen, house, two }) {
     check('grinder: no page error on either tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
     await tablet2.close();
     await decaid('DELETE', `/shots/${pulled.id}`).catch(() => {});
+}
+
+// ── The bean and batch dialog, and the basket dialog ─────────────────────────
+
+const listOf = answer => (Array.isArray(answer) ? answer : answer?.items || []);
+// A bean's batches not archived on a tablet, by the bean's name.
+async function batchesThere(tablet, beanName) {
+    const bean = listOf(await tablet('GET', '/beans')).find(b => b && b.name === beanName);
+    return bean ? listOf(await tablet('GET', `/beans/${bean.id}/batches`)).filter(b => !b.archived) : [];
+}
+const onDay = (batches, day) => batches.find(b => String(b.roastDate || '').startsWith(day)) || null;
+const basketsThere = async tablet => ((await tablet('GET', `/store/${DYE2_PLUGIN_ID}/baskets`)) || []).filter(b => b && !b.archived);
+async function tapName(page, selector) {
+    const box = await page.locator(selector).boundingBox();
+    await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + box.height / 2);
+    return pickDialog(page).waitFor({ timeout: 15_000 }).then(() => page.waitForTimeout(500)).then(() => true, () => false);
+}
+const pickClosed = page => page.locator('#cafe-pick-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).then(() => page.waitForTimeout(600));
+const sideRowNamed = (page, name) => page.locator('#cafe-pick-side .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+const listRowNamed = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+const under = page => page.locator('#cafe-pick-under').textContent();
+const doseRow = page => page.locator('#cafe-dose-desc').textContent();
+const yieldRow = page => page.locator('#cafe-yield-desc').textContent();
+// Choose a batch: highlight its bean, then tap the batch roasted on `dayText`, as the row says it.
+async function chooseBatch(page, beanName, dayPattern) {
+    await tapName(page, '#dose-section .cafe-row-name');
+    await sideRowNamed(page, beanName).click();
+    await page.waitForTimeout(400);
+    await listRowNamed(page, dayPattern).first().click();
+    await pickClosed(page);
+}
+async function chooseBasket(page, name) {
+    await tapName(page, '#drink-section .cafe-row-name');
+    await listRowNamed(page, name).click();
+    await pickClosed(page);
+}
+
+// 13. The bean and batch dialog and the basket dialog with Decent Sync
+//     (docs/cafe/DESIGN.md, "The grinder, bean and basket dialogs"), with the
+//     Recipe loaded on both Machines: a batch of the Recipe's own Bean is
+//     recorded as the Recipe's and reaches the second Machine; a batch of
+//     another Bean changes this Machine only and keeps the Recipe loaded; and
+//     a basket reaches the Recipe, saved by DYE2 when the plugin asks it to.
+async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
+    //     The Location's Baskets: the tablet's DYE2 baskets joined the Library
+    //     when the plugin first reported them (the first run gave them ids). On
+    //     a server that holds them under no id, they are shown here by name.
+    for (const basket of BASKETS.filter(b => !b.archived)) {
+        await sync('POST', '/baskets', { locationId: location.id, content: { name: basket.name, size: basket.size, diameterMm: basket.diameterMm } })
+            .catch(async error => {
+                // 409: the Library has it already, perhaps not shown here.
+                let existing = null;
+                try { existing = JSON.parse(error.message.replace(/^[^{]*/, '')).existing; } catch { /* not a 409's answer */ }
+                if (existing?.id) await sync('PUT', `/baskets/${existing.id}/locations/${location.id}`, { shown: true }).catch(() => {});
+            });
+    }
+    const ready = await until(async () => {
+        const mine = await basketsThere(decaid);
+        const theirs = await basketsThere(decaid2);
+        const blendHere = await batchesThere(decaid, 'Sample Blend');
+        const blendThere = await batchesThere(decaid2, 'Sample Blend');
+        const decafThere = await batchesThere(decaid2, 'Example Decaf');
+        const both = list => BASKETS.filter(b => !b.archived).every(b => list.some(row => row.name === b.name && row.decentSyncId));
+        return both(mine) && both(theirs) && onDay(blendHere, '2026-10-15') && onDay(blendThere, '2026-10-15') && onDay(blendThere, '2026-11-02') && decafThere.length
+            ? { mine, theirs, blendHere, blendThere } : null;
+    }, { timeout: 120_000, every: 2000 });
+    check('bean and basket: the sample baskets and Sample Blend\'s two batches are the Location\'s, on each tablet', !!ready,
+        JSON.stringify({ baskets: (await basketsThere(decaid2)).map(b => b.name), blend: (await batchesThere(decaid2, 'Sample Blend')).map(b => b.roastDate) }));
+    if (!ready) return;
+    const recipe = async () => (await sync('GET', `/recipes/${house.id}`)).recipe;
+    const original = (await recipe()).content;
+    const record = async tablet => ((await tablet('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || []).find(row => row && row.decentSyncId === house.id) || null;
+    const recordBatch = row => String(row?.beanBatchId ?? row?.workflow?.context?.beanBatchId ?? '');
+    const recordBasket = row => row?.dashboardVariables?.basketName ?? row?.workflow?.context?.extras?.basketName ?? null;
+    const skinWrites = mark => seen.requests.slice(mark).filter(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r));
+
+    //     Both tablets with the Recipe loaded.
+    const tablet2 = await openPage(await secondBrowser());
+    try {
+        await tablet2.page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 });
+        await load(tablet2.page, house);
+        await load(page, house);
+        const loadsThere = tablet2.seen.loads;
+
+        //     The line under the title follows the bean highlighted.
+        await tapName(page, '#dose-section .cafe-row-name');
+        check('bean: on a served Machine, with the Recipe\'s own Bean highlighted, the line says the choice is saved to the recipe',
+            (await under(page)) === `${house.name} · saved to the recipe`, await under(page));
+        await sideRowNamed(page, 'Example Decaf').click();
+        await page.waitForTimeout(400);
+        check('bean: with another Bean highlighted, it says a different bean changes this machine only',
+            (await under(page)) === `${house.name} · a different bean changes this machine only`, await under(page));
+        await shot(page, 'sync-bean-dialog-other-bean-light');
+        await sideRowNamed(page, 'Sample Blend').click();
+        await page.waitForTimeout(400);
+        check('bean: and back on the Recipe\'s own Bean, saved again', (await under(page)) === `${house.name} · saved to the recipe`);
+        await shot(page, 'sync-bean-dialog-light');
+        await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+        await pickClosed(page);
+
+        //     A batch of the Recipe's own Bean: the Recipe's, everywhere.
+        let mark = seen.requests.length;
+        await chooseBatch(page, 'Sample Blend', /15/);
+        const older = onDay(ready.blendHere, '2026-10-15');
+        const olderThere = onDay(ready.blendThere, '2026-10-15');
+        check('bean: a batch of the Recipe\'s Bean is one write of the Workflow, and the skin writes no DYE2 record',
+            seen.requests.slice(mark).filter(r => /^PUT \/api\/v1\/workflow$/.test(r)).length === 1 && skinWrites(mark).length === 0, seen.requests.slice(mark).filter(r => /^(PUT|POST)/.test(r)).join(', '));
+        const taken = await until(async () => {
+            const now = await recipe();
+            return String(now.uses?.beanBatch?.roastDate || '').startsWith('2026-10-15') ? now : null;
+        }, { timeout: 60_000, every: 1000 });
+        check('bean: the Recipe on the server takes the batch', !!taken, JSON.stringify((await recipe()).uses?.beanBatch));
+        check('bean: the Recipe\'s record on this tablet names it', !!(await until(async () => recordBatch(await record(decaid)) === String(older.id) || null, { timeout: 60_000, every: 1000 })),
+            recordBatch(await record(decaid)));
+        check('bean: and on the second tablet, by its own batch', !!(await until(async () => recordBatch(await record(decaid2)) === String(olderThere.id) || null, { timeout: 60_000, every: 1000 })),
+            recordBatch(await record(decaid2)));
+        const doseThere = await until(async () => { const now = await doseRow(tablet2.page); return /^Sample Blend · roasted .*15/.test(now) ? now : null; }, { timeout: 90_000, every: 1000 });
+        check('bean: the second Machine names the batch under Dose, with no tap and no reload', !!doseThere && tablet2.seen.loads === loadsThere, await doseRow(tablet2.page));
+        await shot(tablet2.page, 'sync-bean-second-machine-light');
+
+        //     A batch of another Bean: this Machine's only.
+        mark = seen.requests.length;
+        await chooseBatch(page, 'Example Decaf', /Roasted/);
+        await page.locator('#cafe-dose-desc').filter({ hasText: 'Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await sleep(15_000); // several of the plugin's polls, and its ask of DYE2 to save the dial-in
+        const workflow = await decaid('GET', '/workflow');
+        const after = await recipe();
+        check('bean: a batch of another Bean changes this Machine\'s Workflow, and the Recipe stays loaded',
+            workflow.context.coffeeName === 'Example Decaf' && String(workflow.context.extras?.dye?.recipeId) === String(house.recordId) && /^Example Decaf/.test(await doseRow(page)),
+            JSON.stringify(workflow.context));
+        check('bean: it leaves the Recipe on the server as it was', after.content.beanBatchId === taken?.content.beanBatchId && after.content.beanId === taken?.content.beanId,
+            JSON.stringify({ before: taken?.content.beanBatchId, after: after.content.beanBatchId }));
+        check('bean: and the Recipe\'s record on this tablet', recordBatch(await record(decaid)) === String(older.id), recordBatch(await record(decaid)));
+        check('bean: and the second Machine\'s Dose row', /^Sample Blend · roasted .*15/.test(await doseRow(tablet2.page)), await doseRow(tablet2.page));
+        check('bean: the skin wrote no DYE2 record for it', skinWrites(mark).length === 0, skinWrites(mark).join(', '));
+
+        //     A basket: saved onto the Recipe by DYE2, at the plugin's ask.
+        mark = seen.requests.length;
+        await tapName(page, '#drink-section .cafe-row-name');
+        check('basket: on a served Machine the line says the choice is saved to the recipe', (await under(page)) === `${house.name} · saved to the recipe`, await under(page));
+        await shot(page, 'sync-basket-dialog-light');
+        await listRowNamed(page, '20 g sample basket').click();
+        await pickClosed(page);
+        check('basket: the choice is one write of the Workflow, and the skin writes no DYE2 record',
+            seen.requests.slice(mark).filter(r => /^PUT \/api\/v1\/workflow$/.test(r)).length === 1 && skinWrites(mark).length === 0, seen.requests.slice(mark).filter(r => /^(PUT|POST)/.test(r)).join(', '));
+        const basketTaken = await until(async () => ((await recipe()).uses?.basket?.name === '20 g sample basket' || null), { timeout: 60_000, every: 1000 });
+        check('basket: the Recipe on the server takes the basket', !!basketTaken, JSON.stringify((await recipe()).uses?.basket));
+        check('basket: the Recipe\'s record on this tablet names it', !!(await until(async () => recordBasket(await record(decaid)) === '20 g sample basket' || null, { timeout: 60_000, every: 1000 })));
+        check('basket: and on the second tablet', !!(await until(async () => recordBasket(await record(decaid2)) === '20 g sample basket' || null, { timeout: 60_000, every: 1000 })));
+        const yieldThere = await until(async () => ((await yieldRow(tablet2.page)) === '20 g sample basket' || null), { timeout: 60_000, every: 1000 });
+        check('basket: the second Machine names it under Yield, with no tap and no reload', !!yieldThere && tablet2.seen.loads === loadsThere, await yieldRow(tablet2.page));
+        check('bean and basket: no page error on either tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+    } finally {
+        await tablet2.close();
+        //     The Recipe's own batch and basket put back, as the run found them.
+        await sync('PATCH', `/recipes/${house.id}`, { content: { beanBatchId: original.beanBatchId, basketId: original.basketId } })
+            .catch(error => note(`could not put the Recipe's batch and basket back: ${error.message}`));
+        await load(page, house).catch(() => {});
+    }
 }
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -829,6 +993,7 @@ try {
         await waitLegend(page, l => l.label === 'Latest');
 
         await grinderWithDecentSync({ page, seen, house, two });
+        await beanAndBasketWithDecentSync({ page, seen, house, location });
     }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));
