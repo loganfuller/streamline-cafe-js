@@ -805,8 +805,16 @@ async function profileDialogWithDecentSync({ page, house, two }) {
         await page.locator('#cafe-pick-pane-use').click();
         await page.locator('#cafe-pick-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
     };
+    // Step 15 names the Recipe back as it ends, and the name reaches the
+    // tablets' records a moment later: a card loaded under the old name would
+    // be unloaded by the tap that loads it, so the step waits for the name.
+    const namedBack = await until(async () => ((await recordOn(decaid))?.name === house.name && (await recordOn(decaid2))?.name === house.name) || null, { timeout: 90_000, every: 1000 });
+    check('profile dialog: the Recipe has its own name on both tablets', !!namedBack, `${(await recordOn(decaid))?.name} | ${(await recordOn(decaid2))?.name}`);
     const tablet2 = await openPage(await secondBrowser());
     try {
+        for (const view of [tablet2.page, page]) {
+            await view.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 }).catch(() => {});
+        }
         await load(tablet2.page, house);
         await load(page, house);
         check('profile dialog: the Recipe is loaded on both Machines', (await named(decaid)) === String(house.recordId) && (await named(decaid2)) === two.recordId,
@@ -832,20 +840,25 @@ async function profileDialogWithDecentSync({ page, house, two }) {
         let serverAt = null;
         let secondAt = null;
         let setBack = null;
+        // The dialog closes at the tap and the change lands a moment later, so
+        // the first Machine is watched for being set back only once it has it.
+        let mineAt = null;
         for (let waited = 0; waited < 120_000 && !(serverAt && secondAt); waited += 500) {
             const mine = await decaid('GET', '/workflow');
-            if (mine.profile.title !== gentle.profile.title || (await named(decaid)) !== String(house.recordId)) setBack = setBack || `${mine.profile.title}, ${await named(decaid)}`;
+            const holds = mine.profile.title === gentle.profile.title && (await named(decaid)) === String(house.recordId);
+            if (holds && mineAt === null) mineAt = Date.now() - started;
+            if (!holds && mineAt !== null) setBack = setBack || `${mine.profile.title}, ${await named(decaid)}`;
             const recipe = await recipeNow();
             if (!serverAt && recipe.content.profileId === gentle.id && recipe.content.brewTemperature === own(gentle)) serverAt = Date.now() - started;
             const theirs = await brewOn(tablet2.page);
             if (!secondAt && theirs.name === gentle.profile.title && theirs.temp === own(gentle) && (await named(decaid2)) === two.recordId) secondAt = Date.now() - started;
             await sleep(500);
         }
-        note(`profile dialog: the server had the choice ${serverAt === null ? 'never' : `after ${(serverAt / 1000).toFixed(1)} s`}, the second Machine's Brew row ${secondAt === null ? 'never' : `after ${(secondAt / 1000).toFixed(1)} s`}`);
+        note(`profile dialog: the first Machine had the choice ${mineAt === null ? 'never' : `after ${(mineAt / 1000).toFixed(1)} s`}, the server ${serverAt === null ? 'never' : `after ${(serverAt / 1000).toFixed(1)} s`}, the second Machine's Brew row ${secondAt === null ? 'never' : `after ${(secondAt / 1000).toFixed(1)} s`}`);
         const recipe = await recipeNow();
         check('profile dialog: the Recipe on the server takes the Profile, at its own brew temperature', !!serverAt, `${recipe.content.profileId} ${recipe.content.brewTemperature}°C`);
         check('profile dialog: the first Machine kept it, the Recipe loaded, its record holding the Profile',
-            setBack === null && (await recordOn(decaid))?.profileId === gentle.id && (await brewOn(page)).name === gentle.profile.title, setBack || '');
+            mineAt !== null && setBack === null && (await recordOn(decaid))?.profileId === gentle.id && (await brewOn(page)).name === gentle.profile.title, setBack || '');
         check('profile dialog: the second Machine\'s Brew row shows it at its own temperature with no tap, the Recipe still loaded', !!secondAt,
             `${JSON.stringify(await brewOn(tablet2.page))}, ${await named(decaid2)}`);
         check('profile dialog: the second tablet\'s record holds the Profile', (await recordOn(decaid2))?.profileId === gentle.id, (await recordOn(decaid2))?.profileId);
