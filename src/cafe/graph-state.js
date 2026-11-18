@@ -15,7 +15,9 @@
 //   through the Shot seam;
 // - with none, "Last shot", the one Streamline's history module handed the
 //   chart;
-// - while a shot runs, the running shot, whose lines are the chart's own;
+// - while a shot runs, the running shot, whose lines are the chart's own: from
+//   the start of its Preheat, when the chart is emptied, though nothing is
+//   drawn until the profile starts;
 // - once it has ended and until Decaid has saved it, that shot still
 //   (`settling`), its lines kept until the saved Shot is in the graph;
 // - a Shot opened from the Shots list (`opened`), with its own recipe's
@@ -196,8 +198,12 @@ export function referenceParts(shot) {
  * Events:
  * - `{ type: 'recipe', recipe }`: the loaded recipe changed, or was read again;
  *   null when none is loaded.
- * - `{ type: 'shotStarted' }`, `{ type: 'shotEnded', poured }`: `poured` is
- *   whether the shot ran long enough to draw anything.
+ * - `{ type: 'shotStarted', profileStarted }`: the machine went into its
+ *   `espresso` state, which a shot's Preheat is the start of, or was in it as
+ *   the page started. `profileStarted` is whether the profile has started
+ *   already, so the chart holds the running shot's lines.
+ * - `{ type: 'shotEnded', poured }`: `poured` is whether the profile started,
+ *   so the chart drew the shot.
  * - `{ type: 'inView' }`: the page came back into view.
  * - `{ type: 'chartAsks', measurements, workflow }`: Streamline's history
  *   module asks the chart to draw a finished Shot. The answer's `allow` says
@@ -243,6 +249,7 @@ export function referenceParts(shot) {
  *   answer with `openedRead` or `openedUnread`.
  * - `unopened`: say that the Shot tapped could not be read.
  * - `draw`: draw the chart from the state, and the legend.
+ * - `clear`: empty the chart for a shot whose profile has not started yet.
  * - `overlay`: give the chart what it draws in place of its own lines.
  * - `paint`: write the legend and the row under the graph.
  * - `startTimer` (`timer`, `ms`), `stopTimer` (`timer`).
@@ -257,7 +264,7 @@ export function graphStep(state, event) {
 function handle(s, todo, event) {
     switch (event.type) {
         case 'recipe': return recipeChanged(s, todo, event.recipe);
-        case 'shotStarted': return shotStarted(s, todo);
+        case 'shotStarted': return shotStarted(s, todo, event.profileStarted);
         case 'shotEnded': return shotEnded(s, todo, event.poured);
         case 'inView': return refreshSoon(s, todo);
         case 'chartAsks': return chartAsks(s, todo, event);
@@ -342,8 +349,21 @@ function refresh(s, todo, { onlyIfChanged = false } = {}) {
         if (!s.live && s.recipe === null) readLast(s, todo);
         return;
     }
+    readShots(s, todo);
+}
+
+function readShots(s, todo) {
     s.seq += 1;
     todo.push({ do: 'readShots', recipeId: s.recipe.id, seq: s.seq, edits: s.edits });
+}
+
+// A shot that started before anything was read for the loaded recipe reads the
+// recipe's Shots, for the reference behind it: at its start, when a read on its
+// way is dropped, and at DYE2's first answer, on a page opened during a shot or
+// its Preheat. Its lines stay the chart's. A recipe loaded once the shot has
+// started is another than the shot's, and is read at its end.
+function readUnread(s, todo) {
+    if (s.recipe && s.latest === undefined) readShots(s, todo);
 }
 
 function refreshSoon(s, todo) {
@@ -374,7 +394,19 @@ function shotsUnread(s, todo, { seq }) {
 }
 
 function shotsRead(s, todo, { seq, edits: editsThen, shot, chosen }) {
-    if (seq !== s.seq || s.live) return;
+    if (seq !== s.seq) return;
+    // Read while a shot runs (`readUnread`): the reference goes behind the
+    // running shot's lines, and the latest is what its end draws or tells the
+    // saved shot from. Nothing is drawn over the chart's own lines.
+    if (s.live) {
+        s.latest = shot;
+        takeRemarks(s, shot, editsThen);
+        const found = chosen || s.reference || NO_REFERENCE;
+        s.reference = { ...found, ...referenceParts(found.shot) };
+        overlay(todo);
+        paint(todo);
+        return;
+    }
     // A shot has just ended and Decaid does not have it yet: the graph keeps
     // its live lines, and the next look is a little later.
     if (s.settling && s.settleStep < SETTLE_GAPS_MS.length) {
@@ -466,6 +498,8 @@ function referencePushed(s, todo, recipeId) {
 // serve, whichever read fails or is overtaken next. The read that follows is a
 // full one. It ends in a draw, and it takes the place of a read still on its
 // way from the source before, as a look for a shot that has just ended may be.
+// While a shot runs it reads the other source's reference for behind the
+// running shot, and draws nothing over the chart's own lines, as `readUnread`.
 function sourceMoved(s, todo) {
     // An opened Shot gives way to the latest: its reference was the source
     // before's too.
@@ -479,7 +513,8 @@ function sourceMoved(s, todo) {
         overlay(todo);
         paint(todo);
     }
-    refresh(s, todo);
+    if (s.live) readShots(s, todo);
+    else refresh(s, todo);
 }
 
 // The next look for a shot that has ended. After the last, what Decaid holds is
@@ -553,6 +588,7 @@ function recipeChanged(s, todo, next) {
     overlay(todo);
     paint(todo);
     refresh(s, todo);
+    if (s.live && before === undefined) readUnread(s, todo);
 }
 
 // ── The history module's requests ────────────────────────────────────────────
@@ -602,7 +638,14 @@ function chartAsks(s, todo, { measurements, workflow }) {
 
 // ── During a shot ────────────────────────────────────────────────────────────
 
-function shotStarted(s, todo) {
+// The graph goes live as the machine goes into its `espresso` state, at the
+// start of the shot's Preheat: the Shot in the graph, its stage lines and their
+// names leave it, and the empty chart waits for the profile to start, behind it
+// the reference in Reference. Nothing of the Preheat is drawn: the chart's own
+// lines start at the profile, at time zero. A chart that holds the running
+// shot's lines already, as on a page opened while the profile runs, is not
+// emptied.
+function shotStarted(s, todo, profileStarted = false) {
     closeOpened(s, todo);
     s.live = true;
     s.heldBack = false;
@@ -612,7 +655,9 @@ function shotStarted(s, todo) {
     stopTimer(s, todo, 'late');
     stopTimer(s, todo, 'refresh');
     overlay(todo);
+    if (!profileStarted) todo.push({ do: 'clear' });
     paint(todo);
+    readUnread(s, todo);
 }
 
 function shotEnded(s, todo, poured) {
@@ -632,8 +677,11 @@ function shotEnded(s, todo, poured) {
         draw(s, todo);
         return;
     }
-    // A shot stopped before it poured drew nothing and is not saved: the graph
-    // still holds the Shot before it. Any other is looked for until Decaid has it.
+    // A shot stopped before its profile started drew nothing, and if Decaid
+    // saves it at all it is Unfinished: the graph puts back the Shot it held
+    // before, which the shot's start cleared from the chart, and reads again
+    // only in case that Shot is another by now. Any other is looked for until
+    // Decaid has it.
     if (poured) {
         s.settling = true;
         // With no recipe the history module draws the shot once Decaid has saved
@@ -657,8 +705,8 @@ function shotEnded(s, todo, poured) {
         return;
     }
     overlay(todo);
-    paint(todo);
-    refresh(s, todo);
+    draw(s, todo);
+    refresh(s, todo, { onlyIfChanged: true });
 }
 
 // With no recipe, 15 seconds after a shot ended: the history module has drawn

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { referenceOverlay, referenceColor } from '../src/cafe/reference-overlay.js';
+import { referenceOverlay, referenceColor, liveAxis } from '../src/cafe/reference-overlay.js';
 
 // Streamline's seven lines, as chart.js orders them.
 const seven = () => [
@@ -277,4 +277,20 @@ test('the hooks in chart.js: the overlay on the chart\'s own lines only, and the
     await settle();
     assert.equal(names(main()).length, 7);
     assert.equal(main().series[2].data.length, 3, 'with its targets');
+});
+
+test('a running shot\'s time axis starts at zero and runs at least a second, from its Preheat on', () => {
+    const empty = seven().map(trace => ({ ...trace, x: [], y: [] }));
+    // The Preheat: Streamline's empty chart fits itself.
+    assert.deepEqual(liveAxis(empty, layout({ autorange: true, dtick: 1 })).xaxis, { autorange: false, range: [0, 1], dtick: 1 });
+    assert.deepEqual(liveAxis(empty, layout(undefined)).xaxis, { autorange: false, range: [0, 1] });
+    // The profile's first frame, at time zero, and a shot not yet a second in.
+    assert.deepEqual(liveAxis(empty, layout({ range: [-1, 1], autorange: false, dtick: 1 })).xaxis.range, [0, 1]);
+    assert.deepEqual(liveAxis(seven(), layout({ range: [0, 0.4], autorange: false, dtick: 1 })).xaxis.range, [0, 1]);
+    // Longer already: left as it is, the same layout.
+    const longer = layout({ range: [0, 12], autorange: false, dtick: 1 });
+    assert.equal(liveAxis(seven(), longer), longer);
+    // A chart left to fit itself mid-shot fits its own lines, at the live share.
+    const fitted = seven().map(trace => ({ ...trace, x: [0, 20] }));
+    assert.ok(Math.abs(liveAxis(fitted, layout({ autorange: true })).xaxis.range[1] - 20 / 0.93) < 1e-9);
 });
