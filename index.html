@@ -284,6 +284,11 @@
                             <h1 id="cafe-title"></h1>
                             <p id="cafe-subtitle"></p>
                         </div>
+                        <!-- The barista at the machine, whom its next Shots name (src/cafe/page.js). -->
+                        <button id="cafe-barista" type="button" class="cafe-btn cafe-barista cafe-barista-none">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+                            <span id="cafe-barista-name" data-cafe-text="Barista">Barista</span>
+                        </button>
                         <!-- While a Shot opened from the Shots list is in the graph (src/cafe/graph.js). -->
                         <button id="cafe-back" type="button" class="cafe-btn" data-cafe-text="Back to latest" style="display:none">Back to latest</button>
                         <div id="machine-status" data-i18n-key="Connecting" aria-live="assertive">Connecting</div>
@@ -436,8 +441,10 @@
         </div>
     </dialog>
 
-    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, or the basket (src/cafe/pick-dialog.js). -->
-    <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title">
+    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, or the basket, and of the
+         barista at the machine (src/cafe/pick-dialog.js). It fits itself above the soft keyboard, which
+         only the barista's name field brings up, so Streamline does not lift the page behind it. -->
+    <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title" data-keyboard-fit="1">
         <div class="cafe-dialog-canvas">
             <div class="modal-box cafe-dialog cafe-pick-box">
                 <div class="cafe-pick-head">
@@ -459,8 +466,22 @@
                     <div class="cafe-pick-column">
                         <p id="cafe-pick-heading" class="cafe-pick-heading" hidden></p>
                         <div id="cafe-pick-list" class="cafe-pick-rows" role="group"></div>
+                        <!-- The barista dialog's "New barista", set apart under the names: it shows the field below. -->
+                        <button id="cafe-pick-add" type="button" class="cafe-pick-row cafe-pick-add" hidden>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                            <span id="cafe-pick-add-text"></span>
+                        </button>
                     </div>
                 </div>
+                <!-- A barista's name, typed: in the list's place once "New barista" is tapped. -->
+                <form id="cafe-pick-entry" class="cafe-pick-entry" hidden>
+                    <label id="cafe-pick-entry-label" for="cafe-pick-entry-text" class="cafe-pick-heading"></label>
+                    <input id="cafe-pick-entry-text" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
+                    <div class="cafe-pick-entry-actions">
+                        <button id="cafe-pick-entry-back" type="button" class="cafe-btn"></button>
+                        <button id="cafe-pick-entry-use" type="submit" class="cafe-btn cafe-btn-primary" disabled></button>
+                    </div>
+                </form>
             </div>
             <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
         </div>

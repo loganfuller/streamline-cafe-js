@@ -37,9 +37,11 @@ test('the page reads Shots and the choice of reference through the Shot seam onl
 });
 
 test('the Shots list and a Shot by its id are read through the seam only', () => {
-    // The list is the seam's page, read by the list's dialog alone; a Shot by
-    // its id is the seam's too, read by the graph alone, for an opened Shot.
-    assert.deepEqual(filesWith(/\bshotsPage\b[^;]*from '\.\/shot-seam\.js'/), ['shots-dialog.js']);
+    // The list is the seam's page, read by the list's dialog, and its first
+    // page by the barista's, for the names on recent Shots; a Shot by its id
+    // is the seam's too, read by the graph alone, for an opened Shot.
+    assert.deepEqual(filesWith(/\bshotsPage\b[^;]*from '\.\/shot-seam\.js'/), ['barista-dialog.js', 'shots-dialog.js']);
+    assert.match(SOURCES.find(({ name }) => name === 'barista-dialog.js').text, /\bshotsPage\(null, PAGE_SIZE\)/, 'the first page only');
     assert.deepEqual(filesWith(/\bshotById\b[^;]*from '\.\/shot-seam\.js'/), ['graph.js']);
     assert.deepEqual(filesWith(/\bopenShot\b[^;]*from '\.\/graph\.js'/), ['shots-dialog.js'], 'and a Shot is opened only by the graph, told by the list');
 });
@@ -58,13 +60,18 @@ test('a choice in a pick dialog writes the Workflow, through its own writer, and
     // from the Workflow, and DYE2 saves the basket when the plugin asks it to
     // save the dial-in; the skin writes nothing onto a recipe for a choice,
     // with Decent Sync or without.
-    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js']);
+    assert.deepEqual(filesWith(/\bupdateWorkflow\b/), ['barista-dialog.js', 'basket-dialog.js', 'bean-dialog.js', 'grinder-dialog.js']);
     const writes = name => [...SOURCES.find(source => source.name === name).text.matchAll(/\bupdateWorkflow\(([^)]*)\)/g)].map(match => match[1]);
     assert.deepEqual(writes('grinder-dialog.js'), ["patch, 'cafe.grinder'"]);
     // A batch goes through Streamline's own bean writer, as its bean picker writes one.
     assert.deepEqual(writes('bean-dialog.js'), ["patch, 'beans.select'"]);
     assert.deepEqual(writes('basket-dialog.js'), ["patch, 'cafe.basket'"]);
-    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'bean-dialog.js', 'bean-model.js', 'basket-dialog.js', 'basket-model.js', 'pick-dialog.js']) {
+    // The barista's pick and the clear as the machine sleeps, each through the
+    // page's write, which waits for a dial-in change still on its way.
+    assert.deepEqual(writes('barista-dialog.js'), ["patch, 'cafe.barista'", "patch, 'cafe.barista'"]);
+    const barista = SOURCES.find(source => source.name === 'barista-dialog.js').text;
+    assert.equal([...barista.matchAll(/await write\(/g)].length, 2, 'both writes go through write()');
+    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'bean-dialog.js', 'bean-model.js', 'basket-dialog.js', 'basket-model.js', 'barista-dialog.js', 'barista-model.js', 'pick-dialog.js']) {
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv|setKVValue/, name);
     }
@@ -151,6 +158,37 @@ test('Streamline\'s strip module is asked for three things only', () => {
     assert.deepEqual([...names].sort(), ['applyRecipe', 'forgetAppliedItem', 'initDyeStrip']);
     const strip = readFileSync(new URL('../src/modules/dyeStrip.js', import.meta.url), 'utf8');
     assert.match(strip, /export function forgetAppliedItem\(\) \{\s*applySeq\+\+;/, 'the hook is still in dyeStrip.js after a merge of Streamline');
+    // And the one in its applyRecipe: a recipe load keeps the barista
+    // (test/cafe-barista-apply.test.mjs runs it).
+    assert.match(strip, /\n    delete patch\.context\.baristaName;\n    const seq = \+\+applySeq;\n    await withAutoSaveSuppressed\(\(\) => updateWorkflow\(patch, 'dye\.applyRecipe'\)\);/,
+        'the barista hook is still in applyRecipe after a merge of Streamline');
+});
+
+test('the machine seen asleep is announced from the one socket, and clears the barista', () => {
+    // The fork's hook in api.js, beside Streamline's own espresso-start: the
+    // first frame from a sleeping machine is seen too, as previousMachineState
+    // starts out null.
+    const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
+    assert.match(api, /if \(stateValue === 'sleeping' && previousMachineState !== 'sleeping'\) document\.dispatchEvent\(new Event\('streamline:machine-asleep'\)\);/);
+    assert.match(api, /let previousMachineState = null;/);
+    // page.js clears the name; pick-dialog.js closes an open dialog, which
+    // would sit over the screensaver.
+    assert.deepEqual(filesWith(/streamline:machine-asleep/), ['page.js', 'pick-dialog.js']);
+    assert.match(SOURCES.find(({ name }) => name === 'page.js').text,
+        /addEventListener\('streamline:machine-asleep', clearAsleep\);[\s\S]*getMachineState\(\).then\(snapshot => \{ if \(asleep\(snapshot\)\) clearAsleep\(\); \}\)/,
+        'and the state read once at start, for a page opened on a sleeping machine');
+    assert.match(SOURCES.find(({ name }) => name === 'pick-dialog.js').text,
+        /addEventListener\('streamline:machine-asleep', drop\);/, 'and an open dialog closes, as on a shot');
+});
+
+test('the barista lives in the Workflow alone', () => {
+    // No copy in the page's own store, or in the browser's: DYE2's dashboard
+    // field and the page then always agree.
+    for (const name of ['barista-dialog.js', 'barista-model.js']) {
+        const { text } = SOURCES.find(source => source.name === name);
+        assert.doesNotMatch(text, /localStorage|sessionStorage|indexedDB|writeCafe|setKVValue/, name);
+    }
+    assert.doesNotMatch(SOURCES.find(({ name }) => name === 'cafe-store.js').text, /barista/i);
 });
 
 test('no module writes Streamline\'s strip mode', () => {
@@ -160,7 +198,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'page-model.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

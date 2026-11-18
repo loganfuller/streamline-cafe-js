@@ -40,6 +40,11 @@ export const QUARTER_GRINDER = { model: 'Sample Grinder 0.25', settingType: 'num
 // The baristas the run's two shots with no recipe loaded record, one each, so
 // the legend is seen to follow each Shot.
 export const BARISTAS = ['Sample Barista', 'Example Barista'];
+// The barista step's (#47): a name a recipe's record holds, which a load must
+// not apply; a name typed under "New barista"; one too long for the button.
+export const RECIPE_BARISTA = 'Sample Recipe Barista';
+export const TYPED_BARISTA = 'Sample Typed Barista';
+export const LONG_BARISTA = 'Sample Barista With A Name Far Too Long For The Button';
 
 // `profile` is the title of a profile Decaid ships. `slot` is where the recipe
 // ends up; DYE2 places 1 to 5 itself and the run writes 6 to 9 into its records.

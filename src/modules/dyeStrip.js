@@ -511,6 +511,9 @@ export async function applyRecipe(recipe) {
     Object.assign(patch, await mergeRecipeLiveSettings(dv));
     // This recipe is now the one being dialled in (dye2#36).
     mergeContext(patch, recipeIdPatch(recipe.id));
+    // Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): a recipe load keeps the barista at the
+    // machine, whatever the recipe's record holds, so the write leaves the name out.
+    delete patch.context.baristaName;
     const seq = ++applySeq;
     await withAutoSaveSuppressed(() => updateWorkflow(patch, 'dye.applyRecipe'));
     if (seq !== applySeq) return; // a newer tap owns the arming
