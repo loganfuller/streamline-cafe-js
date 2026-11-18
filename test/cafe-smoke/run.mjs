@@ -78,6 +78,9 @@ async function seed() {
     const recipesNow = (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)) || [];
     if (RECIPES.every(r => recipesNow.some(row => row && row.name === r.name))) {
         note('the sample recipes are already there');
+        // A Decaid seeded before the bean and basket dialogs has no second
+        // batch and no baskets with ids, and step 20 measures those dialogs.
+        await beanAndBasketFixtures();
         return;
     }
     const profiles = await decaid('GET', '/profiles');
@@ -118,8 +121,8 @@ async function seed() {
 }
 
 // The bean and batch dialog's batches, and DYE2's baskets with ids, where they
-// are missing: the seed makes them on a fresh Decaid, and step 22 on one seeded
-// before they were added. DYE2's basket list is the fixture's write, as DYE2's
+// are missing: the seed makes them, on a fresh Decaid and on one seeded before
+// they were added, and step 22 makes sure of them again. DYE2's basket list is the fixture's write, as DYE2's
 // own basket page would make it; the skin writes no basket.
 async function beanAndBasketFixtures() {
     const beans = await decaid('GET', '/beans?includeArchived=true');
@@ -1270,10 +1273,10 @@ async function beanAndBasketDialogs() {
         }
 
         //    A shot that starts closes the dialog, and neither opens during one.
-        await openBeans(page);
+        const openBefore = await openBeans(page);
         const run = pullShot(6);
         await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-        check('bean: a shot that starts closes the dialog', await pickClosed(page));
+        check('bean: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
         for (const open of ['#dose-section .cafe-row-name', '#drink-section .cafe-row-name']) await tapAt(page, open);
         await page.waitForTimeout(1500);
         check('bean and basket: neither dialog opens during a shot', !(await pickDialog(page).count()));

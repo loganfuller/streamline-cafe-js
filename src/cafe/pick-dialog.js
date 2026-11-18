@@ -9,6 +9,10 @@
 import { cafeText, setText } from './text.js';
 
 let wired = false;
+// A list is showing, or its close has not yet been cleaned up. The dialog's
+// close event runs a task after close(): a second list opened in between would
+// have its rows cleared, and be answered, by the first one's cleanup.
+let active = false;
 
 function wire(dialog) {
     if (wired) return;
@@ -101,8 +105,9 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
     const sideColumn = document.getElementById('cafe-pick-side-column');
     const sideList = document.getElementById('cafe-pick-side');
     if (!dialog || !list || typeof dialog.showModal !== 'function' || dialog.open) return Promise.resolve(null);
-    if (side && (!sideColumn || !sideList)) return Promise.resolve(null);
+    if (active || (side && (!sideColumn || !sideList))) return Promise.resolve(null);
     wire(dialog);
+    active = true;
     return new Promise(resolve => {
         let chosen = null;
         const pick = row => { chosen = row; dialog.close(); };
@@ -130,6 +135,7 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         dialog.addEventListener('close', () => {
             list.replaceChildren();
             sideList?.replaceChildren();
+            active = false;
             resolve(chosen);
         }, { once: true });
         dialog.showModal();
