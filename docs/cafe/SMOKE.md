@@ -17,7 +17,7 @@ Everything the run writes is made up. The sample beans, grinders and recipes are
 
 Decaid publishes a Linux build with each release. It needs a display server and a session bus, so it runs under `xvfb-run` and `dbus-run-session`.
 
-1. Start a container, with Decaid's port on the host's own port 8080. The skin calls Decaid on port 8080 of whatever host served the page, so the port can't be moved.
+1. Start a container, with Decaid's port on the host's own port 8080. The skin calls Decaid on port 8080 of whatever host served the page. Another port works only where the run is told it with `--decaid=` (see [The run](#the-run)).
 
    ```sh
    docker run -d --name cafe-smoke-decaid -p 127.0.0.1:8080:8080 ubuntu:24.04 sleep infinity
@@ -75,7 +75,7 @@ python3 -m http.server --bind 127.0.0.1 --directory /path/to/streamline-release 
 node test/cafe-smoke/run.mjs --token=$TOKEN --streamline=http://127.0.0.1:13998
 ```
 
-It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere. Decaid writes a Shot's time as its own local time with no offset, so the browser runs in the container's time zone, UTC unless `--timezone=` names another; otherwise the legend's "Today" is wrong whenever the two zones' dates differ. Without `--streamline=` the switch to Streamline and back is skipped, and the run says so.
+It prints one line per check and exits non-zero if any failed. Screenshots land in `test/cafe-smoke/out/`, which git ignores. `--headed` shows the browser; `--base=` and `--decaid=` point it elsewhere. The page calls Decaid on port 8080 of the host that served it, so a Decaid given on another port with `--decaid=` is reached through a mapping in the run's browser (`--host-resolver-rules`): two checkouts can then run at once, each with its Decaid on a port of its own and its skin served on another. Decaid writes a Shot's time as its own local time with no offset, so the browser runs in the container's time zone, UTC unless `--timezone=` names another; otherwise the legend's "Today" is wrong whenever the two zones' dates differ. Without `--streamline=` the switch to Streamline and back is skipped, and the run says so.
 
 In order, it:
 

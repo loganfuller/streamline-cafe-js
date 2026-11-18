@@ -195,13 +195,18 @@ async function pullShot(seconds, tablet = decaid) {
 
 // ── Browser ──────────────────────────────────────────────────────────────────
 
-const browser = await chromium.launch({ headless: !HEADED });
+// The page calls Decaid on port 8080 of the host that served it. A Decaid
+// given elsewhere with --decaid= is reached by mapping that address to it in
+// the browser, so runs from two checkouts can each have a Decaid of their own.
+const PAGE_DECAID = `${new URL(BASE).hostname}:8080`;
+const mapTo = host => (host === PAGE_DECAID ? [] : [`--host-resolver-rules=MAP ${PAGE_DECAID} ${host}`]);
+const browser = await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID).host) });
 // The second Machine's tablet: a browser of its own, in which the first
 // Decaid's address is the second's. The skin calls Decaid on port 8080 of the
 // host that served it, so the same page, served once, is each tablet's own.
 let browser2 = null;
 const secondBrowser = async () => {
-    browser2 = browser2 || await chromium.launch({ headless: !HEADED, args: [`--host-resolver-rules=MAP ${new URL(DECAID).host} ${new URL(DECAID_2).host}`] });
+    browser2 = browser2 || await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID_2).host) });
     return browser2;
 };
 

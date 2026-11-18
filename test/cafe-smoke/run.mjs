@@ -175,7 +175,12 @@ async function pullShot(seconds) {
 
 // ── Browser ──────────────────────────────────────────────────────────────────
 
-const browser = await chromium.launch({ headless: !HEADED });
+// The page calls Decaid on port 8080 of the host that served it. A Decaid
+// given elsewhere with --decaid= is reached by mapping that address to it in
+// the browser, so runs from two checkouts can each have a Decaid of their own.
+const PAGE_DECAID = `${new URL(BASE).hostname}:8080`;
+const mapTo = host => (host === PAGE_DECAID ? [] : [`--host-resolver-rules=MAP ${PAGE_DECAID} ${host}`]);
+const browser = await chromium.launch({ headless: !HEADED, args: mapTo(new URL(DECAID).host) });
 
 // A page with nothing in its own storage. With `machineButtons: false` the
 // machine reports buttons of its own, which the simulated machine never does, so
