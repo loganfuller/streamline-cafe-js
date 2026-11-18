@@ -11,6 +11,7 @@ import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusBu
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
+import { fitTextToWidth } from '../modules/i18n.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { decentSyncSaves } from './sync-status.js';
 import { askStatus, onStatus } from './decent-sync.js';
@@ -331,6 +332,10 @@ export function initPage({ onProfileChange = () => {} } = {}) {
         new MutationObserver(() => { renderHeading(); onProfileChange(); })
             .observe(profile, { characterData: true, childList: true, subtree: true });
     }
+    // A preset grinder's setting is a name, which can be wider than the value's
+    // box: Streamline writes the Grind value, and the page fits it each time.
+    const grind = el('grind-value');
+    if (grind) new MutationObserver(() => fitTextToWidth(grind)).observe(grind, { characterData: true, childList: true, subtree: true });
     const machineButtons = el('ghc-controls');
     if (machineButtons) new MutationObserver(placeSystemButtons).observe(machineButtons, { attributes: true, attributeFilter: ['style'] });
 

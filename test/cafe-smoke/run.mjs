@@ -773,8 +773,12 @@ async function grindRow() {
         await page.waitForTimeout(3000);
         const writes = workflowWrites(page);
         const grind = () => page.locator('#grind-value').textContent();
-        // A Workflow read, as the page makes when it comes back into view.
-        const readAgain = async () => { await lookAgain(page); await page.waitForTimeout(1500); };
+        // A Workflow read, as the page makes when a plugin says the Workflow
+        // changed (DYE2's `changed` socket, through Streamline's plugin surfaces).
+        const readAgain = async () => {
+            await page.evaluate(() => document.dispatchEvent(new Event('streamline:workflow-refresh')));
+            await page.waitForTimeout(2000);
+        };
         // Past the − and +'s debounce, and Streamline's own read after it.
         const settle = () => page.waitForTimeout(2500);
 
@@ -787,6 +791,25 @@ async function grindRow() {
         await settle();
         check('grind row: − on a preset writes nothing and leaves Medium', writes.length === 0 && (await grind()) === 'Medium', `${JSON.stringify(writes)} ${await grind()}`);
         check('grind row: the Workflow still holds Medium', (await decaid('GET', '/workflow')).context?.grinderSetting === 'Medium');
+        // A name sits between − and +: its text, measured by a Range, against
+        // the gap between the two buttons.
+        const fit = () => page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            const range = document.createRange();
+            range.selectNodeContents(value);
+            const text = range.getBoundingClientRect();
+            const minus = document.getElementById('grind-minus').getBoundingClientRect();
+            const plus = document.getElementById('grind-plus').getBoundingClientRect();
+            return { left: text.left - minus.right, right: plus.left - text.right, size: parseFloat(getComputedStyle(value).fontSize) };
+        });
+        const medium = await fit();
+        check('grind row: Medium sits between − and +, at the value\'s size', medium.left >= 4 && medium.right >= 4 && medium.size >= 24, JSON.stringify(medium));
+        await setGrind(preset, 'Extra coarse');
+        await readAgain();
+        const long = await fit();
+        check('grind row: a longer name is shrunk to sit between them', (await grind()) === 'Extra coarse' && long.left >= 4 && long.right >= 4 && long.size >= 14 && long.size < 30, JSON.stringify(long));
+        await setGrind(preset, 'Medium');
+        await readAgain();
 
         await setGrind(quarter, '11.25');
         await readAgain();

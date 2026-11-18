@@ -509,6 +509,13 @@ button.cafe-card {
     border-radius: 8px;
 }
 
+/* The Grind value can be a preset grinder's name: it takes the value's whole
+   width, and Streamline's text fitting (data-fit-text in index.html) shrinks a
+   name wider than that. */
+#grind-value {
+    align-self: stretch;
+}
+
 .cafe-value > .cafe-value-sub,
 .cafe-value > span.text-\[20px\]:not(#steam-flow-value) {
     font-size: 16px;
