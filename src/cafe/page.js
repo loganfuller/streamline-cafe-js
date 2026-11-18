@@ -37,6 +37,7 @@ let liveTimer = null;
 let loading = false;    // a recipe loads, or the strip is arranged
 let picking = 0;        // choices made in a pick dialog, not yet written
 let picks = Promise.resolve(); // the last of them
+let loads = 0;          // recipe loads begun or ended: a dialog read before one is stale
 
 const el = id => document.getElementById(id);
 
@@ -212,14 +213,15 @@ function keepStill() {
  */
 export function showLoading(next) {
     loading = next;
+    loads += 1;
     keepStill();
 }
 
 // ── Pick dialogs ─────────────────────────────────────────────────────────────
 
-// Not while a shot runs, a recipe loads, the strip is arranged, or another
-// choice is still being written.
-const mayPick = () => !loading && picking === 0 && !shotRunning();
+// Not while a shot runs, a recipe loads, the strip is arranged, another choice
+// is still being written, or the main page is behind another.
+const mayPick = () => !loading && picking === 0 && !shotRunning() && !isSubPage();
 
 /**
  * Write a choice made in a pick dialog: `send()` makes its one Workflow write.
@@ -243,7 +245,7 @@ function writePick(send) {
 }
 
 function openGrinder() {
-    openGrinderDialog({ mayOpen: mayPick, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
+    openGrinderDialog({ mayOpen: mayPick, epoch: () => loads, subtitle: () => pickSubtitle(recipe, saved), write: writePick });
 }
 
 // ── During a shot ────────────────────────────────────────────────────────────

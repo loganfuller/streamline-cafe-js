@@ -115,10 +115,13 @@ export function createTabletShots({ listShots, readShot, readChoices, writeChoic
          * lists them for that grinder, each with its Workflow: what the
          * setting it was last used at is read from (`lastUse` in
          * grinder-model.js). Read here on a Machine Decent Sync serves too.
+         * Rejects on an answer with no list of Shots: that is a read that
+         * failed, not a grinder never used.
          */
         async grinderShots(grinderId, limit) {
             const page = await listShots(limit, 0, { grinderId });
-            return page && Array.isArray(page.items) ? page.items : [];
+            if (!Array.isArray(page?.items)) throw new Error('Decaid did not answer a list of Shots');
+            return page.items;
         },
 
         /**
