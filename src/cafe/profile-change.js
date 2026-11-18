@@ -196,7 +196,7 @@ export function afterCheck({ rows, recipeId, record, befores, selection, tapped,
  * landed, or a shot started or the strip began to change before anything was
  * written), `recipe` (another recipe is loaded than the caller named),
  * `profile` (no such profile in Decaid), `unreadable` (DYE2 or the
- * Workflow could not be read), the writer's reasons (`gone`, `unconfirmed`),
+ * Workflow could not be read, or they disagree on which recipe is loaded), the writer's reasons (`gone`, `unconfirmed`),
  * and `workflow` (the record took the profile and the Workflow did not: its
  * write failed, or a shot started, the strip began to change or DYE2 loaded
  * another recipe first). The
@@ -246,6 +246,11 @@ export function createProfileChange({
         // The caller said which recipe the change is for (the dialog's line
         // named it): one loaded since, elsewhere, is not the one it named.
         if (expected !== undefined && recipeId !== (expected == null ? null : String(expected))) return { ok: false, reason: 'recipe' };
+        // DYE2 derives the selection from the Workflow's mark, and answers no
+        // selection where its own read of the Workflow failed. Where the two
+        // disagree, which recipe is loaded is not known: nothing is written.
+        const mark = workflow?.context?.extras?.dye?.recipeId;
+        if ((mark == null ? null : String(mark)) !== recipeId) return { ok: false, reason: 'unreadable' };
         let before;
         let name = null;
         let generation = null;

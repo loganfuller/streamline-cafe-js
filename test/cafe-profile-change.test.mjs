@@ -237,6 +237,17 @@ test('a recipe loaded elsewhere while the record is written, with DYE2\'s select
     assert.deepEqual(w.workflowWrites, [], 'Decaf\'s Workflow is not given the profile');
 });
 
+test('DYE2 answers no selection while the Workflow names a recipe: which is loaded is not known, and nothing is written', async () => {
+    // DYE2's own read of the Workflow failed, and Decaf was loaded elsewhere.
+    const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Decaf')], loaded: 'r2' });
+    w.deps.readSelection = async () => null;
+    w.change = createProfileChange(w.deps).change;
+    assert.deepEqual(await w.change(BLOOM.id, { recipeId: null }), { ok: false, reason: 'unreadable' });
+    assert.deepEqual(await w.change(BLOOM.id), { ok: false, reason: 'unreadable' });
+    assert.deepEqual(w.workflowWrites, [], 'Decaf\'s Workflow is not given the profile');
+    assert.deepEqual(w.get('r2'), recipe('r2', 'Decaf'));
+});
+
 test('records that can\'t be read change nothing', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failRecords = () => true;

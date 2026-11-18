@@ -2254,274 +2254,274 @@ async function profileDialog() {
         for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
     };
     await decaid('PUT', '/machine/state/idle').catch(() => {});
-    let view = await openPage();
-    // Set once the first pass ends: one that throws restores the fixture itself,
-    // as the 1340 by 800 pass after it never runs.
-    let firstDone = false;
+    // Both passes, their pages opened and closed, inside one try: whatever throws,
+    // the fixture is put back.
     try {
-        const { page, seen } = view;
-        // A tablet's numbers open the numpad, which Streamline decides at start.
-        await page.addInitScript(() => { window._forceNumpadMobile = true; });
-        await page.reload();
-        await waitForPage(page);
-        await page.waitForTimeout(2500);
-        const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
-        const loadCard = async recipe => {
-            if ((await card(recipe).getAttribute('aria-pressed')) === 'true') return; // a tap would unload it
-            await card(recipe).click();
-            await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
-            await page.waitForTimeout(3000);
-        };
-        const brewRow = async () => ({ name: (await page.locator('#profile-name').textContent()).trim(), temp: parseFloat(await page.locator('#temp-value').textContent()) });
-        const writesSince = (mark, test) => seen.requests.slice(mark).filter(test);
-        // A write of the Workflow, of DYE2's records or selection, or of a profile.
-        const anyWrite = r => /^PUT .*\/workflow$/.test(r) || /^POST .*dye2\.reaplugin\//.test(r) || /^(PUT|POST|DELETE) .*\/profiles\b/.test(r);
-        const dialIn = wf => JSON.stringify({ dose: wf.context.targetDoseWeight, yield: wf.context.targetYield, grind: wf.context.grinderSetting });
-        const closeDialog = async () => { await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click(); return pickClosed(page); };
-
-        // Loaded afresh, as stored, on its own profile.
-        if ((await card(house).getAttribute('aria-pressed')) === 'true') {
-            await card(house).click(); // unloads it
+        let view = await openPage();
+        try {
+            const { page, seen } = view;
+            // A tablet's numbers open the numpad, which Streamline decides at start.
+            await page.addInitScript(() => { window._forceNumpadMobile = true; });
+            await page.reload();
+            await waitForPage(page);
             await page.waitForTimeout(2500);
-        }
-        await loadCard(house);
-        await matchMachine(house.name);
-        const record = await recordNamed(house.name);
-        const using = byTitle(house.profile);
-        const loadedFirst = await selection();
-        check('profile dialog: the recipe is loaded, and not as changed', loadedRecipeId(loadedFirst) === record.id && loadedFirst.modified === false, JSON.stringify(loadedFirst));
-        const urlBefore = page.url();
+            const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+            const loadCard = async recipe => {
+                if ((await card(recipe).getAttribute('aria-pressed')) === 'true') return; // a tap would unload it
+                await card(recipe).click();
+                await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+                await page.waitForTimeout(3000);
+            };
+            const brewRow = async () => ({ name: (await page.locator('#profile-name').textContent()).trim(), temp: parseFloat(await page.locator('#temp-value').textContent()) });
+            const writesSince = (mark, test) => seen.requests.slice(mark).filter(test);
+            // A write of the Workflow, of DYE2's records or selection, or of a profile.
+            const anyWrite = r => /^PUT .*\/workflow$/.test(r) || /^POST .*dye2\.reaplugin\//.test(r) || /^(PUT|POST|DELETE) .*\/profiles\b/.test(r);
+            const dialIn = wf => JSON.stringify({ dose: wf.context.targetDoseWeight, yield: wf.context.targetYield, grind: wf.context.grinderSetting });
+            const closeDialog = async () => { await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click(); return pickClosed(page); };
 
-        //     The value still opens the numpad; the row's name and the profile's open the dialog.
-        await page.locator('#temp-value').click();
-        const numpad = await page.locator('#numpad-modal-overlay').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
-        check('profile dialog: a tap on the Brew value opens the numpad, and no dialog', numpad && !(await pickDialog(page).count()));
-        if (numpad) await page.locator('#numpad-cancel').click();
-        await page.waitForTimeout(800);
-        for (const [what, on] of [['the row\'s name', '#brew-section .cafe-row-name'], ['the profile\'s name under it', '#profile-name']]) {
-            const opened = await openProfiles(page, on);
-            check(`profile dialog: a tap on ${what} opens the dialog`, opened && (await page.locator('#cafe-pick-title').textContent()) === 'Profile');
-            if (opened) await closeDialog();
-        }
-        check('profile dialog: nothing on the row opened Streamline\'s profile list or one of DYE2\'s pages',
-            // Streamline prefetches its profile list's page at start, so what is
-            // asked is whether it was put on screen: its list never mounted.
-            page.url() === urlBefore && (await page.locator('#main-page').isVisible()) && (await page.locator('#profile-list').count()) === 0
-            && !seen.requests.some(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)),
-            seen.requests.filter(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)).join(', '));
+            // Loaded afresh, as stored, on its own profile.
+            if ((await card(house).getAttribute('aria-pressed')) === 'true') {
+                await card(house).click(); // unloads it
+                await page.waitForTimeout(2500);
+            }
+            await loadCard(house);
+            await matchMachine(house.name);
+            const record = await recordNamed(house.name);
+            const using = byTitle(house.profile);
+            const loadedFirst = await selection();
+            check('profile dialog: the recipe is loaded, and not as changed', loadedRecipeId(loadedFirst) === record.id && loadedFirst.modified === false, JSON.stringify(loadedFirst));
+            const urlBefore = page.url();
 
-        //     The list, the row in use and its description.
-        let mark = seen.requests.length;
-        await openProfiles(page);
-        let shown = await profileDialogShown(page);
-        check('profile dialog: the line says the choice is saved to the recipe', shown.under === `${house.name} · saved to the recipe`, shown.under);
-        check('profile dialog: "Profiles" over every profile Decaid shows, sorted by title',
-            shown.heading === 'Profiles' && JSON.stringify(shown.rows.map(({ id, name }) => ({ id, name }))) === JSON.stringify(listed),
-            `${shown.rows.length} rows, ${listed.length} listed; first ${shown.rows.slice(0, 3).map(r => r.name).join(' | ')}`);
-        const inUseRows = shown.rows.filter(r => r.inUse);
-        check('profile dialog: the profile in use is highlighted and marked "In use", and no other',
-            inUseRows.length === 1 && inUseRows[0].id === String(using.id) && shown.rows.filter(r => r.highlighted).map(r => r.id).join() === String(using.id),
-            JSON.stringify(inUseRows));
-        const lightRow = shown.rows.find(r => r.id === String(light.id));
-        check('profile dialog: a row is the profile\'s title over "By" and its author, then its own temperature',
-            lightRow?.detail === `By ${light.profile.author} · ${own(light).toFixed(0)}°c`, lightRow?.detail);
-        const notesOf = p => String(p.profile.notes || '').replace(/\r\n?/g, '\n').trim();
-        check('profile dialog: "Description", the profile in use\'s title, "By" and its author with "brews at", and its notes',
-            !shown.listShown && shown.paneHeading === 'Description' && shown.paneTitle === using.profile.title
-            && shown.byline === `By ${using.profile.author} · brews at ${own(using).toFixed(0)}°c`
-            && shown.notes === (notesOf(using) || 'This profile has no description.'),
-            `${shown.paneTitle} | ${shown.byline} | ${shown.notes?.slice(0, 60)}`);
-        check('profile dialog: on the profile in use the button\'s place reads "In use"', shown.inUse && shown.use === null && shown.useNote === null);
-        check('profile dialog: the notes are plain text, with their line breaks', shown.notesHtml === shown.notes.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') && shown.notesScroll.whiteSpace === 'pre-line', shown.notesScroll.whiteSpace);
-        await shot(page, 'profile-dialog-1920x1200-light');
+            //     The value still opens the numpad; the row's name and the profile's open the dialog.
+            await page.locator('#temp-value').click();
+            const numpad = await page.locator('#numpad-modal-overlay').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
+            check('profile dialog: a tap on the Brew value opens the numpad, and no dialog', numpad && !(await pickDialog(page).count()));
+            if (numpad) await page.locator('#numpad-cancel').click();
+            await page.waitForTimeout(800);
+            for (const [what, on] of [['the row\'s name', '#brew-section .cafe-row-name'], ['the profile\'s name under it', '#profile-name']]) {
+                const opened = await openProfiles(page, on);
+                check(`profile dialog: a tap on ${what} opens the dialog`, opened && (await page.locator('#cafe-pick-title').textContent()) === 'Profile');
+                if (opened) await closeDialog();
+            }
+            check('profile dialog: nothing on the row opened Streamline\'s profile list or one of DYE2\'s pages',
+                // Streamline prefetches its profile list's page at start, so what is
+                // asked is whether it was put on screen: its list never mounted.
+                page.url() === urlBefore && (await page.locator('#main-page').isVisible()) && (await page.locator('#profile-list').count()) === 0
+                && !seen.requests.some(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)),
+                seen.requests.filter(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)).join(', '));
 
-        //     A tap on another row highlights it and writes nothing.
-        await profileRow(page, light.id).click();
-        await page.waitForTimeout(400);
-        shown = await profileDialogShown(page);
-        check('profile dialog: a tap on another profile highlights it and shows its description',
-            shown.rows.filter(r => r.highlighted).map(r => r.id).join() === String(light.id) && shown.paneTitle === light.profile.title
-            && shown.byline === `By ${light.profile.author} · brews at ${own(light).toFixed(0)}°c` && shown.notes === (notesOf(light) || 'This profile has no description.'),
-            `${shown.paneTitle} | ${shown.byline}`);
-        check('profile dialog: it offers "Use this profile", with "Sets Brew to" its temperature, and the profile in use stays marked',
-            shown.use === 'Use this profile' && shown.useNote === `Sets Brew to ${own(light).toFixed(0)}°c` && !shown.inUse
-            && shown.rows.find(r => r.inUse)?.id === String(using.id), `${shown.use} | ${shown.useNote}`);
-        await shot(page, 'profile-dialog-highlighted-1920x1200-light');
-        //     The notes scroll inside the box where they are long.
-        await profileRow(page, longest.id).click();
-        await page.waitForTimeout(400);
-        shown = await profileDialogShown(page);
-        check('profile dialog: long notes scroll inside the dialog, which fits the window',
-            shown.notesScroll.scroll > shown.notesScroll.client && shown.notesScroll.overflow === 'auto'
-            && shown.box.top >= 0 && shown.box.bottom <= shown.window[1] && shown.box.right <= shown.window[0],
-            `${longest.profile.title}: ${JSON.stringify(shown.notesScroll)}`);
-        check('profile dialog: highlighting wrote nothing, and the Workflow is as it was',
-            writesSince(mark, anyWrite).length === 0 && (await decaid('GET', '/workflow')).profile.title === using.profile.title, writesSince(mark, anyWrite).join(', '));
-        //     Close writes nothing, nor a tap outside.
-        check('profile dialog: Close closes it and writes nothing', (await closeDialog()) && writesSince(mark, anyWrite).length === 0);
-        await openProfiles(page);
-        await page.mouse.click(30, 30);
-        check('profile dialog: a tap outside closes it and writes nothing', (await pickClosed(page)) && writesSince(mark, anyWrite).length === 0);
+            //     The list, the row in use and its description.
+            let mark = seen.requests.length;
+            await openProfiles(page);
+            let shown = await profileDialogShown(page);
+            check('profile dialog: the line says the choice is saved to the recipe', shown.under === `${house.name} · saved to the recipe`, shown.under);
+            check('profile dialog: "Profiles" over every profile Decaid shows, sorted by title',
+                shown.heading === 'Profiles' && JSON.stringify(shown.rows.map(({ id, name }) => ({ id, name }))) === JSON.stringify(listed),
+                `${shown.rows.length} rows, ${listed.length} listed; first ${shown.rows.slice(0, 3).map(r => r.name).join(' | ')}`);
+            const inUseRows = shown.rows.filter(r => r.inUse);
+            check('profile dialog: the profile in use is highlighted and marked "In use", and no other',
+                inUseRows.length === 1 && inUseRows[0].id === String(using.id) && shown.rows.filter(r => r.highlighted).map(r => r.id).join() === String(using.id),
+                JSON.stringify(inUseRows));
+            const lightRow = shown.rows.find(r => r.id === String(light.id));
+            check('profile dialog: a row is the profile\'s title over "By" and its author, then its own temperature',
+                lightRow?.detail === `By ${light.profile.author} · ${own(light).toFixed(0)}°c`, lightRow?.detail);
+            const notesOf = p => String(p.profile.notes || '').replace(/\r\n?/g, '\n').trim();
+            check('profile dialog: "Description", the profile in use\'s title, "By" and its author with "brews at", and its notes',
+                !shown.listShown && shown.paneHeading === 'Description' && shown.paneTitle === using.profile.title
+                && shown.byline === `By ${using.profile.author} · brews at ${own(using).toFixed(0)}°c`
+                && shown.notes === (notesOf(using) || 'This profile has no description.'),
+                `${shown.paneTitle} | ${shown.byline} | ${shown.notes?.slice(0, 60)}`);
+            check('profile dialog: on the profile in use the button\'s place reads "In use"', shown.inUse && shown.use === null && shown.useNote === null);
+            check('profile dialog: the notes are plain text, with their line breaks', shown.notesHtml === shown.notes.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') && shown.notesScroll.whiteSpace === 'pre-line', shown.notesScroll.whiteSpace);
+            await shot(page, 'profile-dialog-1920x1200-light');
 
-        //     "Use this profile", with the recipe loaded.
-        const workflowBefore = await decaid('GET', '/workflow');
-        const othersBefore = JSON.stringify((await records()).filter(row => row && row.id !== record.id));
-        await openProfiles(page);
-        await profileRow(page, light.id).click();
-        await page.waitForTimeout(400);
-        mark = seen.requests.length;
-        await page.locator('#cafe-pick-pane-use').click();
-        check('profile dialog: "Use this profile" closes the dialog', await pickClosed(page));
-        await page.locator('#profile-name').filter({ hasText: light.profile.title }).waitFor({ timeout: 15_000 }).catch(() => {});
-        await page.waitForTimeout(1500);
-        const after = await recordNamed(house.name);
-        const workflowAfter = await decaid('GET', '/workflow');
-        const loadedAfter = await selection();
-        check('profile dialog: the recipe is still loaded, and not as changed', loadedRecipeId(loadedAfter) === record.id && loadedAfter.modified === false, JSON.stringify(loadedAfter));
-        check('profile dialog: the recipe holds the new profile, at its own temperature, and keeps the name it was given by hand',
-            after.profileId === light.id && after.profileTitle === light.profile.title && after.dashboardVariables.brewC === own(light) && after.name === house.name,
-            `${after.profileId} | ${after.profileTitle} | ${after.dashboardVariables.brewC} | ${after.name}`);
-        check('profile dialog: the other records are untouched', JSON.stringify((await records()).filter(row => row && row.id !== record.id)) === othersBefore);
-        check('profile dialog: the Workflow has the profile at its own temperature, with dose, yield and grind as they were',
-            workflowAfter.profile.title === light.profile.title && workflowAfter.profile.steps[0].temperature === own(light) && dialIn(workflowAfter) === dialIn(workflowBefore),
-            `${workflowAfter.profile.title} ${workflowAfter.profile.steps[0].temperature}°C ${dialIn(workflowBefore)} → ${dialIn(workflowAfter)}`);
-        const changeWrites = writesSince(mark, r => /^PUT .*\/workflow$/.test(r) || /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r));
-        check('profile dialog: the change was #50\'s, one record write then one Workflow write, and nothing asked of DYE2\'s save or selection',
-            changeWrites.length === 2 && /\/store\/dye2\.reaplugin\/recipes$/.test(changeWrites[0]) && /\/workflow$/.test(changeWrites[1])
-            && writesSince(mark, r => /^POST .*dye2\.reaplugin\/(record|save-recipe|selection)$/.test(r)).length === 0, writesSince(mark, anyWrite).join(', '));
-        const brew = await brewRow();
-        check('profile dialog: the Brew row names the new profile at its own temperature', brew.name === light.profile.title && brew.temp === own(light), JSON.stringify(brew));
-        check('profile dialog: the dial-in rows and the title band are as they were',
-            (await page.locator('#dose-in-value').textContent()) === `${house.dose}g` && (await page.locator('#drink-out-value').textContent()) === `${house.yield}g`
-            && (await page.locator('#cafe-title').textContent()) === house.name && (await cardName(page, house.slot)) === house.name);
-        const chartProfile = await page.evaluate(async () => (await import('/src/modules/chart.js')).getCurrentProfile()?.title ?? null);
-        check('profile dialog: the graph\'s targets and stage names follow the new profile', chartProfile === light.profile.title, chartProfile);
-        await shot(page, 'profile-dialog-after-1920x1200-light');
-        //     After DYE2's window the recipe is still loaded, and the record holds the profile.
-        await page.waitForTimeout(10_000);
-        check('profile dialog: after DYE2\'s window the recipe is still loaded and its record holds the profile',
-            (await loadedId()) === record.id && (await recordNamed(house.name)).profileId === light.id, `${await loadedId()}`);
-        //     It opens again on the new profile, in use.
-        await openProfiles(page);
-        shown = await profileDialogShown(page);
-        check('profile dialog: it opens again on the profile just chosen, in use',
-            shown.rows.find(r => r.inUse)?.id === String(light.id) && shown.paneTitle === light.profile.title && shown.inUse && shown.use === null, shown.paneTitle);
-        await closeDialog();
+            //     A tap on another row highlights it and writes nothing.
+            await profileRow(page, light.id).click();
+            await page.waitForTimeout(400);
+            shown = await profileDialogShown(page);
+            check('profile dialog: a tap on another profile highlights it and shows its description',
+                shown.rows.filter(r => r.highlighted).map(r => r.id).join() === String(light.id) && shown.paneTitle === light.profile.title
+                && shown.byline === `By ${light.profile.author} · brews at ${own(light).toFixed(0)}°c` && shown.notes === (notesOf(light) || 'This profile has no description.'),
+                `${shown.paneTitle} | ${shown.byline}`);
+            check('profile dialog: it offers "Use this profile", with "Sets Brew to" its temperature, and the profile in use stays marked',
+                shown.use === 'Use this profile' && shown.useNote === `Sets Brew to ${own(light).toFixed(0)}°c` && !shown.inUse
+                && shown.rows.find(r => r.inUse)?.id === String(using.id), `${shown.use} | ${shown.useNote}`);
+            await shot(page, 'profile-dialog-highlighted-1920x1200-light');
+            //     The notes scroll inside the box where they are long.
+            await profileRow(page, longest.id).click();
+            await page.waitForTimeout(400);
+            shown = await profileDialogShown(page);
+            check('profile dialog: long notes scroll inside the dialog, which fits the window',
+                shown.notesScroll.scroll > shown.notesScroll.client && shown.notesScroll.overflow === 'auto'
+                && shown.box.top >= 0 && shown.box.bottom <= shown.window[1] && shown.box.right <= shown.window[0],
+                `${longest.profile.title}: ${JSON.stringify(shown.notesScroll)}`);
+            check('profile dialog: highlighting wrote nothing, and the Workflow is as it was',
+                writesSince(mark, anyWrite).length === 0 && (await decaid('GET', '/workflow')).profile.title === using.profile.title, writesSince(mark, anyWrite).join(', '));
+            //     Close writes nothing, nor a tap outside.
+            check('profile dialog: Close closes it and writes nothing', (await closeDialog()) && writesSince(mark, anyWrite).length === 0);
+            await openProfiles(page);
+            await page.mouse.click(30, 30);
+            check('profile dialog: a tap outside closes it and writes nothing', (await pickClosed(page)) && writesSince(mark, anyWrite).length === 0);
 
-        //     A change that can't be made is a toast, and the row as it was.
-        await page.route(/\/store\/dye2\.reaplugin\/recipes$/, route => (route.request().method() === 'POST' ? route.abort() : route.continue()));
-        await openProfiles(page);
-        await profileRow(page, gentle.id).click();
-        await page.waitForTimeout(300);
-        await page.locator('#cafe-pick-pane-use').click();
-        await page.locator('#app-toast').filter({ hasText: 'Could not change the profile' }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
-        check('profile dialog: a change that could not be made is a toast, and the row and the Workflow as they were',
-            (await page.locator('#app-toast-message').textContent()) === 'Could not change the profile' && (await brewRow()).name === light.profile.title
-            && (await decaid('GET', '/workflow')).profile.title === light.profile.title && (await loadedId()) === record.id,
-            `${await page.locator('#app-toast-message').textContent()} | ${(await brewRow()).name}`);
-        await page.unroute(/\/store\/dye2\.reaplugin\/recipes$/);
-        await page.waitForTimeout(4500);
+            //     "Use this profile", with the recipe loaded.
+            const workflowBefore = await decaid('GET', '/workflow');
+            const othersBefore = JSON.stringify((await records()).filter(row => row && row.id !== record.id));
+            await openProfiles(page);
+            await profileRow(page, light.id).click();
+            await page.waitForTimeout(400);
+            mark = seen.requests.length;
+            await page.locator('#cafe-pick-pane-use').click();
+            check('profile dialog: "Use this profile" closes the dialog', await pickClosed(page));
+            await page.locator('#profile-name').filter({ hasText: light.profile.title }).waitFor({ timeout: 15_000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+            const after = await recordNamed(house.name);
+            const workflowAfter = await decaid('GET', '/workflow');
+            const loadedAfter = await selection();
+            check('profile dialog: the recipe is still loaded, and not as changed', loadedRecipeId(loadedAfter) === record.id && loadedAfter.modified === false, JSON.stringify(loadedAfter));
+            check('profile dialog: the recipe holds the new profile, at its own temperature, and keeps the name it was given by hand',
+                after.profileId === light.id && after.profileTitle === light.profile.title && after.dashboardVariables.brewC === own(light) && after.name === house.name,
+                `${after.profileId} | ${after.profileTitle} | ${after.dashboardVariables.brewC} | ${after.name}`);
+            check('profile dialog: the other records are untouched', JSON.stringify((await records()).filter(row => row && row.id !== record.id)) === othersBefore);
+            check('profile dialog: the Workflow has the profile at its own temperature, with dose, yield and grind as they were',
+                workflowAfter.profile.title === light.profile.title && workflowAfter.profile.steps[0].temperature === own(light) && dialIn(workflowAfter) === dialIn(workflowBefore),
+                `${workflowAfter.profile.title} ${workflowAfter.profile.steps[0].temperature}°C ${dialIn(workflowBefore)} → ${dialIn(workflowAfter)}`);
+            const changeWrites = writesSince(mark, r => /^PUT .*\/workflow$/.test(r) || /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r));
+            check('profile dialog: the change was #50\'s, one record write then one Workflow write, and nothing asked of DYE2\'s save or selection',
+                changeWrites.length === 2 && /\/store\/dye2\.reaplugin\/recipes$/.test(changeWrites[0]) && /\/workflow$/.test(changeWrites[1])
+                && writesSince(mark, r => /^POST .*dye2\.reaplugin\/(record|save-recipe|selection)$/.test(r)).length === 0, writesSince(mark, anyWrite).join(', '));
+            const brew = await brewRow();
+            check('profile dialog: the Brew row names the new profile at its own temperature', brew.name === light.profile.title && brew.temp === own(light), JSON.stringify(brew));
+            check('profile dialog: the dial-in rows and the title band are as they were',
+                (await page.locator('#dose-in-value').textContent()) === `${house.dose}g` && (await page.locator('#drink-out-value').textContent()) === `${house.yield}g`
+                && (await page.locator('#cafe-title').textContent()) === house.name && (await cardName(page, house.slot)) === house.name);
+            const chartProfile = await page.evaluate(async () => (await import('/src/modules/chart.js')).getCurrentProfile()?.title ?? null);
+            check('profile dialog: the graph\'s targets and stage names follow the new profile', chartProfile === light.profile.title, chartProfile);
+            await shot(page, 'profile-dialog-after-1920x1200-light');
+            //     After DYE2's window the recipe is still loaded, and the record holds the profile.
+            await page.waitForTimeout(10_000);
+            check('profile dialog: after DYE2\'s window the recipe is still loaded and its record holds the profile',
+                (await loadedId()) === record.id && (await recordNamed(house.name)).profileId === light.id, `${await loadedId()}`);
+            //     It opens again on the new profile, in use.
+            await openProfiles(page);
+            shown = await profileDialogShown(page);
+            check('profile dialog: it opens again on the profile just chosen, in use',
+                shown.rows.find(r => r.inUse)?.id === String(light.id) && shown.paneTitle === light.profile.title && shown.inUse && shown.use === null, shown.paneTitle);
+            await closeDialog();
 
-        //     Profiles that can't be read are not an empty list.
-        await page.route(/\/api\/v1\/profiles(\?|$)/, route => route.abort());
-        await tapAt(page, '#brew-section .cafe-row-name');
-        await page.locator('#app-toast').filter({ hasText: 'Could not read the profiles' }).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        check('profile dialog: profiles that can\'t be read are a toast, and no dialog',
-            (await page.locator('#app-toast-message').textContent()) === 'Could not read the profiles' && !(await pickDialog(page).count()));
-        await page.unroute(/\/api\/v1\/profiles(\?|$)/);
-        await page.waitForTimeout(4500);
+            //     A change that can't be made is a toast, and the row as it was.
+            await page.route(/\/store\/dye2\.reaplugin\/recipes$/, route => (route.request().method() === 'POST' ? route.abort() : route.continue()));
+            await openProfiles(page);
+            await profileRow(page, gentle.id).click();
+            await page.waitForTimeout(300);
+            await page.locator('#cafe-pick-pane-use').click();
+            await page.locator('#app-toast').filter({ hasText: 'Could not change the profile' }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+            check('profile dialog: a change that could not be made is a toast, and the row and the Workflow as they were',
+                (await page.locator('#app-toast-message').textContent()) === 'Could not change the profile' && (await brewRow()).name === light.profile.title
+                && (await decaid('GET', '/workflow')).profile.title === light.profile.title && (await loadedId()) === record.id,
+                `${await page.locator('#app-toast-message').textContent()} | ${(await brewRow()).name}`);
+            await page.unroute(/\/store\/dye2\.reaplugin\/recipes$/);
+            await page.waitForTimeout(4500);
 
-        //     A recipe load: the dialog does not open while one is under way.
-        await card(other).click();
-        await tapAt(page, '#brew-section .cafe-row-name');
-        await page.waitForTimeout(1500);
-        check('profile dialog: it does not open while a recipe loads', !(await pickDialog(page).count()));
-        await page.locator('#cafe-title').filter({ hasText: other.name }).waitFor({ timeout: 20_000 }).catch(() => {});
-        await page.waitForTimeout(3000);
-        await loadCard(house);
+            //     Profiles that can't be read are not an empty list.
+            await page.route(/\/api\/v1\/profiles(\?|$)/, route => route.abort());
+            await tapAt(page, '#brew-section .cafe-row-name');
+            await page.locator('#app-toast').filter({ hasText: 'Could not read the profiles' }).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            check('profile dialog: profiles that can\'t be read are a toast, and no dialog',
+                (await page.locator('#app-toast-message').textContent()) === 'Could not read the profiles' && !(await pickDialog(page).count()));
+            await page.unroute(/\/api\/v1\/profiles(\?|$)/);
+            await page.waitForTimeout(4500);
 
-        //     A shot that starts closes the dialog, and it does not open during one.
-        const openBefore = await openProfiles(page);
-        const run = pullShot(6);
-        await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-        check('profile dialog: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
-        await tapAt(page, '#brew-section .cafe-row-name');
-        await page.waitForTimeout(1500);
-        check('profile dialog: the dialog does not open during a shot', !(await pickDialog(page).count()));
-        await run;
-        await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
-        await page.waitForTimeout(4000);
-        const during = await decaid('GET', '/shots?limit=1');
-        if (during.items?.[0]) pulled.push(during.items[0].id);
-
-        //     A hidden profile is not listed. In use, it still opens with its
-        //     description, read from the Workflow, and no row is highlighted.
-        await unloadRecipe();
-        await decaid('PUT', `/profiles/${encodeURIComponent(gentle.id)}/visibility`, { visibility: 'hidden' });
-        hiddenIds.push(gentle.id);
-        await decaid('PUT', '/workflow', { profile: gentle.profile });
-        await page.reload();
-        await waitForPage(page);
-        await page.waitForTimeout(3000);
-        await openProfiles(page);
-        shown = await profileDialogShown(page);
-        check('profile dialog: with no recipe loaded, the line says the choice changes this machine only',
-            shown.under === 'No recipe loaded · changes this machine only', shown.under);
-        check('profile dialog: a hidden profile is not listed', !shown.rows.some(r => r.id === String(gentle.id)) && shown.rows.length === listed.length - 1, `${shown.rows.length} rows`);
-        check('profile dialog: a hidden profile in use opens with its description, "In use", and no row highlighted',
-            shown.paneTitle === gentle.profile.title && shown.inUse && shown.use === null && !shown.rows.some(r => r.highlighted || r.inUse),
-            `${shown.paneTitle} | ${shown.rows.filter(r => r.highlighted).map(r => r.name).join()}`);
-        await shot(page, 'profile-dialog-hidden-in-use-1920x1200-light');
-
-        //     With no recipe loaded a choice changes this machine only.
-        const recordsUnloaded = JSON.stringify(await records());
-        await profileRow(page, light.id).click();
-        await page.waitForTimeout(300);
-        mark = seen.requests.length;
-        await page.locator('#cafe-pick-pane-use').click();
-        await pickClosed(page);
-        await page.locator('#profile-name').filter({ hasText: light.profile.title }).waitFor({ timeout: 15_000 }).catch(() => {});
-        await page.waitForTimeout(1500);
-        check('profile dialog: with no recipe loaded the profile changes, and no record does',
-            (await decaid('GET', '/workflow')).profile.title === light.profile.title && JSON.stringify(await records()) === recordsUnloaded
-            && writesSince(mark, r => /^POST .*\/store\/dye2\.reaplugin\//.test(r)).length === 0 && (await loadedId()) === null,
-            writesSince(mark, anyWrite).join(', '));
-        check('profile dialog: and the Brew row follows, at the profile\'s own temperature', (await brewRow()).name === light.profile.title && (await brewRow()).temp === own(light), JSON.stringify(await brewRow()));
-        check('profile dialog: no page error', seen.errors.length === 0, seen.errors.join(' | '));
-        firstDone = true;
-    } finally {
-        await view.close();
-        for (const id of hiddenIds) await decaid('PUT', `/profiles/${encodeURIComponent(id)}/visibility`, { visibility: 'visible' }).catch(() => {});
-        if (!firstDone) await restore();
-    }
-
-    //     At 1340 by 800, with the recipe loaded: the dialog fits, scaled, and long notes scroll inside it.
-    view = await openPage({ viewport: { width: 1340, height: 800 } });
-    try {
-        const { page, seen } = view;
-        await waitForPage(page);
-        await page.waitForTimeout(2500);
-        const card = page.locator('#cafe-strip .cafe-card').nth(house.slot - 1);
-        if ((await card.getAttribute('aria-pressed')) !== 'true') {
-            await card.click();
-            await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 }).catch(() => {});
+            //     A recipe load: the dialog does not open while one is under way.
+            await card(other).click();
+            await tapAt(page, '#brew-section .cafe-row-name');
+            await page.waitForTimeout(1500);
+            check('profile dialog: it does not open while a recipe loads', !(await pickDialog(page).count()));
+            await page.locator('#cafe-title').filter({ hasText: other.name }).waitFor({ timeout: 20_000 }).catch(() => {});
             await page.waitForTimeout(3000);
+            await loadCard(house);
+
+            //     A shot that starts closes the dialog, and it does not open during one.
+            const openBefore = await openProfiles(page);
+            const run = pullShot(6);
+            await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+            check('profile dialog: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
+            await tapAt(page, '#brew-section .cafe-row-name');
+            await page.waitForTimeout(1500);
+            check('profile dialog: the dialog does not open during a shot', !(await pickDialog(page).count()));
+            await run;
+            await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(4000);
+            const during = await decaid('GET', '/shots?limit=1');
+            if (during.items?.[0]) pulled.push(during.items[0].id);
+
+            //     A hidden profile is not listed. In use, it still opens with its
+            //     description, read from the Workflow, and no row is highlighted.
+            await unloadRecipe();
+            await decaid('PUT', `/profiles/${encodeURIComponent(gentle.id)}/visibility`, { visibility: 'hidden' });
+            hiddenIds.push(gentle.id);
+            await decaid('PUT', '/workflow', { profile: gentle.profile });
+            await page.reload();
+            await waitForPage(page);
+            await page.waitForTimeout(3000);
+            await openProfiles(page);
+            shown = await profileDialogShown(page);
+            check('profile dialog: with no recipe loaded, the line says the choice changes this machine only',
+                shown.under === 'No recipe loaded · changes this machine only', shown.under);
+            check('profile dialog: a hidden profile is not listed', !shown.rows.some(r => r.id === String(gentle.id)) && shown.rows.length === listed.length - 1, `${shown.rows.length} rows`);
+            check('profile dialog: a hidden profile in use opens with its description, "In use", and no row highlighted',
+                shown.paneTitle === gentle.profile.title && shown.inUse && shown.use === null && !shown.rows.some(r => r.highlighted || r.inUse),
+                `${shown.paneTitle} | ${shown.rows.filter(r => r.highlighted).map(r => r.name).join()}`);
+            await shot(page, 'profile-dialog-hidden-in-use-1920x1200-light');
+
+            //     With no recipe loaded a choice changes this machine only.
+            const recordsUnloaded = JSON.stringify(await records());
+            await profileRow(page, light.id).click();
+            await page.waitForTimeout(300);
+            mark = seen.requests.length;
+            await page.locator('#cafe-pick-pane-use').click();
+            await pickClosed(page);
+            await page.locator('#profile-name').filter({ hasText: light.profile.title }).waitFor({ timeout: 15_000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+            check('profile dialog: with no recipe loaded the profile changes, and no record does',
+                (await decaid('GET', '/workflow')).profile.title === light.profile.title && JSON.stringify(await records()) === recordsUnloaded
+                && writesSince(mark, r => /^POST .*\/store\/dye2\.reaplugin\//.test(r)).length === 0 && (await loadedId()) === null,
+                writesSince(mark, anyWrite).join(', '));
+            check('profile dialog: and the Brew row follows, at the profile\'s own temperature', (await brewRow()).name === light.profile.title && (await brewRow()).temp === own(light), JSON.stringify(await brewRow()));
+            check('profile dialog: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+        } finally {
+            await view.close();
+            for (const id of hiddenIds) await decaid('PUT', `/profiles/${encodeURIComponent(id)}/visibility`, { visibility: 'visible' }).catch(() => {});
         }
-        const opened = await openProfiles(page);
-        let shown = opened ? await profileDialogShown(page) : null;
-        check('profile dialog 1340x800: it opens from the Brew row, on the profile in use', opened && shown.rows.some(r => r.inUse && r.highlighted) && shown.inUse, shown?.paneTitle);
-        await shot(page, 'profile-dialog-1340x800-light');
-        await profileRow(page, longest.id).click();
-        await page.waitForTimeout(400);
-        shown = await profileDialogShown(page);
-        check('profile dialog 1340x800: it fits inside the window, and long notes scroll inside it',
-            shown.box.left >= 0 && shown.box.top >= 0 && shown.box.right <= shown.window[0] && shown.box.bottom <= shown.window[1] && shown.notesScroll.scroll > shown.notesScroll.client,
-            `${JSON.stringify(shown.box)} in ${shown.window.join('x')}`);
-        await shot(page, 'profile-dialog-highlighted-1340x800-light');
-        await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
-        check('profile dialog 1340x800: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+
+        //     At 1340 by 800, with the recipe loaded: the dialog fits, scaled, and long notes scroll inside it.
+        view = await openPage({ viewport: { width: 1340, height: 800 } });
+        try {
+            const { page, seen } = view;
+            await waitForPage(page);
+            await page.waitForTimeout(2500);
+            const card = page.locator('#cafe-strip .cafe-card').nth(house.slot - 1);
+            if ((await card.getAttribute('aria-pressed')) !== 'true') {
+                await card.click();
+                await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 }).catch(() => {});
+                await page.waitForTimeout(3000);
+            }
+            const opened = await openProfiles(page);
+            let shown = opened ? await profileDialogShown(page) : null;
+            check('profile dialog 1340x800: it opens from the Brew row, on the profile in use', opened && shown.rows.some(r => r.inUse && r.highlighted) && shown.inUse, shown?.paneTitle);
+            await shot(page, 'profile-dialog-1340x800-light');
+            await profileRow(page, longest.id).click();
+            await page.waitForTimeout(400);
+            shown = await profileDialogShown(page);
+            check('profile dialog 1340x800: it fits inside the window, and long notes scroll inside it',
+                shown.box.left >= 0 && shown.box.top >= 0 && shown.box.right <= shown.window[0] && shown.box.bottom <= shown.window[1] && shown.notesScroll.scroll > shown.notesScroll.client,
+                `${JSON.stringify(shown.box)} in ${shown.window.join('x')}`);
+            await shot(page, 'profile-dialog-highlighted-1340x800-light');
+            await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+            check('profile dialog 1340x800: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+        } finally {
+            await view.close();
+        }
     } finally {
-        await view.close();
         await restore();
     }
 }
