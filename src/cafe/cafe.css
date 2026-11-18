@@ -601,6 +601,45 @@ button.cafe-card {
     line-height: 40px;
 }
 
+/* The barista at the machine, after the title. With a name it is quiet,
+   outlined as a dial-in pick's row is; with none it keeps the accent of the
+   page's other buttons, since it is the only prompt to pick one. A name too
+   long for it ends in "…". As tall as "Back to latest", on the same line. */
+.cafe-barista {
+    flex: none;
+    height: 52px;
+    max-width: 320px;
+    margin-bottom: 4px;
+    padding: 0 18px;
+    gap: 10px;
+    border-width: 2px;
+    touch-action: manipulation;
+}
+
+.cafe-barista svg {
+    flex: none;
+}
+
+#cafe-barista-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-barista:not(.cafe-barista-none) {
+    border-color: var(--profile-button-outline-color);
+    background: var(--profile-button-background-color);
+    color: var(--text-primary);
+}
+
+/* Dark: the page's buttons lose their outline there, so the accent is the
+   outline and a tint, with the text as the in-use mark's is. */
+[data-theme="dark"] .cafe-barista.cafe-barista-none {
+    border-color: var(--button-primary-bg);
+    background: var(--button-primary-tint);
+    color: var(--text-primary);
+}
+
 /* "Back to latest", beside the machine's status while a Shot opened from the
    Shots list is in the graph. */
 #cafe-back {
@@ -1364,6 +1403,12 @@ button.cafe-card {
 
 /* ── Choosing what a dial-in row names ────────────────────────────────────── */
 
+/* With the soft keyboard up, for the barista's name, the dialog takes the
+   height left above it (src/cafe/pick-dialog.js). */
+#cafe-pick-dialog {
+    height: var(--cafe-pick-visible, 100%);
+}
+
 .cafe-dialog.cafe-pick-box {
     width: 780px;
     padding: 32px;
@@ -1430,7 +1475,10 @@ button.cafe-card {
 }
 
 .cafe-pick-column[hidden],
-.cafe-pick-heading[hidden] {
+.cafe-pick-heading[hidden],
+.cafe-pick-lists[hidden],
+.cafe-pick-add[hidden],
+.cafe-pick-entry[hidden] {
     display: none;
 }
 
@@ -1518,6 +1566,58 @@ button.cafe-card {
     font-size: 16px;
     font-weight: 600;
     color: var(--mimoja-blue-v2);
+}
+
+/* "New barista": set apart under the names, dashed, in the accent colour. */
+.cafe-pick-row.cafe-pick-add {
+    margin-top: 6px;
+    border-style: dashed;
+    background: transparent;
+    color: var(--mimoja-blue-v2);
+    gap: 14px;
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.cafe-pick-add svg {
+    flex: none;
+}
+
+[data-theme="dark"] .cafe-pick-row.cafe-pick-add {
+    color: var(--text-primary);
+}
+
+/* A barista's name, typed in the list's place. */
+.cafe-pick-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#cafe-pick-entry-text {
+    box-sizing: border-box;
+    width: 100%;
+    height: 68px;
+    padding: 0 20px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 24px;
+}
+
+.cafe-pick-entry-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.cafe-pick-entry-actions .cafe-btn {
+    min-width: 160px;
+    padding: 0 24px;
 }
 
 /* The bean whose batches are shown: filled in the accent colour. */

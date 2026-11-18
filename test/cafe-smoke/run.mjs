@@ -11,7 +11,8 @@
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
 // switches Streamline's "DYE2 on" setting, writes made-up beans, grinders and
 // recipes, makes recipes and moves them between slots from the page, chooses
-// grinders from the page, changes the language, and pulls simulated shots. Point it at a throwaway Decaid only.
+// grinders from the page, changes the language, sets the barista, puts the
+// machine to sleep and wakes it, and pulls simulated shots. Point it at a throwaway Decaid only.
 
 import { chromium } from 'playwright';
 import { mkdir, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
@@ -20,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS, MORE_BATCHES, BASKETS } from './sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS, MORE_BATCHES, BASKETS, RECIPE_BARISTA, TYPED_BARISTA, LONG_BARISTA } from './sample-data.mjs';
 import { KEYBOARD_GAP } from '../../src/modules/keyboard-fit.js';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
@@ -657,6 +658,8 @@ const DIALOG_PARTS = {
     'cafe-shots-dialog': ['h3', '.cafe-shots-head .cafe-btn', '.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-star'],
     'cafe-reference-dialog': ['h3', '#cafe-reference-dialog-recipe', '.cafe-reference-dialog-shots', '#cafe-reference-dialog-replace'],
     'cafe-note-dialog': ['h3', '#cafe-note-meta', '#cafe-note-text', '#cafe-note-save'],
+    'cafe-barista-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '#cafe-pick-list .cafe-pick-row', '#cafe-pick-add'],
+    'cafe-barista-name-dialog': ['h3', '#cafe-pick-under', '#cafe-pick-entry-label', '#cafe-pick-entry-text', '#cafe-pick-entry-use'],
 };
 // Opens each dialog on `page` as a barista would, but for the reference's, and
 // hands each to `measure`, by its name and its element's id, while it is open
@@ -697,6 +700,13 @@ async function eachDialog(page, measure) {
     }), () => page.locator('#cafe-reference-dialog button', { hasText: 'Cancel' }).click());
     await opened('cafe-note-dialog', () => page.locator('#cafe-shot-note').click(),
         () => page.locator('#cafe-note-cancel').click());
+    await opened('cafe-barista-dialog', () => page.locator('#cafe-barista').click(), closePick, 'cafe-pick-dialog');
+    await opened('cafe-barista-name-dialog', async () => {
+        await page.locator('#cafe-barista').click();
+        await pickDialog(page).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(600);
+        await page.locator('#cafe-pick-add').click();
+    }, closePick, 'cafe-pick-dialog');
 }
 async function dialogsAtTabletSize() {
     const design = {};
@@ -1329,6 +1339,356 @@ async function beanAndBasketDialogs() {
         await dark.close();
     }
     for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+}
+
+// 23. The barista at the machine (docs/cafe/DESIGN.md, "The barista"), without
+//     Decent Sync, on a page at 1920 by 1200 and on one at 1340 by 800: the
+//     title band's button, its dialog of the names on recent Shots, "No
+//     barista" and a typed name, each one write of the Workflow's barista
+//     alone; a Shot that records the name; a recipe load that keeps it, from a
+//     record that holds another; and the machine's sleep, which clears it.
+const baristaShown = page => page.locator('#cafe-barista-name').textContent();
+const openBaristas = async page => {
+    await page.locator('#cafe-barista').click();
+    return pickDialog(page).waitFor({ timeout: 10_000 }).then(() => page.waitForTimeout(500)).then(() => true, () => false);
+};
+// A row of the dialog by its whole name, not a part of it.
+const baristaRow = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row')
+    .filter({ has: page.locator('.cafe-pick-row-name', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
+const baristaWrites = writes => writes.filter(write => write?.context && 'baristaName' in write.context);
+// What the button looks like: its words, whether it has the accent look, and
+// whether its name is cut short, with the accent colour to compare with.
+const baristaLook = page => page.evaluate(() => {
+    const button = document.getElementById('cafe-barista');
+    const name = document.getElementById('cafe-barista-name');
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--mimoja-blue-v2)';
+    document.body.append(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    const style = getComputedStyle(button);
+    const box = button.getBoundingClientRect();
+    const title = document.querySelector('.cafe-title-text').getBoundingClientRect();
+    const status = document.getElementById('machine-status').getBoundingClientRect();
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--streamline-scale-x')) || 1;
+    return {
+        text: name.textContent, accent: style.borderTopColor === accent && style.color === accent, none: button.classList.contains('cafe-barista-none'),
+        cut: name.scrollWidth > name.clientWidth + 1 && getComputedStyle(name).textOverflow === 'ellipsis',
+        visible: box.width > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+        between: box.left >= title.right - 1 && box.right <= status.left + 1,
+        width: box.width / scale, height: Math.round(box.height / scale), label: button.getAttribute('aria-label'),
+    };
+});
+// The names on Decaid's newest 50 Shots, each once under its newest spelling,
+// worked out here apart from the page's own model.
+async function recentNames() {
+    const items = (await decaid('GET', '/shots?limit=50')).items || [];
+    const names = [];
+    for (const item of items) {
+        const name = String(item.workflow?.context?.baristaName || '').trim();
+        if (name && !names.some(seen => seen.toLowerCase() === name.toLowerCase())) names.push(name);
+    }
+    return names;
+}
+async function baristaAtTheMachine() {
+    const house = RECIPES[0];
+    const other = RECIPES[2];
+    const recordsBefore = await records();
+    const pulled = [];
+    const named = async () => (await decaid('GET', '/workflow')).context?.baristaName ?? null;
+    const waitFor = async (test, ms = 15_000) => {
+        for (let waited = 0; waited < ms; waited += 500) {
+            if (await test()) return true;
+            await sleep(500);
+        }
+        return false;
+    };
+    // A recipe whose record holds a barista: a load must not apply it. The
+    // fixture's write, put back afterwards.
+    await decaid('POST', RECIPE_STORE, recordsBefore.map(row => (row && row.name === other.name && row.workflow
+        ? { ...row, workflow: { ...row.workflow, context: { ...(row.workflow.context || {}), baristaName: RECIPE_BARISTA } } } : row)));
+    try {
+        for (const viewport of [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }]) {
+            const size = `${viewport.width}x${viewport.height}`;
+            await decaid('PUT', '/machine/state/idle').catch(() => {});
+            await decaid('PUT', '/workflow', { context: { baristaName: null } });
+            await unloadRecipe();
+            let view = await openPage({ viewport });
+            let { page, seen } = view;
+            try {
+                await waitForPage(page);
+                await page.waitForTimeout(2500);
+                const writes = workflowWrites(page);
+                const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+                const loadCard = async recipe => {
+                    await card(recipe).click();
+                    await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+                    await page.waitForTimeout(3000);
+                };
+                const refresh = async () => {
+                    await page.evaluate(() => document.dispatchEvent(new Event('streamline:workflow-refresh')));
+                    await page.waitForTimeout(1500);
+                };
+
+                //    With none, and no recipe loaded.
+                let look = await baristaLook(page);
+                check(`barista ${size}: with no barista and no recipe the title band's button reads "Barista", in the accent colour, between the title and the status`,
+                    look.visible && look.text === 'Barista' && look.none && look.accent && look.between && look.height === 52, JSON.stringify(look));
+                await shot(page, `barista-none-${size}-light`);
+
+                //    The dialog, with a recipe loaded.
+                await loadCard(house);
+                const record = await recordNamed(house.name);
+                const selectionBefore = await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
+                const expected = await recentNames();
+                check(`barista ${size}: a tap opens the dialog`, await openBaristas(page));
+                check(`barista ${size}: it is titled "Barista", with the line that says the name is on this machine's shots and cleared on waking`,
+                    (await page.locator('#cafe-pick-title').textContent()) === 'Barista' && (await pickUnder(page)) === 'Named on this machine\'s shots · cleared when the machine wakes',
+                    await pickUnder(page));
+                let rows = await pickRows(page);
+                check(`barista ${size}: it lists the names on recent Shots, each once, most recent first, then "No barista", marked in use`,
+                    sameJson(rows.map(r => r.name), [...expected, 'No barista']) && rows.at(-1).inUse && rows.filter(r => r.inUse).length === 1
+                    && rows.at(-1).detail === 'Shots record no name' && rows.slice(0, -1).every(r => /^Last shot \S/.test(r.detail)),
+                    `${JSON.stringify(rows)} for ${JSON.stringify(expected)}`);
+                check(`barista ${size}: "New barista" is set apart under the list`,
+                    await page.locator('#cafe-pick-add').isVisible() && (await page.locator('#cafe-pick-add').textContent()).trim() === 'New barista'
+                    && (await page.locator('#cafe-pick-add').evaluate(element => element.parentElement.querySelector('#cafe-pick-list').contains(element))) === false);
+                await shot(page, `barista-dialog-${size}-light`);
+                writes.length = 0;
+                await baristaRow(page, 'No barista').click();
+                await pickClosed(page);
+                check(`barista ${size}: a tap on the row in use writes nothing`, baristaWrites(writes).length === 0, JSON.stringify(baristaWrites(writes)));
+
+                //    A pick: one write of the name alone, the recipe still loaded and unchanged.
+                const pick = expected.includes(BARISTAS[0]) ? BARISTAS[0] : expected[0];
+                check(`barista ${size}: a name to pick is on the list`, !!pick, JSON.stringify(expected));
+                await openBaristas(page);
+                writes.length = 0;
+                await baristaRow(page, pick).click();
+                await pickClosed(page);
+                await page.locator('#cafe-barista-name').filter({ hasText: pick }).waitFor({ timeout: 10_000 }).catch(() => {});
+                await page.waitForTimeout(1500);
+                const selectionAfter = await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
+                const workflow = await decaid('GET', '/workflow');
+                check(`barista ${size}: a pick is one write of the barista's name and nothing else`,
+                    writes.length === 1 && sameJson(writes[0], { context: { baristaName: pick } }), JSON.stringify(writes));
+                check(`barista ${size}: the Workflow names the barista, and the button shows the name, quiet`,
+                    workflow.context.baristaName === pick && (await baristaShown(page)) === pick && !(await baristaLook(page)).none,
+                    `${workflow.context.baristaName} | ${await baristaShown(page)}`);
+                check(`barista ${size}: the recipe stays loaded and is not marked changed`,
+                    workflow.context.extras?.dye?.recipeId === record.id && selectionAfter?.kind === 'recipe' && String(selectionAfter.id) === String(record.id)
+                    && selectionAfter.modified === selectionBefore?.modified && (await card(house).getAttribute('aria-pressed')) === 'true',
+                    `${JSON.stringify(selectionBefore)} → ${JSON.stringify(selectionAfter)}`);
+                check(`barista ${size}: the button's label names the barista for a screen reader`, (await baristaLook(page)).label === `Barista: ${pick}`, (await baristaLook(page)).label);
+                await shot(page, `barista-named-${size}-light`);
+
+                //    A shot records the name.
+                const before = ((await decaid('GET', '/shots?limit=1')).items || [])[0]?.id;
+                await pullShot(6);
+                let newest = null;
+                await waitFor(async () => {
+                    newest = ((await decaid('GET', '/shots?limit=1')).items || [])[0];
+                    return newest && newest.id !== before;
+                }, 30_000);
+                if (newest && newest.id !== before) pulled.push(newest.id);
+                const saved = newest && newest.id !== before ? await decaid('GET', `/shots/${newest.id}`) : null;
+                check(`barista ${size}: a shot pulled then records the name`, saved?.workflow?.context?.baristaName === pick, saved?.workflow?.context?.baristaName);
+                await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+                await page.waitForTimeout(3000);
+
+                //    A recipe load keeps it, from a record that holds another name.
+                writes.length = 0;
+                await loadCard(other);
+                const loaded = await decaid('GET', '/workflow');
+                const apply = writes.find(write => write?.context?.extras?.dye?.recipeId);
+                check(`barista ${size}: loading a recipe whose record names another barista keeps the barista`,
+                    loaded.context.baristaName === pick && (await baristaShown(page)) === pick && !!apply && !('baristaName' in apply.context),
+                    `${loaded.context.baristaName} | ${await baristaShown(page)} | ${JSON.stringify(apply?.context)}`);
+
+                //    On every state of the page: here a Shot opened from the list, beside "Back to latest".
+                if (saved) {
+                    await page.locator('#cafe-shots-btn').click();
+                    await page.locator(`[data-shot-id="${saved.id}"]`).click({ timeout: 10_000 }).catch(() => {});
+                    await page.locator('#cafe-back').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+                    const viewing = await page.evaluate(() => {
+                        const a = document.getElementById('cafe-barista').getBoundingClientRect();
+                        const b = document.getElementById('cafe-back').getBoundingClientRect();
+                        return { back: b.width > 0, apart: a.right <= b.left + 1, bottoms: Math.abs(a.bottom - b.bottom) <= 1, heights: Math.abs(a.height - b.height) <= 1 };
+                    });
+                    check(`barista ${size}: with a Shot opened from the list the button stays, beside "Back to latest", as tall and on the same line`,
+                        viewing.back && viewing.apart && viewing.bottoms && viewing.heights && (await baristaShown(page)) === pick, JSON.stringify(viewing));
+                    await shot(page, `barista-viewing-${size}-light`);
+                    await page.locator('#cafe-back').click().catch(() => {});
+                    await page.waitForTimeout(1500);
+                }
+
+                //    "New barista": the field, Back, and a typed name, trimmed.
+                writes.length = 0;
+                await openBaristas(page);
+                await page.locator('#cafe-pick-add').click();
+                await page.waitForTimeout(400);
+                check(`barista ${size}: "New barista" turns the dialog into a "Name" field, with Back and "Use this name", the field focused`,
+                    (await page.locator('#cafe-pick-title').textContent()) === 'New barista' && await page.locator('#cafe-pick-entry-text').isVisible()
+                    && (await page.locator('#cafe-pick-entry-label').textContent()) === 'Name' && (await page.locator('#cafe-pick-entry-back').textContent()) === 'Back'
+                    && (await page.locator('#cafe-pick-entry-use').textContent()) === 'Use this name' && !(await page.locator('#cafe-pick-list').isVisible())
+                    && (await page.evaluate(() => document.activeElement?.id)) === 'cafe-pick-entry-text');
+                await page.locator('#cafe-pick-entry-text').fill('    ');
+                check(`barista ${size}: a name of nothing but spaces can't be used`, await page.locator('#cafe-pick-entry-use').isDisabled());
+                await page.locator('#cafe-pick-entry-text').press('Enter');
+                await page.waitForTimeout(400);
+                check(`barista ${size}: nor sent with the keyboard's own key`, (await pickDialog(page).count()) === 1 && writes.length === 0);
+                await page.locator('#cafe-pick-entry-back').click();
+                await page.waitForTimeout(300);
+                check(`barista ${size}: Back shows the list again`, (await page.locator('#cafe-pick-title').textContent()) === 'Barista' && await page.locator('#cafe-pick-list').isVisible());
+                await page.locator('#cafe-pick-add').click();
+                await page.locator('#cafe-pick-entry-text').fill(`  ${TYPED_BARISTA}  `);
+                await shot(page, `barista-name-field-${size}-light`);
+                //    The soft keyboard, which the run can't raise: Streamline's
+                //    scaling says how much of the screen is left above one, and
+                //    the dialog takes it, as the note's does (step 9).
+                const keyboard = detail => page.evaluate(d => document.dispatchEvent(new CustomEvent('streamline:scaleupdate', { detail: d })), detail);
+                const above = Math.round(viewport.height / 2);
+                await keyboard({ keyboardUp: true, visibleHeight: above });
+                await page.waitForTimeout(300);
+                const fitted = await page.evaluate(() => {
+                    const box = document.querySelector('#cafe-pick-dialog .cafe-pick-box').getBoundingClientRect();
+                    const use = document.getElementById('cafe-pick-entry-use').getBoundingClientRect();
+                    return { top: Math.round(box.top), bottom: Math.round(box.bottom), use: Math.round(use.bottom) };
+                });
+                await shot(page, `barista-name-field-keyboard-${size}-light`);
+                await keyboard({ keyboardUp: false, visibleHeight: viewport.height });
+                await page.waitForTimeout(300);
+                check(`barista ${size}: with a keyboard up the name field's dialog sits in what is left above it, "Use this name" in view`,
+                    fitted.top >= 0 && fitted.bottom <= above && fitted.use <= above, `${JSON.stringify(fitted)} in ${above}`);
+                await page.locator('#cafe-pick-entry-use').click();
+                await pickClosed(page);
+                await page.locator('#cafe-barista-name').filter({ hasText: TYPED_BARISTA }).waitFor({ timeout: 10_000 }).catch(() => {});
+                check(`barista ${size}: a typed name is written trimmed, in one write of the name alone`,
+                    writes.length === 1 && sameJson(writes[0], { context: { baristaName: TYPED_BARISTA } }) && (await named()) === TYPED_BARISTA && (await baristaShown(page)) === TYPED_BARISTA,
+                    JSON.stringify(writes));
+                //    A typed name that is a listed one but for its case is that one.
+                await openBaristas(page);
+                rows = await pickRows(page);
+                check(`barista ${size}: a name in use that no Shot carries is listed first, marked, with no second line`,
+                    rows[0]?.name === TYPED_BARISTA && rows[0].inUse && rows[0].detail === '', JSON.stringify(rows[0]));
+                await page.locator('#cafe-pick-add').click();
+                await page.locator('#cafe-pick-entry-text').fill(` ${pick.toUpperCase()}`);
+                await page.locator('#cafe-pick-entry-text').press('Enter');
+                await pickClosed(page);
+                await page.waitForTimeout(1500);
+                check(`barista ${size}: a typed name that is a listed one in another case is the listed one`, (await named()) === pick && (await baristaShown(page)) === pick, await named());
+
+                //    A name set elsewhere shows without a tap, a long one cut short; the dialog shows it whole.
+                await decaid('PUT', '/workflow', { context: { baristaName: LONG_BARISTA } });
+                await refresh();
+                look = await baristaLook(page);
+                check(`barista ${size}: a name set elsewhere shows on the button without a tap, a long one ended with "…" in no more than 320 px`,
+                    look.text === LONG_BARISTA && look.cut && look.width <= 321, JSON.stringify(look));
+                await openBaristas(page);
+                rows = await pickRows(page);
+                check(`barista ${size}: the dialog shows a long name whole`, rows[0]?.name === LONG_BARISTA && rows[0].inUse, JSON.stringify(rows[0]));
+                await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+                await pickClosed(page);
+
+                //    "No barista" clears it.
+                writes.length = 0;
+                await openBaristas(page);
+                await baristaRow(page, 'No barista').click();
+                await pickClosed(page);
+                await page.waitForTimeout(1500);
+                look = await baristaLook(page);
+                check(`barista ${size}: "No barista" clears the name in one write, and the button reads "Barista" again`,
+                    writes.length === 1 && sameJson(writes[0], { context: { baristaName: null } }) && (await named()) === null && look.text === 'Barista' && look.none,
+                    JSON.stringify(writes));
+
+                //    During a shot: the button shows the name and opens nothing,
+                //    and a shot that starts closes the dialog, typed text and all.
+                await decaid('PUT', '/workflow', { context: { baristaName: pick } });
+                await refresh();
+                writes.length = 0;
+                await openBaristas(page);
+                await page.locator('#cafe-pick-add').click();
+                await page.locator('#cafe-pick-entry-text').fill('Sample Half Typed');
+                const run = pullShot(6);
+                await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+                check(`barista ${size}: a shot that starts closes the dialog, typed text and all`, await pickClosed(page));
+                await page.locator('#cafe-barista').click();
+                await page.waitForTimeout(1500);
+                check(`barista ${size}: during a shot the button shows the name and opens nothing`,
+                    !(await pickDialog(page).count()) && (await baristaShown(page)) === pick);
+                await shot(page, `barista-live-${size}-light`);
+                await run;
+                await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+                await page.waitForTimeout(4000);
+                const during = ((await decaid('GET', '/shots?limit=1')).items || [])[0];
+                if (during && !pulled.includes(during.id)) pulled.push(during.id);
+                check(`barista ${size}: nothing was written for the barista`,
+                    baristaWrites(writes).length === 0 && (await named()) === pick, JSON.stringify(baristaWrites(writes)));
+
+                //    Sleep clears a set name, and a sleep with none writes nothing.
+                writes.length = 0;
+                await decaid('PUT', '/machine/state/sleeping');
+                const clearedAsleep = await waitFor(async () => (await named()) === null);
+                check(`barista ${size}: putting the machine to sleep with a name set clears it, in one write`,
+                    clearedAsleep && baristaWrites(writes).length === 1 && sameJson(baristaWrites(writes)[0], { context: { baristaName: null } }), JSON.stringify(baristaWrites(writes)));
+                await decaid('PUT', '/machine/state/idle');
+                await page.waitForTimeout(4000);
+                look = await baristaLook(page);
+                check(`barista ${size}: after the wake there is no barista, and the button stands out`, (await named()) === null && look.text === 'Barista' && look.none, JSON.stringify(look));
+                writes.length = 0;
+                await decaid('PUT', '/machine/state/sleeping');
+                await page.waitForTimeout(4000);
+                check(`barista ${size}: a sleep with no name set writes nothing`, baristaWrites(writes).length === 0, JSON.stringify(baristaWrites(writes)));
+                await decaid('PUT', '/machine/state/idle');
+                await page.waitForTimeout(3000);
+                check(`barista ${size}: no page error`, seen.errors.length === 0, seen.errors.join(' | '));
+            } finally {
+                await view.close();
+            }
+
+            //    A page opened on a sleeping machine clears a name set meanwhile.
+            await decaid('PUT', '/machine/state/sleeping');
+            await sleep(2000);
+            await decaid('PUT', '/workflow', { context: { baristaName: BARISTAS[1] } });
+            view = await openPage({ viewport });
+            ({ page, seen } = view);
+            try {
+                const cleared = await waitFor(async () => (await named()) === null, 20_000);
+                check(`barista ${size}: a page opened on a sleeping machine clears a name set while it slept`, cleared, String(await named()));
+            } finally {
+                await view.close();
+                await decaid('PUT', '/machine/state/idle').catch(() => {});
+                await sleep(3000);
+            }
+        }
+
+        //    Dark, for the pull request: the button with and without a name, and the dialog.
+        await decaid('PUT', '/workflow', { context: { baristaName: null } });
+        const dark = await openPage({ theme: 'dark' });
+        try {
+            await waitForPage(dark.page, 'dark');
+            await dark.page.waitForTimeout(2500);
+            await shot(dark.page, 'barista-none-1920x1200-dark');
+            await openBaristas(dark.page);
+            await shot(dark.page, 'barista-dialog-1920x1200-dark');
+            await dark.page.locator('#cafe-pick-add').click();
+            await dark.page.locator('#cafe-pick-entry-text').fill(TYPED_BARISTA);
+            await shot(dark.page, 'barista-name-field-1920x1200-dark');
+            await dark.page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+            await pickClosed(dark.page);
+            await decaid('PUT', '/workflow', { context: { baristaName: BARISTAS[0] } });
+            await dark.page.evaluate(() => document.dispatchEvent(new Event('streamline:workflow-refresh')));
+            await dark.page.waitForTimeout(1500);
+            await shot(dark.page, 'barista-named-1920x1200-dark');
+        } finally {
+            await dark.close();
+        }
+    } finally {
+        await decaid('POST', RECIPE_STORE, recordsBefore);
+        await decaid('PUT', '/workflow', { context: { baristaName: null } }).catch(() => {});
+        await decaid('PUT', '/machine/state/idle').catch(() => {});
+        for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+    }
 }
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -2646,6 +3006,7 @@ try {
     await dialogsAtTabletSize();
     await grindRow();
     await beanAndBasketDialogs();
+    await baristaAtTheMachine();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

@@ -618,6 +618,9 @@ export function connectWebSocket(onData, onReconnect) {
             }
             // Plugin overlays that asked for it close when a shot starts (see `closeOnShot`).
             if (stateValue === 'espresso' && previousMachineState !== 'espresso') document.dispatchEvent(new Event('streamline:espresso-start'));
+            // Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): the machine is seen asleep, as it goes
+            // to sleep or in the first frame of a page opened on a sleeping machine.
+            if (stateValue === 'sleeping' && previousMachineState !== 'sleeping') document.dispatchEvent(new Event('streamline:machine-asleep'));
             // Keep the last frame so pages that need a live reading (the
             // sensor calibration capture) can take one without opening a
             // second socket -- this one is a process-wide singleton.

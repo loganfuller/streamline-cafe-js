@@ -1,12 +1,12 @@
-// The cafe page around the strip: the title, what each dial-in row names and
-// the dialogs those names open, the weight during a shot, the scale's battery,
-// and where Settings and Sleep sit (docs/cafe/DESIGN.md, "What the screen
-// shows").
+// The cafe page around the strip: the title, the barista at the machine, what
+// each dial-in row names and the dialogs those names open, the weight during a
+// shot, the scale's battery, and where Settings and Sleep sit
+// (docs/cafe/DESIGN.md, "What the screen shows" and "The barista").
 //
 // Streamline's modules still paint the steppers, the status line, the telemetry
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
-import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight } from '../modules/api.js';
+import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight, getMachineState } from '../modules/api.js';
 import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
@@ -20,6 +20,8 @@ import { cafeText, formatRoastDay, setText } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
 import { openBeanDialog } from './bean-dialog.js';
 import { openBasketDialog } from './basket-dialog.js';
+import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
+import { baristaName, asleep } from './barista-model.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -33,6 +35,8 @@ const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier ed
 let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
+let barista = '';       // the Workflow's barista, as last read or written: '' for none
+let baristaSeq = 0;     // writes of the barista: a read begun before one is stale for it
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let namesSeq = 0;
 let namesTimer = null;
@@ -63,6 +67,37 @@ export function showRecipe(next) {
     renderHeading();
 }
 
+// ── The barista ──────────────────────────────────────────────────────────────
+
+// The Workflow's name, or "Barista" in the accent colour where there is none,
+// the only prompt to pick one (cafe.css). Read with the dial-in's names.
+function renderBarista() {
+    const button = el('cafe-barista');
+    if (!button) return;
+    button.classList.toggle('cafe-barista-none', !barista);
+    setText(el('cafe-barista-name'), barista || 'Barista', { translate: !barista });
+    button.setAttribute('aria-label', barista ? `${cafeText('Barista')}: ${barista}` : cafeText('Barista'));
+}
+
+function seeBarista(name) {
+    barista = name;
+    renderBarista();
+}
+
+// A write named the barista: a read of the Workflow begun before it is stale
+// for the barista, though not for the dial-in's names.
+function baristaWritten(name) {
+    baristaSeq += 1;
+    seeBarista(name);
+}
+
+function openBarista() {
+    openBaristaDialog({ mayOpen: mayPick, shown: () => barista, seen: seeBarista, written: baristaWritten, write: writePick });
+}
+
+// The machine seen asleep: the name is cleared, so each wake starts with none.
+const clearAsleep = () => clearOnSleep({ write: writePick, written: baristaWritten });
+
 // ── Whether the dial-in is saved ─────────────────────────────────────────────
 
 // The skin saves nothing onto a recipe itself. Decent Sync's plugin does, after
@@ -85,9 +120,10 @@ function renderNames() {
     setText(el('cafe-grind-desc'), names.grinder);
 }
 
-/** Read the Workflow again, and with it the bean, roast date, basket and grinder. */
+/** Read the Workflow again, and with it the barista, bean, roast date, basket and grinder. */
 export async function refreshNames() {
     const seq = ++namesSeq;
+    const baristaAt = baristaSeq;
     let workflow;
     try {
         workflow = await getWorkflow();
@@ -95,6 +131,7 @@ export async function refreshNames() {
         return; // Decaid can't be reached: what is shown stays
     }
     if (seq !== namesSeq) return;
+    if (baristaAt === baristaSeq) seeBarista(baristaName(workflow?.context));
     const batchId = workflow?.context?.beanBatchId || null;
     if (!batchId) batch = null;
     else if (!batch || batch.id !== batchId) {
@@ -320,6 +357,7 @@ function placeSystemButtons() {
  */
 export function initPage({ onProfileChange = () => {} } = {}) {
     renderHeading();
+    renderBarista();
     renderNames();
     placeSystemButtons();
     paintBattery();
@@ -375,6 +413,16 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     el('cafe-grind-pick')?.addEventListener('click', openGrinder);
     el('cafe-dose-pick')?.addEventListener('click', openBean);
     el('cafe-yield-pick')?.addEventListener('click', openBasket);
+    // During a shot, or a recipe load, the button shows the name and opens
+    // nothing: Decaid names the Shot from the Workflow as the shot ends.
+    el('cafe-barista')?.addEventListener('click', openBarista);
+    // Each wake starts with no barista: the name is cleared as the machine is
+    // seen asleep, going to sleep or in the first frame of a page opened on it
+    // asleep (the hook in api.js). The state is read once at start too, for a
+    // sleeping machine that sends no frame; a second clear finds no name and
+    // writes nothing.
+    document.addEventListener('streamline:machine-asleep', clearAsleep);
+    getMachineState().then(snapshot => { if (asleep(snapshot)) clearAsleep(); }).catch(() => {});
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);
     document.addEventListener('streamline:espresso-end', shotEnded);
@@ -389,4 +437,5 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // Keyed text follows the language by itself (text.js). The roast date is put
     // together here, so it is drawn again.
     document.addEventListener('streamline:languagechange', renderNames);
+    document.addEventListener('streamline:languagechange', renderBarista);
 }

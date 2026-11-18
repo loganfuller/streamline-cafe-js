@@ -170,6 +170,10 @@ export const WORKFLOW_WRITERS = {
     // DYE2's own picker writes them. A batch chosen there is written by
     // `beans.select`, above. Listed in docs/cafe/UPSTREAM_EDITS.md.
     'cafe.basket': ['context.extras.basketId', 'context.extras.basketName'],
+    // The barista at the machine, chosen or typed from the title band, and
+    // cleared when the machine is seen asleep: the name alone, in one write.
+    // Listed in docs/cafe/UPSTREAM_EDITS.md.
+    'cafe.barista': ['context.baristaName'],
 };
 
 // --- what a recipe apply must not inherit (#189) ---------------------------
