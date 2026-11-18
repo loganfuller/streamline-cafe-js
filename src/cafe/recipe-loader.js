@@ -54,7 +54,7 @@ const names = (selection, recipe) => !!selection && selection.kind === 'recipe' 
  *   `onUnloadError(error, recipe)` of an unload that failed.
  *
  * Returns `tap(recipe)`, `refresh()` and `busy()`, which is true from a tap
- * until its load or unload has finished.
+ * until its load or unload has finished and, for an unload, its hold is over.
  */
 export function createRecipeLoader({
     apply, unload = async () => {}, read, show,

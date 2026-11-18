@@ -459,10 +459,16 @@ test('a double tap on the loaded card unloads it, even when the unload finishes 
 test('the hold after an unload is started at its tap, and a load gets none', async () => {
     let holds = 0;
     let selection = { kind: 'recipe', id: 'a' };
+    let gate = null;
     const loader = createRecipeLoader({
-        apply: async recipe => { selection = { kind: 'recipe', id: recipe.id }; },
+        // The load's own read of DYE2 after it is written is held open.
+        apply: async recipe => { selection = { kind: 'recipe', id: recipe.id }; gate = deferred(); },
         unload: async () => { selection = null; },
-        read: async () => ({ rows: [A, B], selection }),
+        async read() {
+            const answer = { rows: [A, B], selection };
+            if (gate) await gate.promise;
+            return answer;
+        },
         show: () => {},
         hold: () => { holds += 1; return Promise.resolve(); },
     });
@@ -470,8 +476,15 @@ test('the hold after an unload is started at its tap, and a load gets none', asy
     loader.tap(B);
     await idle();
     assert.equal(holds, 0, 'a load is slow enough on its own');
+    assert.equal(loader.busy(), false, 'the load is done; only its read of DYE2 is still open');
+    // The unload waits behind that read, and its hold has begun already.
     loader.tap(B);
     assert.equal(holds, 1, 'started at the tap, not when the unload runs');
+    gate.resolve();
+    gate = null;
+    await idle();
+    assert.equal(holds, 1);
+    assert.equal(selection, null, 'and the unload ran');
     assert.ok(UNLOAD_HOLD_MS >= 300 && UNLOAD_HOLD_MS <= 600, 'longer than a double tap\'s gap, short enough to go unnoticed');
 });
 
