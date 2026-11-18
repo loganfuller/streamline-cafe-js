@@ -11,6 +11,7 @@ import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusBu
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
+import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { decentSyncSaves } from './sync-status.js';
 import { askStatus, onStatus } from './decent-sync.js';
@@ -330,6 +331,36 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     if (profile) {
         new MutationObserver(() => { renderHeading(); onProfileChange(); })
             .observe(profile, { characterData: true, childList: true, subtree: true });
+    }
+    // The Grind value fits itself to its box: a preset grinder's setting is a
+    // name, which can be wider than a number, and a number in the row's tabular
+    // digits can be too (111.25 at 30 px). Streamline's data-fit-text measures
+    // on a canvas, which draws digits narrower than the row does, and re-fits on
+    // its own observers; so this measures the value itself, in layout pixels,
+    // once for each new text and each new width. Only a name is cut, with an
+    // ellipsis, past the 8 px floor; cafe.css fixes the line's height, so a new
+    // size never resizes the box.
+    const grind = el('grind-value');
+    if (grind) {
+        let fittedText = null;
+        const fitGrind = (force = false) => {
+            const text = grind.textContent;
+            if (!force && text === fittedText) return;
+            fittedText = text;
+            const name = grindNumber(text) === null;
+            grind.classList.toggle('cafe-grind-name', name);
+            grind.style.fontSize = '';
+            // A name keeps Streamline's 4 px each side; a number is shrunk only
+            // once it is wider than the box, so every number that fitted before
+            // keeps the column's 30 px.
+            const room = grind.clientWidth - (name ? 8 : 0);
+            if (room <= 0 || grind.scrollWidth <= room) return;
+            const size = parseFloat(getComputedStyle(grind).fontSize);
+            grind.style.fontSize = `${Math.max(8, Math.floor(size * room / grind.scrollWidth))}px`;
+        };
+        new MutationObserver(() => fitGrind()).observe(grind, { characterData: true, childList: true, subtree: true });
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => fitGrind(true)).observe(grind);
+        fitGrind(true);
     }
     const machineButtons = el('ghc-controls');
     if (machineButtons) new MutationObserver(placeSystemButtons).observe(machineButtons, { attributes: true, attributeFilter: ['style'] });

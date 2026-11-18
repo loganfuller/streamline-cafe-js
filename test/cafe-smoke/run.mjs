@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES, BARISTAS } from './sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
 import { KEYBOARD_GAP } from '../../src/modules/keyboard-fit.js';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader, dialogDrawn } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
@@ -904,6 +904,137 @@ async function grinderDialog() {
     }
     // The Shots this step pulled go, so a later run reads its own.
     for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+}
+
+// 21. The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen
+//     shows"): a preset grinder's setting shown by its name, with − and +
+//     writing nothing, and a 0.25-step grinder's setting kept to its places
+//     through a Workflow read and stepped on its own grid.
+async function grindRow() {
+    const listed = await decaid('GET', '/grinders?includeArchived=true');
+    const grinders = Array.isArray(listed) ? listed : listed.items || [];
+    const ensure = async spec => {
+        const found = grinderNamed(grinders, spec.model);
+        if (!found) return decaid('POST', '/grinders', spec);
+        return found.archived ? decaid('PUT', `/grinders/${found.id}`, { ...found, archived: false }) : found;
+    };
+    const preset = await ensure(PRESET_GRINDER);
+    const quarter = await ensure(QUARTER_GRINDER);
+    const plain = grinderNamed(grinders, GRINDER.model);
+    check('grind row: the preset grinder is a preset, the other steps by 0.25',
+        preset?.settingType === 'preset' && quarter?.settingSmallStep === 0.25, JSON.stringify({ preset, quarter }));
+    const setGrind = (grinder, grinderSetting) => decaid('PUT', '/workflow', { context: { grinderId: grinder.id, grinderModel: grinder.model, grinderSetting } });
+    await unloadRecipe();
+    await setGrind(preset, 'Medium');
+    const view = await openPage({ machineButtons: false });
+    const { page, seen } = view;
+    try {
+        await waitForPage(page);
+        await page.waitForTimeout(3000);
+        const writes = workflowWrites(page);
+        const grind = () => page.locator('#grind-value').textContent();
+        // A Workflow read, as the page makes when a plugin says the Workflow
+        // changed (DYE2's `changed` socket, through Streamline's plugin surfaces).
+        const readAgain = async () => {
+            await page.evaluate(() => document.dispatchEvent(new Event('streamline:workflow-refresh')));
+            await page.waitForTimeout(2000);
+        };
+        // Past the − and +'s debounce, and Streamline's own read after it.
+        const settle = () => page.waitForTimeout(2500);
+
+        check('grind row: a preset grinder\'s "Medium" shows as Medium', (await grind()) === 'Medium', await grind());
+        await shot(page, 'grind-row-preset-light');
+        await page.locator('#grind-plus').click();
+        await settle();
+        check('grind row: + on a preset writes nothing and leaves Medium', writes.length === 0 && (await grind()) === 'Medium', `${JSON.stringify(writes)} ${await grind()}`);
+        await page.locator('#grind-minus').click();
+        await settle();
+        check('grind row: − on a preset writes nothing and leaves Medium', writes.length === 0 && (await grind()) === 'Medium', `${JSON.stringify(writes)} ${await grind()}`);
+        check('grind row: the Workflow still holds Medium', (await decaid('GET', '/workflow')).context?.grinderSetting === 'Medium');
+        // A name sits between − and +: its text, measured by a Range, against
+        // the gap between the two buttons.
+        const fit = () => page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            const range = document.createRange();
+            range.selectNodeContents(value);
+            const text = range.getBoundingClientRect();
+            const minus = document.getElementById('grind-minus').getBoundingClientRect();
+            const plus = document.getElementById('grind-plus').getBoundingClientRect();
+            return { left: text.left - minus.right, right: plus.left - text.right, size: parseFloat(getComputedStyle(value).fontSize) };
+        });
+        const medium = await fit();
+        check('grind row: Medium sits between − and +, shrunk no further than it must be', medium.left >= 4 && medium.right >= 4 && medium.size >= 20, JSON.stringify(medium));
+        await setGrind(preset, 'Extra coarse');
+        await readAgain();
+        const long = await fit();
+        check('grind row: a longer name is shrunk to sit between them', (await grind()) === 'Extra coarse' && long.left >= 4 && long.right >= 4 && long.size >= 14 && long.size < 30, JSON.stringify(long));
+        // A name too long even at the fitting's 8 px floor is cut with an
+        // ellipsis inside the value's box, never run under − or +.
+        await setGrind(preset, 'Extra coarse for cold brew and large batch service only');
+        await readAgain();
+        const clipped = await page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            const box = value.getBoundingClientRect();
+            const minus = document.getElementById('grind-minus').getBoundingClientRect();
+            const plus = document.getElementById('grind-plus').getBoundingClientRect();
+            return { left: box.left - minus.right, right: plus.left - box.right, cut: value.scrollWidth > value.clientWidth, overflow: getComputedStyle(value).textOverflow };
+        });
+        check('grind row: a name too long to fit ends in an ellipsis between − and +', clipped.left >= 0 && clipped.right >= 0 && clipped.cut && clipped.overflow === 'ellipsis', JSON.stringify(clipped));
+        // A number is never cut: the fitting measures digits narrower than the
+        // row's tabular ones, so a wide one is left to show whole.
+        await setGrind(quarter, '111.25');
+        await readAgain();
+        const wide = await page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            return { text: value.textContent, overflow: getComputedStyle(value).overflowX };
+        });
+        const wideFit = await fit();
+        check('grind row: a wide number such as 111.25 is shown whole, not cut, and clear of − and +', wide.text === '111.25' && wide.overflow === 'visible' && wideFit.left >= 0 && wideFit.right >= 0, JSON.stringify({ ...wide, ...wideFit }));
+        await setGrind(preset, 'Medium');
+        await readAgain();
+
+        await setGrind(quarter, '11.25');
+        await readAgain();
+        check('grind row: a 0.25-step grinder at 11.25 shows 11.25 after a Workflow read', (await grind()) === '11.25', await grind());
+        await page.locator('#grind-plus').click();
+        check('grind row: + steps it to 11.5, written to its places', (await grind()) === '11.50', await grind());
+        await settle();
+        const stepped = await decaid('GET', '/workflow');
+        check('grind row: and writes 11.50 into the Workflow, once', writes.length === 1 && stepped.context?.grinderSetting === '11.50' && stepped.context?.grinderId === quarter.id,
+            `${JSON.stringify(writes)} ${JSON.stringify(stepped.context)}`);
+        await readAgain();
+        check('grind row: still 11.50 after the next Workflow read', (await grind()) === '11.50', await grind());
+        await page.locator('#grind-minus').click();
+        await page.locator('#grind-minus').click();
+        await settle();
+        check('grind row: − twice steps to 11.00 on its grid', (await grind()) === '11' || (await grind()) === '11.00', await grind());
+        check('grind row: and the Workflow holds 11.00', (await decaid('GET', '/workflow')).context?.grinderSetting === '11.00');
+        await setGrind(quarter, '11.75');
+        await readAgain();
+        await shot(page, 'grind-row-quarter-light');
+
+        //    A whole-number and a 0.1-step grinder show as on Streamline's page.
+        if (plain) {
+            await setGrind(plain, '12');
+            await readAgain();
+            check('grind row: a whole number shows whole', (await grind()) === '12', await grind());
+            await setGrind(plain, '2.60');
+            await readAgain();
+            check('grind row: a 0.1-step setting shows to one place', (await grind()) === '2.6', await grind());
+            await page.locator('#grind-plus').click();
+            check('grind row: + steps a 0.1-step grinder to 2.7', (await grind()) === '2.7', await grind());
+            await settle();
+        } else {
+            check('grind row: the sample grinder is there', false);
+        }
+        check('grind row: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+    } finally {
+        await shot(page, 'grind-row-at-end').catch(() => {});
+        await view.close();
+    }
+    // The two grinders go, so the grinder dialog's list on a later run is its own.
+    for (const grinder of [preset, quarter]) await decaid('PUT', `/grinders/${grinder.id}`, { ...grinder, archived: true }).catch(() => {});
+    if (plain) await setGrind(plain, GRINDER_USE.first.setting).catch(() => {});
 }
 
 // ── The run ──────────────────────────────────────────────────────────────────
@@ -2219,6 +2350,7 @@ try {
     }
 
     await dialogsAtTabletSize();
+    await grindRow();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {
