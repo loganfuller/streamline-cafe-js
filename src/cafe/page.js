@@ -347,12 +347,16 @@ export function initPage({ onProfileChange = () => {} } = {}) {
             const text = grind.textContent;
             if (!force && text === fittedText) return;
             fittedText = text;
-            grind.classList.toggle('cafe-grind-name', grindNumber(text) === null);
+            const name = grindNumber(text) === null;
+            grind.classList.toggle('cafe-grind-name', name);
             grind.style.fontSize = '';
-            const width = grind.clientWidth;
-            if (!width || grind.scrollWidth <= width - 8) return;
+            // A name keeps Streamline's 4 px each side; a number is shrunk only
+            // once it is wider than the box, so every number that fitted before
+            // keeps the column's 30 px.
+            const room = grind.clientWidth - (name ? 8 : 0);
+            if (room <= 0 || grind.scrollWidth <= room) return;
             const size = parseFloat(getComputedStyle(grind).fontSize);
-            grind.style.fontSize = `${Math.max(8, Math.floor(size * (width - 8) / grind.scrollWidth))}px`;
+            grind.style.fontSize = `${Math.max(8, Math.floor(size * room / grind.scrollWidth))}px`;
         };
         new MutationObserver(() => fitGrind()).observe(grind, { characterData: true, childList: true, subtree: true });
         if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => fitGrind(true)).observe(grind);
