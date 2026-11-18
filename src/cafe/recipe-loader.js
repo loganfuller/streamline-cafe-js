@@ -1,42 +1,74 @@
-// Which recipe the strip shows as loaded, and the order loads are written in
-// (docs/cafe/DESIGN.md, "Recipes and the strip"). No browser global is touched:
-// the caller passes in Streamline's apply, the read of DYE2, and the painter.
+// Which recipe the strip shows as loaded, which taps load or unload one, and
+// the order those are written in (docs/cafe/DESIGN.md, "Recipes and the
+// strip"). No browser global is touched: the caller passes in Streamline's
+// apply, the unload, the read of DYE2, the painter, and whether a shot runs.
 //
-// Loads run one at a time, and a tap made while one runs waits for it. Without
-// that, two taps in quick succession could write the Workflow in the other
-// order, leaving the machine on the first recipe under the second one's name.
+// A tap on a card loads its recipe; a tap on the loaded card unloads it. Loads
+// and unloads run one at a time, and a tap made while one runs waits for it.
+// Without that, two taps in quick succession could write the Workflow in the
+// other order, leaving the machine on the first recipe under the second one's
+// name; and an unload sent while a load's write is on its way would be undone
+// when that write landed, since Streamline's apply writes the marker with it.
 //
-// Before a load is written, dial-in edits still on their way are let land:
-// written after the load, they would change the new recipe instead. And the
-// recipe is read again from DYE2's records, so what is loaded is what DYE2 holds
-// now, not what the card showed when it was last drawn.
+// Before either is written, dial-in edits still on their way are let land:
+// written after a load, they would change the new recipe instead. In the
+// seconds after a pour, both wait until Decaid has stored the Shot, which takes
+// the Workflow's recipe as it is then. And the recipe is read again from DYE2's
+// records, so what is loaded is what DYE2 holds now, not what the card showed
+// when it was last drawn.
 import { createLatestTaskRunner } from '../modules/latest-task-runner.js';
 import { loadedAfterRead } from './strip-model.js';
+
+// How long from its tap an unload holds the strip, so the second tap of a
+// double tap on the loaded card lands while it runs and is ignored, as during a
+// load. An unload alone is quick, often under the gap between two taps, and the
+// second tap would otherwise load the recipe again as stored. A load is slow
+// enough on its own and gets no such hold.
+export const UNLOAD_HOLD_MS = 400;
+
+// Does DYE2's selection name this recipe as the loaded one?
+const names = (selection, recipe) => !!selection && selection.kind === 'recipe' && String(selection.id) === String(recipe.id);
 
 /**
  * - `apply(recipe)` loads a recipe (Streamline's `applyRecipe`) and rejects when
  *   it could not.
+ * - `unload()` clears DYE2's selection, which unloads whatever recipe is
+ *   loaded and changes nothing else, and rejects when it could not.
  * - `read()` resolves `{ rows, selection }`: DYE2's records, or null when the
  *   read failed, and its selection, or undefined when it could not be asked.
  * - `show(recipes, loaded)` paints.
  * - `settle()` resolves once edits made before the tap have been written, and
- *   rejects when they could not be: the load is then not made.
- * - `onLoading(loading)` is told when a tap's load begins and when the last one
- *   has finished, so the page can keep the dial-in still in between: an edit
- *   made while a recipe loads belongs to neither recipe for certain.
- * - `onApplied()` runs after each load is written, landed or not.
- * - `onError(error, recipe)` is told of a load that failed.
+ *   rejects when they could not be: the load or unload is then not made.
+ * - `afterShot()` resolves once Decaid has stored the Shot of a pour that has
+ *   just ended, at once when none has.
+ * - `shotRunning()` says whether a shot runs. No card takes a tap during one,
+ *   and a tap that finds one running once it is its turn, or once DYE2 has
+ *   been read just before the write, does nothing.
+ * - `onLoading(loading)` is told when a tap's load or unload begins and when the
+ *   last one has finished, so the page can keep the dial-in still in between:
+ *   an edit made then belongs to neither recipe for certain.
+ * - `hold()` resolves once an unload has run long enough that the second tap
+ *   of a double tap still finds it running. It is started at the tap.
+ * - `onApplied()` runs after each load or unload, made or not.
+ * - `onError(error, recipe)` is told of a load that failed, and
+ *   `onUnloadError(error, recipe)` of an unload that failed.
  *
- * Returns `load(recipe)`, `refresh()` and `busy()`, which is true from a tap
- * until its load has finished.
+ * Returns `tap(recipe)`, `refresh()` and `busy()`, which is true from a tap
+ * until its load or unload has finished and, for an unload, its hold is over.
  */
-export function createRecipeLoader({ apply, read, show, settle = async () => {}, onLoading = () => {}, onApplied = () => {}, onError = () => {} }) {
+export function createRecipeLoader({
+    apply, unload = async () => {}, read, show,
+    settle = async () => {}, afterShot = async () => {}, shotRunning = () => false,
+    hold = () => new Promise(resolve => setTimeout(resolve, UNLOAD_HOLD_MS)),
+    onLoading = () => {}, onApplied = () => {}, onError = () => {}, onUnloadError = () => {},
+}) {
     let recipes = [];
     let loaded = null;     // what the strip shows as loaded: a tap moves it at once
-    let confirmed = null;  // what DYE2, or the last load that landed, said is loaded
+    let confirmed = null;  // what DYE2, or the last load or unload made, said is loaded
     let taps = 0;
     let reads = 0;
-    let loading = false;   // a tap's load has not finished
+    let loading = false;   // a tap's load or unload has not finished
+    let tapped = null;     // the id of the newest tap's recipe, while loading
 
     const paint = () => show(recipes, loaded);
 
@@ -56,40 +88,91 @@ export function createRecipeLoader({ apply, read, show, settle = async () => {},
         paint();
     }
 
-    // One load at a time. A tap made while one runs replaces any tap already
-    // waiting, so only the newest is written after it.
-    const run = createLatestTaskRunner(async ({ recipe, seq }) => {
+    async function loadNow(recipe) {
+        // What DYE2 holds now. A read that fails leaves the card's own copy.
+        const { rows } = await read();
+        const current = rows ? rows.find(r => r && r.id === recipe.id) : recipe;
+        if (!current) throw new Error('The recipe is no longer in DYE2.');
+        if (rows) recipes = rows;
+        // A shot that started during the read is left alone too.
+        if (shotRunning()) return;
+        await apply(current);
+        confirmed = current;
+    }
+
+    async function unloadNow(recipe) {
+        const { rows, selection } = await read();
+        if (rows) recipes = rows;
+        // A recipe DYE2 no longer names as loaded, unloaded or replaced elsewhere
+        // meanwhile, is not unloaded again: that would unload whatever is loaded
+        // now. Where DYE2 could not be asked, that can't be ruled out, so the
+        // unload is not made, and fails.
+        if (selection === undefined) throw new Error('DYE2 could not say which recipe is loaded.');
+        if (!names(selection, recipe)) {
+            confirmed = loadedAfterRead(selection, recipes, confirmed);
+            return;
+        }
+        // A shot that started during the read is left alone too.
+        if (shotRunning()) return;
+        await unload();
+        confirmed = null;
+    }
+
+    // One load or unload at a time. A tap made while one runs replaces any tap
+    // already waiting, so only the newest is written after it.
+    const run = createLatestTaskRunner(async ({ kind, recipe, seq, held }) => {
         try {
             await settle();
-            // What DYE2 holds now. A read that fails leaves the card's own copy.
-            const { rows } = await read();
-            const current = rows ? rows.find(r => r && r.id === recipe.id) : recipe;
-            if (!current) throw new Error('The recipe is no longer in DYE2.');
-            if (rows) recipes = rows;
-            await apply(current);
-            confirmed = current;
+            await afterShot();
+            // A shot that started meanwhile is left alone: a load would change
+            // the running shot, and an unload would file it under no recipe.
+            if (!shotRunning()) await (kind === 'unload' ? unloadNow(recipe) : loadNow(recipe));
         } catch (error) {
-            onError(error, recipe);
+            (kind === 'unload' ? onUnloadError : onError)(error, recipe);
         }
         onApplied();
+        await held; // an unload's hold, from its tap
         if (seq !== taps) return; // a newer tap is waiting, and owns the strip
         loading = false;
-        loaded = confirmed; // a load that failed goes back to what was loaded
+        tapped = null;
+        loaded = confirmed; // one that failed, or was not made, goes back to what was loaded
         paint();
         onLoading(false);
         await refresh(); // DYE2's answer decides
     }, error => onError(error, null));
 
-    function load(recipe) {
-        // The loaded card takes no tap, as on Streamline's strip: loading it again
-        // would put the stored values back over a dial-in in progress.
-        if (loaded && loaded.id === recipe.id) return;
+    function queue(kind, recipe) {
         if (!loading) onLoading(true);
         loading = true;
-        loaded = recipe;
+        tapped = recipe.id;
+        // The highlight moves at the tap, and comes back if it was not made.
+        loaded = kind === 'unload' ? null : recipe;
         paint();
-        run({ recipe, seq: ++taps });
+        run({ kind, recipe, seq: ++taps, held: kind === 'unload' ? hold() : null });
     }
 
-    return { load, refresh, busy: () => loading };
+    function tap(recipe) {
+        if (shotRunning()) return;
+        if (loading) {
+            // The card of the newest tap, still on its way: the second tap of a
+            // double tap, which must not undo the first.
+            if (tapped === recipe.id) return;
+            queue('load', recipe);
+            return;
+        }
+        queue(loaded && loaded.id === recipe.id ? 'unload' : 'load', recipe);
+    }
+
+    return { tap, refresh, busy: () => loading };
+}
+
+/**
+ * Clear DYE2's selection, which unloads the recipe and leaves every setting as
+ * it was. Streamline's strip module is told first (`forget`, its
+ * `forgetAppliedItem`): a request of its own that is still retrying would
+ * otherwise name the recipe to DYE2 again after `post` cleared it.
+ */
+export async function unloadSelection({ forget, post }) {
+    forget();
+    await post();
 }

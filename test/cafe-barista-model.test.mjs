@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BARISTA_PHRASES, foldBarista, baristaName, baristaRows, typedBarista, baristaPick, sleepClear, asleep, storeWait, SHOT_STORE_MS, baristaStamps } from '../src/cafe/barista-model.js';
+import { BARISTA_PHRASES, foldBarista, baristaName, baristaRows, typedBarista, baristaPick, sleepClear, asleep, storeWait, waitOutStore, SHOT_STORE_MS, baristaStamps } from '../src/cafe/barista-model.js';
 import { WORKFLOW_WRITERS, assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
 const t = (phrase, vars = {}) => phrase.replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
@@ -144,6 +144,30 @@ test('a barista write waits out the seconds in which Decaid may still store the 
     assert.equal(storeWait(10_000, 15_000), 0);
     assert.equal(storeWait(10_000, 60_000), 0, 'long after');
     assert.equal(storeWait(Number.NaN, 1_000), 0);
+    assert.equal(storeWait(10_000, 7_000), 5000, 'a clock stepped back since the shot ended waits the window, no longer');
+});
+
+test('the wait after a pour is made again for a shot that ends during it', async () => {
+    let now = 13_000;
+    let endedAt = 10_000;
+    const slept = [];
+    await waitOutStore(() => endedAt, () => now, async ms => {
+        slept.push(ms);
+        // A short second shot ends while the first one's wait runs.
+        if (slept.length === 1) endedAt = 14_000;
+        now += ms;
+    });
+    assert.deepEqual(slept, [2000, 4000], 'the second shot gets its own 5 s from its end');
+
+    const none = [];
+    await waitOutStore(() => null, () => now, async ms => { none.push(ms); });
+    assert.deepEqual(none, [], 'no shot this session: no wait');
+
+    // A clock stepped back an hour since the shot ended: one window, not an hour.
+    let clock = 10_000 - 3_600_000;
+    const stepped = [];
+    await waitOutStore(() => 10_000, () => clock, async ms => { stepped.push(ms); clock += ms; });
+    assert.deepEqual(stepped, [5000]);
 });
 
 test('the button shows the newest read of the barista, and a read begun before a write or a later read paints nothing', () => {

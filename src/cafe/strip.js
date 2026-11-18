@@ -4,10 +4,12 @@
 // The skin draws the cards and handles the tap and the long-press. Loading the
 // recipe is Streamline's: `applyRecipe` writes the Workflow and tells DYE2 which
 // recipe is loaded, and which recipe is loaded is then read back from DYE2, as
-// Streamline's strip reads it. recipe-loader.js keeps the two in order. A
-// long-press never loads, and never leaves the page: it opens a menu on the
-// card (slot-menu.js), whose actions are in arrange.js.
-import { getDye2KvArray, callPluginEndpoint } from '../modules/api.js';
+// Streamline's strip reads it. A tap on the loaded card unloads it, by
+// clearing DYE2's selection alone (arrange.js). recipe-loader.js decides which
+// taps count and keeps loads and unloads in order. A long-press never loads,
+// and never leaves the page: it opens a menu on the card (slot-menu.js), whose
+// actions are in arrange.js.
+import { getDye2KvArray, callPluginEndpoint, getEspressoEndedAt } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast, setupPressAndHold } from '../modules/ui.js';
@@ -17,7 +19,8 @@ import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { stripCards, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
 import { slotMenu } from './slot-menu.js';
-import { makeRecipeIn, chooseRecipeFor, removeRecipe } from './arrange.js';
+import { makeRecipeIn, chooseRecipeFor, removeRecipe, clearSelection } from './arrange.js';
+import { waitOutStore } from './barista-model.js';
 import { chooseRecipe } from './recipe-dialog.js';
 import { cafeText } from './text.js';
 
@@ -47,6 +50,13 @@ function within(ms, promise) {
     });
     return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
+
+// Decaid stores a Shot, with the Workflow's recipe as it is then, up to its 4 s
+// backstop after the pour ends. A load or an unload tapped in those seconds
+// waits them out, so the Shot just pulled keeps the recipe it was pulled with.
+// A shot that ends during the wait gets its own. The wait goes once Decaid
+// stores the Shot before taking another change.
+const afterShot = () => waitOutStore(getEspressoEndedAt, Date.now, ms => new Promise(resolve => setTimeout(resolve, ms)));
 
 async function readDye2() {
     const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);
@@ -136,7 +146,7 @@ function render() {
         button.className = 'cafe-card no-select has-context-menu';
         button.setAttribute('aria-pressed', String(card.loaded));
         button.append(line('cafe-card-name', card.name), line('cafe-card-bean', card.bean));
-        setupPressAndHold(button, () => { if (!arranging) loader.load(card.recipe); }, () => openMenu(button, card));
+        setupPressAndHold(button, () => { if (!arranging) loader.tap(card.recipe); }, () => openMenu(button, card));
         return button;
     }));
 }
@@ -154,12 +164,13 @@ export function refreshStripSoon() {
  * Draw the strip and keep it in step with DYE2's records. Called once, when the
  * page starts. `onChange` is told the loaded recipe, or null, each time the
  * strip is drawn; `onBeforeLoad` resolves once edits made before a tap have been
- * written; `onLoading` is told when a load begins and ends; `onApply` runs once
- * a tap's load has been written, whether or not it landed, and after the strip
- * was arranged; `isShotRunning` says whether a shot is running.
+ * written; `onLoading` is told when a load or unload begins and ends; `onApply`
+ * runs once a tap's load or unload has been written, whether or not it landed,
+ * and after the strip was arranged; `isShotRunning` says whether a shot is
+ * running, during which no card takes a tap.
  */
 export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, onLoading = () => {}, onApply = () => {}, isShotRunning = () => false }) {
-    // Before another recipe is loaded, or a recipe is made from the Workflow: let
+    // Before a recipe is loaded or unloaded, or one is made from the Workflow: let
     // an edit still on its way reach the Workflow. A request that stalls is not
     // waited for past a few seconds.
     settleEdits = () => within(SETTLE_MAX_MS, onBeforeLoad());
@@ -168,10 +179,13 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
     keepStill = onLoading;
     loader = createRecipeLoader({
         apply: applyRecipe,
+        unload: clearSelection,
         read: readDye2,
         // A stalled edit calls the load off instead of holding the page: whatever
         // is still on the wire then lands on the recipe that stays loaded.
         settle: settleEdits,
+        afterShot,
+        shotRunning: () => shotRunning(),
         show(recipes, loaded) {
             cards = stripCards(recipes, loaded);
             render();
@@ -182,6 +196,11 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
         onError(error, recipe) {
             logger.error('Cafe: could not load the recipe', error);
             if (recipe) showToast(cafeText('Could not load {name}', { name: recipeName(recipe) }), 2400, 'error');
+        },
+        // The card is highlighted again, and the recipe is still loaded.
+        onUnloadError(error, recipe) {
+            logger.error('Cafe: could not unload the recipe', error);
+            showToast(cafeText('Could not unload {name}', { name: recipeName(recipe) }), 4000, 'error');
         },
     });
     render();

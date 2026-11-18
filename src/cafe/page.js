@@ -162,9 +162,10 @@ function refreshSoon() {
 }
 
 /**
- * A recipe was just loaded from the strip. Its names are read, and Decent Sync
- * is asked again: sharing turned off since the last answer would otherwise
- * leave "saved to the recipe" standing until the page next regained focus.
+ * A recipe was just loaded or unloaded from the strip. Its names are read, and
+ * Decent Sync is asked again: sharing turned off since the last answer would
+ * otherwise leave "saved to the recipe" standing until the page next regained
+ * focus.
  */
 export function afterRecipeLoad() {
     refreshNames();
