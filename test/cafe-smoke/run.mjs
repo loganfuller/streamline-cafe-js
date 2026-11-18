@@ -9,6 +9,7 @@
 //   node test/cafe-smoke/run.mjs --token=... --timezone=Europe/Berlin   (the container's zone, UTC by default)
 //   node test/cafe-smoke/run.mjs --token=... --only=profile   (step 25 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --only=preheat   (step 26 alone, after a whole run)
+//   node test/cafe-smoke/run.mjs --token=... --only=labels   (step 27 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --restart-decaid='<a command that starts Decaid again>'
 //
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
@@ -2238,8 +2239,10 @@ const axisExtent = (page, id = 'plotly-chart') => page.evaluate(async chartId =>
     const chart = echarts.getInstanceByDom(document.getElementById(chartId));
     return chart ? chart.getModel().getComponent('xAxis', 0).axis.scale.getExtent() : null;
 }, id);
-// The live axis's end for a reference of `seconds`, as the overlay sets it.
-const liveEnd = seconds => seconds / 0.93;
+// The live axis's end for a reference of `seconds`, as the overlay sets it: on
+// the main graph the reference's length, as at rest (issue #66), and on the
+// full-screen chart Streamline's live fraction past it.
+const liveEnd = (seconds, chart = 'main') => (chart === 'main' ? seconds : seconds / 0.93);
 const near = (a, b, within = 0.05) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= within;
 
 // 26. The graph goes live at the Preheat, issue #64 (docs/cafe/DESIGN.md, "When
@@ -2487,6 +2490,210 @@ async function preheatLive() {
     }
 }
 
+// The labels the main chart's lines carry, as drawn: each label's line, text,
+// colour, where it points and its line's newest point, and how far its text
+// reaches to the right, against the chart's width and its plot's right edge.
+const lineLabels = page => page.evaluate(async () => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const element = document.getElementById('plotly-chart');
+    const chart = echarts.getInstanceByDom(element);
+    if (!chart) return null;
+    const option = chart.getOption();
+    const context = document.createElement('canvas').getContext('2d');
+    const grid = option.grid[0];
+    const labels = option.series
+        .map((series, seriesIndex) => ({ series, seriesIndex }))
+        .filter(({ series }) => series && String(series.id).startsWith('trace-') && series.markPoint && series.markPoint.data?.length)
+        .map(({ series, seriesIndex }) => {
+            const label = series.markPoint.label;
+            const coord = series.markPoint.data[0].coord;
+            const at = chart.convertToPixel({ seriesIndex }, coord);
+            context.font = `${label.fontSize}px ${label.fontFamily}`;
+            const text = typeof label.formatter === 'function' ? label.formatter() : label.formatter;
+            return {
+                name: series.name, text, color: label.color, lineColor: series.lineStyle?.color, coord,
+                newest: series.data.length ? series.data[series.data.length - 1] : null,
+                x: at[0], y: at[1] + (label.offset?.[1] || 0),
+                right: at[0] + (label.distance || 0) + context.measureText(text).width,
+            };
+        });
+    return { labels, width: element.clientWidth, plotRight: element.clientWidth - grid.right, end: option.xAxis[0].max };
+});
+const OWN_LABELLED = 'Pressure,Flow,°C,Weight';
+
+// 27. The line names during a shot, issue #66 (docs/cafe/DESIGN.md, "Line names
+//     during a shot"): on the main graph Pressure, Flow, °C and Weight are
+//     named at their lines' newest points from the profile's first sample, in
+//     Reference and Targets, with a recipe loaded and with none, at 1920 by
+//     1200 and 1340 by 800, in English and in the language with the widest
+//     labels; none during a Preheat, none on a target or the reference; no
+//     label reaching past the chart; frames appended with no full draw; and
+//     where each label is when the shot ends, and once the saved Shot is drawn.
+async function liveLabels() {
+    const house = RECIPES[0];
+    const pulled = [];
+    const newestId = async () => (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
+    const pull = async (seconds, during = null) => {
+        const before = await newestId();
+        await decaid('PUT', '/machine/state/espresso');
+        if (during) await during();
+        await sleep(seconds * 1000);
+        await decaid('PUT', '/machine/state/idle');
+        return before;
+    };
+    const saved = async before => {
+        for (let waited = 0; waited < 30_000 && (await newestId()) === before; waited += 1000) await sleep(1000);
+        const id = await newestId();
+        if (id && id !== before) pulled.push(id);
+        return id && id !== before ? id : null;
+    };
+    const choicesBefore = await storeValue(REFERENCES);
+    const viewBefore = await storeValue(GRAPH_VIEW);
+    await decaid('PUT', '/machine/state/idle').catch(() => {});
+    const feed = machineFeed();
+    let view = null;
+
+    // The language whose four labels are widest, measured as the chart does.
+    const widest = await (async () => {
+        const probe = await openPage();
+        try {
+            await waitForPage(probe.page);
+            let best = { code: 'en', width: 0 };
+            for (const code of ['en', ...FINISHED_LANGUAGES]) {
+                await setLanguage(probe.page, code);
+                const width = await probe.page.evaluate(async () => {
+                    const { getTranslation } = await import('/src/modules/i18n.js');
+                    const context = document.createElement('canvas').getContext('2d');
+                    context.font = '16px Inter, sans-serif';
+                    return Math.max(...['Pressure', 'Flow', 'Weight'].map(key => context.measureText(getTranslation(key)).width));
+                });
+                if (width > best.width) best = { code, width };
+            }
+            await setLanguage(probe.page, 'en');
+            return best;
+        } finally {
+            await probe.close();
+        }
+    })();
+    note(`the widest labels are ${widest.code}'s, ${Math.round(widest.width)} px`);
+
+    // One shot watched: the Preheat held, then the profile, sampled as it runs.
+    const watch = async ({ language, graphView, viewport, loaded, seconds, name }) => {
+        const tag = `${graphView}, ${viewport.width}x${viewport.height}, ${language}${loaded ? '' : ', no recipe'}`;
+        await decaid('POST', GRAPH_VIEW, graphView);
+        view = await openPage({ machine: feed, viewport });
+        const { page, seen } = view;
+        try {
+            await waitForPage(page);
+            if (loaded) await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 });
+            if (language !== 'en') await setLanguage(page, language);
+            await page.waitForTimeout(3000);
+            const expected = await page.evaluate(async () => {
+                const { getTranslation } = await import('/src/modules/i18n.js');
+                return ['Pressure', 'Flow', '°C', 'Weight'].map(key => (key === '°C' ? key : getTranslation(key)));
+            });
+            const samples = [];
+            let preheat = null;
+            let draws = null;
+            let lastLive = null;
+            feed.hold();
+            const before = await pull(seconds, async () => {
+                await page.waitForTimeout(2000);
+                preheat = await chartLines(page);
+                feed.pass();
+                await page.waitForTimeout(700);
+                samples.push(await lineLabels(page));
+                const counting = countDraws(page, 1500);
+                for (let i = 0; i < 6; i += 1) { await page.waitForTimeout(250); samples.push(await lineLabels(page)); }
+                draws = await counting;
+            });
+            // The pull's own wait ran the shot on; the last frame before the stop.
+            lastLive = await lineLabels(page);
+            samples.push(lastLive);
+            check(`live labels (${tag}): none during the Preheat`, preheat && preheat.labelled.length === 0, JSON.stringify(preheat?.labelled));
+            const ok = samples.every(sample => sample && sample.labels.map(l => l.name).join() === OWN_LABELLED);
+            check(`live labels (${tag}): Pressure, Flow, °C and Weight named through the shot, and no target or reference line`, ok, JSON.stringify(samples.map(sample => sample?.labels.map(l => l.name))));
+            check(`live labels (${tag}): in the page's language and the lines' colours`,
+                samples.every(sample => sample && JSON.stringify(sample.labels.map(l => l.text)) === JSON.stringify(expected) && sample.labels.every(l => l.color === l.lineColor)),
+                JSON.stringify({ expected, got: lastLive?.labels.map(l => [l.text, l.color, l.lineColor]) }));
+            check(`live labels (${tag}): each at its line's newest point, on every frame looked at`,
+                samples.every(sample => sample && sample.labels.every(l => l.newest && l.coord[0] === l.newest[0] && l.coord[1] === l.newest[1])),
+                JSON.stringify(lastLive?.labels.map(l => [l.coord, l.newest])));
+            const times = samples.map(sample => sample?.labels[0]?.coord[0] ?? null);
+            check(`live labels (${tag}): they move with the shot`, times.every((t, i) => i === 0 || (t !== null && t >= times[i - 1])) && times.at(-1) > times[0], JSON.stringify(times));
+            const reach = samples.map(sample => (sample ? Math.max(...sample.labels.map(l => l.right)) - sample.width : null));
+            check(`live labels (${tag}): no label reaches past the chart's right edge`, reach.every(r => r !== null && r <= 0), JSON.stringify({ reach: reach.map(Math.round), width: lastLive?.width, plotRight: lastLive?.plotRight }));
+            check(`live labels (${tag}): the frames were appended, the lines not drawn again in full`, draws && draws.appended > 0 && draws.full === 0, JSON.stringify(draws));
+            await shot(page, `${name}-live`);
+            // The shot's end, before Decaid has saved it: nothing moves.
+            await page.waitForTimeout(600);
+            const ended = await lineLabels(page);
+            const moved = lastLive && ended ? Math.max(...ended.labels.map((l, i) => Math.hypot(l.x - lastLive.labels[i].x, l.y - lastLive.labels[i].y))) : null;
+            check(`live labels (${tag}): when the shot ends the labels stay where they were (within a frame's travel)`,
+                ended && ended.labels.map(l => l.name).join() === OWN_LABELLED && moved !== null && moved <= 12,
+                JSON.stringify({ moved, end: [lastLive?.end, ended?.end] }));
+            // Once saved, the Shot as Decaid stored it is drawn: say how far each label went.
+            const id = await saved(before);
+            check(`live labels (${tag}): the shot was saved`, !!id);
+            await page.waitForTimeout(4000);
+            const finished = await lineLabels(page);
+            const travel = ended && finished && finished.labels.length === ended.labels.length
+                ? finished.labels.map((l, i) => Math.round(Math.hypot(l.x - ended.labels[i].x, l.y - ended.labels[i].y))) : null;
+            note(`(${tag}) once the saved Shot is drawn each label moved ${JSON.stringify(travel)} px, the axis ${ended?.end?.toFixed(2)} → ${finished?.end?.toFixed(2)} s`);
+            check(`live labels (${tag}): the saved Shot's labels name the same four lines, none reaching past the chart`,
+                finished && finished.labels.map(l => l.name).join() === OWN_LABELLED && Math.max(...finished.labels.map(l => l.right)) <= finished.width,
+                JSON.stringify(finished?.labels.map(l => [l.name, Math.round(l.right)])));
+            check(`live labels (${tag}): no page error`, seen.errors.length === 0, seen.errors.join(' | '));
+            await page.waitForTimeout(3000);
+        } finally {
+            feed.pass();
+            await view.close().catch(() => {});
+            view = null;
+        }
+    };
+
+    try {
+        // Loaded, with a reference shorter than the watched shots, so in
+        // Reference the axis grows past it and the labels need their room.
+        await decaid('POST', GRAPH_VIEW, 'reference');
+        view = await openPage({ machine: feed });
+        const { page } = view;
+        await waitForPage(page);
+        const record = await recordNamed(house.name);
+        if (loadedRecipeId(await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`)) !== record.id) {
+            await page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).click();
+            await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 });
+            await page.waitForTimeout(3000);
+        }
+        const reference = await saved(await pull(6));
+        check('live labels: a reference was pulled with the recipe', !!reference);
+        await decaid('POST', REFERENCES, { ...(choicesBefore || {}), [record.id]: reference });
+        await sleep(3000);
+        await view.close();
+        view = null;
+
+        for (const viewport of [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }]) {
+            const size = `${viewport.width}x${viewport.height}`;
+            for (const graphView of ['reference', 'targets']) {
+                await watch({ language: 'en', graphView, viewport, loaded: true, seconds: 10, name: `live-labels-${graphView}-${size}-light` });
+            }
+            if (widest.code !== 'en') {
+                await watch({ language: widest.code, graphView: 'targets', viewport, loaded: true, seconds: 10, name: `live-labels-targets-${size}-${widest.code}-light` });
+            }
+        }
+        await unloadRecipe();
+        await watch({ language: 'en', graphView: 'targets', viewport: { width: 1920, height: 1200 }, loaded: false, seconds: 8, name: 'live-labels-no-recipe-1920x1200-light' });
+    } finally {
+        feed.pass();
+        if (view) await view.close().catch(() => {});
+        await decaid('PUT', '/machine/state/idle').catch(() => {});
+        await decaid('POST', REFERENCES, choicesBefore || {}).catch(() => {});
+        if (viewBefore !== null) await decaid('POST', GRAPH_VIEW, viewBefore).catch(() => {});
+        await unloadRecipe().catch(() => {});
+        for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+    }
+}
+
 // ── The run ──────────────────────────────────────────────────────────────────
 
 await mkdir(OUT, { recursive: true });
@@ -2510,9 +2717,9 @@ if ((await decaid('GET', '/plugins')).some(plugin => plugin.id === 'decent-sync.
     process.exit(2);
 }
 
-// --only=profile: step 25 alone, on a Decaid a whole run has already set up.
+// --only=profile, preheat or labels: step 25, 26 or 27 alone, on a Decaid a whole run has already set up.
 if (ONLY) {
-    const steps = { profile: profileChange, preheat: preheatLive };
+    const steps = { profile: profileChange, preheat: preheatLive, labels: liveLabels };
     try {
         if (!steps[ONLY]) throw new Error(`no step named "${ONLY}": ${Object.keys(steps).join(', ')}`);
         await setSetting(true);
@@ -3827,6 +4034,7 @@ try {
     await unloadByTap();
     await profileChange();
     await preheatLive();
+    await liveLabels();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

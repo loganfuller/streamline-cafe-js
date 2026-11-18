@@ -90,6 +90,20 @@ export function liveAxis(traces, layout) {
 }
 
 /**
+ * Which time axis the reference is fitted to, as `referenceOverlay`'s `mode`:
+ * `live` keeps the room past the newest second that Streamline's live axis
+ * has, `full` is the axis at rest. Through a shot, from its Preheat on
+ * (`live`), the full-screen chart has the live one. The main graph has the one
+ * it will have once the shot is over: its own live axis already leaves its end
+ * labels their room, so neither the axis nor a label moves when the shot ends.
+ * At rest it is the chart's own mode.
+ */
+export function overlayAxis(live, mode, chart) {
+    if (!live) return mode;
+    return chart === 'main' ? 'full' : 'live';
+}
+
+/**
  * The lines and layout to draw in place of the chart's own, in the Reference
  * view. `curves` is the reference's (`shotCurves`), or null to draw none: the
  * targets are hidden either way. A target is a line with a dash, on both
