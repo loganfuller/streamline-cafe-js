@@ -590,6 +590,9 @@ const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const REST_TARGETS = 'time dose yield ratio peak';
 const LIVE = 'time weight weightFlow flow pressure temperature';
 const SIGNED = /^([+\u2212]\d|0\.0)/;
+// The recipe a DYE2 selection names as loaded, or null for none: no marker, or
+// a `recent:` favourite DYE2 matched the Workflow against.
+const loadedRecipeId = selection => (selection?.kind === 'recipe' ? selection.id ?? null : null);
 // The newest of Decaid's Shots pulled with a recipe.
 const newestShotWith = async recipeId => ((await decaid('GET', '/shots?limit=100')).items || []).find(row => shotRecipeId(row.workflow) === String(recipeId)) || null;
 // The gate took the page's place: nothing behind it, no recipe read or loaded,
@@ -1390,6 +1393,163 @@ async function recentNames() {
     }
     return names;
 }
+// ── A tap on the loaded card unloads it (#53) ────────────────────────────────
+
+// On a page at 1920 by 1200 and on one at 1340 by 800: a tap on the loaded
+// card unloads the recipe, with the machine set as it was; a step afterwards
+// changes the Workflow and no DYE2 record; a tap on the card loads it as
+// stored; a double tap on another card loads it; no card takes a tap during a
+// shot; an unload tapped just after a pour leaves the Shot naming the recipe;
+// and an unload DYE2 refuses is a toast with the card still highlighted.
+async function unloadByTap() {
+    const [house, single] = RECIPES;
+    const selection = () => decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
+    const loadedId = async () => loadedRecipeId(await selection());
+    // What the machine is set to, without the marker that says which recipe is loaded.
+    const settings = async () => {
+        const wf = await decaid('GET', '/workflow');
+        const { extras, ...context } = wf.context;
+        const { dye, ...rest } = extras || {};
+        return JSON.stringify({ profile: wf.profile.title, context, rest, steam: wf.steamSettings, water: wf.hotWaterData, rinse: wf.rinseData });
+    };
+    const waitFor = async (test, ms = 15_000) => {
+        for (let waited = 0; waited < ms; waited += 250) {
+            if (await test()) return true;
+            await sleep(250);
+        }
+        return false;
+    };
+    for (const viewport of [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }]) {
+        const size = `${viewport.width}x${viewport.height}`;
+        await decaid('PUT', '/machine/state/idle').catch(() => {});
+        await unloadRecipe();
+        const view = await openPage({ viewport });
+        const { page, seen } = view;
+        try {
+            await waitForPage(page);
+            await page.waitForTimeout(2500);
+            const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+            const title = () => page.locator('#cafe-title').textContent();
+            const pressed = () => page.locator('#cafe-strip [aria-pressed="true"]').count();
+            const toastShown = () => page.locator('#app-toast').isVisible();
+            const loadCard = async recipe => {
+                await card(recipe).click();
+                await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
+                await page.waitForTimeout(3000);
+            };
+            await loadCard(house);
+            const record = await recordNamed(house.name);
+            check(`unload ${size}: the recipe is loaded before the tap`, (await loadedId()) === record.id && (await pressed()) === 1, `${await loadedId()}`);
+            await shot(page, `unload-before-${size}-light`);
+
+            //     The tap: only the marker is cleared, and the page is the no-recipe page.
+            const before = await settings();
+            const doseShown = await page.locator('#dose-in-value').textContent();
+            const writesFrom = seen.requests.length;
+            await card(house).click();
+            await page.locator('#cafe-title').filter({ hasText: 'No recipe selected' }).waitFor({ timeout: 10_000 }).catch(() => {});
+            await page.waitForTimeout(2500);
+            check(`unload ${size}: a tap on the loaded card unloads it: DYE2's selection names no recipe`, (await loadedId()) === null, JSON.stringify(await selection()));
+            check(`unload ${size}: the page is the no-recipe page`,
+                (await title()) === 'No recipe selected' && (await page.locator('#cafe-subtitle').textContent()) === 'Tap a recipe to load it'
+                && (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe' && (await pressed()) === 0,
+                `${await title()} | ${await page.locator('#cafe-subtitle').textContent()} | ${await page.locator('#cafe-dial-label').textContent()} | ${await pressed()} filled`);
+            check(`unload ${size}: the graph shows "Last shot"`, (await legend(page)).label === 'Last shot', (await legend(page)).label);
+            check(`unload ${size}: the machine is set as it was, and the steppers show it`, (await settings()) === before && (await page.locator('#dose-in-value').textContent()) === doseShown);
+            const unloadWrites = seen.requests.slice(writesFrom).filter(r => /^PUT .*\/workflow$|^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2/.test(r));
+            check(`unload ${size}: the page wrote no Workflow and no record: DYE2 cleared the marker`, unloadWrites.length === 0, unloadWrites.join(', '));
+            check(`unload ${size}: it asked nothing first and showed no toast`, !(await toastShown()) && !(await page.locator('dialog[open]').count()));
+            await shot(page, `unload-after-${size}-light`);
+
+            //     A step afterwards changes this machine only.
+            const recordBefore = JSON.stringify(await recordNamed(house.name));
+            const dose = parseFloat(await page.locator('#dose-in-value').textContent());
+            await page.locator('#dose-in-plus').click();
+            const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
+            await page.waitForTimeout(5000);
+            check(`unload ${size}: a step afterwards reaches the Workflow`, stepped > dose && Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001, `${dose}g to ${stepped}g`);
+            check(`unload ${size}: and the recipe's DYE2 record did not change`, JSON.stringify(await recordNamed(house.name)) === recordBefore);
+
+            //     A tap on the card loads the recipe as stored, over the step.
+            const held = (await recordNamed(house.name)).dashboardVariables;
+            await loadCard(house);
+            const workflow = await decaid('GET', '/workflow');
+            check(`unload ${size}: a tap on the unloaded card loads it as stored`,
+                (await loadedId()) === record.id && workflow.context.targetDoseWeight === held.dose && workflow.context.targetYield === held.drink
+                && (await page.locator('#dose-in-value').textContent()) === `${held.dose}g` && (await card(house).getAttribute('aria-pressed')) === 'true',
+                `${workflow.context.targetDoseWeight}g / ${workflow.context.targetYield}g, selection ${await loadedId()}`);
+
+            //     A double tap on another card loads it.
+            await card(single).dblclick();
+            await page.locator('#cafe-title').filter({ hasText: single.name }).waitFor({ timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(4000);
+            const singleId = (await recordNamed(single.name)).id;
+            check(`unload ${size}: a double tap on a card leaves its recipe loaded`,
+                (await loadedId()) === singleId && (await title()) === single.name && (await card(single).getAttribute('aria-pressed')) === 'true',
+                `${await title()}, selection ${await loadedId()}`);
+
+            //     During a shot no card takes a tap.
+            const duringBefore = { settings: await settings(), loaded: await loadedId() };
+            const running = pullShot(8);
+            await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(500);
+            await card(single).click();
+            await card(house).click();
+            await page.waitForTimeout(1500);
+            check(`unload ${size}: while a shot runs a tap on the loaded card and on another change nothing`,
+                (await page.locator('#main-page.cafe-shot-live').count()) === 1 && (await loadedId()) === duringBefore.loaded
+                && (await settings()) === duringBefore.settings && (await title()) === single.name && (await card(single).getAttribute('aria-pressed')) === 'true',
+                `${await title()}, selection ${await loadedId()}`);
+            await running;
+            await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+            await page.waitForTimeout(6000);
+
+            //     An unload tapped just after a pour waits for the Shot to be
+            //     stored, and the Shot names the recipe.
+            const newestBefore = ((await decaid('GET', '/shots?limit=1')).items || [])[0]?.id;
+            await decaid('PUT', '/machine/state/espresso');
+            await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
+            await sleep(6000);
+            await decaid('PUT', '/machine/state/idle');
+            await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+            await card(single).click();
+            await page.waitForTimeout(800);
+            const waiting = { shown: await pressed(), loaded: await loadedId() };
+            let newest = null;
+            await waitFor(async () => {
+                newest = ((await decaid('GET', '/shots?limit=1')).items || [])[0];
+                return newest && newest.id !== newestBefore;
+            }, 20_000);
+            const stored = newest && newest.id !== newestBefore ? await decaid('GET', `/shots/${newest.id}`) : null;
+            const unloaded = await waitFor(async () => (await loadedId()) === null, 15_000);
+            check(`unload ${size}: tapped just after a pour, the highlight leaves at once and DYE2 still names the recipe while the Shot is stored`,
+                waiting.shown === 0 && waiting.loaded === singleId, JSON.stringify(waiting));
+            check(`unload ${size}: the Shot just pulled names the recipe`, !!stored && shotRecipeId(stored.workflow) === String(singleId), `${stored?.id}: ${shotRecipeId(stored?.workflow)}`);
+            check(`unload ${size}: and the recipe is unloaded once the Shot is stored`, unloaded && (await title()) === 'No recipe selected', `${await title()}, selection ${await loadedId()}`);
+
+            //     An unload DYE2 refuses: a toast, and the card highlighted again.
+            await loadCard(house);
+            await page.route(`**/api/v1/plugins/${DYE2_PLUGIN_ID}/selection`, route => (route.request().method() === 'POST'
+                ? route.fulfill({ status: 500, body: 'Sample refusal.' }) : route.fallback()));
+            await card(house).click();
+            await page.locator('#app-toast').filter({ hasText: `Could not unload ${house.name}` }).waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+            check(`unload ${size}: an unload DYE2 refuses shows "Could not unload ${house.name}"`,
+                (await page.locator('#app-toast-message').textContent()) === `Could not unload ${house.name}`, await page.locator('#app-toast-message').textContent());
+            await page.waitForTimeout(1500);
+            check(`unload ${size}: and the card is highlighted with the recipe still loaded`,
+                (await card(house).getAttribute('aria-pressed')) === 'true' && (await title()) === house.name && (await loadedId()) === record.id,
+                `${await title()}, selection ${await loadedId()}`);
+            await shot(page, `unload-refused-${size}-light`);
+            await page.unroute(`**/api/v1/plugins/${DYE2_PLUGIN_ID}/selection`);
+            check(`unload ${size}: no page error`, seen.errors.length === 0, seen.errors.join(' | '));
+        } finally {
+            await view.close();
+        }
+    }
+    // As the run leaves it: no recipe loaded.
+    await unloadRecipe();
+}
+
 async function baristaAtTheMachine() {
     const house = RECIPES[0];
     const other = RECIPES[2];
@@ -2274,7 +2434,10 @@ try {
         const tcards = tp.locator('#cafe-strip .cafe-card');
         const [house, single, decaf, long] = RECIPES;
         const title = () => tp.locator('#cafe-title').textContent();
-        const selectionId = async () => (await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`))?.id ?? null;
+        // The recipe DYE2's selection names, or null. With no recipe loaded DYE2
+        // may answer a `recent:` favourite it matched the Workflow against,
+        // which names no recipe.
+        const selectionId = async () => loadedRecipeId(await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`));
         // What the machine is set to, without the marker that says which recipe is loaded.
         const settings = async () => {
             const wf = await decaid('GET', '/workflow');
@@ -3010,6 +3173,7 @@ try {
     await grindRow();
     await beanAndBasketDialogs();
     await baristaAtTheMachine();
+    await unloadByTap();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

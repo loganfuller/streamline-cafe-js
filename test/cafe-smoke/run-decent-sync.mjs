@@ -210,8 +210,8 @@ const secondBrowser = async () => {
     return browser2;
 };
 
-async function openPage(on = browser) {
-    const context = await on.newContext({ viewport: { width: 1920, height: 1200 }, timezoneId: TIMEZONE });
+async function openPage(on = browser, viewport = { width: 1920, height: 1200 }) {
+    const context = await on.newContext({ viewport, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], sockets: [], loads: 0 };
     page.on('pageerror', error => seen.errors.push(error.message));
@@ -367,6 +367,92 @@ async function grinderWithDecentSync({ page, seen, house, two }) {
     check('grinder: no page error on either tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
     await tablet2.close();
     await decaid('DELETE', `/shots/${pulled.id}`).catch(() => {});
+}
+
+// 14. A tap on the loaded card unloads it (#53), on this Machine only: the
+//     server shows it with no Loaded Recipe; a step made there afterwards is
+//     saved to no Recipe and does not reach the second Machine, which keeps the
+//     Recipe loaded; a Shot pulled there lists as "No recipe"; and a tap on the
+//     card loads the Recipe as the server has it. On a page of this tablet's
+//     own at 1920 by 1200, then on one at 1340 by 800.
+async function unloadWithDecentSync({ house, two, machine }) {
+    const tablet2 = await openPage(await secondBrowser());
+    try {
+        await tablet2.page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 });
+        await load(tablet2.page, house);
+        for (const viewport of [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }]) {
+            const view = await openPage(browser, viewport);
+            try {
+                await unloadAtSize({ ...view, size: `${viewport.width}x${viewport.height}`, house, two, machine, tablet2 });
+            } finally {
+                await view.close();
+            }
+        }
+        check('unload: no page error on the second tablet', tablet2.seen.errors.length === 0, tablet2.seen.errors.join(' | '));
+    } finally {
+        await tablet2.close();
+    }
+}
+
+async function unloadAtSize({ page, seen, size, house, two, machine, tablet2 }) {
+    const loadedOn = async id => (await sync('GET', `/machines/${id}`)).machine.loadedRecipe?.recipe?.id ?? null;
+    const content = async () => (await sync('GET', `/recipes/${house.id}`)).recipe.content;
+    const named = async tablet => { const now = await tablet('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`); return now?.kind === 'recipe' ? String(now.id) : null; };
+    await page.waitForTimeout(2500);
+    await load(page, house);
+    const loadedFirst = await until(async () => ((await loadedOn(machine.id)) === house.id && (await loadedOn(two.machine.id)) === house.id) || null, { timeout: 60_000, every: 1000 });
+    check(`unload ${size}: with the Recipe loaded on both Machines, the server shows it on each`, !!loadedFirst, `${await loadedOn(machine.id)} | ${await loadedOn(two.machine.id)}`);
+
+    //     The tap, on this Machine.
+    await page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).click();
+    await page.locator('#cafe-title').filter({ hasText: 'No recipe selected' }).waitFor({ timeout: 10_000 }).catch(() => {});
+    check(`unload ${size}: a tap on the loaded card leaves the page with no recipe, "Dial-in · not saved to a recipe"`,
+        (await page.locator('#cafe-title').textContent()) === 'No recipe selected' && (await label(page)) === 'Dial-in · not saved to a recipe', `${await page.locator('#cafe-title').textContent()} | ${await label(page)}`);
+    const gone = await until(async () => ((await loadedOn(machine.id)) === null || null), { timeout: 60_000, every: 1000 });
+    check(`unload ${size}: the server shows this Machine with no Loaded Recipe`, !!gone, await loadedOn(machine.id));
+    await shot(page, `sync-unloaded-${size}-light`);
+
+    //     A step afterwards: this Machine's alone.
+    const stored = await content();
+    const theirDose = (await decaid2('GET', '/workflow')).context.targetDoseWeight;
+    const dose = parseFloat(await page.locator('#dose-in-value').textContent());
+    await page.locator('#dose-in-plus').click();
+    const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
+    await page.waitForTimeout(3000);
+    check(`unload ${size}: a step afterwards reaches this Machine's Workflow`, stepped > dose && Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001, `${dose}g to ${stepped}g`);
+    //     The plugin polls every 5 s: a save it should not make is given the time to land.
+    await sleep(15_000);
+    check(`unload ${size}: and is saved to no Recipe: the server's Recipe keeps its dose`, (await content()).dose === stored.dose, `${stored.dose} then ${(await content()).dose}`);
+    check(`unload ${size}: nor reaches the second Machine, which keeps the Recipe loaded`,
+        (await decaid2('GET', '/workflow')).context.targetDoseWeight === theirDose && (await named(decaid2)) === two.recordId && (await loadedOn(two.machine.id)) === house.id
+        && (await tablet2.page.locator('#cafe-title').textContent()) === house.name,
+        `${(await decaid2('GET', '/workflow')).context.targetDoseWeight} g, selection ${await named(decaid2)}, server ${await loadedOn(two.machine.id)}`);
+
+    //     A Shot pulled with nothing loaded belongs to no recipe.
+    const before = (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
+    await pullShot(5);
+    const pulled = await until(async () => { const newest = (await decaid('GET', '/shots?limit=1')).items?.[0]; return newest && newest.id !== before ? newest : null; }, { timeout: 30_000 });
+    const there = pulled ? await until(async () => (await sync('GET', `/shots/${pulled.id}`)).shot, { timeout: 60_000, every: 1000 }) : null;
+    check(`unload ${size}: a Shot pulled there reaches the server with no Recipe`, !!there && there.recipe === null, JSON.stringify(there?.recipe));
+    await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
+    await page.waitForTimeout(6000);
+    await openList(page);
+    const listed = (await listRows(page)).find(r => r.id === pulled?.id);
+    check(`unload ${size}: and lists as "No recipe"`, listed?.name === 'No recipe', JSON.stringify(listed));
+    await closeList(page);
+    await page.locator('#cafe-shots-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
+    //     A tap on the card loads the Recipe as the server has it.
+    await load(page, house);
+    const now = await content();
+    const workflow = await decaid('GET', '/workflow');
+    check(`unload ${size}: a tap on the card loads the Recipe as the server has it`,
+        workflow.context.targetDoseWeight === now.dose && workflow.context.targetYield === now.yield && (await named(decaid)) === String(house.recordId),
+        `${workflow.context.targetDoseWeight}/${workflow.context.targetYield} against ${now.dose}/${now.yield}, selection ${await named(decaid)}`);
+    const back = await until(async () => ((await loadedOn(machine.id)) === house.id || null), { timeout: 60_000, every: 1000 });
+    check(`unload ${size}: and the server shows it loaded again`, !!back, await loadedOn(machine.id));
+    check(`unload ${size}: no page error`, seen.errors.length === 0, seen.errors.join(' | '));
+    if (pulled) await decaid('DELETE', `/shots/${pulled.id}`).catch(() => {});
 }
 
 // ── The bean and batch dialog, and the basket dialog ─────────────────────────
@@ -994,6 +1080,7 @@ try {
 
         await grinderWithDecentSync({ page, seen, house, two });
         await beanAndBasketWithDecentSync({ page, seen, house, location });
+        await unloadWithDecentSync({ house, two, machine });
     }
 
     check('no page error with Decent Sync', seen.errors.length === 0, seen.errors.join(' | '));
