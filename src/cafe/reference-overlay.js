@@ -74,6 +74,22 @@ function withRoomFor(layout, seconds, mode, traces) {
 }
 
 /**
+ * A running shot's time axis, from the start of its Preheat: it starts at zero
+ * and runs at least a second. Streamline's chart fits an empty chart to
+ * itself, and gives its first live frame, at time zero, an axis from -1 to 1;
+ * either would move zero when the profile starts, after an empty Preheat. An
+ * axis that is longer already, as the reference's or a shot's that has run a
+ * second, is left as it is; one left to fit itself fits the chart's own lines.
+ */
+export function liveAxis(traces, layout) {
+    const xaxis = layout.xaxis || {};
+    const fitted = xaxis.autorange === true || !Array.isArray(xaxis.range);
+    if (!fitted && xaxis.range[0] === 0 && xaxis.range[1] >= 1) return layout;
+    const end = fitted ? ownEnd(traces) / LIVE_X_DATA_FRACTION : xaxis.range[0] >= 0 ? xaxis.range[1] : 0;
+    return { ...layout, xaxis: { ...xaxis, range: [0, Math.max(1, end)], autorange: false } };
+}
+
+/**
  * The lines and layout to draw in place of the chart's own, in the Reference
  * view. `curves` is the reference's (`shotCurves`), or null to draw none: the
  * targets are hidden either way. A target is a line with a dash, on both

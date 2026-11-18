@@ -211,9 +211,9 @@ On a Machine Decent Sync serves, the reference is the Recipe's Reference Shot: t
   - When the socket opens, and when a push says the connection came or went, the status is asked and the reference read after it.
   - A push with a `what` the skin doesn't know is ignored.
   - Only recipes in a slot are pushed. One in no slot is read when it loads.
-- **During a shot nothing is read.** The reference's lines stay the ones the shot started with, and the shot's end reads both Shots again.
+- **During a shot a push reads nothing.** The reference's lines stay the ones the shot started with, and the shot's end reads both Shots again. Two reads do happen during a shot, and draw nothing over its lines: the loaded recipe's Shots, where nothing had been read for it when the shot started ([When the graph goes live](#when-the-graph-goes-live)), and the reference from the other source when the source changes (below).
 - **The socket** is opened through one export the fork adds to `api.js`, which uses Streamline's own socket helpers. Streamline's `connectPluginPush` keeps one socket for each plugin and gives it to the plugin's `changed` endpoint, so it could not carry this one as well. It opens once, after the plugin has first answered its status, so a tablet with no Decent Sync opens none. It is never closed, and comes back by itself after it drops.
-- **When Decent Sync can't be asked for the reference while Decaid answers,** as for a refusal the skin does not know, the latest Shot is still drawn, and the reference read before stays. One read from the other source does not stay: when the source changes, the reference in the graph is dropped at once, during a shot too, and both Shots are read again. So the tablet's own choice is not left on a Machine Decent Sync has come to serve, whichever read fails next.
+- **When Decent Sync can't be asked for the reference while Decaid answers,** as for a refusal the skin does not know, the latest Shot is still drawn, and the reference read before stays. One read from the other source does not stay: when the source changes, the reference in the graph is dropped at once, during a shot too, and both Shots are read again; during a shot that read only puts the other source's reference behind the running shot. So the tablet's own choice is not left on a Machine Decent Sync has come to serve, whichever read fails next.
 - **A choice still on its way when the source changes** is not drawn when it answers. The read that follows the change is.
 
 ### Rating and notes
@@ -290,9 +290,21 @@ A row of five cards under the graph, for the Shot in the graph. The graph gives 
 - **A card's title is put into capitals in the code, not by the stylesheet,** so a long one is fitted at the width it is drawn at, and the dose in the Ratio card's title keeps its "g".
 - **Temperatures** follow the page's °C or °F. Numbers are written with a point in every language, as on the rest of the page.
 
+### When the graph goes live
+
+The graph goes live when the machine goes into its `espresso` state, which is when a shot's Preheat starts (the substate `preparingForShot`), not when the profile's first step starts.
+
+- **At the start of the Preheat** the Shot in the graph leaves it, with its stage lines and their names. What is left is the empty live chart: in Reference the reference's lines behind it, with the time axis the live one, at the reference's length; in Targets nothing. In both views the time axis starts at zero and runs at least a second, so the first live frame, which Streamline gives an axis from −1 to 1, moves nothing. The legend reads "Live shot", and the row under the graph is the six live cards.
+- **Nothing of the Preheat is drawn.** Time zero is still the start of the profile, so the running shot and the reference are compared at the same second, as a saved Shot is drawn without its Preheat. Until the profile starts the Time card reads zero and the other five have no value. The machine's status in the title band names the phase; the graph adds no text of its own.
+- **Streamline still clears its chart and starts its shot clock at the profile's first frame.** The chart is empty already then, and drawn the same, so nothing moves.
+- **A shot stopped during the Preheat** puts back what the graph held before it started: the latest Shot, or "Last shot" with no recipe, with its stage names and the five cards at rest, drawn at once and read again only in case it is another by now. The shot drew nothing, so the page makes none of the looks for a saved shot: if Decaid saves the run at all it is Unfinished, and never the latest. Whether the profile started is Streamline's shot clock, as the shot ends; Streamline's shot table still holds the Shot before until the profile starts.
+- **A page opened or reloaded during the Preheat** is live too: one rule, the graph is live while the machine is in its `espresso` state. Where the shot started before the loaded recipe's Shots were read, as when DYE2 answers after the machine's first frame, they are read then, for the reference behind the running shot; nothing is drawn over the chart's own lines. A recipe loaded once a shot has started is read at the shot's end, as before.
+- **The same everywhere:** the main graph and the full-screen chart, both views, a recipe loaded or none, and a Shot opened from the Shots list, which a shot that starts closes. Where Streamline's history module shows a past shot, its own lock ends that review on the shot's first frame, and the chart goes live.
+- **Flush, steam and hot water** change nothing on the graph.
+
 ### The live cards
 
-While a shot runs, six cards take the row's place: Time, Weight, Weight flow, Water flow, Pressure and Temperature. The five return when the finished Shot is in the graph, so they stay through the few seconds Decaid takes to save it.
+While a shot runs, from the start of its Preheat ([When the graph goes live](#when-the-graph-goes-live)), six cards take the row's place: Time, Weight, Weight flow, Water flow, Pressure and Temperature. The five return when the finished Shot is in the graph, so they stay through the few seconds Decaid takes to save it.
 
 - **In Reference** each sits beside the reference at the same second of its own run, with the difference. Time's card says how long the reference ran.
   - **"The same second"** is seconds from the start of each Shot's profile, its Preheat left out, taking the reference's value between its two nearest samples.

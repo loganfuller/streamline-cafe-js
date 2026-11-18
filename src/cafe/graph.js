@@ -11,8 +11,8 @@
 // (the reads through the Shot seam, the timers, the drawing) and draws through
 // the two hooks the fork adds to chart.js.
 import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
-import { getTotalTime, getCurrentShot } from '../modules/shotData.js';
-import { getScaleReading } from '../modules/api.js';
+import { getCurrentShot } from '../modules/shotData.js';
+import { getScaleReading, currentMachineState } from '../modules/api.js';
 import { getTempUnit } from '../modules/units.js';
 import { showToast } from '../modules/ui.js';
 import { isSubPage } from '../modules/router.js';
@@ -23,7 +23,7 @@ import { graphModel, shotCredit, whenText, viewFrom } from './shot-model.js';
 import { graphStep, initialGraphState, shownRemarks, inGraph, shotInGraphId } from './graph-state.js';
 import { starFills, ratingForTap, ratingOf, ratingText, noteToSave, editedRemarks } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
-import { referenceOverlay, referenceColor } from './reference-overlay.js';
+import { referenceOverlay, referenceColor, liveAxis } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
 import { shotNumbers, restCards, liveCards, liveFrame } from './comparison.js';
@@ -68,6 +68,7 @@ function perform(effect) {
         case 'readOpened': readOpened(effect); break;
         case 'unopened': showToast(cafeText('The shot could not be read'), 4000, 'error'); break;
         case 'draw': draw(); break;
+        case 'clear': if (!isSubPage()) clearChart(); break;
         case 'overlay': applyOverlay(); break;
         case 'paint': paint(); break;
         case 'startTimer':
@@ -166,7 +167,12 @@ function nameWidth(name) {
 // written, so they are repainted exactly as often as the chart is.
 function overlay(traces, layout, mode, chart) {
     const { curves, stages } = overlayFor;
-    let drawn = view === 'reference' ? referenceOverlay(traces, layout, mode, { curves, dark: isDark() }) : { traces, layout };
+    // Through a shot's Preheat the chart is drawn as at rest, empty, and the
+    // time axis is the live one already, starting at zero in both views, so the
+    // profile's start moves nothing.
+    const axis = state.live ? 'live' : mode;
+    let drawn = view === 'reference' ? referenceOverlay(traces, layout, axis, { curves, dark: isDark() }) : { traces, layout };
+    if (state.live) drawn = { traces: drawn.traces, layout: liveAxis(traces, drawn.layout) };
     if (chart !== 'main') return drawn;
     let shown = drawn.layout;
     if (stages && !(shown.shapes && shown.shapes.length)) shown = { ...shown, shapes: stageShapes(stages, isDark()) };
@@ -241,14 +247,23 @@ export function showGraphRecipe(next) {
 
 // ── During a shot ────────────────────────────────────────────────────────────
 
+// Is the profile running, so the chart holds the shot's lines? Streamline
+// starts its shot clock, and the chart, at the profile's first frame, and stops
+// it at the frame after the shot's end: the end is told before that frame is.
+const profileRunning = () => !!window.app?.isShotActive?.();
+
+// The machine went into its `espresso` state: the start of a shot's Preheat.
 function shotStarted() {
     frame = null;
-    dispatch({ type: 'shotStarted' });
+    dispatch({ type: 'shotStarted', profileStarted: profileRunning() });
     el('cafe-reference-dialog')?.close();
 }
 
+// A shot stopped in its Preheat drew nothing. Streamline's own shot table still
+// holds the Shot before it until the profile starts, so its time says nothing
+// of this shot.
 function shotEnded() {
-    dispatch({ type: 'shotEnded', poured: getTotalTime() > 0 });
+    dispatch({ type: 'shotEnded', poured: profileRunning() });
 }
 
 // ── The legend ───────────────────────────────────────────────────────────────
@@ -545,10 +560,13 @@ export function onShotChanges(listen) {
 
 /** Called once, when the page starts. */
 export function initGraph() {
-    state = initialGraphState({ live: !!window.app?.isShotActive?.() });
+    state = initialGraphState();
     setShotChooser(chooseShot);
     applyOverlay();
     paint();
+    // A page opened during a shot, in its Preheat as much as later, is live: the
+    // machine went into its `espresso` state before the page was listening.
+    if (currentMachineState === 'espresso' || profileRunning()) shotStarted();
 
     // The view this tablet was left in. Reference until it is known.
     readCafe(VIEW_KEY)

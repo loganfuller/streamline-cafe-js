@@ -294,7 +294,9 @@ const fahrenheit = value => (value === null || value === undefined ? value : (va
 /**
  * The six cards while a shot runs.
  *
- * - `frame`: what the shot reads now (`liveFrame`), or null before its first.
+ * - `frame`: what the shot reads now (`liveFrame`), or null before its first,
+ *   as through the shot's Preheat: the time then reads zero, since the profile
+ *   has not started, and every other card has no value.
  * - `reference`: `{ samples, numbers }` of the recipe's reference
  *   (`shotSamples`, `shotNumbers`), or null with none.
  * - `stopAt`: the weight the shot stops at, in grams.
@@ -306,7 +308,7 @@ const fahrenheit = value => (value === null || value === undefined ? value : (va
 export function liveCards({ view, frame, reference = null, stopAt = null, fahrenheit: inFahrenheit = false }) {
     const of = key => (frame ? frame[key] : null);
     const degrees = (value, kind) => (kind === 'celsius' && inFahrenheit ? [fahrenheit(value), 'fahrenheit'] : [value, kind]);
-    const time = side => card('time', phrase(PHRASES.time), shown(of('seconds'), 'seconds'), side);
+    const time = side => card('time', phrase(PHRASES.time), shown(frame ? frame.seconds : 0, 'seconds'), side);
 
     if (view === 'targets') {
         return [
