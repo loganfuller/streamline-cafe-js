@@ -810,6 +810,9 @@ async function profileDialogWithDecentSync({ page, house, two }) {
     // be unloaded by the tap that loads it, so the step waits for the name.
     const namedBack = await until(async () => ((await recordOn(decaid))?.name === house.name && (await recordOn(decaid2))?.name === house.name) || null, { timeout: 90_000, every: 1000 });
     check('profile dialog: the Recipe has its own name on both tablets', !!namedBack, `${(await recordOn(decaid))?.name} | ${(await recordOn(decaid2))?.name}`);
+    // The Recipe's Profile and brew temperature as the step found them, put
+    // back should the step be cut short.
+    const contentAtStart = (await recipeNow()).content;
     const tablet2 = await openPage(await secondBrowser());
     try {
         for (const view of [tablet2.page, page]) {
@@ -893,8 +896,11 @@ async function profileDialogWithDecentSync({ page, house, two }) {
         await tablet2.close();
         // A step cut short before the Profile was chosen back: the Recipe's
         // own put back on the server, outside the dialog this step tries.
-        if ((await recipeNow().catch(() => null))?.content?.profileId !== usual.id) {
-            await sync('PATCH', `/recipes/${house.id}`, { content: { profileId: usual.id } }).catch(() => {});
+        const contentNow = (await recipeNow().catch(() => null))?.content;
+        if (contentNow?.profileId !== contentAtStart.profileId || contentNow?.brewTemperature !== contentAtStart.brewTemperature) {
+            await sync('PATCH', `/recipes/${house.id}`, {
+                content: { profileId: contentAtStart.profileId, brewTemperature: contentAtStart.brewTemperature ?? null },
+            }).catch(() => {});
         }
     }
 }

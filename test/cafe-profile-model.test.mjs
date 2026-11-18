@@ -190,6 +190,17 @@ test('two of one title whose steps differ by other amounts: a stepped one is tol
     assert.equal(profileInUse(wholeProfiles(all), inWorkflow(stepped(bloom.profile, 3))), bloom);
 });
 
+test('a replacement that stops at another volume, the old one hidden and still in use: the replacement can be chosen', () => {
+    const old = record('p-40', { ...bloom.profile, target_volume: 40, target_volume_count_start: 2 }, 'hidden');
+    const replacement = record('p-50', { ...bloom.profile, target_volume: 50, target_volume_count_start: 2 });
+    const all = [old, replacement];
+    const { rows, pane, opening } = profileView({ records: listedProfiles(all), known: wholeProfiles(all), workflowProfile: inWorkflow(old.profile), t });
+    assert.equal(rows.some(r => r.inUse || r.highlighted), false);
+    assert.ok(pane(rows.find(r => r.id === 'p-50')).use);
+    assert.equal(opening.inUse, true);
+    assert.equal(profileInUse(wholeProfiles(all), inWorkflow(replacement.profile)), replacement);
+});
+
 test('with no profile in the Workflow, it opens on the first row, highlighted and offered', () => {
     const { rows, opening } = view({ workflowProfile: null });
     assert.deepEqual(rows.map(r => r.highlighted), [true, false, false]);

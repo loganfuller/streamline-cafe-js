@@ -71,6 +71,7 @@ export function brewTemp(celsius, unit) {
 
 const temps = profile => (Array.isArray(profile?.steps) ? profile.steps : []).map(s => (typeof s?.temperature === 'number' ? s.temperature : null));
 const stepTemps = profile => JSON.stringify(temps(profile));
+const volumeStop = profile => JSON.stringify([profile?.target_volume ?? null, profile?.target_volume_count_start ?? null]);
 // Each step's temperature less the first's: what a Brew step, which shifts
 // every step alike, leaves as it was.
 const stepShape = profile => {
@@ -84,8 +85,8 @@ const stepShape = profile => {
  * compares two profiles (its title, its tank temperature and its steps, each
  * step's temperature left out), so a profile whose temperature was stepped is
  * still the one in use. Where several match (two of one title that differ
- * only in temperature, or a version hidden since), the temperatures tell them
- * apart: the one at the Workflow's own step temperatures; else, of those a
+ * only in temperature or in their stop by volume, or a version hidden since),
+ * the stop by volume tells them apart first, then the temperatures: the one at the Workflow's own step temperatures; else, of those a
  * Brew step could have made the Workflow's (the same steps between steps),
  * the one `preferId` names (the loaded recipe's profile), else the one listed.
  * A listed record wins each tie, as Streamline's own binding never takes a
@@ -96,8 +97,13 @@ const stepShape = profile => {
 export function profileInUse(records, workflowProfile, preferId = null) {
     const fp = profileFingerprint(isObject(workflowProfile) ? workflowProfile : null);
     if (!fp) return null;
-    const matches = (records || []).filter(record => profileFingerprint(record.profile) === fp);
-    if (matches.length < 2) return matches[0] || null;
+    const fingerprinted = (records || []).filter(record => profileFingerprint(record.profile) === fp);
+    if (fingerprinted.length < 2) return fingerprinted[0] || null;
+    // Where several compare the same, the stop by volume, which DYE2 leaves out
+    // and the Workflow keeps as the profile has it, tells them apart first.
+    const sameStop = fingerprinted.filter(record => volumeStop(record.profile) === volumeStop(workflowProfile));
+    const matches = sameStop.length ? sameStop : fingerprinted;
+    if (matches.length === 1) return matches[0];
     const named = list => list.find(record => preferId != null && String(record.id) === String(preferId));
     const listedFirst = list => named(list.filter(shown)) || list.find(shown) || named(list) || list[0] || null;
     const exact = matches.filter(record => stepTemps(record.profile) === stepTemps(workflowProfile));
