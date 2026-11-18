@@ -4,15 +4,13 @@ import assert from 'node:assert/strict';
 
 import { grindText, grindNumber } from '../src/cafe/grind-text.js';
 import { stepValue } from '../src/modules/value-format.js';
-import { grindDecimals } from '../src/modules/grinder-sync.js';
 
-// The row's + as ui.js wires it: the number read off the row, one step up, written
-// with the step's places (the Grind tile's formatter in setupValueAdjuster).
+// The row's + as ui.js wires it: the number read off the row, one step up, painted
+// as a Workflow read paints it (the Grind tile's formatter in setupValueAdjuster).
 const plus = (text, step) => {
     const value = grindNumber(text);
     if (value === null) return null;
-    const next = stepValue(value, step, 1);
-    return Number.isInteger(step) ? String(Math.round(next)) : next.toFixed(grindDecimals(step));
+    return grindText(stepValue(value, step, 1), step);
 };
 
 test('a preset grinder\'s setting shows as it is, and the row steps nothing from it', () => {
@@ -63,4 +61,25 @@ test('a number keeps no more than the two places the row writes', () => {
     assert.equal(grindText('11.2999999', 0.1), '11.3');
     assert.equal(grindText('11.256', 0.25), '11.26');
     assert.equal(grindText('-1.5', 0.5), '-1.5');
+});
+
+test('two taps before the write step from what the first tap wrote', () => {
+    // 11.25 on a 0.1 grinder: the first + writes 11.35, so the row must not show
+    // 11.3, or the second + would step from there and write 11.40.
+    const once = plus('11.25', 0.1);
+    assert.equal(once, '11.35');
+    assert.equal(plus(once, 0.1), '11.45');
+    // On its own grid the − and + paint as Streamline's formatter did.
+    assert.equal(plus('11.3', 0.1), '11.4');
+    assert.equal(plus('11', 1), '12');
+    assert.equal(plus('11.75', 0.25), '12');
+});
+
+test('a number written with a bare point is still a number', () => {
+    assert.equal(grindText('.5', 0.1), '0.5');
+    assert.equal(grindText('11.', 0.1), '11');
+    assert.equal(grindNumber('.5'), 0.5);
+    assert.equal(grindNumber('11.'), 11);
+    assert.equal(plus('.5', 0.1), '0.6');
+    for (const text of ['.', '-', '1.2.3', '-.']) assert.equal(grindNumber(text), null, text);
 });

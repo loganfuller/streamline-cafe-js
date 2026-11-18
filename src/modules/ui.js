@@ -15,7 +15,6 @@ import { shouldUseNumpad } from './numpad-policy.js';
 import { openContextMenu } from './context-menu.js';
 import { initCalibratedSteam } from './calibrated-steam-ui.js';
 import { logger } from './logger.js';
-import { grindDecimals } from './grinder-sync.js';
 import { grindText, grindNumber } from '../cafe/grind-text.js';
 import { shouldWriteStatus } from './machine-status-render.js';
 import { SETTINGS_RESTORED_EVENT } from './settingsSync.js';
@@ -2925,7 +2924,9 @@ export function initUI(callbacks) {
     // writes them); without one the tile keeps its 0 floor and no ceiling.
     setupValueAdjuster('grind-minus', 'grind-plus', 'grind-value', grindStepNow,
         () => workflowGrinderRange.min,
-        (val) => Number.isInteger(grindStepNow()) ? String(Math.round(val)) : val.toFixed(grindDecimals(grindStepNow())),
+        // Streamline Cafe (#42): painted as a Workflow read paints it, so a second tap
+        // before the write steps from the number the first one wrote.
+        (val) => grindText(val, grindStepNow()),
         updateGrindValue, undefined, () => workflowGrinderRange.max, grindNumber);
     setupValueAdjuster('flush-minus', 'flush-plus', 'flush-value', 1, 0, (val) => `${val}s`, (val) => {
         updateFlushValue(val);

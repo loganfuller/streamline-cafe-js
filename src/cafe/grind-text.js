@@ -9,9 +9,10 @@
 
 import { grindDecimals } from '../modules/grinder-sync.js';
 
-// A number as the Workflow writes one ("11.25", "11.30", "12"); anything else,
-// such as a preset grinder's "Medium", is shown as it is.
-const NUMBER = /^-?\d+(\.\d+)?$/;
+// A number as the Workflow writes one ("11.25", "11.30", "12"), or as another
+// writer might (".5", "11."); anything else, such as a preset grinder's
+// "Medium" or "3 Fine", is shown as it is.
+const NUMBER = /^-?(\d+\.?\d*|\.\d+)$/;
 
 // Places a number carries once read to the two the row keeps.
 const placesOf = n => (String(Number(n.toFixed(2))).split('.')[1] || '').length;

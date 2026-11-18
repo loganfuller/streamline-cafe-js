@@ -123,7 +123,7 @@ test('the Grind row\'s hook is still in ui.js', () => {
     const ui = readFileSync(new URL('../src/modules/ui.js', import.meta.url), 'utf8');
     assert.match(ui, /^import \{ grindText, grindNumber \} from '\.\.\/cafe\/grind-text\.js';$/m);
     assert.match(ui, /export function updateGrindDisplay\(grinderData\) \{[^}]*grindValueEl\.textContent = grindText\(grindValue, grindStepNow\(\)\);/);
-    assert.match(ui, /updateGrindValue, undefined, \(\) => workflowGrinderRange\.max, grindNumber\);/, 'the Grind row reads its number strictly');
+    assert.match(ui, /\(val\) => grindText\(val, grindStepNow\(\)\),\s*updateGrindValue, undefined, \(\) => workflowGrinderRange\.max, grindNumber\);/, 'the Grind row\'s − and + paint as a read does, and read its number strictly');
     assert.equal(ui.match(/let currentValue = readValue\(valueEl\);\s*if \(currentValue === null\) return;/g)?.length, 2, 'and − and + both step nothing from no number');
 });
 

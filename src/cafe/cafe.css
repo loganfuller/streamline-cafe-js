@@ -511,9 +511,12 @@ button.cafe-card {
 
 /* The Grind value can be a preset grinder's name: it takes the value's whole
    width, and Streamline's text fitting (data-fit-text in index.html) shrinks a
-   name wider than that. */
+   name wider than that. A name still too wide at the fitting's smallest size
+   ends in an ellipsis rather than running under − and +. */
 #grind-value {
     align-self: stretch;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .cafe-value > .cafe-value-sub,

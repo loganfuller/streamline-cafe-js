@@ -849,6 +849,18 @@ async function grindRow() {
         await readAgain();
         const long = await fit();
         check('grind row: a longer name is shrunk to sit between them', (await grind()) === 'Extra coarse' && long.left >= 4 && long.right >= 4 && long.size >= 14 && long.size < 30, JSON.stringify(long));
+        // A name too long even at the fitting's 8 px floor is cut with an
+        // ellipsis inside the value's box, never run under − or +.
+        await setGrind(preset, 'Extra coarse for cold brew and large batch service only');
+        await readAgain();
+        const clipped = await page.evaluate(() => {
+            const value = document.getElementById('grind-value');
+            const box = value.getBoundingClientRect();
+            const minus = document.getElementById('grind-minus').getBoundingClientRect();
+            const plus = document.getElementById('grind-plus').getBoundingClientRect();
+            return { left: box.left - minus.right, right: plus.left - box.right, cut: value.scrollWidth > value.clientWidth, overflow: getComputedStyle(value).textOverflow };
+        });
+        check('grind row: a name too long to fit ends in an ellipsis between − and +', clipped.left >= 0 && clipped.right >= 0 && clipped.cut && clipped.overflow === 'ellipsis', JSON.stringify(clipped));
         await setGrind(preset, 'Medium');
         await readAgain();
 
