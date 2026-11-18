@@ -15,7 +15,8 @@ export const BASKET_PHRASES = {
     double: 'Double',
     triple: 'Triple',
     bottomless: 'Bottomless',
-    other: 'Other',
+    // Not "Other": Streamline's file has that only as a heading in capitals.
+    other: 'Other size',
     diameter: '{mm} mm',
     unnamed: 'Unnamed',
 };

@@ -119,6 +119,7 @@ test('a tap on the batch in use writes nothing', () => {
 test('the Recipe\'s own Bean is the one its record names, else its batch\'s', () => {
     assert.equal(recipeBeanId({ beanId: 'bean-house', beanBatchId: 'b-single' }, BATCHES), 'bean-house');
     assert.equal(recipeBeanId({ beanBatchId: 'b-single' }, BATCHES), 'bean-single', 'a recipe DYE2 made from the Workflow has no beanId');
+    assert.equal(recipeBeanId({ beanId: '  ', beanBatchId: 'b-single' }, BATCHES), 'bean-single', 'a blank beanId is none');
     assert.equal(recipeBeanId({ beanBatchId: 'b-house-finished' }, BATCHES), 'bean-house', 'an archived batch still tells its bean');
     assert.equal(recipeBeanId({ beanBatchId: 'b-far' }, BATCHES, batch('b-far', 'bean-far', null)), 'bean-far', 'or the batch read on its own');
     assert.equal(recipeBeanId({ beanBatchId: 'b-far' }, BATCHES), null, 'a batch nowhere to be read gives no Bean');

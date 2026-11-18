@@ -39,7 +39,7 @@ test('a row says what it has: a size DYE2 does not offer as written, no size, no
     const [row] = basketRows([{ id: 'x', size: 'competition', diameterMm: 0 }], {}, t);
     assert.deepEqual([row.name, row.detail], ['Unnamed', 'competition']);
     assert.equal(basketRows([{ id: 'y', name: 'Sample', diameterMm: 54 }], {}, t)[0].detail, '54 mm');
-    assert.equal(basketRows([{ id: 'z', name: 'Sample', size: 'other' }], {}, t)[0].detail, 'Other');
+    assert.equal(basketRows([{ id: 'z', name: 'Sample', size: 'other' }], {}, t)[0].detail, 'Other size');
 });
 
 test('an archived basket in use is not listed, and no row is marked', () => {

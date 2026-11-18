@@ -37,9 +37,10 @@ async function readBeans(recipe) {
     }))).flat();
     // A recipe DYE2 made from the Workflow names its batch and no bean. A batch
     // of a bean not listed is read on its own, to tell its bean; one that can't
-    // be read leaves the recipe with no Bean.
+    // be read leaves the recipe with no Bean. recipeBeanId() decides whether the
+    // bean is told already, so the two never disagree on a blank beanId.
     let recipeBatch = null;
-    if (recipe && recipe.beanId == null && recipe.beanBatchId != null && !batches.some(batch => sameId(batch?.id, recipe.beanBatchId))) {
+    if (recipe?.beanBatchId != null && recipeBeanId(recipe, batches) == null) {
         try {
             recipeBatch = await getBeanBatch(recipe.beanBatchId);
         } catch (error) {
