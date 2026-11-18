@@ -334,10 +334,10 @@ test('live, in Targets: the stage, the weight it stops at, and each target the s
     ]);
 });
 
-test('live: before the first frame every value is "—"', () => {
+test('live: before the first frame, as through the Preheat, the time reads zero and every other value is "—"', () => {
     for (const view of ['reference', 'targets']) {
         const cards = liveCards({ view, frame: null, reference: liveReference(), stopAt: 36 });
-        assert.deepEqual(cards.map(c => [c.value, c.diff]), Array(6).fill(['—', '']));
+        assert.deepEqual(cards.map(c => [c.value, c.diff]), [['0.0 s', ''], ...Array(5).fill(['—', ''])]);
     }
     assert.deepEqual(liveCards({ view: 'reference', frame: null, reference: liveReference() })[1].side, { phrase: PHRASES.ref, vars: { value: '—' } });
 });

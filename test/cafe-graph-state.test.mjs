@@ -66,7 +66,10 @@ function withNone() {
     return play(unloaded.state, { type: 'newestRead', seq: read.seq, edits: read.edits, record: LATEST }).state;
 }
 
-const live = state => play(state, { type: 'shotStarted' }).state;
+// Before DYE2 has said which recipe is loaded, with the history module's Shot drawn.
+const STATES_UNKNOWN = () => play(initialGraphState(), { type: 'chartAsks', measurements: LATEST.measurements, workflow: LATEST.workflow }).state;
+
+const live = state => play(state, { type: 'shotStarted', profileStarted: false }).state;
 
 // A shot ended and Decaid does not have it yet.
 function settling(state) {
@@ -187,15 +190,94 @@ test('a shot started: the running shot owns the chart, and every timer stops', (
     for (const [name, make] of Object.entries(STATES)) {
         let before = make();
         before = play(before, { type: 'inView' }).state; // a read soon
-        const { state, effects } = play(before, { type: 'shotStarted' });
+        const { state, effects } = play(before, { type: 'shotStarted', profileStarted: false });
         assert.equal(state.live, true, name);
         assert.equal(state.settling, false, name);
         assert.equal(state.heldBack, false, name);
         assert.ok(state.seq > before.seq, `${name}: a read on its way is no longer wanted`);
         assert.deepEqual(state.timers, { refresh: false, settle: null, late: false, locked: false }, name);
         assert.ok(!did(effects, 'readShots').length && !did(effects, 'draw').length, name);
-        assert.deepEqual(kinds(effects).filter(kind => kind !== 'stopTimer'), ['overlay', 'paint'], name);
+        assert.deepEqual(kinds(effects).filter(kind => kind !== 'stopTimer'), ['overlay', 'clear', 'paint'], name);
     }
+});
+
+// ── The Preheat (issue #64) ──────────────────────────────────────────────────
+
+test('the graph goes live at the Preheat: the chart is emptied, with a recipe or none, and whatever was in the graph', () => {
+    const OPENED = shot('s-opened', 50);
+    const opened = state => {
+        const tapped = play(state, { type: 'open', shotId: OPENED.id, recipe: RECIPE, name: null });
+        const read = did(tapped.effects, 'readOpened').at(-1);
+        return play(tapped.state, { type: 'openedRead', seq: read.seq, edits: read.edits, shotId: OPENED.id, shot: OPENED, canChange: true, chosen: chosen(REF) }).state;
+    };
+    const before = {
+        ...STATES,
+        'DYE2 not read yet': () => play(initialGraphState(), { type: 'chartAsks', measurements: LATEST.measurements, workflow: LATEST.workflow }).state,
+        'a recipe with no Shot yet': () => {
+            const loaded = play(initialGraphState(), { type: 'recipe', recipe: RECIPE });
+            return answer(loaded.state, loaded.effects, null).state;
+        },
+        'a Shot opened from the list': () => opened(withRecipe()),
+    };
+    for (const [name, make] of Object.entries(before)) {
+        const { state, effects } = play(make(), { type: 'shotStarted', profileStarted: false });
+        assert.equal(state.live, true, name);
+        assert.equal(state.opened, null, `${name}: an opened Shot gives way`);
+        assert.equal(did(effects, 'clear').length, 1, `${name}: the chart is emptied`);
+        assert.ok(kinds(effects).indexOf('clear') > kinds(effects).indexOf('overlay'), `${name}: once the overlay is the live one`);
+        assert.equal(inGraph(state).live, true, `${name}: the legend reads "Live shot" and the cards are the live ones`);
+        assert.equal(shotInGraphId(state), null, `${name}: no Shot is in the graph`);
+    }
+});
+
+test('a page opened while the profile runs keeps the chart\'s lines: they are the running shot\'s', () => {
+    for (const [name, make] of Object.entries({ 'a recipe': withRecipe, 'none': withNone, 'nothing yet': initialGraphState })) {
+        const { state, effects } = play(make(), { type: 'shotStarted', profileStarted: true });
+        assert.equal(state.live, true, name);
+        assert.ok(!did(effects, 'clear').length && !did(effects, 'draw').length, name);
+    }
+});
+
+test('the profile starting changes nothing in the graph\'s state: it went live at the Preheat', () => {
+    // Streamline's own clear and shot clock start at the profile's first frame;
+    // the page is told nothing then, so nothing is drawn again.
+    const preheat = live(withRecipe());
+    const again = play(preheat, { type: 'chartAsks', measurements: NEWER.measurements, workflow: NEWER.workflow });
+    assert.equal(again.allow, false, 'the history module still draws nothing over the live chart');
+    assert.ok(!did(again.effects, 'draw').length && !did(again.effects, 'clear').length);
+});
+
+test('a shot stopped in its Preheat puts back the Shot the graph held, at once, with a recipe or none', () => {
+    const recipe = play(live(withRecipe()), { type: 'shotEnded', poured: false });
+    assert.equal(recipe.state.live, false);
+    assert.equal(recipe.state.settling, false, 'it is not looked for');
+    assert.equal(recipe.state.latest, LATEST);
+    assert.equal(inGraph(recipe.state).reference.shot, REF);
+    assert.deepEqual(kinds(recipe.effects), ['overlay', 'draw', 'readShots'], 'drawn before any read answers');
+    // The read is only in case the Shot is another by now: the same one draws nothing again.
+    const same = answer(recipe.state, recipe.effects, LATEST);
+    assert.ok(!did(same.effects, 'draw').length);
+    const other = answer(recipe.state, recipe.effects, NEWER);
+    assert.equal(did(other.effects, 'draw').length, 1);
+    assert.equal(other.state.latest, NEWER);
+
+    const none = play(live(withNone()), { type: 'shotEnded', poured: false });
+    assert.equal(none.state.settling, false);
+    assert.equal(none.state.latest.timestamp, LATEST.timestamp, '"Last shot" is the history module\'s Shot');
+    assert.equal(shownRemarks(none.state).id, LATEST.id, 'with its stars');
+    assert.deepEqual(kinds(none.effects), ['overlay', 'draw', 'readNewest']);
+
+    const unknown = play(live(STATES_UNKNOWN()), { type: 'shotEnded', poured: false });
+    assert.deepEqual(kinds(unknown.effects), ['overlay', 'draw'], 'before DYE2 has answered, the Shot handed over is drawn');
+    assert.equal(unknown.state.latest.timestamp, LATEST.timestamp);
+});
+
+test('a recipe whose Shots were not read yet when its shot stopped in the Preheat reads them, and draws what it finds', () => {
+    const loaded = play(initialGraphState(), { type: 'recipe', recipe: RECIPE });
+    const stopped = play(loaded.state, { type: 'shotStarted', profileStarted: false }, { type: 'shotEnded', poured: false });
+    assert.deepEqual(kinds(stopped.effects).slice(-3), ['overlay', 'draw', 'readShots']);
+    const found = answer(stopped.state, stopped.effects, LATEST);
+    assert.equal(did(found.effects, 'draw').length, 1);
 });
 
 test('a shot started over a finished one still waiting stops the looks for it', () => {
@@ -270,9 +352,9 @@ test('a look that can\'t reach Decaid is followed by the next', () => {
 test('a shot stopped before it poured is not looked for: the Shots are read once', () => {
     const recipe = play(live(withRecipe()), { type: 'shotEnded', poured: false });
     assert.equal(recipe.state.settling, false);
-    assert.deepEqual(kinds(recipe.effects), ['overlay', 'paint', 'readShots']);
+    assert.deepEqual(kinds(recipe.effects), ['overlay', 'draw', 'readShots']);
     const none = play(live(withNone()), { type: 'shotEnded', poured: false });
-    assert.deepEqual(kinds(none.effects), ['overlay', 'paint', 'readNewest']);
+    assert.deepEqual(kinds(none.effects), ['overlay', 'draw', 'readNewest']);
 });
 
 test('a shot ended with no recipe waits for the history module to draw it', () => {

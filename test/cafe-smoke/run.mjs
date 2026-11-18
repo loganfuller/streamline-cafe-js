@@ -8,6 +8,7 @@
 //   node test/cafe-smoke/run.mjs --token=... --streamline=http://127.0.0.1:13998
 //   node test/cafe-smoke/run.mjs --token=... --timezone=Europe/Berlin   (the container's zone, UTC by default)
 //   node test/cafe-smoke/run.mjs --token=... --only=profile   (step 25 alone, after a whole run)
+//   node test/cafe-smoke/run.mjs --token=... --only=preheat   (step 26 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --restart-decaid='<a command that starts Decaid again>'
 //
 // It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
@@ -200,12 +201,16 @@ const sendOn = route => route.fetch({ url: route.request().url().replace(`http:/
 // that one answer is rewritten on the way in. `decentSync` stands in for Decent
 // Sync's plugin, which this Decaid does not have: its entry in the plugin list
 // and its Status answer, `served` or a refusal's code.
-async function openPage({ theme = 'light', machineButtons = true, decentSync = null, weights = false, viewport = { width: 1920, height: 1200 } } = {}) {
+//
+// `machine`: a `machineFeed()` the page's machine socket goes through, for a
+// Preheat longer than the simulated machine's (step 26).
+async function openPage({ theme = 'light', machineButtons = true, decentSync = null, weights = false, viewport = { width: 1920, height: 1200 }, machine = null } = {}) {
     const context = await browser.newContext({ viewport, timezoneId: TIMEZONE });
     const page = await context.newPage();
     const seen = { errors: [], requests: [], theme };
     page.on('pageerror', error => seen.errors.push(error.message));
     page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
+    if (machine) await page.routeWebSocket(/\/ws\/v1\/machine\/snapshot$/, socket => machine.attach(socket));
     if (!machineButtons) {
         await page.route('**/api/v1/machine/info', async route => {
             const response = await sendOn(route);
@@ -2163,6 +2168,270 @@ async function profileChange() {
     }
 }
 
+// ── The graph goes live at the Preheat (#64) ─────────────────────────────────
+
+// The page's machine socket, through the run. The simulated machine's Preheat
+// lasts about half a second, too short to stop a shot in or to reload a page
+// during, so the run makes it longer as the page sees it:
+// - `pass()`: Decaid's frames as they come;
+// - `hold()`: Decaid's frames, with an `espresso` frame's substate given as
+//   `preparingForShot`, so the pour Decaid is running is a Preheat to the page
+//   until `pass()`, when the page sees the profile start;
+// - `drop()`: Decaid's frames without its Preheat, for a shot with none;
+// - `fake(state, substate)`: none of Decaid's frames, but its last one sent ten
+//   times a second in that state, so the page sees a Preheat, or its end, with
+//   no shot pulled.
+function machineFeed() {
+    let mode = 'pass';
+    let last = null;
+    let timer = null;
+    const pages = new Set();
+    const stamp = date => decaidTime(date).replace('.000', `.${String(date.getMilliseconds()).padStart(3, '0')}`);
+    const send = frame => { for (const socket of pages) { try { socket.send(JSON.stringify(frame)); } catch { /* the page went */ } } };
+    const stopFaking = () => { clearInterval(timer); timer = null; };
+    return {
+        attach(socket) {
+            const server = socket.connectToServer();
+            pages.add(socket);
+            socket.onClose(() => pages.delete(socket));
+            socket.onMessage(message => server.send(message));
+            server.onMessage(message => {
+                const frame = JSON.parse(message);
+                last = frame;
+                if (typeof mode === 'object') return;
+                if (mode === 'drop' && frame.state?.substate === 'preparingForShot') return;
+                if (mode === 'hold' && frame.state?.state === 'espresso') frame.state = { ...frame.state, substate: 'preparingForShot' };
+                try { socket.send(JSON.stringify(frame)); } catch { /* the page went */ }
+            });
+        },
+        pass() { stopFaking(); mode = 'pass'; },
+        hold() { stopFaking(); mode = 'hold'; },
+        drop() { stopFaking(); mode = 'drop'; },
+        fake(state, substate) {
+            stopFaking();
+            mode = { state, substate };
+            const tick = () => { if (last) send({ ...last, timestamp: stamp(new Date()), state: { state, substate }, flow: 0, pressure: 0, profileFrame: 0 }); };
+            tick();
+            timer = setInterval(tick, 100);
+        },
+    };
+}
+
+// The chart's own lines, which are not the reference's, and where its time
+// axis ends; each own line's first time, for the first sample's place.
+const ownLines = async (page, id = 'plotly-chart') => {
+    const lines = await chartLines(page, id);
+    if (!lines) return null;
+    const own = lines.names.map((name, index) => ({ name, points: lines.points[index] })).filter(line => !REFERENCE_LINES.includes(line.name));
+    const reference = lines.names.map((name, index) => ({ name, points: lines.points[index] })).filter(line => REFERENCE_LINES.includes(line.name));
+    return { end: lines.end, own: own.reduce((sum, line) => sum + line.points, 0), reference: reference.reduce((sum, line) => sum + line.points, 0), referenceEnd: lines.referenceEnd, names: lines.names, points: lines.points };
+};
+const firstTime = (page, name) => page.evaluate(async lineName => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const chart = echarts.getInstanceByDom(document.getElementById('plotly-chart'));
+    const line = chart?.getOption().series.find(series => series && String(series.id).startsWith('trace-') && series.name === lineName);
+    return line && line.data.length ? line.data[0][0] : null;
+}, name);
+// The live axis's end for a reference of `seconds`, as the overlay sets it.
+const liveEnd = seconds => seconds / 0.93;
+const near = (a, b, within = 0.05) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= within;
+
+// 26. The graph goes live at the Preheat, issue #64 (docs/cafe/DESIGN.md, "When
+//     the graph goes live"): with a recipe loaded, whose latest Shot is drawn
+//     against its reference, the Preheat empties the graph of the latest's
+//     lines and stage names, on the main graph and the full-screen chart, in
+//     Reference with the reference behind it on the live axis and in Targets
+//     with nothing; the legend reads "Live shot" and the six live cards have no
+//     values but a time of zero. A shot stopped in the Preheat puts back the
+//     latest, its stage names and the five cards, and so it does with no recipe
+//     loaded, as "Last shot". A page opened during a Preheat is live. A real
+//     shot with a long Preheat draws its first sample at the profile's start,
+//     at time zero, with the axis where the Preheat had it; and a shot with no
+//     Preheat frame goes live and draws as before.
+async function preheatLive() {
+    const house = RECIPES[0];
+    const pulled = [];
+    const newestId = async () => (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
+    // A shot pulled with the recipe, through the page's feed as it is set.
+    const pull = async (seconds, during = null) => {
+        const before = await newestId();
+        await decaid('PUT', '/machine/state/espresso');
+        if (during) await during();
+        await sleep(seconds * 1000);
+        await decaid('PUT', '/machine/state/idle');
+        for (let waited = 0; waited < 30_000 && (await newestId()) === before; waited += 1000) await sleep(1000);
+        const id = await newestId();
+        if (id && id !== before) pulled.push(id);
+        await sleep(5000);
+        return id && id !== before ? id : null;
+    };
+    const choicesBefore = await storeValue(REFERENCES);
+    const viewBefore = await storeValue(GRAPH_VIEW);
+    await decaid('PUT', '/machine/state/idle').catch(() => {});
+    await decaid('POST', GRAPH_VIEW, 'reference');
+    const feed = machineFeed();
+    let view = await openPage({ machine: feed });
+    let { page, seen } = view;
+    try {
+        await waitForPage(page);
+        const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+        const record = await recordNamed(house.name);
+        // Loaded, and two Shots with it: the first the reference, the second the latest.
+        if (loadedRecipeId(await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`)) !== record.id) {
+            await card(house).click();
+            await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 });
+            await page.waitForTimeout(3000);
+        }
+        const first = await pull(8);
+        const second = await pull(8);
+        check('preheat: two shots were pulled with the recipe', !!first && !!second);
+        await decaid('POST', REFERENCES, { ...(choicesBefore || {}), [record.id]: first });
+        await view.close();
+        view = await openPage({ machine: feed });
+        ({ page, seen } = view);
+        await waitForPage(page);
+        await page.locator('#cafe-title').filter({ hasText: house.name }).waitFor({ timeout: 20_000 });
+        await page.waitForTimeout(4000);
+
+        // At rest: the latest against the reference.
+        const rest = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('preheat: at rest the latest is drawn against the reference, with its stage names and the five cards',
+            rest.legend.label === 'Latest' && rest.legend.reference !== null && rest.lines.own > 10 && rest.lines.reference > 10 && rest.stages.some(Boolean) && rest.row.mode === 'rest' && keys(rest.row) === REST_REFERENCE,
+            JSON.stringify({ legend: rest.legend, stages: rest.stages, lines: rest.lines, row: keys(rest.row) }));
+        await shot(page, 'preheat-before-light');
+
+        // The Preheat.
+        feed.fake('espresso', 'preparingForShot');
+        await page.waitForTimeout(1500);
+        let now = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('preheat, in Reference: the latest\'s lines leave the graph and the reference stays behind it', now.lines.own === 0 && now.lines.reference > 10, JSON.stringify(now.lines));
+        check('preheat, in Reference: the stage lines and their names leave with it', now.stages.length === 0, JSON.stringify(now.stages));
+        check('preheat, in Reference: the time axis is the live one, at the reference\'s length', near(now.lines.end, liveEnd(now.lines.referenceEnd)), `${now.lines.end} for a reference of ${now.lines.referenceEnd} s`);
+        check('preheat: the legend reads "Live shot", with the reference\'s row', now.legend.label === 'Live shot' && now.legend.reference !== null && now.legend.make === null, JSON.stringify(now.legend));
+        check('preheat: the six live cards, with no values and a time of zero',
+            now.row.mode === 'live' && keys(now.row) === LIVE && now.row.cards[0].value === '0.0 s' && now.row.cards.slice(1).every(c => c.value === '—') && now.row.cards.every(c => c.diff === ''), JSON.stringify(now.row.cards));
+        await shot(page, 'preheat-reference-light');
+        const preheatEnd = now.lines.end;
+        await page.locator('#plotly-chart').click();
+        await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
+        await page.waitForTimeout(1500);
+        const zoomed = await ownLines(page, 'expanded-chart');
+        check('preheat, on the full-screen chart: nothing of the latest, the reference behind', zoomed.own === 0 && zoomed.reference > 10, JSON.stringify(zoomed));
+        await shot(page, 'preheat-full-screen-light');
+        await page.locator('#expanded-chart').click();
+        await page.waitForTimeout(1000);
+        await page.locator('#cafe-view button[data-view="targets"]').click();
+        await page.waitForTimeout(800);
+        now = { lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('preheat, in Targets: nothing on the graph', now.lines.own === 0 && now.lines.reference === 0 && now.stages.length === 0, JSON.stringify({ lines: now.lines, stages: now.stages }));
+        check('preheat, in Targets: the six live cards, with no values and a time of zero', now.row.mode === 'live' && now.row.cards[0].value === '0.0 s' && now.row.cards.slice(1).every(c => c.value === '—'), JSON.stringify(now.row.cards));
+        await shot(page, 'preheat-targets-light');
+        await page.locator('#cafe-view button[data-view="reference"]').click();
+        await page.waitForTimeout(800);
+
+        // Stopped in the Preheat.
+        feed.fake('idle', 'idle');
+        await page.waitForTimeout(1500);
+        feed.pass();
+        await page.waitForTimeout(1500);
+        now = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('stopped in the Preheat: the latest is back, with its time, its lines and the reference\'s',
+            now.legend.label === 'Latest' && now.legend.when === rest.legend.when && JSON.stringify(now.lines.points) === JSON.stringify(rest.lines.points) && near(now.lines.end, rest.lines.end, 0.01),
+            JSON.stringify({ legend: now.legend, lines: now.lines, was: rest.lines }));
+        check('stopped in the Preheat: its stage names are back', JSON.stringify(now.stages) === JSON.stringify(rest.stages), JSON.stringify(now.stages));
+        check('stopped in the Preheat: the five cards at rest, as before', now.row.mode === 'rest' && JSON.stringify(now.row.cards) === JSON.stringify(rest.row.cards), JSON.stringify(now.row.cards));
+        check('stopped in the Preheat: no Shot was saved', (await newestId()) === second);
+        // Still the latest after the page looks again.
+        await page.waitForTimeout(3000);
+        check('stopped in the Preheat: still the latest a moment later', (await legend(page)).when === rest.legend.when && (await ownLines(page)).own === rest.lines.own);
+
+        // A page opened during a Preheat.
+        feed.fake('espresso', 'preparingForShot');
+        await view.close();
+        view = await openPage({ machine: feed });
+        ({ page, seen } = view);
+        await waitForPage(page);
+        await page.waitForTimeout(5000);
+        now = { legend: await legend(page), lines: await ownLines(page), row: await row(page) };
+        check('a page opened during a Preheat is live: "Live shot", nothing of the latest, the live cards with a time of zero',
+            now.legend.label === 'Live shot' && now.lines.own === 0 && now.lines.reference > 10 && now.row.mode === 'live' && now.row.cards[0].value === '0.0 s',
+            JSON.stringify({ legend: now.legend, lines: now.lines, row: now.row.cards.map(c => c.value) }));
+        await shot(page, 'preheat-reloaded-light');
+        feed.fake('idle', 'idle');
+        await page.waitForTimeout(1500);
+        feed.pass();
+        await page.waitForTimeout(2500);
+        check('and its shot stopped in the Preheat puts the latest back', (await legend(page)).label === 'Latest' && (await legend(page)).when === rest.legend.when && (await ownLines(page)).own === rest.lines.own);
+
+        // A real shot with a long Preheat: the profile starts when the hold ends.
+        let atStart = null;
+        feed.hold();
+        const third = await pull(4, async () => {
+            await page.waitForTimeout(2500);
+            const held = await ownLines(page);
+            check('a shot\'s long Preheat: nothing drawn, the axis the live one', held.own === 0 && near(held.end, preheatEnd), JSON.stringify(held));
+            const draws = countDraws(page, 1500);
+            feed.pass();
+            await page.waitForTimeout(400);
+            const ends = [];
+            for (let i = 0; i < 4; i += 1) { ends.push((await ownLines(page)).end); await page.waitForTimeout(150); }
+            atStart = { ends, first: await firstTime(page, 'Pressure'), legend: (await legend(page)).label, draws: await draws, own: (await ownLines(page)).own };
+        });
+        check('the profile starting: its first sample is drawn at time zero', atStart && atStart.own > 0 && typeof atStart.first === 'number' && atStart.first >= 0 && atStart.first < 0.5, JSON.stringify(atStart));
+        check('the profile starting: the time axis stays where the Preheat had it', atStart && atStart.ends.every(end => near(end, preheatEnd)), JSON.stringify(atStart?.ends));
+        check('the profile starting: still "Live shot", the frames appended', atStart && atStart.legend === 'Live shot' && atStart.draws.appended > 0, JSON.stringify(atStart));
+        check('the shot with a long Preheat was saved', !!third);
+        for (let waited = 0; waited < 20_000 && (await legend(page)).when === rest.legend.when; waited += 1000) await sleep(1000);
+        check('and once saved it is the latest', (await legend(page)).label === 'Latest' && (await legend(page)).when !== rest.legend.when, JSON.stringify(await legend(page)));
+
+        // A shot with no Preheat frame.
+        let noPreheat = null;
+        feed.drop();
+        const fourth = await pull(4, async () => {
+            await page.waitForTimeout(1800);
+            noPreheat = { legend: (await legend(page)).label, own: (await ownLines(page)).own, first: await firstTime(page, 'Pressure'), row: (await row(page)).mode };
+        });
+        feed.pass();
+        check('a shot with no Preheat frame goes live and draws from time zero, as before', noPreheat && noPreheat.legend === 'Live shot' && noPreheat.own > 0 && noPreheat.first >= 0 && noPreheat.first < 0.5 && noPreheat.row === 'live', JSON.stringify(noPreheat));
+        check('the shot with no Preheat frame was saved', !!fourth);
+        check('preheat: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+        await view.close();
+
+        // With no recipe loaded.
+        await unloadRecipe();
+        view = await openPage({ machine: feed });
+        ({ page, seen } = view);
+        await waitForPage(page);
+        await page.waitForTimeout(5000);
+        const last = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('no recipe, at rest: "Last shot" with its lines', last.legend.label === 'Last shot' && last.lines.own > 10, JSON.stringify(last.legend));
+        feed.fake('espresso', 'preparingForShot');
+        await page.waitForTimeout(1500);
+        now = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('no recipe, the Preheat: "Live shot", nothing drawn, the live cards with a time of zero',
+            now.legend.label === 'Live shot' && now.lines.own === 0 && now.stages.length === 0 && now.row.mode === 'live' && now.row.cards[0].value === '0.0 s', JSON.stringify({ legend: now.legend, lines: now.lines, row: now.row.cards.map(c => c.value) }));
+        await shot(page, 'preheat-no-recipe-light');
+        feed.fake('idle', 'idle');
+        await page.waitForTimeout(1500);
+        feed.pass();
+        await page.waitForTimeout(2000);
+        now = { legend: await legend(page), lines: await ownLines(page), stages: await stageNames(page), row: await row(page) };
+        check('no recipe, stopped in the Preheat: "Last shot" is back, with its time, lines, stage names and cards',
+            now.legend.label === 'Last shot' && now.legend.when === last.legend.when && JSON.stringify(now.lines.points) === JSON.stringify(last.lines.points)
+            && JSON.stringify(now.stages) === JSON.stringify(last.stages) && now.row.mode === 'rest' && JSON.stringify(now.row.cards) === JSON.stringify(last.row.cards),
+            JSON.stringify({ legend: now.legend, lines: now.lines.points, was: last.lines.points }));
+        check('no recipe: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+    } finally {
+        feed.pass();
+        await view.close().catch(() => {});
+        await decaid('PUT', '/machine/state/idle').catch(() => {});
+        await decaid('POST', REFERENCES, choicesBefore || {}).catch(() => {});
+        if (viewBefore !== null) await decaid('POST', GRAPH_VIEW, viewBefore).catch(() => {});
+        await unloadRecipe().catch(() => {});
+        for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
+    }
+}
+
 // ── The run ──────────────────────────────────────────────────────────────────
 
 await mkdir(OUT, { recursive: true });
@@ -2188,7 +2457,7 @@ if ((await decaid('GET', '/plugins')).some(plugin => plugin.id === 'decent-sync.
 
 // --only=profile: step 25 alone, on a Decaid a whole run has already set up.
 if (ONLY) {
-    const steps = { profile: profileChange };
+    const steps = { profile: profileChange, preheat: preheatLive };
     try {
         if (!steps[ONLY]) throw new Error(`no step named "${ONLY}": ${Object.keys(steps).join(', ')}`);
         await setSetting(true);
@@ -3502,6 +3771,7 @@ try {
     await baristaAtTheMachine();
     await unloadByTap();
     await profileChange();
+    await preheatLive();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
 } finally {

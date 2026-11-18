@@ -243,7 +243,7 @@ test('the graph\'s Shot is assigned only from what graph-state.js answers', () =
     // graph.js keeps the module's state whole: it never sets the Shot in the
     // graph, its reference or its rating and note itself.
     const graph = SOURCES.find(({ name }) => name === 'graph.js').text;
-    assert.deepEqual([...graph.matchAll(/\bstate\s*=(?!=)[^;]*/g)].map(match => match[0]), ['state = initialGraphState()', 'state = step.state', 'state = initialGraphState({ live: !!window.app?.isShotActive?.() })']);
+    assert.deepEqual([...graph.matchAll(/\bstate\s*=(?!=)[^;]*/g)].map(match => match[0]), ['state = initialGraphState()', 'state = step.state', 'state = initialGraphState()']);
     assert.doesNotMatch(graph, /\b(latest|reference|remarks|recipe|live|settling|handed)\s*=(?!=)/);
     assert.doesNotMatch(graph, /\bstate\.\w+\s*=(?!=)/);
 });
