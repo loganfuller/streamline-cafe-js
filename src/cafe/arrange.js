@@ -13,6 +13,7 @@ import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { placeInSlot, removeFromSlot } from './recipe-writer.js';
+import { unloadSelection } from './recipe-loader.js';
 import { recipeName, SLOT_COUNT } from './strip-model.js';
 import { cafeText } from './text.js';
 
@@ -27,12 +28,16 @@ const failed = text => showToast(text, 4000, 'error');
 // sound while that request retries: Streamline's apply writes the marker with
 // the Workflow itself, and DYE2 reads the selection from the marker, so DYE2
 // names the recipe as loaded whether or not the request has landed.
+//
+// This is the page's one way to clear DYE2's selection: a tap on the loaded
+// card unloads through it too (strip.js).
+export const clearSelection = () => unloadSelection({ forget: forgetAppliedItem, post: () => callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', {}) });
+
 async function unloadIfLoaded(recipeId) {
     try {
         const selection = await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', null, 'GET');
         if (!selection || selection.kind !== 'recipe' || String(selection.id) !== String(recipeId)) return;
-        forgetAppliedItem();
-        await callPluginEndpoint(DYE2_PLUGIN_ID, 'selection', {});
+        await clearSelection();
     } catch (error) {
         // The page goes on naming the recipe as loaded, which is then still true.
         logger.warn('Cafe: could not unload the recipe that left its slot', error);

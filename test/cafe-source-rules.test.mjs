@@ -147,6 +147,20 @@ test('no module opens one of DYE2\'s pages', () => {
     assert.deepEqual(filesWith(/\bopenPluginOverlay\b|recipe-edit|\bopenGrinderSurface\b|grinder-picker/), []);
 });
 
+test('DYE2\'s selection is cleared in one place, after Streamline\'s strip module is told', () => {
+    // Every request to DYE2's selection but a read is the unload's, in
+    // arrange.js, which a tap on the loaded card and a recipe leaving its slot
+    // both go through. unloadSelection calls forgetAppliedItem before the post
+    // (test/cafe-recipe-loader.test.mjs); this keeps the post inside it.
+    const posts = SOURCES.flatMap(({ name, text }) => [...text.matchAll(/callPluginEndpoint\(\s*DYE2_PLUGIN_ID\s*,\s*'selection'\s*,([^)]*)\)/g)]
+        .filter(match => !/'GET'/.test(match[1])).map(() => name));
+    assert.deepEqual(posts, ['arrange.js']);
+    const arrange = SOURCES.find(({ name }) => name === 'arrange.js').text;
+    assert.match(arrange, /unloadSelection\(\{ forget: forgetAppliedItem, post: \(\) => callPluginEndpoint\(DYE2_PLUGIN_ID, 'selection', \{\}\) \}\)/);
+    assert.deepEqual(filesWith(/\bunloadSelection\b/), ['arrange.js', 'recipe-loader.js']);
+    assert.deepEqual(filesWith(/\bclearSelection\b/), ['arrange.js', 'strip.js']);
+});
+
 test('Streamline\'s strip module is asked for three things only', () => {
     // Its apply, its start, and the one hook the fork added to it.
     const names = new Set();
