@@ -58,6 +58,7 @@ export const SHRINK_ADOPT_MS = 1500;
 //    than the layout window on such a WebView. A shrink is measured from it, so
 //    that gap never counts as a keyboard, and a keyboard that closes clears the
 //    mark even though the screen never gets back to the full window.
+//  - `pendingVisible`: while a shrink waits to be adopted, the least room seen.
 export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editing, now, force = false }) {
     // The keyboard shows up as either of these, depending on the WebView, so the
     // shorter one decides whether the screen lost room. Only the layout window
@@ -74,7 +75,10 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     });
 
     if (force || widthChanged) return adopt();
-    if (shortest >= resting) {
+    // Back to the resting room, in a window no shorter than the baseline. A
+    // shorter window whose room still reaches the old resting room is a host
+    // resize, adopted below once it has held, not a grow.
+    if (shortest >= resting && rawHeight >= baseline) {
         const baselineHeight = Math.max(rawHeight, baseline);
         return {
             baselineHeight, baselineWidth: rawWidth, baselineVisible: shortest,
@@ -82,12 +86,21 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
         };
     }
 
-    const keyboardLike = !!state?.keyboardLike || editing;
+    // A shrink already waiting to be adopted, which nothing was typed into, is
+    // a keyboard only if the screen loses more room while something is typed
+    // into: a gap that appeared just before a field took focus would otherwise
+    // count as a keyboard until the screen got that room back, which a lasting
+    // gap never does. A keyboard opens after its field has focus, so its first
+    // shrink is seen while typing and never waits.
+    const waiting = !state?.keyboardLike && state?.shrunkSince > 0;
+    const floor = waiting ? state.pendingVisible ?? Infinity : Infinity;
+    const keyboardLike = !!state?.keyboardLike || (editing && shortest < floor);
     const shrunkSince = state?.shrunkSince || now;
     if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
     return {
         baselineHeight: baseline, baselineWidth: state?.baselineWidth ?? rawWidth,
-        baselineVisible: resting, shrunkSince, keyboardLike, shrunk: true,
+        baselineVisible: resting, pendingVisible: Math.min(floor, shortest),
+        shrunkSince, keyboardLike, shrunk: true,
     };
 }
 

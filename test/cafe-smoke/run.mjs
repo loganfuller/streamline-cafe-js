@@ -221,8 +221,6 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
 // visualViewport, to stand in for a soft keyboard. Every change of the canvas's
 // transform is kept in `window.__cafeTransforms`. The machine reports buttons of
 // its own, as a DE1Pro does, so Settings, Shots and Sleep sit at the bottom of
-// the dial-in column, close to the screen's bottom edge. The machine reports buttons of
-// its own, as a DE1Pro does, so Settings, Shots and Sleep sit at the bottom of
 // the dial-in column, close to the screen's bottom edge.
 async function openTouchPage(short) {
     const context = await browser.newContext({
@@ -1810,10 +1808,13 @@ try {
         const shotsOpened = await page.locator('#cafe-shots-dialog[open]').waitFor({ timeout: 5000 }).then(() => true, () => false);
         check(`${short} px short: one tap on Shots opens the list, and the canvas doesn't move`, shotsOpened && (await moved()).length === 0, JSON.stringify(await moved()));
         await shot(page, `touch-${short}px-shots`);
+        const focused = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.tagName);
         await page.keyboard.press('Escape');
-        await page.locator('#cafe-shots-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        const shotsClosed = await page.locator('#cafe-shots-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).then(() => true, () => false);
         await page.waitForTimeout(500);
-        check(`${short} px short: with the list closed and focus back on Shots, the canvas is where it was`, (await transform()) === resting, await transform());
+        const afterList = { closed: shotsClosed, focus: await focused(), transform: await transform() };
+        check(`${short} px short: with the list closed and focus back on Shots, the canvas is where it was`,
+            afterList.closed && afterList.focus === 'cafe-shots-btn' && afterList.transform === resting, JSON.stringify(afterList));
 
         await mark();
         await page.tap('#sleep-button');
@@ -1843,27 +1844,31 @@ try {
             await keyboard(short + 360);
             const visible = 800 - short - 360;
             const typing = await noteDialog(page);
+            const typingFocus = await focused();
             await shot(page, `touch-${short}px-note-keyboard`);
             check(`${short} px short: with a keyboard up over the note's text the dialog sits above it`,
-                !!typing && typing.box.top >= 0 && typing.box.bottom <= visible + 1, `${JSON.stringify(typing?.box)} in ${visible}`);
+                !!typing && typingFocus === 'cafe-note-text' && typing.box.top >= 0 && typing.box.bottom <= visible + 1,
+                `${JSON.stringify(typing?.box)} in ${visible}, focus on ${typingFocus}`);
             //     Save note takes focus with the keyboard still up: the dialog
             //     still fits, and the canvas behind it isn't lifted for it.
             await page.locator('#cafe-note-save').focus();
             await page.waitForTimeout(300);
             const save = await page.locator('#cafe-note-save').evaluate(element => Math.round(element.getBoundingClientRect().bottom));
-            check(`${short} px short: a button in the dialog focused with the keyboard up is above it`, save <= visible + 1, `${save} in ${visible}`);
+            const saveFocus = await focused();
+            check(`${short} px short: a button in the dialog focused with the keyboard up is above it`,
+                saveFocus === 'cafe-note-save' && save <= visible + 1, `${save} in ${visible}, focus on ${saveFocus}`);
             //     Cancel with the keyboard still up: focus goes back to the page,
             //     whose canvas is lifted so that button clears the keyboard.
             await page.locator('#cafe-note-cancel').focus();
             await page.keyboard.press('Enter');
-            await closed(page);
+            const noteClosed = await closed(page);
             await page.waitForTimeout(400);
             const back = await page.evaluate(() => {
                 const element = document.activeElement;
                 return { id: element?.id || element?.tagName, bottom: Math.round(element?.getBoundingClientRect().bottom ?? -1) };
             });
-            check(`${short} px short: back on the page with the keyboard up, the focused button clears it`,
-                back.bottom > 0 && back.bottom <= visible, JSON.stringify(back));
+            check(`${short} px short: back on the page with the keyboard up, the note's button has focus and clears it`,
+                noteClosed && back.id === 'cafe-shot-note' && back.bottom > 0 && back.bottom <= visible, JSON.stringify(back));
             //     Shots, at the screen's bottom, focused with the keyboard still
             //     up: the canvas lifts so it clears the keyboard.
             await page.locator('#cafe-shots-btn').focus();

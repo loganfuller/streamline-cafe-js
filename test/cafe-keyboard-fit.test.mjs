@@ -113,6 +113,43 @@ for (const gap of [0.5, 30]) {
     });
 }
 
+test('a gap that appears just before a field takes focus is not a keyboard', () => {
+    const visibleHeight = H - 30;
+    const pending = track(boot(), { visibleHeight });
+    assert.ok(pending.shrunkSince > 0 && !pending.keyboardLike, 'waiting to be adopted');
+
+    // The field takes focus before the gap is adopted, and nothing shrinks more.
+    const focused = track(pending, { visibleHeight, editing: true, now: t0 + 500 });
+    assert.equal(focused.keyboardLike, false);
+    assert.equal(liftFor(focused, LOW_FIELD, visibleHeight), 0);
+    // So it is adopted on time, typing or not, and a button tapped later stays put.
+    const adopted = track(focused, { visibleHeight, editing: true, now: t0 + SHRINK_ADOPT_MS });
+    assert.deepEqual([adopted.baselineHeight, adopted.baselineVisible, adopted.keyboardLike], [H, visibleHeight, false]);
+    assert.equal(liftFor(track(adopted, { visibleHeight, now: t0 + 5000 }), SHOTS_BUTTON, visibleHeight), 0);
+});
+
+test('a keyboard that opens while a gap waits to be adopted is still a keyboard', () => {
+    const pending = track(boot(), { visibleHeight: H - 30 });
+    const up = track(pending, { visibleHeight: 440, editing: true, now: t0 + 500 });
+    assert.equal(up.keyboardLike, true);
+    assert.ok(liftFor(up, LOW_FIELD, 440) > 0);
+    assert.equal(track(up, { visibleHeight: 440, now: t0 + 60_000 }).baselineHeight, H, 'never adopted');
+    // A further shrink seen while nothing is typed into only lowers the mark.
+    const lower = track(pending, { visibleHeight: H - 40, now: t0 + 200 });
+    assert.deepEqual([lower.keyboardLike, lower.pendingVisible], [false, H - 40]);
+    assert.equal(track(lower, { visibleHeight: H - 40, editing: true, now: t0 + 300 }).keyboardLike, false);
+});
+
+test('a host resize that leaves a gapped screen its room is adopted as a smaller window', () => {
+    // At rest 800 tall with 770 of room; the host makes the window 780 with no gap.
+    const start = track(boot(H - 30), { visibleHeight: H - 30 });
+    const pending = track(start, { rawHeight: 780, visibleHeight: 780 });
+    assert.ok(pending.shrunkSince > 0, 'not taken as a grow back to the resting room');
+    assert.equal(liftFor(pending, SHOTS_BUTTON, 780), 0);
+    const adopted = track(pending, { rawHeight: 780, visibleHeight: 780, now: t0 + SHRINK_ADOPT_MS });
+    assert.deepEqual([adopted.baselineHeight, adopted.baselineVisible, adopted.shrunk], [780, 780, false]);
+});
+
 test('a keyboard on a screen with no gap still lifts as before', () => {
     const up = track(boot(), { visibleHeight: 440, editing: true });
     assert.equal(up.keyboardLike, true);
