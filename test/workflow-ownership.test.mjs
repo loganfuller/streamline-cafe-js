@@ -93,6 +93,7 @@ const SNAPSHOT = {
     'cafe.barista': 'context.baristaName',
     'cafe.basket': 'context.extras.basketId context.extras.basketName',
     'cafe.grinder': 'context.extras.rpm context.grinderId context.grinderModel context.grinderSetting',
+    'cafe.profile': 'profile',
     'dye.applyFavourite': 'context.baristaName context.basket context.beanBatchId context.coffeeName context.coffeeRoaster context.drinkerName context.extras.basketId context.extras.basketName context.extras.dye context.extras.feedRate context.extras.note context.extras.rpm context.grinderId context.grinderModel context.grinderSetting context.roastDate context.targetDoseWeight context.targetYield profile',
     'dye.applyRecipe': 'context.baristaName context.basket context.beanBatchId context.coffeeName context.coffeeRoaster context.drinkerName context.extras.basketId context.extras.basketName context.extras.dye context.extras.feedRate context.extras.rpm context.grinderId context.grinderModel context.grinderSetting context.targetDoseWeight context.targetYield hotWaterData.duration hotWaterData.flow hotWaterData.targetTemperature hotWaterData.volume profile rinseData steamSettings.duration steamSettings.flow steamSettings.stopAtTemperature steamSettings.targetTemperature',
     'dye.clearOnDisable': 'context.baristaName context.basket context.beanBatchId context.coffeeName context.coffeeRoaster context.drinkerName context.extras.dye context.extras.rpm',

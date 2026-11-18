@@ -174,6 +174,11 @@ export const WORKFLOW_WRITERS = {
     // cleared when the machine is seen asleep: the name alone, in one write.
     // Listed in docs/cafe/UPSTREAM_EDITS.md.
     'cafe.barista': ['context.baristaName'],
+    // The profile changed from the main page, with a recipe loaded only after
+    // the recipe's DYE2 record holds it: the profile alone, with the yield as its
+    // stop weight, never the recipe id or the dial-in. Listed in
+    // docs/cafe/UPSTREAM_EDITS.md.
+    'cafe.profile': ['profile'],
 };
 
 // --- what a recipe apply must not inherit (#189) ---------------------------
