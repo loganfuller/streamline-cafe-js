@@ -129,7 +129,8 @@ const namesRecipe = (selection, id) => !!selection && selection.kind === 'recipe
  * - `rows`, DYE2's records, or null when they could not be read;
  * - `recipeId`, the recipe whose record took the profile, and `record`, the profile;
  * - `befores`, the profiles the record had before the change (`heldProfile`),
- *   and before any earlier change whose check this one took over;
+ *   and the ones any earlier change found and wrote, where that change's check
+ *   had not run or had to write the record again;
  * - `selection`, DYE2's, or undefined when it could not be asked;
  * - `tapped`, whether a tap on the strip has loaded or unloaded a recipe since;
  * - `live`, the Workflow's profile, or null when it could not be read.
@@ -204,11 +205,12 @@ export function createProfileChange({
     idle = async () => {}, wait, onChecked = () => {},
 }) {
     // The latest change made to each recipe's record: `{ generation, befores,
-    // done }`. A check for an earlier one is superseded: it would read the
-    // later change as its own record set back (A, then B, then A again) and
-    // write B over it. The later check takes over the profiles the earlier one
-    // would have known as set back, while that one has not run: a DYE2 save
-    // begun before both may write back the first.
+    // mine, rewrote, done }`, `mine` the profile it wrote. A check for an
+    // earlier one is superseded: it would read the later change as its own
+    // record set back (A, then B, then A again) and write B over it. The later
+    // check takes over the profiles the earlier one found and wrote, while that
+    // one's check has not run or had to write the record again (`done` stays
+    // false): a DYE2 save begun before either may write back what it read.
     const latest = new Map();
     let changes = 0;
     // A write the check must not make now: its turn is tried again later.
@@ -262,7 +264,7 @@ export function createProfileChange({
             const earlier = latest.get(recipeId);
             const befores = earlier && !earlier.done ? [...earlier.befores, earlier.mine, before] : [before];
             const mine = heldProfile({ profileId: record.id, workflow: { profile: record.profile } });
-            latest.set(recipeId, { generation, befores, mine, done: false });
+            latest.set(recipeId, { generation, befores, mine, rewrote: false, done: false });
             // The record holds the profile; a shot or an arrangement begun
             // meanwhile gets no Workflow write, as one that failed.
             if (!settled()) return { ok: false, reason: 'workflow' };
@@ -296,8 +298,10 @@ export function createProfileChange({
         const entry = entryOf(change);
         if (!entry) return 'superseded';
         const plan = await readPlan(change, entry.befores);
+        // A later change made while it read has its own check.
+        if (!entryOf(change)) return 'superseded';
         if (plan.rewrite || plan.reload) return null;
-        entry.done = true;
+        if (!entry.rewrote) entry.done = true;
         return plan.outcome;
     }
 
@@ -306,14 +310,16 @@ export function createProfileChange({
         const entry = entryOf(change);
         if (!entry) return 'superseded';
         const plan = await readPlan(change, entry.befores);
-        const outcome = await act(change, entry.befores, plan);
-        // A rewrite says a DYE2 save wrote the old list back, and another may
-        // yet: a later change keeps what this one knew as set back.
-        if (!plan.rewrite) entry.done = true;
+        const outcome = await act(change, entry, plan);
+        // A rewrite, in this turn or one given up after it, says a DYE2 save
+        // wrote the old list back, and another may yet: a later change keeps
+        // what this one knew as set back.
+        if (!entry.rewrote) entry.done = true;
         return outcome;
     }
 
-    async function act({ recipeId, record, at }, befores, plan) {
+    async function act({ recipeId, record, at }, entry, plan) {
+        const { befores } = entry;
         if (plan.rewrite) {
             if (!settled()) throw notNow();
             const result = await saveRecord(recipeId, (row, rowsNow) => recordFields(row, rowsNow, record), {
@@ -327,6 +333,7 @@ export function createProfileChange({
             });
             if (!result.ok && result.reason === 'busy') throw notNow();
             if (!result.ok) return result.reason === 'moved' ? 'moved' : 'lost';
+            entry.rewrote = true;
         }
         if (!plan.reload) return plan.outcome;
         // A tap since the read: the strip is the barista's.

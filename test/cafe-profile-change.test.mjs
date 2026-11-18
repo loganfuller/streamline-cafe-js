@@ -601,3 +601,16 @@ test('a DYE2 save that read the record after an earlier change writes that chang
     assert.equal(w.get('r1').profileId, BLOOM.id);
     assert.equal(w.recipeId(), 'r1');
 });
+
+test('a check that had to write the record again: the next change still writes back the profile the first one found', async () => {
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    // Each check's window: DYE2 writes back the list it read before the first change.
+    w.onWait = world => { world.rows = [copy(original)]; };
+    const first = await w.change(BLOOM.id);
+    assert.equal(await first.checked, 'rewritten');
+    const second = await w.change(OTHER.id);
+    assert.equal(await second.checked, 'rewritten', 'Turbo, the first change\'s, is known as set back');
+    assert.equal(w.get('r1').profileId, OTHER.id);
+    assert.equal(w.recipeId(), 'r1');
+});
