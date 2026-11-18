@@ -2,8 +2,8 @@
 // Streamline (docs/cafe/DESIGN.md, "Changing the profile"). What it decides is
 // worked out in profile-change.js, which touches no browser global.
 //
-// Nothing on the page calls it yet: the profile dialog (issue #51) will. The
-// smoke run calls `changeProfile` from the page itself.
+// The profile dialog (profile-dialog.js) calls it, and nothing else on the page
+// does. The smoke run calls `changeProfile` from the page itself too.
 import { getProfiles, getWorkflow, getDye2KvArray, callPluginEndpoint, updateWorkflow, getEspressoEndedAt } from '../modules/api.js';
 import { setActiveProfile } from '../modules/profileManager.js';
 import { logger } from '../modules/logger.js';

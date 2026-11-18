@@ -74,7 +74,7 @@ test('a choice in a pick dialog writes the Workflow, through its own writer, and
     assert.deepEqual(writes('barista-dialog.js'), ["patch, 'cafe.barista'", "patch, 'cafe.barista'"]);
     const barista = SOURCES.find(source => source.name === 'barista-dialog.js').text;
     assert.equal([...barista.matchAll(/await write\(/g)].length, 2, 'both writes go through write()');
-    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'bean-dialog.js', 'bean-model.js', 'basket-dialog.js', 'basket-model.js', 'barista-dialog.js', 'barista-model.js', 'pick-dialog.js']) {
+    for (const name of ['grinder-dialog.js', 'grinder-model.js', 'bean-dialog.js', 'bean-model.js', 'basket-dialog.js', 'basket-model.js', 'barista-dialog.js', 'barista-model.js', 'profile-dialog.js', 'profile-model.js', 'pick-dialog.js']) {
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /from '\.\/(recipe-writer|recipe-write|arrange)\.js'|save-recipe|\/record\b|setDye2Kv|setKVValue/, name);
     }
@@ -227,6 +227,19 @@ test('the barista lives in the Workflow alone', () => {
     assert.doesNotMatch(SOURCES.find(({ name }) => name === 'cafe-store.js').text, /barista/i);
 });
 
+test('the profile dialog changes the profile through changeProfile alone', () => {
+    // The record first, then the Workflow, both in profile-changer.js: the
+    // dialog adds no write of a DYE2 record or of the Workflow.
+    assert.deepEqual(filesWith(/\bchangeProfile\(/), ['profile-changer.js', 'profile-dialog.js']);
+    assert.deepEqual(filesWith(/from '\.\/profile-changer\.js'/), ['page.js', 'profile-dialog.js']);
+    const dialog = SOURCES.find(source => source.name === 'profile-dialog.js').text;
+    assert.deepEqual([...dialog.matchAll(/\bchangeProfile\(([^)]*)\)/g)].map(match => match[1]), ['row.id']);
+    for (const name of ['profile-dialog.js', 'profile-model.js']) {
+        const { text } = SOURCES.find(source => source.name === name);
+        assert.doesNotMatch(text, /\b(updateWorkflow|putWorkflow|sendProfile|setActiveProfile|setRecipeFields|markLoaded|callPluginEndpoint)\b/, name);
+    }
+});
+
 test('no module writes Streamline\'s strip mode', () => {
     assert.deepEqual(filesWith(/\bsetStripMode\b|dyeStripMode/), []);
 });
@@ -234,7 +247,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });
