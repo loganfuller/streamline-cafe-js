@@ -21,6 +21,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, PRESET_GRINDER, QUARTER_GRINDER, RECIPES, BARISTAS } from './sample-data.mjs';
+import { KEYBOARD_GAP } from '../../src/modules/keyboard-fit.js';
 import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, sides, stageNames, remarks, noteDialog, legendFits, REFERENCE_LINES, shotsHeader } from './page-helpers.mjs';
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
@@ -210,6 +211,46 @@ async function openPage({ theme = 'light', machineButtons = true, decentSync = n
             }, COLD_START_MS);
         });
     }
+    await page.goto(`${BASE}/index.html`);
+    return { page, seen, close: () => context.close() };
+}
+
+// A tablet's touchscreen at 1340x800 whose visualViewport rests `short` px
+// shorter than the window, as a WebView's can by a fraction of a pixel or a
+// system bar. `window.__cafeSmokeShort` changes it later, with a resize on
+// visualViewport, to stand in for a soft keyboard. Every change of the canvas's
+// transform is kept in `window.__cafeTransforms`. The machine reports buttons of
+// its own, as a DE1Pro does, so Settings, Shots and Sleep sit at the bottom of
+// the dial-in column, close to the screen's bottom edge.
+async function openTouchPage(short) {
+    const context = await browser.newContext({
+        viewport: { width: 1340, height: 800 }, hasTouch: true, timezoneId: TIMEZONE,
+        userAgent: 'Mozilla/5.0 (Linux; Android 13; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Safari/537.36',
+    });
+    await context.addInitScript(gap => {
+        window.__cafeSmokeShort = gap;
+        const height = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
+        Object.defineProperty(VisualViewport.prototype, 'height', {
+            configurable: true,
+            get() { return Math.max(0, height.get.call(this) - window.__cafeSmokeShort); },
+        });
+        window.__cafeTransforms = [];
+        document.addEventListener('DOMContentLoaded', () => {
+            const content = document.getElementById('scaled-content');
+            new MutationObserver(() => window.__cafeTransforms.push(content.style.transform))
+                .observe(content, { attributes: true, attributeFilter: ['style'] });
+        });
+    }, short);
+    const page = await context.newPage();
+    const seen = { errors: [], requests: [] };
+    page.on('pageerror', error => seen.errors.push(error.message));
+    page.on('request', request => seen.requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
+    await page.route('**/api/v1/machine/info', async route => {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), GHC: true } });
+    });
+    // Sleep is answered here, so the simulated machine stays awake for the run.
+    await page.route('**/api/v1/machine/state/sleeping', route => route.fulfill({ status: 200, json: {} }));
     await page.goto(`${BASE}/index.html`);
     return { page, seen, close: () => context.close() };
 }
@@ -2065,6 +2106,108 @@ try {
     }
 
     await grinderDialog();
+
+    // 19. A touchscreen whose screen rests short of its window (issue #38). A
+    //     button takes focus as it is pressed, and Streamline's keyboard lift used
+    //     to move the canvas then, so the button left the finger and the first
+    //     tap missed. One tap on Settings, Shots or Sleep acts, and the canvas
+    //     doesn't move. A keyboard over the note's text still leaves the dialog
+    //     in view, through Streamline's own scaling this time, and a button
+    //     focused with the keyboard up is lifted clear of it.
+    for (const short of [0.5, 30]) {
+        const touch = await openTouchPage(short);
+        const { page } = touch;
+        await waitForPage(page);
+        await page.waitForTimeout(2000); // past SHRINK_ADOPT_MS, as a tablet is long after load
+        const transform = () => page.evaluate(() => document.getElementById('scaled-content').style.transform);
+        const moved = () => page.evaluate(start => window.__cafeTransforms.slice(start), 0);
+        const mark = () => page.evaluate(() => { window.__cafeTransforms.length = 0; });
+        const resting = await transform();
+        const bottom = await page.locator('#cafe-system').evaluate(element => Math.round(element.getBoundingClientRect().bottom));
+        check(`${short} px short: Settings, Shots and Sleep end inside the band the lift used to catch (${KEYBOARD_GAP} px above the screen's bottom)`,
+            bottom + KEYBOARD_GAP > 800 - short && bottom <= 800, `the canvas rests at "${resting}", the buttons end at ${bottom} of 800`);
+
+        await mark();
+        await page.tap('#cafe-shots-btn');
+        const shotsOpened = await page.locator('#cafe-shots-dialog[open]').waitFor({ timeout: 5000 }).then(() => true, () => false);
+        check(`${short} px short: one tap on Shots opens the list, and the canvas doesn't move`, shotsOpened && (await moved()).length === 0, JSON.stringify(await moved()));
+        await shot(page, `touch-${short}px-shots`);
+        const focused = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.tagName);
+        await page.keyboard.press('Escape');
+        const shotsClosed = await page.locator('#cafe-shots-dialog:not([open])').waitFor({ state: 'attached', timeout: 5000 }).then(() => true, () => false);
+        await page.waitForTimeout(500);
+        const afterList = { closed: shotsClosed, focus: await focused(), transform: await transform() };
+        check(`${short} px short: with the list closed and focus back on Shots, the canvas is where it was`,
+            afterList.closed && afterList.focus === 'cafe-shots-btn' && afterList.transform === resting, JSON.stringify(afterList));
+
+        await mark();
+        await page.tap('#sleep-button');
+        await page.waitForTimeout(800);
+        check(`${short} px short: one tap on Sleep asks for sleep, and the canvas doesn't move`,
+            touch.seen.requests.includes('PUT /api/v1/machine/state/sleeping') && (await moved()).length === 0, JSON.stringify(await moved()));
+
+        await mark();
+        await page.tap('#settings-btn');
+        const settingsOpened = await page.locator('#subpage-host #settings-content-area').waitFor({ timeout: 10_000 }).then(() => true, () => false);
+        const settingsMoved = await moved();
+        check(`${short} px short: one tap on Settings opens the settings page, and the canvas doesn't move`, settingsOpened && settingsMoved.length === 0, JSON.stringify(settingsMoved));
+        await page.goBack();
+        await waitForPage(page);
+        await page.waitForTimeout(500);
+
+        //     A keyboard that takes 360 px opens over the note's text.
+        const open = await page.locator('#cafe-shot-note').isVisible();
+        if (open) {
+            await page.tap('#cafe-shot-note');
+            await page.waitForTimeout(400);
+            await page.tap('#cafe-note-text');
+            const keyboard = async px => {
+                await page.evaluate(gap => { window.__cafeSmokeShort = gap; window.visualViewport.dispatchEvent(new Event('resize')); }, px);
+                await page.waitForTimeout(600);
+            };
+            await keyboard(short + 360);
+            const visible = 800 - short - 360;
+            const typing = await noteDialog(page);
+            const typingFocus = await focused();
+            await shot(page, `touch-${short}px-note-keyboard`);
+            check(`${short} px short: with a keyboard up over the note's text the dialog sits above it`,
+                !!typing && typingFocus === 'cafe-note-text' && typing.box.top >= 0 && typing.box.bottom <= visible + 1,
+                `${JSON.stringify(typing?.box)} in ${visible}, focus on ${typingFocus}`);
+            //     Save note takes focus with the keyboard still up: the dialog
+            //     still fits, and the canvas behind it isn't lifted for it.
+            await page.locator('#cafe-note-save').focus();
+            await page.waitForTimeout(300);
+            const save = await page.locator('#cafe-note-save').evaluate(element => Math.round(element.getBoundingClientRect().bottom));
+            const saveFocus = await focused();
+            check(`${short} px short: a button in the dialog focused with the keyboard up is above it`,
+                saveFocus === 'cafe-note-save' && save <= visible + 1, `${save} in ${visible}, focus on ${saveFocus}`);
+            //     Cancel with the keyboard still up: focus goes back to the page,
+            //     whose canvas is lifted so that button clears the keyboard.
+            await page.locator('#cafe-note-cancel').focus();
+            await page.keyboard.press('Enter');
+            const noteClosed = await closed(page);
+            await page.waitForTimeout(400);
+            const back = await page.evaluate(() => {
+                const element = document.activeElement;
+                return { id: element?.id || element?.tagName, bottom: Math.round(element?.getBoundingClientRect().bottom ?? -1) };
+            });
+            check(`${short} px short: back on the page with the keyboard up, the note's button has focus and clears it`,
+                noteClosed && back.id === 'cafe-shot-note' && back.bottom > 0 && back.bottom <= visible, JSON.stringify(back));
+            //     Shots, at the screen's bottom, focused with the keyboard still
+            //     up: the canvas lifts so it clears the keyboard.
+            await page.locator('#cafe-shots-btn').focus();
+            await page.waitForTimeout(300);
+            const low = await page.locator('#cafe-shots-btn').evaluate(element => Math.round(element.getBoundingClientRect().bottom));
+            check(`${short} px short: Shots focused with the keyboard up is lifted clear of it`, low > 0 && low <= visible, `${low} in ${visible}, canvas "${await transform()}"`);
+            await keyboard(short);
+            check(`${short} px short: once the keyboard closes the canvas goes back to rest`, (await transform()) === resting, await transform());
+        } else {
+            check(`${short} px short: a Shot to write a note on is in the graph`, false);
+        }
+        check(`${short} px short: no page error`, touch.seen.errors.length === 0, touch.seen.errors.join(' | '));
+        await touch.close();
+    }
+
     await grindRow();
 } catch (error) {
     check(`the run finished (${error.message.split('\n')[0]})`, false);
