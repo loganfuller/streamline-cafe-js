@@ -9,6 +9,21 @@ export const BEANS = [
 
 export const GRINDER = { model: 'Sample Grinder 64' };
 
+// The bean and batch dialog's: Sample Blend has a second batch, roasted before
+// its first, and a third that is archived, which the dialog does not list.
+export const MORE_BATCHES = [
+    { bean: 'Sample Blend', roastDate: '2026-10-15T00:00:00Z' },
+    { bean: 'Sample Blend', roastDate: '2026-09-20T00:00:00Z', archived: true },
+];
+
+// DYE2's baskets, with ids, as its own basket page makes them, and one archived.
+// The recipes name the first two by id as well as by name.
+export const BASKETS = [
+    { id: 'bskt-sample-18', name: '18 g sample basket', size: 'double', diameterMm: 58, notes: '', createdAt: '2026-11-01T00:00:00.000Z' },
+    { id: 'bskt-sample-20', name: '20 g sample basket', size: 'double', diameterMm: 58, notes: '', createdAt: '2026-11-01T00:00:01.000Z' },
+    { id: 'bskt-sample-retired', name: 'Retired sample basket', size: 'single', diameterMm: 58, notes: '', createdAt: '2026-11-01T00:00:02.000Z', archived: true },
+];
+
 // The grinder dialog's: a second grinder, with burrs and a step of its own, and
 // one archived, which the dialog does not list. The run pulls a shot on each of
 // the two at a setting of its own (`GRINDER_USE`), which the dialog then says
