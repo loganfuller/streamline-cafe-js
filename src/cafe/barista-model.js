@@ -133,6 +133,15 @@ export function storeWait(endedAt, now) {
 }
 
 /**
+ * Resolve once Decaid has no Shot still to store: wait what `storeWait` leaves,
+ * and again for a shot that ended meanwhile. `endedAt()` and `now()` are read
+ * afresh each time round; `sleep(ms)` waits.
+ */
+export async function waitOutStore(endedAt, now, sleep) {
+    for (let ms = storeWait(endedAt(), now()); ms > 0; ms = storeWait(endedAt(), now())) await sleep(ms);
+}
+
+/**
  * Which read of the Workflow's barista the button shows: the newest. Each read
  * and write takes a ticket as it begins. `see(name)` paints a name a write
  * made, at once. `look()`, called as a read begins, answers what paints the

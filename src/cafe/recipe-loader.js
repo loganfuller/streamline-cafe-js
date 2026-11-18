@@ -35,7 +35,8 @@ const names = (selection, recipe) => !!selection && selection.kind === 'recipe' 
  * - `afterShot()` resolves once Decaid has stored the Shot of a pour that has
  *   just ended, at once when none has.
  * - `shotRunning()` says whether a shot runs. No card takes a tap during one,
- *   and a tap that finds one running once it is its turn does nothing.
+ *   and a tap that finds one running once it is its turn, or once DYE2 has
+ *   been read just before the write, does nothing.
  * - `onLoading(loading)` is told when a tap's load or unload begins and when the
  *   last one has finished, so the page can keep the dial-in still in between:
  *   an edit made then belongs to neither recipe for certain.
@@ -83,6 +84,8 @@ export function createRecipeLoader({
         const current = rows ? rows.find(r => r && r.id === recipe.id) : recipe;
         if (!current) throw new Error('The recipe is no longer in DYE2.');
         if (rows) recipes = rows;
+        // A shot that started during the read is left alone too.
+        if (shotRunning()) return;
         await apply(current);
         confirmed = current;
     }
@@ -92,11 +95,15 @@ export function createRecipeLoader({
         if (rows) recipes = rows;
         // A recipe DYE2 no longer names as loaded, unloaded or replaced elsewhere
         // meanwhile, is not unloaded again: that would unload whatever is loaded
-        // now. Where DYE2 could not be asked, the tap is taken at its word.
-        if (selection !== undefined && !names(selection, recipe)) {
+        // now. Where DYE2 could not be asked, that can't be ruled out, so the
+        // unload is not made, and fails.
+        if (selection === undefined) throw new Error('DYE2 could not say which recipe is loaded.');
+        if (!names(selection, recipe)) {
             confirmed = loadedAfterRead(selection, recipes, confirmed);
             return;
         }
+        // A shot that started during the read is left alone too.
+        if (shotRunning()) return;
         await unload();
         confirmed = null;
     }

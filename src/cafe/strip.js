@@ -20,7 +20,7 @@ import { stripCards, recipeName } from './strip-model.js';
 import { createRecipeLoader } from './recipe-loader.js';
 import { slotMenu } from './slot-menu.js';
 import { makeRecipeIn, chooseRecipeFor, removeRecipe, clearSelection } from './arrange.js';
-import { storeWait } from './barista-model.js';
+import { waitOutStore } from './barista-model.js';
 import { chooseRecipe } from './recipe-dialog.js';
 import { cafeText } from './text.js';
 
@@ -54,11 +54,9 @@ function within(ms, promise) {
 // Decaid stores a Shot, with the Workflow's recipe as it is then, up to its 4 s
 // backstop after the pour ends. A load or an unload tapped in those seconds
 // waits them out, so the Shot just pulled keeps the recipe it was pulled with.
-// The wait goes once Decaid stores the Shot before taking another change.
-function afterShot() {
-    const ms = storeWait(getEspressoEndedAt(), Date.now());
-    return ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
-}
+// A shot that ends during the wait gets its own. The wait goes once Decaid
+// stores the Shot before taking another change.
+const afterShot = () => waitOutStore(getEspressoEndedAt, Date.now, ms => new Promise(resolve => setTimeout(resolve, ms)));
 
 async function readDye2() {
     const [rows, selection] = await Promise.all([getDye2KvArray(RECIPES_KEY), readSelection()]);

@@ -523,6 +523,53 @@ test('a shot that starts during the wait after a pour leaves the recipe loaded, 
     assert.deepEqual(world.errors, []);
 });
 
+test('a shot that starts while DYE2 is read, just before the write, is left alone too', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
+    await loader.refresh();
+
+    // The unload's read of DYE2 is slow, and a shot starts during it.
+    const gate = deferred();
+    world.readGates.push(gate);
+    loader.tap(A);
+    await idle();
+    world.shot = true;
+    gate.resolve();
+    await idle();
+    assert.equal(world.unloads.length, 0, 'the running shot is not filed under no recipe');
+    assert.equal(world.last(), 'a');
+    assert.deepEqual(world.unloadErrors, []);
+
+    // And a load's.
+    world.shot = false;
+    const second = deferred();
+    world.readGates.push(second);
+    loader.tap(B);
+    await idle();
+    world.shot = true;
+    second.resolve();
+    await idle();
+    assert.equal(world.applies.length, 0, 'the running shot keeps its recipe');
+    assert.equal(world.last(), 'a');
+    assert.deepEqual(world.errors, []);
+});
+
+test('a tap on the loading card, after a tap on another, moves the highlight back and is loaded next', async () => {
+    const { loader, world } = build();
+    await loader.refresh();
+
+    loader.tap(A);
+    await idle();
+    loader.tap(B);
+    loader.tap(A);
+    assert.equal(world.last(), 'a', 'the newest tap is shown');
+    world.applies[0].resolve();
+    await idle();
+    assert.deepEqual(world.applies.map(a => a.recipe.id), ['a', 'a'], 'B, overtaken while it waited, is never written');
+    world.applies[1].resolve();
+    await idle();
+    assert.equal(world.last(), 'a');
+});
+
 test('an unload that DYE2 refuses says so, and the card stays highlighted', async () => {
     const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
     await loader.refresh();
@@ -574,14 +621,18 @@ test('a recipe already unloaded elsewhere is not unloaded again', async () => {
     assert.equal(world.last(), 'c');
 });
 
-test('with DYE2 unable to say what is loaded, the tap still unloads', async () => {
+test('with DYE2 unable to say what is loaded, the tap unloads nothing, and says so', async () => {
     const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
     await loader.refresh();
+    // Another recipe may have been loaded elsewhere meanwhile: clearing the
+    // selection would unload that one.
     world.selection = undefined;
 
     loader.tap(A);
     await idle();
-    assert.equal(world.unloads.length, 1);
+    assert.equal(world.unloads.length, 0);
+    assert.deepEqual(world.unloadErrors, ['a']);
+    assert.equal(world.last(), 'a', 'the card is highlighted again');
 });
 
 test('the unload tells Streamline\'s strip module before it clears DYE2\'s selection', async () => {
