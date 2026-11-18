@@ -227,8 +227,11 @@ const shot = (page, name) => page.screenshot({ path: join(OUT, `${name}.png`) })
 const label = page => page.locator('#cafe-dial-label').textContent();
 const waitLegend = (page, test, timeout = 30_000) => until(async () => { const now = await legend(page); return test(now) ? now : null; }, { timeout, every: 300 });
 // Tap a recipe's card, and let the load write the Workflow before anything else does.
+// A card already loaded is not tapped: a tap on it unloads it.
 async function load(page, recipe) {
-    await page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
+    const card = page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
+    if ((await card.getAttribute('aria-pressed')) === 'true' && (await page.locator('#cafe-title').textContent()) === recipe.name) return;
+    await card.click();
     await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(3000);
 }
