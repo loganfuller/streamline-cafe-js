@@ -19,6 +19,13 @@
 import { createLatestTaskRunner } from '../modules/latest-task-runner.js';
 import { loadedAfterRead } from './strip-model.js';
 
+// How long from its tap an unload holds the strip, so the second tap of a
+// double tap on the loaded card lands while it runs and is ignored, as during a
+// load. An unload alone is quick, often under the gap between two taps, and the
+// second tap would otherwise load the recipe again as stored. A load is slow
+// enough on its own and gets no such hold.
+export const UNLOAD_HOLD_MS = 400;
+
 // Does DYE2's selection name this recipe as the loaded one?
 const names = (selection, recipe) => !!selection && selection.kind === 'recipe' && String(selection.id) === String(recipe.id);
 
@@ -40,6 +47,8 @@ const names = (selection, recipe) => !!selection && selection.kind === 'recipe' 
  * - `onLoading(loading)` is told when a tap's load or unload begins and when the
  *   last one has finished, so the page can keep the dial-in still in between:
  *   an edit made then belongs to neither recipe for certain.
+ * - `hold()` resolves once an unload has run long enough that the second tap
+ *   of a double tap still finds it running. It is started at the tap.
  * - `onApplied()` runs after each load or unload, made or not.
  * - `onError(error, recipe)` is told of a load that failed, and
  *   `onUnloadError(error, recipe)` of an unload that failed.
@@ -50,6 +59,7 @@ const names = (selection, recipe) => !!selection && selection.kind === 'recipe' 
 export function createRecipeLoader({
     apply, unload = async () => {}, read, show,
     settle = async () => {}, afterShot = async () => {}, shotRunning = () => false,
+    hold = () => new Promise(resolve => setTimeout(resolve, UNLOAD_HOLD_MS)),
     onLoading = () => {}, onApplied = () => {}, onError = () => {}, onUnloadError = () => {},
 }) {
     let recipes = [];
@@ -110,7 +120,7 @@ export function createRecipeLoader({
 
     // One load or unload at a time. A tap made while one runs replaces any tap
     // already waiting, so only the newest is written after it.
-    const run = createLatestTaskRunner(async ({ kind, recipe, seq }) => {
+    const run = createLatestTaskRunner(async ({ kind, recipe, seq, held }) => {
         try {
             await settle();
             await afterShot();
@@ -121,6 +131,7 @@ export function createRecipeLoader({
             (kind === 'unload' ? onUnloadError : onError)(error, recipe);
         }
         onApplied();
+        await held; // an unload's hold, from its tap
         if (seq !== taps) return; // a newer tap is waiting, and owns the strip
         loading = false;
         tapped = null;
@@ -137,7 +148,7 @@ export function createRecipeLoader({
         // The highlight moves at the tap, and comes back if it was not made.
         loaded = kind === 'unload' ? null : recipe;
         paint();
-        run({ kind, recipe, seq: ++taps });
+        run({ kind, recipe, seq: ++taps, held: kind === 'unload' ? hold() : null });
     }
 
     function tap(recipe) {

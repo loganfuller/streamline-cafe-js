@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecipeLoader, unloadSelection } from '../src/cafe/recipe-loader.js';
+import { createRecipeLoader, unloadSelection, UNLOAD_HOLD_MS } from '../src/cafe/recipe-loader.js';
 
 const A = { id: 'a', stripSlot: 1, title: 'A', dose: 18 };
 const B = { id: 'b', stripSlot: 2, title: 'B', dose: 20 };
@@ -27,7 +27,7 @@ const idle = () => new Promise(resolve => setImmediate(resolve));
 function build({ rows = [A, B, C], selection = null } = {}) {
     const world = {
         rows, selection, written: [], applies: [], unloads: [], shown: [], errors: [], unloadErrors: [], log: [],
-        applied: 0, reads: 0, readGates: [], settleGate: null, storeGate: null, shot: false, loading: [],
+        applied: 0, reads: 0, readGates: [], settleGate: null, storeGate: null, holdGate: null, shot: false, loading: [],
     };
     const loader = createRecipeLoader({
         unload() {
@@ -41,6 +41,8 @@ function build({ rows = [A, B, C], selection = null } = {}) {
             if (world.storeGate) await world.storeGate.promise;
         },
         shotRunning: () => world.shot,
+        // The hold after an unload's tap is over at once unless a test holds it.
+        hold: () => world.holdGate ? world.holdGate.promise : Promise.resolve(),
         onUnloadError: (error, recipe) => world.unloadErrors.push(recipe.id),
         apply(recipe) {
             const gate = deferred();
@@ -423,6 +425,54 @@ test('a tap on the card being unloaded is ignored', async () => {
     assert.equal(world.applies.length, 0, 'the second tap loaded nothing');
     assert.equal(world.unloads.length, 1);
     assert.equal(world.last(), null);
+});
+
+test('a double tap on the loaded card unloads it, even when the unload finishes between the taps', async () => {
+    const { loader, world } = build({ selection: { kind: 'recipe', id: 'a' } });
+    await loader.refresh();
+    world.holdGate = deferred();
+
+    loader.tap(A);
+    await idle();
+    world.unloads[0].resolve(); // the unload is done before the second tap
+    await idle();
+    assert.equal(world.selection, null);
+    loader.tap(A); // the second tap, inside the hold
+    await idle();
+    assert.equal(world.applies.length, 0, 'the recipe is not loaded again');
+    assert.equal(world.last(), null);
+    assert.equal(loader.busy(), true, 'the strip is held');
+
+    world.holdGate.resolve();
+    await idle();
+    assert.equal(loader.busy(), false);
+    assert.equal(world.last(), null);
+    assert.deepEqual(world.loading, [true, false]);
+
+    // Once the hold is over, a tap loads it again.
+    world.holdGate = null;
+    loader.tap(A);
+    await idle();
+    assert.equal(world.applies.length, 1);
+});
+
+test('the hold after an unload is started at its tap, and a load gets none', async () => {
+    let holds = 0;
+    let selection = { kind: 'recipe', id: 'a' };
+    const loader = createRecipeLoader({
+        apply: async recipe => { selection = { kind: 'recipe', id: recipe.id }; },
+        unload: async () => { selection = null; },
+        read: async () => ({ rows: [A, B], selection }),
+        show: () => {},
+        hold: () => { holds += 1; return Promise.resolve(); },
+    });
+    await loader.refresh();
+    loader.tap(B);
+    await idle();
+    assert.equal(holds, 0, 'a load is slow enough on its own');
+    loader.tap(B);
+    assert.equal(holds, 1, 'started at the tap, not when the unload runs');
+    assert.ok(UNLOAD_HOLD_MS >= 300 && UNLOAD_HOLD_MS <= 600, 'longer than a double tap\'s gap, short enough to go unnoticed');
 });
 
 test('a tap on another card during an unload loads it once the unload is done', async () => {
