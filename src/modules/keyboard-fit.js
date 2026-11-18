@@ -38,7 +38,8 @@ export const SHRINK_ADOPT_MS = 1500;
 //    resizing the WebView while the user is reading.
 //
 // A shrink that appeared while an editable had focus is a keyboard and stays
-// one until the window grows back, even after the field is blurred: on Android
+// one, even after the field is blurred, until the window grows back or, with
+// nothing typed into, more than half the room it took comes back: on Android
 // the keyboard often stays up when focus moves to a button, and adopting then
 // is exactly the "the page shrank when I tapped the title" bug.
 //
@@ -95,7 +96,10 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     // the mark, and the lift with it, stayed until a reload or a rotation.
     // While a field still has focus a smaller room is a keyboard that changed
     // size, so the mark holds until focus moves, which runs this again before
-    // anything is lifted.
+    // anything is lifted. The price: a keyboard that gives back more than half
+    // its room while staying up, then loses focus to a button, reads as closed
+    // and is adopted as the window until it closes. Geometry alone can't tell
+    // that from a keyboard closed into a little less room.
     const keyboardVisible = state?.keyboardVisible ?? shortest;
     if (state?.keyboardLike && !editing && shortest - keyboardVisible > (resting - keyboardVisible) / 2) {
         return {
@@ -110,10 +114,12 @@ export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editi
     // into: a gap that appeared just before a field took focus would otherwise
     // count as a keyboard until the screen got that room back, which a lasting
     // gap never does. A keyboard opens after its field has focus, so its first
-    // shrink is seen while typing and never waits.
+    // shrink is seen while typing and never waits. "More" is over a pixel, so a
+    // gap whose fraction of a pixel wobbles as a field takes focus is no
+    // keyboard.
     const waiting = !state?.keyboardLike && state?.shrunkSince > 0;
     const floor = waiting ? state.pendingVisible ?? Infinity : Infinity;
-    const keyboardLike = !!state?.keyboardLike || (editing && shortest < floor);
+    const keyboardLike = !!state?.keyboardLike || (editing && shortest < floor - 1);
     const shrunkSince = state?.shrunkSince || now;
     if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
     return {

@@ -193,6 +193,15 @@ test('a keyboard that gets smaller while a field is typed into is still a keyboa
     assert.equal(liftFor(tapped, SHOTS_BUTTON, H - 48), 0);
 });
 
+test('a waiting gap whose fraction of a pixel wobbles as a field takes focus is no keyboard', () => {
+    const pending = track(boot(), { visibleHeight: H - 0.5 });
+    const wobble = track(pending, { visibleHeight: H - 0.25, now: t0 + 200 });
+    const focused = track(wobble, { visibleHeight: H - 0.75, editing: true, now: t0 + 400 });
+    assert.equal(focused.keyboardLike, false);
+    const adopted = track(focused, { visibleHeight: H - 0.75, now: t0 + SHRINK_ADOPT_MS });
+    assert.equal(liftFor(track(adopted, { visibleHeight: H - 0.75, now: t0 + 5000 }), SHOTS_BUTTON, H - 0.75), 0);
+});
+
 test('a keyboard is measured from the room at the last pass, not the least ever seen', () => {
     const shrinking = track(boot(), { visibleHeight: 700 });
     const partly = track(shrinking, { visibleHeight: 760, now: t0 + 300 });
