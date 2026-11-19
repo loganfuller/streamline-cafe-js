@@ -42,7 +42,7 @@ export function decentSync(cafe, state) {
             if (!served()) return refused(state === 'coldStart' ? 'unreachable' : state);
             const recordId = parsed.searchParams.get('recipe');
             const record = (cafe.fake.store.get('dye2.reaplugin', 'recipes') || []).find(row => row && String(row.id) === recordId);
-            if (!record) return { status: 409, body: { code: 'noSuchRecipe', message: 'Sample refusal.' } };
+            if (!record) return { status: 404, body: { code: 'noSuchRecipe', message: 'Sample refusal.' } };
             return { status: 200, body: { recipe: { id: `sample-recipe-${recordId}`, name: record.name, recordId }, reference: null, source: 'server' } };
         }
         return null; // anything else is unanswered, and fails the test naming it
