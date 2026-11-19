@@ -232,7 +232,7 @@ export function createProfileChange({
     // A write the check must not make now: its turn is tried again later.
     const notNow = () => new Error('not now');
     // The Workflow the record is owed could not be written now: likewise.
-    const owing = () => Object.assign(notNow(), { follow: true });
+    const owing = notNow;
     const open = entry => !!entry && !entry.done && (entry.rewroteAt == null || now() - entry.rewroteAt <= AFTER_CHECK_MS);
 
     async function changeNow(profileId, at, expected) {
@@ -466,7 +466,6 @@ export function createProfileChange({
         // Not during a shot, and not before Decaid has stored it: loading the
         // recipe again would change what the Shot records. Its turn may still
         // find a shot or an arrangement begun meanwhile: then twice more, after it.
-        let follow = false;
         for (let attempt = 0; attempt < 3; attempt += 1) {
             await untilSettled();
             const look = await lookNow(change);
@@ -476,7 +475,6 @@ export function createProfileChange({
             } catch (error) {
                 // the change before it never landed, or a shot or an
                 // arrangement began, or the Workflow could not follow
-                follow = !!error?.follow;
             }
         }
         // Given up: by now any DYE2 save begun before the change has written, so
@@ -484,7 +482,8 @@ export function createProfileChange({
         // wrote the record again, which keeps them one window more (`rewroteAt`).
         const entry = entryOf(change);
         if (entry && !entry.rewrote) entry.done = true;
-        return follow ? 'workflow' : 'skipped';
+        // The Workflow still owed the pick, whatever stopped the last turn.
+        return entry?.owed ? 'workflow' : 'skipped';
     }
 
     async function change(profileId, { recipeId: expected } = {}) {

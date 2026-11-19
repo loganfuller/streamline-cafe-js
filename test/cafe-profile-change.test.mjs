@@ -305,6 +305,19 @@ test('a Workflow write that fails says so; the record holds the profile', async 
     assert.deepEqual(w.checked, [['workflow', 'r1']]);
 });
 
+test('a check that gives up with the Workflow still owed says so, whatever stopped its last turn', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    w.failWorkflowWrite = true;
+    let turns = 0;
+    const queue = w.deps.queue;
+    // Two turns find the Workflow unwritable; the third never comes, as when a shot starts while it waits.
+    w.deps.queue = async task => { turns += 1; if (turns === 4) throw new Error('a shot started'); return queue(task); };
+    w.change = createProfileChange(w.deps).change;
+    const answer = await w.change(BLOOM.id);
+    assert.equal(await answer.checked, 'workflow');
+    assert.equal(turns, 4, 'the change and three turns of the check');
+});
+
 test('a Workflow write that failed at the change is made at the check, and the recipe stays loaded', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failWorkflowWrite = true;
@@ -317,7 +330,22 @@ test('a Workflow write that failed at the change is made at the check, and the r
     assert.ok(w.log.includes(`follow ${BLOOM.id}`), 'Streamline follows the profile');
 });
 
-test('a Workflow not written at the change, on another profile chosen since, is left alone; so is a recipe unloaded by a tap', async () => {
+test('a Workflow not written at the change, on another profile chosen since, is left alone, the recipe loaded or unloaded by it; so is a recipe unloaded by a tap', async () => {
+    // Another profile chosen with the recipe loaded since (DYE2 noted it at a load): it stays loaded, and the machine keeps it.
+    const kept = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    kept.failWorkflowWrite = true;
+    kept.onWait = world => {
+        world.failWorkflowWrite = false;
+        world.workflow.profile = copy(OTHER.profile);
+        world.baseline = profileFingerprint(OTHER.profile);
+    };
+    const held = await kept.change(BLOOM.id);
+    assert.equal(await held.checked, 'held');
+    assert.deepEqual(kept.workflowWrites, []);
+    assert.equal(profileFingerprint(kept.workflow.profile), profileFingerprint(OTHER.profile));
+    assert.equal(kept.recipeId(), 'r1');
+
+    // Another profile chosen that DYE2 unloads the recipe for: nothing is written, and the check says so.
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failWorkflowWrite = true;
     w.onWait = world => {
@@ -326,7 +354,7 @@ test('a Workflow not written at the change, on another profile chosen since, is 
         world.dye2();
     };
     const answer = await w.change(BLOOM.id);
-    assert.notEqual(await answer.checked, 'followed');
+    assert.equal(await answer.checked, 'unloaded');
     assert.deepEqual(w.workflowWrites, []);
     assert.equal(profileFingerprint(w.workflow.profile), profileFingerprint(OTHER.profile));
 

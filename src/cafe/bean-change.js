@@ -168,7 +168,7 @@ export function createBeanChange({
     const notNow = () => new Error('not now');
     // The Workflow the record is owed could not be written now: the check's
     // next turn tries again.
-    const owing = () => Object.assign(notNow(), { follow: true });
+    const owing = notNow;
     const open = entry => !!entry && !entry.done && (entry.rewroteAt == null || now() - entry.rewroteAt <= AFTER_CHECK_MS);
 
     async function changeNow(bean, batch, expected, still) {
@@ -347,7 +347,6 @@ export function createBeanChange({
 
     async function checkLater(change) {
         await wait(AFTER_CHECK_MS);
-        let follow = false;
         for (let attempt = 0; attempt < 3; attempt += 1) {
             await untilSettled();
             const look = await lookNow(change);
@@ -357,7 +356,6 @@ export function createBeanChange({
             } catch (error) {
                 // the change before it never landed, or a shot or an
                 // arrangement began, or the Workflow could not follow
-                follow = !!error?.follow;
             }
         }
         // Given up: by now any DYE2 save begun before the change has written, so
@@ -365,7 +363,8 @@ export function createBeanChange({
         // the record again, which keeps them one window more (`rewroteAt`).
         const entry = entryOf(change);
         if (entry && !entry.rewrote) entry.done = true;
-        return follow ? 'workflow' : 'skipped';
+        // The Workflow still owed the pick, whatever stopped the last turn.
+        return entry?.owed ? 'workflow' : 'skipped';
     }
 
     async function change({ bean, batch, recipeId: expected = null, still = () => true } = {}) {

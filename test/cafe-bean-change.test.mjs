@@ -319,6 +319,18 @@ test('a shot begun while the record is written: no Workflow is written then, and
     assert.deepEqual(v.checked, [['followed', 'r1']]);
 });
 
+test('a check that gives up with the Workflow still owed says so, whatever stopped its last turn', async () => {
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    w.failWorkflowWrite = true;
+    let turns = 0;
+    const queue = w.deps.queue;
+    w.deps.queue = async task => { turns += 1; if (turns === 4) throw new Error('a shot started'); return queue(task); };
+    w.change = createBeanChange(w.deps).change;
+    const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(await answer.checked, 'workflow');
+    assert.equal(turns, 4, 'the change and three turns of the check');
+});
+
 test('a Workflow not written at the change, on another batch of the old bean than the record named, still follows', async () => {
     // The machine's own pick of Hill's other batch, before; the record names Hill's newest.
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1', batchId: HILL_OLD.id });
