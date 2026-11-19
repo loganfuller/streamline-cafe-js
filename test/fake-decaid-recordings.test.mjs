@@ -84,19 +84,29 @@ test(`pour: the replayed pour stores the Shot Decaid ${pour.recordedWith.decaid}
     for (const path of ['/ws/v1/machine/snapshot', '/ws/v1/machine/shotState', '/ws/v1/scale/snapshot']) {
         fake.connect(path, text => frames.push({ path, frame: JSON.parse(text) }));
     }
+    const dye2Pushes = [];
+    fake.connect('/ws/v1/plugins/dye2.reaplugin/changed', text => dye2Pushes.push(JSON.parse(text)));
+    const recordedDye2 = at => pour.frames.filter(f => f.socket === 'plugins/dye2.reaplugin/changed' && at(f.ms)).map(f => f.frame);
     fake.flush();
     frames.length = 0;
     const id = fake.startPour();
     fake.finishPour();
     fake.flush();
     const restAt = pour.idleAtMs + 500;
-    assert.equal(frames.length, pour.frames.filter(f => f.ms <= restAt).length, 'every frame of the pour is sent');
+    assert.equal(frames.length, pour.frames.filter(f => f.ms <= restAt && !f.socket.startsWith('plugins/')).length, 'every frame of the pour is sent');
+    assert.deepEqual(dye2Pushes, recordedDye2(ms => ms <= restAt), 'DYE2 pushed as it did during the pour');
+    dye2Pushes.length = 0;
     const states = frames.filter(f => f.path === '/ws/v1/machine/snapshot').map(f => f.frame.state.state);
     assert.ok(states.includes('espresso') && states.at(-1) !== 'espresso', 'into espresso and out of it');
     frames.length = 0;
     fake.storeShot();
     fake.flush();
     assert.deepEqual(frames.map(f => f.frame.event + ':' + f.frame.state), pour.frames.filter(f => f.ms > restAt && f.socket === 'machine/shotState').map(f => f.frame.event + ':' + f.frame.state), 'the store sends what the shot-state socket said then');
+    // DYE2 works out its recents once the Shot is stored and pushes, within
+    // about 0.1 s of it on the pinned stack: the model pushes at the store.
+    const afterStore = recordedDye2(ms => ms > restAt);
+    assert.ok(afterStore.length > 0, 'the recording has DYE2\'s push after the store');
+    assert.deepEqual(dye2Pushes, afterStore, 'DYE2 pushes once the Shot is stored, as recorded');
     const stored = fake.shots.get(id);
     const recorded = pour.shot;
     assert.equal(stored.timestamp, recorded.timestamp, 'its time is the shot\'s start');

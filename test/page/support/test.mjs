@@ -12,6 +12,8 @@ import { test as base, expect } from 'playwright/test';
 
 import { createFakeDecaid } from '../../../fake-decaid/index.js';
 import { attach, recording } from './adapter.mjs';
+
+const POUR = recording('pour');
 import { servePage, PAGE_ORIGIN } from './page-files.mjs';
 
 export { expect };
@@ -102,22 +104,44 @@ class Cafe {
             this.fake.setNow(await this.page.evaluate(() => Date.now()));
             this.fake.startPour();
             this.pouring = { at: 0 };
+            this.idleSeenAt = null;
         }
         const end = Math.min(toMs, this.fake.machine.pourLength());
         const from = this.pouring.at;
+        const play = at => {
+            this.fake.playPour(at);
+            // The page's time when the machine's frame back at rest reached it.
+            if (this.idleSeenAt === null && at >= POUR.idleAtMs) this.idleSeenAt = this.fake.now();
+        };
         if (end > from) {
-            await this.advance(end - from, { step, during: moved => this.fake.playPour(from + moved) });
+            await this.advance(end - from, { step, during: moved => play(from + moved) });
             this.pouring.at = end;
         }
         if (toMs === Infinity) {
             this.fake.finishPour();
+            if (this.idleSeenAt === null) this.idleSeenAt = this.fake.now();
             this.fake.flush();
             await this.settle();
             this.pouring = null;
         }
     }
 
-    /** Decaid stores the pour's Shot, as it does up to 4 s after the pump stops. */
+    /**
+     * Moves the clock on after a whole pour to the moment Decaid stored the
+     * recorded Shot: as long after the page had the machine back at rest as in
+     * the recording. The Shot is not stored; `storeShot()` does that.
+     */
+    async untilStored() {
+        if (this.idleSeenAt == null) throw new Error('untilStored() follows a whole pour()');
+        const at = this.idleSeenAt + (POUR.storedAtMs - POUR.idleAtMs);
+        for (;;) {
+            const left = at - await this.page.evaluate(() => Date.now());
+            if (left <= 0) return;
+            await this.advance(Math.min(left, 500));
+        }
+    }
+
+    /** Decaid stores the pour's Shot, as it does about 4 s after the pump stops. */
     async storeShot() {
         this.fake.setNow(await this.page.evaluate(() => Date.now()));
         const id = this.fake.storeShot();

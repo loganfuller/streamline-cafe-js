@@ -6,7 +6,8 @@
 // `recipeModified`, `deriveSelection`, `favouriteMatches`, `profileFingerprint`,
 // `resolveRecipeFromHistory`); guided by decent-sync's
 // server/test/support/simulated-dye2.ts, which follows DYE2 v0.1.40.
-// Recorded: recordings/dye2-selection.json.
+// Recorded: recordings/dye2-selection.json; the push once a Shot is stored, in
+// recordings/pour.json (DYE2's `changed` socket through the store).
 //
 // - The selection is derived from the live Workflow each time, never stored: a
 //   recipe by `context.extras.dye.recipeId`, `modified` when the Workflow has

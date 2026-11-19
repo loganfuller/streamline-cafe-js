@@ -17,6 +17,11 @@ test('no page test holds a fixed sleep or swallows a timeout', () => {
     for (const file of files) {
         const source = readFileSync(file, 'utf8').replace(/\/\/.*$/gm, '');
         assert.doesNotMatch(source, /waitForTimeout|\bsleep\(|setTimeout\(/, `${file.pathname}: a fixed sleep`);
-        assert.doesNotMatch(source, /\.catch\(\s*\(\)\s*=>\s*(\{\s*\}|null|undefined|false)\s*\)|\.then\(\s*\(\)\s*=>\s*true\s*,/, `${file.pathname}: a timeout swallowed`);
+        assert.doesNotMatch(source, /\.then\(\s*\(\)\s*=>\s*true\s*,/, `${file.pathname}: a timeout swallowed`);
+        // A .catch that doesn't throw again, or a catch block left empty.
+        for (const [at] of source.matchAll(/\.catch\(/g).map(m => [m.index])) {
+            assert.match(source.slice(at, at + 200), /throw\b/, `${file.pathname}: a .catch that swallows (${source.slice(at, at + 60).replace(/\s+/g, ' ')})`);
+        }
+        assert.doesNotMatch(source, /catch\s*(\([^)]*\))?\s*\{\s*\}/, `${file.pathname}: an empty catch`);
     }
 });

@@ -74,9 +74,7 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
         const pointsOf = lines => Object.fromEntries(lines.names.map((name, index) => [name, lines.points[index]]));
         const ended = pointsOf(await chartLines(page));
         measured.forEach(([name, points]) => expect(ended[name], `${name} is kept when the pump stops`).toBeGreaterThanOrEqual(points));
-        // Decaid stored the recorded Shot this long after the pour's last frame
-        // the fake replays.
-        await cafe.advance(POUR.storedAtMs - fake.machine.pourLength());
+        await cafe.untilStored();
         expect((await legend(page)).when, 'no time yet').toBeNull();
         expect(keys(await row(page)), 'the six live cards stay').toBe(LIVE);
         const waited = pointsOf(await chartLines(page));

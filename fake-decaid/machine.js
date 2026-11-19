@@ -58,7 +58,8 @@ export function createMachine({ pour, timeZone, now, emit, nextId, workflow, sto
     // The pour, to the machine back at rest; what follows, to the store, is the
     // shot-state socket saying the shot finished, which the store sends.
     const restAt = pour.idleAtMs + 500;
-    const frames = pour.frames.filter(f => f.ms <= restAt);
+    // DYE2's pushes in the recording are the model's to make (dye2.js), not the machine's.
+    const frames = pour.frames.filter(f => f.ms <= restAt && !f.socket.startsWith('plugins/'));
     const afterStore = pour.frames.filter(f => f.ms > restAt && f.socket === 'machine/shotState');
     const firstMachine = frames.find(f => f.socket === 'machine/snapshot');
     // The recording's clock, at the moment the pour was asked for.

@@ -42,6 +42,21 @@ if (!KEEP) {
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { stack.stop(); process.exit(signal === 'SIGINT' ? 130 : 143); });
 }
 const PORT_USED = new URL(stack.api).port;
+
+// The versions written on each recording are the pins: the stack and the page
+// recorded must be them, a stack reached with --api= included.
+{
+    const { version: decaidVersion } = await (await fetch(`${stack.api}/info`)).json();
+    const skin = JSON.parse(await readFile(join(ROOT, 'skin-manifest.json'), 'utf8')).version;
+    const problems = [
+        decaidVersion !== PINS.decaid.version && `Decaid ${decaidVersion} is running, pinned ${PINS.decaid.version}`,
+        !String(skin).startsWith(`${PINS.streamline.version}-`) && String(skin) !== PINS.streamline.version && `the page is Streamline ${skin}, pinned ${PINS.streamline.version}`,
+    ].filter(Boolean);
+    if (problems.length) {
+        stack.stop();
+        throw new Error(`not recording: ${problems.join('; ')}`);
+    }
+}
 const ws = `ws://127.0.0.1:${PORT_USED}/ws/v1`;
 
 /** Decaid's REST API: answers JSON, throws on an error status. */
@@ -209,7 +224,7 @@ async function boot() {
 // Workflow, as step 7's page test loads it: the Default profile, with stages of
 // its own, which the simulated machine stops on weight.
 async function pour() {
-    const watch = listen(['machine/snapshot', 'machine/shotState', 'scale/snapshot']);
+    const watch = listen(['machine/snapshot', 'machine/shotState', 'scale/snapshot', 'plugins/dye2.reaplugin/changed']);
     await watch.opened();
     await sleep(1500);
     const atRest = {};
