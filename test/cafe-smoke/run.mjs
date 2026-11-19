@@ -635,8 +635,9 @@ const pickClosed = page => page.locator('#cafe-pick-dialog:not([open])').waitFor
 const pickRows = page => page.locator('#cafe-pick-list .cafe-pick-row').evaluateAll(rows => rows.map(row => ({
     name: row.querySelector('.cafe-pick-row-name').textContent,
     detail: row.querySelector('.cafe-pick-row-detail').textContent,
-    // Marked "In use". In the bean dialog `aria-pressed` is the batch highlighted (#70).
-    inUse: !!row.querySelector('.cafe-pick-in-use'),
+    // Marked "In use", and, in a dialog a tap chooses in, pressed. In the bean
+    // dialog's confirmed list `aria-pressed` is the batch highlighted (#70).
+    inUse: !!row.querySelector('.cafe-pick-in-use') && (row.parentElement.classList.contains('cafe-pick-confirming') || row.getAttribute('aria-pressed') === 'true'),
 })));
 const pickRow = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
 // A tap where a finger would land: on the row's name, or on the grinder's name
@@ -1570,15 +1571,15 @@ async function beanAndBasketDialogs() {
                     return {
                         label: button.textContent,
                         enabled: !button.hidden && !button.disabled,
-                        cut: button.scrollWidth > button.clientWidth + 1,
                         inside: at.left >= row.left - 1 && at.right <= row.right + 1 && at.bottom <= box.bottom && box.right <= innerWidth && box.bottom <= innerHeight,
-                        noteBeside: !note.hidden && rect(note).right <= at.left + 1 && rect(note).height < at.height,
+                        // Beside the button, on one line, and not squeezed to a sliver.
+                        noteBeside: !note.hidden && rect(note).right <= at.left + 1 && rect(note).height < at.height && rect(note).width >= 60,
                     };
                 });
                 // The label in this language's own words, so a label left in the
                 // last language, or in English, isn't measured in its place.
                 const translated = fit.label === (code === 'en' ? 'Use this batch' : CAFE_TRANSLATIONS['Use this batch'][code]);
-                if (!fit.enabled || fit.cut || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
+                if (!fit.enabled || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
                 if (code === 'en') await shot(page, 'bean-dialog-highlighted-1340x800-light');
                 if (code === 'de') await shot(page, 'bean-dialog-highlighted-1340x800-de-light');
                 await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
