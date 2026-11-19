@@ -262,8 +262,12 @@ test.describe('rating and notes', { tag: '@remarks' }, () => {
     });
 
     test('the reference\'s row: its rating as "★ 3.5", and its note opened to read, which Close leaves unedited', async ({ cafe, fake }) => {
-        const page = await openWithReference(cafe, { latest: { enjoyment: 8, espressoNotes: NOTE }, reference: { enjoyment: 7, espressoNotes: REFERENCE_NOTE } });
-        expect(await remarks(page), 'the reference\'s row shows its rating as "★ 3.5", and a note icon')
+        const page = await openWithReference(cafe, { latest: { enjoyment: 8, espressoNotes: NOTE } });
+        expect(await remarks(page), 'a reference with no rating and no note shows neither').toMatchObject({ referenceRating: null, referenceNote: false });
+        // Rated and noted elsewhere while the page is open, and looked at again.
+        expect(fake.request({ method: 'PUT', url: `/api/v1/shots/${REFERENCE}`, body: { annotations: { enjoyment: 7, espressoNotes: REFERENCE_NOTE } } }).status).toBe(200);
+        await lookAgain(cafe);
+        await expect.poll(() => remarks(page), 'the reference\'s row shows its rating as "★ 3.5", and a note icon')
             .toEqual({ stars: [100, 100, 100, 100, 0], note: 'note', referenceRating: '★ 3.5', referenceNote: true });
 
         const mark = fake.log.length;

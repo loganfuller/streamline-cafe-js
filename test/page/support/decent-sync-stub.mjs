@@ -39,7 +39,7 @@ export function decentSync(cafe, state) {
         // No Reference Shot for any recipe, and no copy of one while it can't
         // reach its server. The Recipe asked about is named by DYE2's record.
         if (route === 'reference' && method === 'GET') {
-            if (!served()) return { status: 503, body: { code: 'unreachable', message: 'Sample refusal.' } };
+            if (!served()) return refused(state === 'coldStart' ? 'unreachable' : state);
             const recordId = parsed.searchParams.get('recipe');
             const record = (cafe.fake.store.get('dye2.reaplugin', 'recipes') || []).find(row => row && String(row.id) === recordId);
             if (!record) return { status: 409, body: { code: 'noSuchRecipe', message: 'Sample refusal.' } };

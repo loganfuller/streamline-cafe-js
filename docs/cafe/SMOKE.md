@@ -115,7 +115,7 @@ In order, it:
 
 The run seeds DYE2's records at its start when the sample recipes are not there, keeps them when they are, and puts them back after the steps that change them, so it can be repeated on the same Decaid. It leaves behind what the seed's fixtures made, which a repeat finds and uses: Sample Blend's two further batches and DYE2's three sample baskets.
 
-Six things are not Decaid's own answers:
+Five things are not Decaid's own answers:
 
 - **The recipes' names and the slots above 5.** DYE2 names a saved recipe after its bean and places only slots 1 to 5, so the run writes the names and slots 7 and 9 into DYE2's records itself. That is the fixture's write. The skin's own writer of those records is a separate module with its own guards.
 
@@ -124,7 +124,6 @@ Six things are not Decaid's own answers:
 - **A profile change that can't be made, and profiles that can't be read.** Step 27 drops the page's write of DYE2's records in the browser, for the toast and the row as it was, and then its read of Decaid's profiles, for the toast and no dialog. The profile it hides is hidden through Decaid's own API, and shown again afterwards.
 - **A recipe DYE2 does not call changed.** The simulated machine's Workflow reports a flush at 90 °C whatever its settings hold, and the sample recipes hold 25 °C, so DYE2 calls each one changed as soon as it loads. Step 27 gives the loaded recipe's record the steam, hot water and flush the Workflow reports before the change, so that a recipe DYE2 does not call changed afterwards shows the change made it no different. It puts DYE2's records back afterwards.
 - **A recipe DYE2 named.** The seed renames its recipes, so steps 13 and 15 of the second run give the sample Recipe DYE2's name for it ("Sample Blend") through the server's API, as the management interface would, and name it back afterwards.
-- **Decent Sync.** In the first run this Decaid has no Decent Sync plugin. For the label check the run adds the plugin to Decaid's plugin list in the browser and answers its Status request there: as a served Machine, as a Capture-only one, and as a plugin that connects a few seconds after the page opens. It answers the plugin's `reference` request too, with no Reference Shot, and as a plugin with no copy while it is not connected, and takes its `changes` socket, on which it sends only the push that says its connection came. Nothing saves a dial-in in that check: it shows the label only. The real plugin is the second run's.
 
 The theme is painted in the page and never stored: a stored theme is carried to Decaid's settings store, which every later page then reads back.
 

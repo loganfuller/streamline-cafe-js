@@ -10,8 +10,10 @@
 // reload; and "Replace the reference?", cancelled, then confirmed.
 //
 // Every shot is the one recorded pour (fake-decaid/recordings/pour.json),
-// replayed with the page's clock moving with its frames, with the second
-// sample recipe loaded, as the smoke run had it. A second pour would be the
+// replayed with the page's clock moving with its frames, with House espresso
+// loaded: the pour was recorded on its profile (Default), so the live frames'
+// steps and targets are the loaded profile's. (The smoke run had the second
+// sample recipe loaded, on Adaptive v3.) A second pour would be the
 // first one again, every card beside it "0.0", so the tests past the first
 // start from a reference chosen before the page opens: the sample data's
 // newest Shot, another pour of the pinned stack's simulated machine, as Decaid
@@ -38,8 +40,8 @@ import { shotCurves } from '../../src/cafe/shot-model.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
 import { shiftTime } from '../../fake-decaid/machine.js';
 
-// The recipe the smoke run had loaded at this step.
-const target = RECIPES[1];
+// The recipe on the recorded pour's profile (Default).
+const target = RECIPES[0];
 const POUR = recording('pour');
 const CAFE = 'streamlineCafe';
 const REST_REFERENCE = 'time firstDrip yield ratio peak';
@@ -50,7 +52,7 @@ const LIVE = 'time weight weightFlow flow pressure temperature';
 // The smoke run's check named this `OWN_LABELLED` without defining it here.
 const OWN_LABELLED = ['Pressure', 'Flow', '°C', 'Weight'];
 // Two moments of the pour, each well before the reference's end (the profile
-// starts 0.5 s in and runs 17.6 s): one in its third stage, one in its fifth.
+// starts 0.5 s in and runs 17.6 s): one in its fourth step, one in its fifth.
 const MID_MS = 9000;
 const LATER_MS = 12000;
 
@@ -83,14 +85,31 @@ async function pullShot(cafe) {
  * drip and yield, so the cards beside it differ from the pour's.
  */
 function seedReference(fake) {
-    const record = recordOf(fake, target.name);
     const [newest] = fake.shots.newest(1);
-    const sample = fake.shots.get(newest.id);
-    // Each time as it was written, wall clock in the fake's zone, half an hour
-    // back: shifted as UTC text, so the zone is not applied twice.
-    const earlier = text => shiftTime(text, -30 * 60_000, 'UTC');
-    const at = Date.parse(sample.createdAt) - 30 * 60_000;
-    const id = '00000000-0000-4000-8000-0000000c0001';
+    const { id, recipeId } = seedRecipeShot(fake, newest.id, '00000000-0000-4000-8000-0000000c0001', 30);
+    fake.store.set(CAFE, 'references', { [recipeId]: id });
+    return { id, recipeId };
+}
+
+/**
+ * The sample data's other Shot (18.1 s, 182 frames, to the reference's 18.4 s
+ * and 185), as the recipe's latest, pulled after the reference and not it: so
+ * a page that drew or compared against the latest Shot in the reference's
+ * place would show other numbers.
+ */
+function seedLatest(fake) {
+    const [, other] = fake.shots.newest(2);
+    return seedRecipeShot(fake, other.id, '00000000-0000-4000-8000-0000000c0003', 10).id;
+}
+
+/** A copy of the sample Shot `sampleId` as `id`, pulled with the recipe loaded, `minutes` earlier. */
+function seedRecipeShot(fake, sampleId, id, minutes) {
+    const record = recordOf(fake, target.name);
+    const sample = fake.shots.get(sampleId);
+    // Each time as it was written, wall clock in the fake's zone, moved back:
+    // shifted as UTC text, so the zone is not applied twice.
+    const earlier = text => shiftTime(text, -minutes * 60_000, 'UTC');
+    const at = Date.parse(sample.createdAt) - minutes * 60_000;
     const context = record.workflow.context;
     fake.shots.add({
         ...sample,
@@ -110,7 +129,6 @@ function seedReference(fake) {
             machine: sample.workflow.machine,
         },
     });
-    fake.store.set(CAFE, 'references', { [record.id]: id });
     return { id, recipeId: record.id };
 }
 
@@ -237,10 +255,14 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
 
     test('a second shot is drawn with the reference faded behind it, its axis the reference\'s, its frames appended, and its live cards beside the reference or the targets', async ({ cafe, fake }) => {
         const { id: first } = seedReference(fake);
+        const latestId = seedLatest(fake);
         const page = await openLoaded(cafe);
-        await expect.poll(async () => (await legend(page)).badge).toBe('This shot is the reference');
         const reference = fake.shots.get(first);
         const curves = shotCurves(reference.measurements);
+        await expect.poll(async () => { const now = await legend(page); return [now.when, now.reference, now.badge]; }, 'a newer Shot is the latest, against the reference')
+            .toEqual([await creditOf(page, fake.shots.get(latestId)), await creditOf(page, reference), null]);
+        const latestCurves = shotCurves(fake.shots.get(latestId).measurements);
+        expect([latestCurves.seconds, latestCurves.pressure.x.length], 'which differs from the reference').not.toEqual([curves.seconds, curves.pressure.x.length]);
 
         await pourTo(cafe, MID_MS);
         await expect(page.locator('#main-page.cafe-shot-live')).toBeAttached();

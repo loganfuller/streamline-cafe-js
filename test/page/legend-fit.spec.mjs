@@ -29,6 +29,7 @@
 import { test, expect } from './support/test.mjs';
 import { legend, remarks, legendFits, load } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
+import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { localTime } from '../../fake-decaid/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { RECIPES, BARISTAS } from '../cafe-smoke/sample-data.mjs';
@@ -107,6 +108,8 @@ async function inEveryLanguage(cafe, name) {
     const cut = [];
     for (const code of ['en', ...FINISHED_LANGUAGES]) {
         await inLanguage(cafe, code);
+        // The legend painted again in it, so what is measured is that language's.
+        if (code !== 'en') expect((await legend(cafe.page)).make, `the legend is in ${code}`).toBe(CAFE_TRANSLATIONS['Make reference'][code]);
         const fit = await legendFits(cafe.page);
         if (fit.out.length || fit.times.length !== 2 || fit.names.length !== 2) unfit.push(`${code}: ${fit.out.join(', ') || 'a time or a name is missing'}`);
         if (fit.times.some(lack => lack >= 0.1)) cut.push(`${code} ${Math.max(...fit.times)}px`);

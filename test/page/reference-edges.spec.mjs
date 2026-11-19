@@ -140,7 +140,7 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         await expect.poll(async () => (await legend(page)).badge, 'the latest is the reference').toBe('This shot is the reference');
         const before = await legend(page);
 
-        const short = unfinishedFrom(fake, latest, fake.now() + 60_000);
+        const short = unfinishedFrom(fake, latest, fake.now());
         expect(isUnfinished(short), 'the Shot added is Unfinished by the page\'s own rule').toBe(true);
         expect(fake.shots.newest(1)[0].id, 'and is the newest Decaid lists').toBe(short.id);
         const mark = fake.log.length;
