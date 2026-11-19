@@ -33,6 +33,17 @@ const normal = value => {
 const scenarios = readdirSync(DIR).filter(file => file.endsWith('.json')).map(file => file.slice(0, -5))
     .map(name => ({ name, recording: load(name) })).filter(({ recording }) => Array.isArray(recording.steps));
 
+test('every recording was made with the pinned versions', () => {
+    const pins = JSON.parse(readFileSync(new URL('../fake-decaid/pins.json', import.meta.url), 'utf8'));
+    for (const file of readdirSync(DIR).filter(name => name.endsWith('.json'))) {
+        const { recordedWith } = load(file.slice(0, -5));
+        assert.equal(recordedWith?.decaid, pins.decaid.version, `${file}: recorded with Decaid ${recordedWith?.decaid}, pinned ${pins.decaid.version}; record again`);
+        assert.equal(recordedWith?.dye2, pins.dye2.version, `${file}: recorded with DYE2 ${recordedWith?.dye2}, pinned ${pins.dye2.version}; record again`);
+    }
+    // Only the boot holds what Streamline's own modules ask for.
+    assert.equal(boot.recordedWith.streamline, pins.streamline.version, `boot.json: recorded with Streamline ${boot.recordedWith.streamline}, pinned ${pins.streamline.version}; record the boot again`);
+});
+
 test('every rule file has a recorded scenario', () => {
     const rules = new Set(scenarios.map(({ recording }) => recording.rule));
     for (const rule of ['fake-decaid/workflow.js', 'fake-decaid/store.js', 'fake-decaid/dye2.js', 'fake-decaid/shots.js', 'fake-decaid/library.js']) {

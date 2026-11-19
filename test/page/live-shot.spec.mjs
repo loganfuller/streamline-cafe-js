@@ -21,8 +21,6 @@ const [house] = RECIPES;
 const LIVE = 'time weight weightFlow flow pressure temperature';
 const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const POUR = recording('pour');
-// Decaid stored the recorded Shot this long after the machine went back to idle.
-const STORE_AFTER_MS = POUR.storedAtMs - POUR.idleAtMs;
 // The last of the pour's frames before the machine went back to idle.
 const POUR_LENGTH_MS = POUR.idleAtMs - 1;
 
@@ -73,12 +71,16 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
         // six cards stay, and the row names no time.
         // The pour's last frame may be drawn after the read above, so a line may
         // have a point more; none has fewer.
-        const ended = await chartLines(page);
-        ended.points.forEach((points, index) => expect(points, `${ended.names[index]} is kept when the pump stops`).toBeGreaterThanOrEqual(poured.points[index]));
-        await cafe.advance(STORE_AFTER_MS);
+        const pointsOf = lines => Object.fromEntries(lines.names.map((name, index) => [name, lines.points[index]]));
+        const ended = pointsOf(await chartLines(page));
+        measured.forEach(([name, points]) => expect(ended[name], `${name} is kept when the pump stops`).toBeGreaterThanOrEqual(points));
+        // Decaid stored the recorded Shot this long after the pour's last frame
+        // the fake replays.
+        await cafe.advance(POUR.storedAtMs - fake.machine.pourLength());
         expect((await legend(page)).when, 'no time yet').toBeNull();
         expect(keys(await row(page)), 'the six live cards stay').toBe(LIVE);
-        expect((await chartLines(page)).points.slice(0, 7), 'the live lines stay').toEqual(ended.points.slice(0, 7));
+        const waited = pointsOf(await chartLines(page));
+        measured.forEach(([name]) => expect(waited[name], `${name} stays until the Shot is stored`).toBe(ended[name]));
         const id = await cafe.storeShot();
         await cafe.advance(4000);
 

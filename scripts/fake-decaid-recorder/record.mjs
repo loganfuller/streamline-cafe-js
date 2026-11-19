@@ -13,16 +13,17 @@ import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { standUp, PINS, ROOT } from './stack.mjs';
+import { standUp, CACHE, PINS, ROOT } from './stack.mjs';
 import { seed } from './seed.mjs';
 import { RECIPES } from '../../test/cafe-smoke/sample-data.mjs';
 import { servePage, PAGE_ORIGIN } from '../../test/page/support/page-files.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => args.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const ONLY = flag('only', 'sample-data,scenarios,boot,pour').split(',');
-// --scenario=a,b records only those scenarios.
+// --scenario=a,b records only those scenarios, and nothing else unless --only
+// names it: on a kept stack, the sample data written again would be a second copy.
 const SCENARIO = flag('scenario', '') ? flag('scenario', '').split(',') : null;
+const ONLY = flag('only', SCENARIO ? 'scenarios' : 'sample-data,scenarios,boot,pour').split(',');
 const KEEP = args.includes('--keep');
 const PORT = Number(flag('port', '18157'));
 const OUT = join(ROOT, 'fake-decaid', 'recordings');
@@ -242,6 +243,10 @@ try {
     if (ONLY.includes('boot')) await boot();
     if (ONLY.includes('pour')) await pour();
 } finally {
-    if (KEEP) console.log(`kept: ${stack.api} (token ${stack.token}${stack.id ? `, container ${stack.id.slice(0, 12)}` : ''})`);
-    else stack.stop();
+    if (KEEP && stack.id) {
+        // The token is a credential: kept in a file only its owner reads, never printed.
+        const tokenFile = join(CACHE, `kept-${stack.id.slice(0, 12)}.token`);
+        await writeFile(tokenFile, stack.token, { mode: 0o600 });
+        console.log(`kept: ${stack.api}, container ${stack.id.slice(0, 12)}; its token is in ${tokenFile}`);
+    } else if (!KEEP) stack.stop();
 }

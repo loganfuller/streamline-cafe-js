@@ -15,7 +15,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(HERE, '..', '..');
 export const PINS = JSON.parse(await readFile(join(ROOT, 'fake-decaid', 'pins.json'), 'utf8'));
 const LABEL = 'streamline-cafe-js.fake-decaid';
-const CACHE = process.env.FAKE_DECAID_CACHE || join(homedir(), '.cache', 'streamline-cafe-fake-decaid');
+export const CACHE = process.env.FAKE_DECAID_CACHE || join(homedir(), '.cache', 'streamline-cafe-fake-decaid');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
