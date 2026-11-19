@@ -278,11 +278,11 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
 
     // A save written back between the page's record write and its confirming
     // read: the writer finds its write lost and makes it again
-    // (src/cafe/recipe-write.js). The second POST fails in Chromium ("Failed
-    // to fetch"): setKVValue sends with `keepalive`, whose bodies in flight
-    // may not pass 64 KiB, and the sample list is 33 KB, so the change answers
-    // `unconfirmed`.
-    test.fixme('a save written back before the record write is confirmed: the writer writes it again', async ({ cafe, fake }) => {
+    // (src/cafe/recipe-write.js). Two writes of the 33 KB list back to back:
+    // sent with `keepalive`, whose bodies in flight may not pass 64 KiB, the
+    // second failed in Chromium ("Failed to fetch") and the change answered
+    // `unconfirmed` (#74). DYE2's records are written without it.
+    test('a save written back before the record write is confirmed: the writer writes it again', async ({ cafe, fake }) => {
         const before = await openLoaded(cafe);
         const page = cafe.page;
         const writeBack = fake.dye2RecordReads();
@@ -302,6 +302,30 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(loadedId(fake)).toBe(before.id);
         expect(await checkedAfter(cafe)).toBe('held');
         expect(recordOf(fake, house.name).profileId).toBe(bloom.id);
+    });
+
+    // DYE2's list over 64 KiB, about a dozen recipes: a write sent with
+    // `keepalive` may not carry more, and failed in Chromium before it left
+    // the page (#74).
+    test('a recipes list over 64 KiB takes the change in one write', async ({ cafe, fake }) => {
+        const stored = fake.store.get('dye2.reaplugin', 'recipes');
+        const like = stored.find(row => row && row.name === house.name);
+        const more = Array.from({ length: 8 }, (_, i) => ({
+            ...like, id: `sample-more-${i + 1}`, name: `Sample recipe ${i + 1}`, title: `Sample recipe ${i + 1}`, stripSlot: null, showOnStreamlineDashboard: false,
+        }));
+        fake.store.set('dye2.reaplugin', 'recipes', [...stored, ...more]);
+        expect(JSON.stringify(records(fake)).length, 'the list is over 64 KiB').toBeGreaterThan(64 * 1024);
+        const before = await openLoaded(cafe);
+        const mark = fake.log.length;
+        const answer = await changeProfile(cafe.page, bloom.id);
+        expect(answer).toMatchObject({ ok: true });
+        const writes = cafe.since(mark, isRecordWrite);
+        expect(writes, 'one record write').toHaveLength(1);
+        expect(JSON.stringify(writes[0].body).length, 'the whole list, over 64 KiB').toBeGreaterThan(64 * 1024);
+        expect(records(fake), 'every recipe kept').toHaveLength(stored.length + more.length);
+        expect(recordOf(fake, house.name).profileId).toBe(bloom.id);
+        expect(loadedId(fake)).toBe(before.id);
+        expect(await checkedAfter(cafe)).toBe('held');
     });
 
     test('a record written back over the change in DYE2\'s window is written again by the check', async ({ cafe, fake }) => {
