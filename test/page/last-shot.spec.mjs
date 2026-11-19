@@ -214,6 +214,25 @@ test.describe('"Last shot" across midnight', { tag: '@lastshot' }, () => {
         await expect.poll(async () => (await legend(page)).when, 'painted again as the day turns, with nothing touched').toBe('Nov 18 10:59 PM');
     });
 
+    // Chromium's timers on Android need not count the time a tablet sleeps, so
+    // one set for midnight before a sleep can fire long after it. Here the
+    // clock is moved on 50 s with no timer counting them, as a sleep would, and
+    // the page comes back into view at 23:59:50: the timer set at 23:59 would
+    // fire near 00:01, and the one set again as the page shows fires at
+    // midnight.
+    test('the midnight timer is set again as the page comes back into view, so a sleep before midnight leaves it on time', async ({ cafe, start }) => {
+        const page = await cafe.open();
+        expect((await legend(page)).when).toBe('Today 10:59 PM');
+        await page.clock.setSystemTime(start + 50_000);
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await cafe.advance(1000);
+        expect((await legend(page)).when, 'back in view before midnight: "Today"').toBe('Today 10:59 PM');
+        await cafe.advance(15_000, { step: 1000 });
+        expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
+        expect(await page.evaluate(() => new Date().getMinutes()), 'within the first minute').toBe(0);
+        await expect.poll(async () => (await legend(page)).when, 'written as the day turns, not a minute late').toBe('Nov 18 10:59 PM');
+    });
+
     test('with a recipe loaded, its latest Shot and its reference both read with their dates once the day turns, the page left at rest', async ({ cafe, fake, start }) => {
         const houseId = String(recordOf(fake, house.name).id);
         // The reference is the sample data's newest Shot, at 22:59; the

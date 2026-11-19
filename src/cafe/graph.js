@@ -279,17 +279,27 @@ function creditParts(shot) {
     return { time: whenText(when, new Date(), cafeDateLocale(), cafeText('Today')), who };
 }
 
-// The legend's day is the Shot's against the clock when it is painted, so it
-// is painted again as the local day turns: a page left at rest overnight
-// would read "Today" for yesterday's Shot. A timer that fires late, as one
-// can on a tablet that slept, is set again when the page comes back into view.
+// The legend's day is the Shot's against the clock when it is painted, so its
+// two times are written again as the local day turns: a page left at rest
+// overnight would read "Today" for yesterday's Shot. Only the times: the rest
+// of `paint()` writes the live cards, which a timer never does. Chromium's
+// timers on Android need not count the time a tablet sleeps, so the timer is
+// set again when the page comes back into view; that is the `inView` cue too,
+// whose read of the Shots ends in a draw that writes the legend.
 function watchDay() {
     clearTimeout(dayTimer);
     dayTimer = setTimeout(() => {
         dayTimer = null;
-        paint();
+        paintDays();
         watchDay();
     }, untilNextDay(new Date()));
+}
+
+// The legend's two times, on the rows `paint()` last showed.
+function paintDays() {
+    const shown = model();
+    if (shown.row) paintCredit('shot', shown.row.shot);
+    if (shown.reference) paintCredit('reference', shown.reference);
 }
 
 // "Today 14:32 · Ana", for a dialog that names a Shot.
@@ -620,7 +630,6 @@ export function initGraph() {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         inView();
-        paint();
         watchDay();
     });
     watchDay();
