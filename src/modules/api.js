@@ -1416,17 +1416,20 @@ export async function getKVValue(namespace, key) {
     return response.json();
 }
 
-export async function setKVValue(namespace, key, value) {
+export async function setKVValue(namespace, key, value, { keepalive = true } = {}) {
     // keepalive: settingsSync's mirror fires this right after a localStorage
     // write and never awaits it before the page can navigate (e.g. switching
     // skins). Without keepalive that in-flight POST is cancelled on unload,
     // the durable copy stays stale, and the next hydrate() overwrites the
     // fresh local value back to the old one ("KV wins on conflict").
+    // Streamline Cafe: a caller may pass { keepalive: false }. The browser
+    // refuses a keepalive request once its body, with the keepalive bodies
+    // still in flight, passes 64 KiB (setDye2KvArray below; fork issue #74).
     const response = await fetch(`${API_BASE_URL}/store/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(value),
-        keepalive: true,
+        keepalive,
     });
     if (!response.ok) {
         const errorBody = await response.text();
@@ -1477,8 +1480,13 @@ export async function getDye2KvArray(key) {
 // Write a whole DYE2 collection array back — see the module note above: this
 // is only ever called with an array freshly read moments earlier and patched
 // in place, never a stale cached copy.
+// Streamline Cafe: sent without keepalive. A recipes list passes keepalive's
+// 64 KiB at about a dozen recipes, and the browser then refuses the write
+// before it leaves the page. The recipe writer and the strip's hide await it;
+// the older-DYE2 auto-save fires it from a timer (docs/cafe/UPSTREAM_EDITS.md;
+// fork issue #74).
 export async function setDye2KvArray(key, items) {
-    await setKVValue(DYE2_KV_NAMESPACE, key, items);
+    await setKVValue(DYE2_KV_NAMESPACE, key, items, { keepalive: false });
 }
 
 // ─── Profile API ─────────────────────────────────────────────────────────────
