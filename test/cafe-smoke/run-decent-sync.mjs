@@ -501,8 +501,10 @@ async function chooseBasket(page, name) {
 //     (docs/cafe/DESIGN.md, "The grinder, bean and basket dialogs"), with the
 //     Recipe loaded on both Machines: a batch of the Recipe's own Bean is
 //     recorded as the Recipe's and reaches the second Machine; a batch of
-//     another Bean changes this Machine only and keeps the Recipe loaded; and
-//     a basket reaches the Recipe, saved by DYE2 when the plugin asks it to.
+//     another Bean becomes the Recipe's Bean (#52), the skin writing the
+//     record first, and a name DYE2 gave follows it, on the server and on the
+//     second Machine, with both keeping the Recipe loaded; and a basket
+//     reaches the Recipe, saved by DYE2 when the plugin asks it to.
 async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
     //     The Location's Baskets: the tablet's DYE2 baskets joined the Library
     //     when the plugin first reported them (the first run gave them ids). On
@@ -550,8 +552,8 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
             (await under(page)) === `${house.name} · saved to the recipe`, await under(page));
         await sideRowNamed(page, 'Example Decaf').click();
         await page.waitForTimeout(400);
-        check('bean: with another Bean highlighted, it says a different bean changes this machine only',
-            (await under(page)) === `${house.name} · a different bean changes this machine only`, await under(page));
+        check('bean: with another Bean highlighted, it says the choice changes the recipe\'s bean',
+            (await under(page)) === `${house.name} · changes the recipe's bean`, await under(page));
         await shot(page, 'sync-bean-dialog-other-bean-light');
         await sideRowNamed(page, 'Sample Blend').click();
         await page.waitForTimeout(400);
@@ -580,26 +582,66 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
         check('bean: the second Machine names the batch under Dose, with no tap and no reload', !!doseThere && tablet2.seen.loads === loadsThere, await doseRow(tablet2.page));
         await shot(tablet2.page, 'sync-bean-second-machine-light');
 
-        //     A batch of another Bean: this Machine's only.
+        //     A batch of another Bean: the Recipe's Bean now, everywhere (#52).
+        //     The Recipe given DYE2's name for it first ("Sample Blend", as
+        //     DYE2 leaves "Default" out), through the server's API as the
+        //     management interface would, so the name follows the Bean.
+        const nameOf = now => now.name ?? now.content?.name;
+        const named = async tablet => { const now = await tablet('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`); return now?.kind === 'recipe' ? String(now.id) : null; };
+        const generated = house.bean;
+        const renamed = `Example Decaf`;
+        await sync('PATCH', `/recipes/${house.id}`, { content: { name: generated } });
+        const nameThere = await until(async () => ((await record(decaid))?.name === generated && (await record(decaid2))?.name === generated) || null, { timeout: 90_000, every: 1000 });
+        await page.locator('#cafe-title').filter({ hasText: generated }).waitFor({ timeout: 30_000 }).catch(() => {});
+        check('bean: the Recipe has the name DYE2 gives it, on both tablets and on the first page', !!nameThere && (await page.locator('#cafe-title').textContent()) === generated,
+            `${(await record(decaid))?.name} | ${(await record(decaid2))?.name} | ${await page.locator('#cafe-title').textContent()}`);
+        const decafHere = (await batchesThere(decaid, 'Example Decaf'))[0];
+        const loadedThere = await named(decaid2);
         mark = seen.requests.length;
+        const started = Date.now();
         await chooseBatch(page, 'Example Decaf', /Roasted/);
-        await page.locator('#cafe-dose-desc').filter({ hasText: 'Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
-        await sleep(15_000); // several of the plugin's polls, and its ask of DYE2 to save the dial-in
-        const workflow = await decaid('GET', '/workflow');
-        const after = await recipe();
-        check('bean: a batch of another Bean changes this Machine\'s Workflow, and the Recipe stays loaded',
-            workflow.context.coffeeName === 'Example Decaf' && String(workflow.context.extras?.dye?.recipeId) === String(house.recordId) && /^Example Decaf/.test(await doseRow(page)),
-            JSON.stringify(workflow.context));
-        check('bean: it leaves the Recipe on the server as it was', after.content.beanBatchId === taken?.content.beanBatchId && after.content.beanId === taken?.content.beanId,
-            JSON.stringify({ before: taken?.content.beanBatchId, after: after.content.beanBatchId }));
-        check('bean: and the Recipe\'s record on this tablet', recordBatch(await record(decaid)) === String(older.id), recordBatch(await record(decaid)));
-        check('bean: and the second Machine\'s Dose row', /^Sample Blend · roasted .*15/.test(await doseRow(tablet2.page)), await doseRow(tablet2.page));
-        check('bean: the skin wrote no DYE2 record for it', skinWrites(mark).length === 0, skinWrites(mark).join(', '));
+        let reached = false;
+        let setBack = null;
+        let serverAt = null;
+        let secondAt = null;
+        for (let waited = 0; waited < 120_000 && !(serverAt && secondAt && waited > 15_000); waited += 500) {
+            const mine = await decaid('GET', '/workflow');
+            const onDecaf = String(mine.context.beanBatchId) === String(decafHere.id) && mine.context.coffeeName === 'Example Decaf';
+            if (onDecaf) reached = true;
+            if (reached && (!onDecaf || (await named(decaid)) !== String(house.recordId))) setBack = setBack || `${mine.context.coffeeName}, ${await named(decaid)}`;
+            const now = await recipe();
+            if (!serverAt && now.uses?.bean?.name === 'Example Decaf' && String(now.uses?.beanBatch?.roastDate || '').startsWith('2026-10-20') && nameOf(now) === renamed) serverAt = Date.now() - started;
+            if (!secondAt && /^Example Decaf · roasted/.test(await doseRow(tablet2.page)) && (await named(decaid2)) === loadedThere) secondAt = Date.now() - started;
+            await sleep(500);
+        }
+        const writesNow = seen.requests.slice(mark).filter(r => /^POST .*\/store\/dye2\.reaplugin\/recipes$|^PUT \/api\/v1\/workflow$/.test(r));
+        check('bean: a batch of another Bean is one record write by the skin, then one Workflow write',
+            writesNow.length === 2 && writesNow[0].startsWith('POST') && writesNow[1].startsWith('PUT'), writesNow.join(', '));
+        check('bean: the Recipe on the server takes the Bean, the batch and the name DYE2 gives with it',
+            serverAt !== null, JSON.stringify({ bean: (await recipe()).uses?.bean, batch: (await recipe()).uses?.beanBatch, name: nameOf(await recipe()) }));
+        note(`bean: the server took the Bean, batch and name ${serverAt === null ? 'never' : `in ${(serverAt / 1000).toFixed(1)} s`}`);
+        check('bean: the first Machine was never set back, its Workflow on the batch with the Recipe loaded', reached && setBack === null, setBack || `reached: ${reached}`);
+        check('bean: the second Machine names the new Bean under Dose, with the Recipe loaded, no tap and no reload',
+            secondAt !== null && tablet2.seen.loads === loadsThere, await doseRow(tablet2.page));
+        note(`bean: the second Machine followed ${secondAt === null ? 'never' : `in ${(secondAt / 1000).toFixed(1)} s`}`);
+        const mineNow = await record(decaid);
+        check('bean: the Recipe\'s record on this tablet names the Bean, the batch and the new name',
+            String(mineNow?.beanId ?? '') !== '' && recordBatch(mineNow) === String(decafHere.id) && mineNow?.name === renamed, JSON.stringify({ beanId: mineNow?.beanId, batch: recordBatch(mineNow), name: mineNow?.name }));
+        const decafThere = (await batchesThere(decaid2, 'Example Decaf'))[0];
+        check('bean: and on the second tablet, by its own batch', !!(await until(async () => {
+            const row = await record(decaid2);
+            return (recordBatch(row) === String(decafThere?.id) && row?.name === renamed) || null;
+        }, { timeout: 60_000, every: 1000 })), JSON.stringify({ batch: recordBatch(await record(decaid2)), name: (await record(decaid2))?.name }));
+        await page.locator('#cafe-title').filter({ hasText: renamed }).waitFor({ timeout: 10_000 }).catch(() => {});
+        check('bean: the first page\'s title band and card show the new name', (await page.locator('#cafe-title').textContent()) === renamed,
+            await page.locator('#cafe-title').textContent());
+        await shot(page, 'sync-bean-after-other-bean-light');
+        await shot(tablet2.page, 'sync-bean-other-bean-second-machine-light');
 
         //     A basket: saved onto the Recipe by DYE2, at the plugin's ask.
         mark = seen.requests.length;
         await tapName(page, '#drink-section .cafe-row-name');
-        check('basket: on a served Machine the line says the choice is saved to the recipe', (await under(page)) === `${house.name} · saved to the recipe`, await under(page));
+        check('basket: on a served Machine the line says the choice is saved to the recipe', (await under(page)) === `${renamed} · saved to the recipe`, await under(page));
         await shot(page, 'sync-basket-dialog-light');
         await listRowNamed(page, '20 g sample basket').click();
         await pickClosed(page);
@@ -615,8 +657,11 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
     } finally {
         await tablet2.close();
         //     The Recipe's own batch and basket put back, as the run found them.
-        await sync('PATCH', `/recipes/${house.id}`, { content: { beanBatchId: original.beanBatchId, basketId: original.basketId } })
-            .catch(error => note(`could not put the Recipe's batch and basket back: ${error.message}`));
+        // The batch carries its Bean back with it.
+        await sync('PATCH', `/recipes/${house.id}`, { content: { beanBatchId: original.beanBatchId, basketId: original.basketId, name: house.name } })
+            .catch(error => note(`could not put the Recipe's batch, basket and name back: ${error.message}`));
+        await until(async () => ((await record(decaid))?.name === house.name && (await record(decaid2))?.name === house.name) || null, { timeout: 90_000, every: 1000 });
+        await page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 }).catch(() => {});
         await load(page, house).catch(() => {});
     }
 }

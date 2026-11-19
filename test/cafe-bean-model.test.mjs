@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, beanRows, daysOffRoast, batchRows, batchPick, beanSubtitle,
+    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchRows, batchPick, beanSubtitle,
 } from '../src/cafe/bean-model.js';
 import { assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
@@ -127,20 +127,43 @@ test('the Recipe\'s own Bean is the one its record names, else its batch\'s', ()
     assert.equal(recipeBeanId(null, BATCHES), null);
 });
 
+test('a pick is acted on only while the recipe loaded, and its bean, are the ones the dialog opened on', () => {
+    const opened = { id: 'r1', beanId: 'bean-house', beanBatchId: 'b-house-new' };
+    const own = recipeBeanId(opened, BATCHES);
+    assert.equal(sameRecipeBean(opened, opened, own, BATCHES), true);
+    assert.equal(sameRecipeBean(opened, { ...opened, beanBatchId: 'b-house-old' }, own, BATCHES), true, 'another batch of the same bean');
+    assert.equal(sameRecipeBean(opened, { ...opened, beanId: 'bean-single', beanBatchId: 'b-single' }, own, BATCHES), false, 'its bean changed elsewhere');
+    assert.equal(sameRecipeBean(opened, { id: 'r2', beanId: 'bean-house' }, own, BATCHES), false, 'another recipe loaded');
+    assert.equal(sameRecipeBean(opened, null, own, BATCHES), false, 'unloaded');
+    assert.equal(sameRecipeBean(null, opened, null, BATCHES), false, 'loaded since');
+    assert.equal(sameRecipeBean(null, null, null, BATCHES), true, 'none loaded, then or now');
+    const none = { id: 'r3', name: 'No bean' };
+    assert.equal(sameRecipeBean(none, { ...none }, recipeBeanId(none, BATCHES), BATCHES), true, 'a recipe with no bean, still none');
+    assert.equal(sameRecipeBean(none, { ...none, beanBatchId: 'b-single' }, null, BATCHES), false, 'a recipe with no bean that took one');
+    const made = { id: 'r4', beanBatchId: 'b-far' };
+    const far = batch('b-far', 'bean-far', null);
+    assert.equal(sameRecipeBean(made, made, recipeBeanId(made, BATCHES, far), BATCHES, far), true, 'a bean told by the batch read on its own');
+});
+
 test('the line under the title follows the bean highlighted on the left', () => {
     const recipe = { id: 'r', title: 'Sample Espresso', beanId: 'bean-house' };
     const vars = { recipe: 'Sample Espresso' };
-    // Served, the Recipe's own Bean highlighted: saved.
+    const changes = { key: "{recipe} · changes the recipe's bean", vars };
+    assert.equal(BEAN_PHRASES.otherBean, changes.key);
+    // The Recipe's own Bean highlighted: as the grinder's line, saved or not.
     assert.deepEqual(beanSubtitle(recipe, true, 'bean-house', 'bean-house'), { key: '{recipe} · saved to the recipe', vars });
-    // Served, another Bean highlighted: this machine only, the Recipe kept loaded.
-    assert.deepEqual(beanSubtitle(recipe, true, 'bean-single', 'bean-house'), { key: BEAN_PHRASES.otherBean, vars });
-    // Served, a Recipe that names no Bean takes any batch with its Bean.
-    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, true, 'bean-single', null), { key: '{recipe} · saved to the recipe', vars });
-    // Not served: nothing is saved, whichever bean.
-    assert.deepEqual(beanSubtitle(recipe, false, 'bean-single', 'bean-house'), { key: '{recipe} · not saved to the recipe', vars });
     assert.deepEqual(beanSubtitle(recipe, false, 'bean-house', 'bean-house'), { key: '{recipe} · not saved to the recipe', vars });
-    // No recipe.
+    // Another Bean highlighted: it changes the recipe's bean, on every tablet.
+    assert.deepEqual(beanSubtitle(recipe, true, 'bean-single', 'bean-house'), changes);
+    assert.deepEqual(beanSubtitle(recipe, false, 'bean-single', 'bean-house'), changes);
+    // A Recipe that names no Bean takes any bean as its first, saved or not.
+    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, true, 'bean-single', null), changes);
+    assert.deepEqual(beanSubtitle({ id: 'r', title: 'Sample Espresso' }, false, 'bean-single', null), changes);
+    // Ids compared as text, as Decaid's and DYE2's may differ in type.
+    assert.deepEqual(beanSubtitle({ ...recipe, beanId: 7 }, true, '7', '7'), { key: '{recipe} · saved to the recipe', vars });
+    // No recipe: this machine only, whichever bean.
     assert.deepEqual(beanSubtitle(null, true, 'bean-single', null), { key: 'No recipe loaded · changes this machine only' });
+    assert.deepEqual(beanSubtitle(null, false, 'bean-single', 'bean-house'), { key: 'No recipe loaded · changes this machine only' });
     // An empty list highlights nothing.
     assert.deepEqual(beanSubtitle(recipe, true, null, 'bean-house'), { key: '{recipe} · saved to the recipe', vars });
 });

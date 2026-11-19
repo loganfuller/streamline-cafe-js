@@ -1,16 +1,16 @@
 // The bean and batch dialog's two lists, the line under its title, and what
-// choosing a batch writes (docs/cafe/DESIGN.md, "The grinder, bean and basket
-// dialogs"). No browser global is touched: the phrases go through `t`, the
-// roast day through `formatDay`, and Decaid's answers and today's date are
-// handed in.
+// choosing a batch writes into the Workflow (docs/cafe/DESIGN.md, "The grinder,
+// bean and basket dialogs" and "The bean and batch dialog"). No browser global
+// is touched: the phrases go through `t`, the roast day through `formatDay`,
+// and Decaid's answers and today's date are handed in.
 //
-// A choice writes the Workflow and nothing else: the bean's name, its roaster
-// and the batch's id, under Streamline's own bean writer (`beans.select`). On a
-// Machine Decent Sync serves, with a Recipe loaded, Decent Sync records a batch
-// of the Recipe's own Bean from that write; a batch of another Bean stays this
-// machine's (decent-sync ADR-0022, "What stays the Machine's own").
+// A choice writes the bean's name, its roaster and the batch's id into the
+// Workflow, under Streamline's own bean writer (`beans.select`). With a recipe
+// loaded, a batch of another bean than the recipe's own is saved onto the
+// recipe first (bean-change.js), and the line under the title says so.
 import { selectableBeans, selectableBatches, currentBeanContext } from '../modules/bean-selection.js';
 import { pickSubtitle, roastDay } from './page-model.js';
+import { writesRecord } from './bean-change.js';
 
 /** The phrases the dialog may say, for the translations test. */
 export const BEAN_PHRASES = {
@@ -25,7 +25,7 @@ export const BEAN_PHRASES = {
     days: '{days} days off roast',
     noRoastDate: 'No roast date',
     unnamed: 'Unnamed',
-    otherBean: '{recipe} · a different bean changes this machine only',
+    otherBean: '{recipe} · changes the recipe\'s bean',
 };
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
@@ -102,6 +102,18 @@ export function recipeBeanId(recipe, batches, recipeBatch = null) {
 }
 
 /**
+ * Is the recipe loaded now (`now`, the page's) still the one the dialog
+ * opened on (`before`), with the bean the line under the title was worked out
+ * from (`ownBeanId`)? Another tablet may change the recipe's bean while the
+ * dialog stays open, and the line, and which write a pick makes, would then be
+ * wrong.
+ */
+export function sameRecipeBean(before, now, ownBeanId, batches, recipeBatch = null) {
+    if (!before || !now) return !before && !now;
+    return sameId(before.id, now.id) && recipeBeanId(now, batches, recipeBatch) === (ownBeanId == null ? null : String(ownBeanId));
+}
+
+/**
  * The left list's rows: each bean's name over its roaster and how many
  * batches it has, the one shown on the right `highlighted`.
  */
@@ -163,13 +175,13 @@ export function batchPick(bean, batch, context) {
 
 /**
  * The line under the dialog's title, which follows the bean highlighted on
- * the left: as the grinder's (`pickSubtitle`), except that where Decent Sync
- * saves (`saved`) and that bean is not the Recipe's own (`ownBeanId`, from
- * `recipeBeanId`), a choice stays this machine's, and the line says so. A
- * Recipe that names no Bean takes any batch with its Bean.
+ * the left: as the grinder's (`pickSubtitle`), except that with a recipe
+ * loaded and that bean not the Recipe's own (`ownBeanId`, from
+ * `recipeBeanId`), a choice changes the recipe's bean, on every tablet, and
+ * the line says so. A Recipe that names no Bean takes any bean as its first.
  */
 export function beanSubtitle(recipe, saved, highlightedId, ownBeanId) {
     const line = pickSubtitle(recipe, saved);
-    if (!recipe || !saved || ownBeanId == null || highlightedId == null || sameId(highlightedId, ownBeanId)) return line;
+    if (!writesRecord(recipe, ownBeanId, highlightedId)) return line;
     return { key: BEAN_PHRASES.otherBean, vars: line.vars };
 }

@@ -24,6 +24,7 @@ import { openBaristaDialog, clearOnSleep } from './barista-dialog.js';
 import { openProfileDialog } from './profile-dialog.js';
 import { baristaName, asleep, baristaStamps } from './barista-model.js';
 import { initProfileChanger } from './profile-changer.js';
+import { initBeanChanger } from './bean-changer.js';
 
 const LIVE_WEIGHT_MS = 250;
 const BATTERY_MS = 10_000;
@@ -98,9 +99,10 @@ const clearAsleep = () => clearOnSleep({ write: writePick, written: seeBarista }
 
 // ── Whether the dial-in is saved ─────────────────────────────────────────────
 
-// The skin saves nothing onto a recipe itself. Decent Sync's plugin does, after
-// every change on a Machine it serves, so the column says "saved to the recipe"
-// only there. Its Status request says which (decent-sync.js), and is asked at
+// Decent Sync's plugin saves the dial-in onto the recipe, after every change on
+// a Machine it serves, so the column says "saved to the recipe" only there. The
+// skin itself saves only the profile and a batch of another bean (DESIGN.md,
+// "Who saves it"). Its Status request says which (decent-sync.js), and is asked at
 // start-up, when the page comes back into view and after each recipe load.
 function showStatus(answer) {
     const next = decentSyncSaves(saved, answer);
@@ -280,7 +282,7 @@ function openGrinder() {
 }
 
 function openBean() {
-    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved, write: writePick });
+    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved });
 }
 
 function openBasket() {
@@ -374,6 +376,8 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // moves the epoch, which the check after it reads. A load or an arrangement
     // of the strip (`loading`) or a shot begun while it reads holds its writes.
     initProfileChanger({ mayChange: mayPick, settled: () => !loading && !shotRunning(), queue: writePick, epoch: () => loads, shotRunning });
+    // A batch, and with it the recipe's bean where it is another, takes its turn the same way.
+    initBeanChanger({ settled: () => !loading && !shotRunning(), queue: writePick, shotRunning });
 
     const profile = el('profile-name');
     if (profile) {

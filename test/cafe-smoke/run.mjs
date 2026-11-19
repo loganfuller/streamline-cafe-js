@@ -7,6 +7,7 @@
 //   node test/cafe-smoke/run.mjs --token=... --headed
 //   node test/cafe-smoke/run.mjs --token=... --streamline=http://127.0.0.1:13998
 //   node test/cafe-smoke/run.mjs --token=... --timezone=Europe/Berlin   (the container's zone, UTC by default)
+//   node test/cafe-smoke/run.mjs --token=... --only=bean   (step 22 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --only=profile   (step 25 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --only=preheat   (step 26 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --only=profile-dialog   (step 27 alone, after a whole run)
@@ -1129,10 +1130,14 @@ const sorted = value => (value && typeof value === 'object' && !Array.isArray(va
     ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sorted(value[key])])) : value);
 
 // 22. The bean and batch dialog and the basket dialog (docs/cafe/DESIGN.md,
-//     "The grinder, bean and basket dialogs"), without Decent Sync: a tap on
-//     Dose's name lists the beans with a batch beside the highlighted bean's
-//     batches, a tap on Yield's lists DYE2's baskets, and a choice writes the
-//     Workflow and nothing else, with a recipe loaded and with none. The
+//     "The grinder, bean and basket dialogs" and "The bean and batch dialog"),
+//     without Decent Sync: a tap on Dose's name lists the beans with a batch
+//     beside the highlighted bean's batches, a tap on Yield's lists DYE2's
+//     baskets. A batch of the recipe's own bean and a basket write the Workflow
+//     and nothing else; with a recipe loaded a batch of another bean becomes the
+//     recipe's bean (#52): its DYE2 record first, then the Workflow, the recipe
+//     kept loaded, a name DYE2 gave following the bean and one named by hand
+//     kept. With no recipe loaded each choice writes the Workflow alone. The
 //     grinder's own choices, with a recipe and without, are step 18's.
 async function beanAndBasketDialogs() {
     await beanAndBasketFixtures();
@@ -1161,15 +1166,27 @@ async function beanAndBasketDialogs() {
         await waitForPage(page);
         const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
         const loadCard = async recipe => {
+            if ((await card(recipe).getAttribute('aria-pressed')) === 'true') return; // a tap would unload it
             await card(recipe).click();
             await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
             await page.waitForTimeout(3000);
         };
         const dose = () => page.locator('#cafe-dose-desc').textContent();
         const basket = () => page.locator('#cafe-yield-desc').textContent();
+        // Loaded afresh, as stored, so DYE2 does not call it changed already.
+        if ((await card(house).getAttribute('aria-pressed')) === 'true') {
+            await card(house).click(); // unloads it
+            await page.waitForTimeout(2500);
+        }
         await loadCard(house);
+        // The recipe's flush as the simulated machine reports it, so DYE2 does
+        // not call it changed already (step 25's fixture write).
+        await matchMachine(house.name);
         const writes = workflowWrites(page);
         const record = await recordNamed(house.name);
+        const selection = () => decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
+        const recordWrites = mark => seen.requests.slice(mark).filter(r => /^POST .*\/store\/dye2\.reaplugin\/recipes$/.test(r));
+        const cardBean = slot => page.locator('#cafe-strip .cafe-card').nth(slot - 1).locator('.cafe-card-bean').textContent();
         check('bean: the loaded recipe names its bean and roast date under Dose, and its basket under Yield',
             /^Sample Blend · roasted .*2/.test(await dose()) && (await basket()) === house.basket, `${await dose()} | ${await basket()}`);
 
@@ -1208,7 +1225,12 @@ async function beanAndBasketDialogs() {
         check('bean: a tap on a bean shows its batches, and chooses nothing',
             rows.length === 1 && !rows[0].inUse && (await pickDialog(page).count()) === 1 && writes.length === 0
             && sameJson((await sideRows(page)).filter(b => b.highlighted).map(b => b.name), ['Sample Single Origin']), JSON.stringify(rows));
-        check('bean: without Decent Sync, the line stays "not saved" whichever bean', (await pickUnder(page)) === `${house.name} · not saved to the recipe`);
+        check('bean: with another bean highlighted, the line says the choice changes the recipe\'s bean, without Decent Sync too',
+            (await pickUnder(page)) === `${house.name} · changes the recipe's bean`, await pickUnder(page));
+        await shot(page, 'bean-dialog-other-bean-light');
+        await sideRow(page, 'Sample Blend').click();
+        await page.waitForTimeout(400);
+        check('bean: and back on the recipe\'s own bean, "not saved" again', (await pickUnder(page)) === `${house.name} · not saved to the recipe`, await pickUnder(page));
         await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
         check('bean: Close closes it, and nothing was written', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
         check('bean: a tap on the bean\'s name under Dose opens it too', await openBeans(page, '#cafe-dose-desc'));
@@ -1229,8 +1251,14 @@ async function beanAndBasketDialogs() {
         check('bean: the Workflow holds it, and the recipe stays loaded',
             workflow.context.beanBatchId === blendOld.id && workflow.context.extras?.dye?.recipeId === record.id, JSON.stringify(workflow.context));
         check('bean: Dose names the bean with the new batch\'s roast date', /^Sample Blend · roasted .*15/.test(await dose()), await dose());
+        check('bean: a batch of the recipe\'s own bean changes no DYE2 record, and the skin wrote none', sameJson(await recordNamed(house.name), record) && recordWrites(0).length === 0,
+            recordWrites(0).join(', '));
 
-        //    A batch of another bean.
+        //    A batch of another bean: the recipe's bean now (#52). The record
+        //    first, then the Workflow; the name, typed by hand, kept.
+        const decafBean = beanOf('Example Decaf');
+        const loadedBefore = await selection();
+        let mark = seen.requests.length;
         await openBeans(page);
         await sideRow(page, 'Example Decaf').click();
         await page.waitForTimeout(400);
@@ -1239,9 +1267,39 @@ async function beanAndBasketDialogs() {
         await page.locator('#cafe-dose-desc').filter({ hasText: 'Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
         await page.waitForTimeout(1500);
         workflow = await decaid('GET', '/workflow');
-        check('bean: a batch of another bean is written as one, and the recipe stays loaded',
-            writes.length === 2 && workflow.context.beanBatchId === decaf.id && workflow.context.coffeeName === 'Example Decaf'
-            && workflow.context.extras?.dye?.recipeId === record.id && /^Example Decaf · roasted .*20/.test(await dose()), `${await dose()} ${JSON.stringify(workflow.context)}`);
+        const writesNow = seen.requests.slice(mark).filter(r => /^POST .*\/store\/dye2\.reaplugin\/recipes$|^PUT .*\/workflow$/.test(r));
+        check('bean: a batch of another bean is one record write, then one Workflow write',
+            sameJson(writesNow.map(r => r.split(' ')[0]), ['POST', 'PUT']) && writes.length === 2
+            && sameJson(sorted(writes[1]), sorted({ context: { beanBatchId: decaf.id, coffeeName: 'Example Decaf', coffeeRoaster: 'Example Coffee Co' } })),
+            `${writesNow.join(', ')} | ${JSON.stringify(writes.slice(1))}`);
+        const taken = await recordNamed(house.name);
+        const wantRecord = {
+            ...record, beanId: decafBean.id, beanName: 'Example Decaf', beanRoaster: 'Example Coffee Co', beanBatchId: decaf.id, subtitle: 'Example Decaf',
+            workflow: { ...record.workflow, context: { ...record.workflow.context, beanBatchId: decaf.id, coffeeName: 'Example Decaf', coffeeRoaster: 'Example Coffee Co' } },
+        };
+        check('bean: the record takes the bean\'s id, name and roaster and the batch, in its stored Workflow too, keeping every other field and its name',
+            sameJson(sorted(taken), sorted(wantRecord)), JSON.stringify({ beanId: taken?.beanId, beanBatchId: taken?.beanBatchId, name: taken?.name, context: taken?.workflow?.context }));
+        check('bean: the record\'s top and its stored Workflow name the same bean: what DYE2\'s own apply reads, and what Streamline\'s applies',
+            taken?.beanName === taken?.workflow?.context?.coffeeName && taken?.beanRoaster === taken?.workflow?.context?.coffeeRoaster && taken?.beanBatchId === taken?.workflow?.context?.beanBatchId);
+        const loadedAfter = await selection();
+        check('bean: the Workflow holds the batch, and the recipe stays loaded and is not called changed',
+            workflow.context.beanBatchId === decaf.id && workflow.context.extras?.dye?.recipeId === record.id
+            && loadedRecipeId(loadedAfter) === record.id && loadedAfter.modified === false && loadedBefore?.modified === false,
+            `${JSON.stringify(loadedBefore)} -> ${JSON.stringify(loadedAfter)}`);
+        check('bean: Dose, the card and the title band name the new bean, and the recipe keeps its name',
+            /^Example Decaf · roasted .*20/.test(await dose()) && (await cardBean(house.slot)) === 'Example Decaf' && (await cardName(page, house.slot)) === house.name
+            && (await page.locator('#cafe-title').textContent()) === house.name,
+            `${await dose()} | ${await cardBean(house.slot)} | ${await cardName(page, house.slot)}`);
+        await shot(page, 'bean-after-other-bean-light');
+        await page.waitForTimeout(11_000); // DYE2's save window, and the check after it
+        {
+            const held = await recordNamed(house.name);
+            const now = await selection();
+            check('bean: after DYE2\'s window the record still holds the bean, the recipe is still loaded, and nothing wrote the record again',
+                held?.beanBatchId === decaf.id && held?.beanId === decafBean.id && loadedRecipeId(now) === record.id && recordWrites(mark).length === 1,
+                `${held?.beanBatchId}, ${JSON.stringify(now)}, ${recordWrites(mark).length} record writes`);
+        }
+        const recordAfterBean = await recordNamed(house.name);
 
         //    The basket dialog.
         check('basket: a tap on the Yield row\'s name opens the basket dialog', await openBaskets(page));
@@ -1266,9 +1324,9 @@ async function beanAndBasketDialogs() {
         check('basket: the Workflow holds it, Yield names it, and the recipe stays loaded',
             workflow.context.extras?.basketId === 'bskt-sample-20' && (await basket()) === '20 g sample basket' && workflow.context.extras?.dye?.recipeId === record.id,
             JSON.stringify(workflow.context.extras));
-        check('bean and basket: the recipe\'s DYE2 record is unchanged by the choices', sameJson(await recordNamed(house.name), record));
-        check('bean and basket: the skin asked DYE2 to save nothing, and wrote none of its records',
-            !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r)));
+        check('basket: the recipe\'s DYE2 record is unchanged by the basket', sameJson(await recordNamed(house.name), recordAfterBean));
+        check('bean and basket: the skin asked DYE2 to save nothing, and wrote its records once, for the other bean',
+            !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$/.test(r)) && recordWrites(0).length === 1, recordWrites(0).join(', '));
         await lookAgain(page);
         check('bean and basket: Dose and Yield name the choices after the page goes out of view and comes back',
             /^Example Decaf/.test(await dose()) && (await basket()) === '20 g sample basket', `${await dose()} | ${await basket()}`);
@@ -1281,13 +1339,68 @@ async function beanAndBasketDialogs() {
             await again.close();
         }
 
-        //    Another recipe, then this one again: the recipe's own bean and basket are back.
+        //    Another recipe, then this one again, through Streamline's apply: the
+        //    recipe's new bean and batch, and its own basket, are back.
         await loadCard(other);
         await loadCard(house);
         workflow = await decaid('GET', '/workflow');
-        check('bean and basket: loading another recipe and this one again brings the recipe\'s own bean and basket back',
-            workflow.context.beanBatchId === record.beanBatchId && /^Sample Blend · roasted .*2/.test(await dose()) && (await basket()) === house.basket,
+        check('bean and basket: loading another recipe and this one again brings the recipe\'s new bean and batch back, and its own basket',
+            workflow.context.beanBatchId === decaf.id && workflow.context.coffeeName === 'Example Decaf' && /^Example Decaf · roasted .*20/.test(await dose()) && (await basket()) === house.basket,
             `${await dose()} | ${await basket()} | ${workflow.context.beanBatchId}`);
+
+        //    A recipe DYE2 named, made by its own save-recipe from the Workflow
+        //    on Adaptive v3 and Sample Single Origin, in slot 4, which DYE2 marks
+        //    loaded: another bean renames it.
+        const adaptive = (await decaid('GET', '/profiles')).find(p => p.profile?.title === 'Adaptive v3');
+        await decaid('PUT', '/workflow', { profile: adaptive.profile, context: { coffeeName: 'Sample Single Origin', coffeeRoaster: 'Sample Roasters', beanBatchId: single.id } });
+        const made = await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/save-recipe`, { slot: 4 });
+        await matchMachine(made.name);
+        await lookAgain(page);
+        await page.locator('#cafe-title').filter({ hasText: made.name }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        const madeLoaded = await selection();
+        check('bean: DYE2 named the recipe it made from the profile and the bean, with no beanId, and it is loaded, not called changed',
+            made.name === 'Adaptive Sample Single Origin' && made.beanId == null && loadedRecipeId(madeLoaded) === made.id && madeLoaded.modified === false, `${made.name}, ${made.beanId}, ${JSON.stringify(madeLoaded)}`);
+        await openBeans(page);
+        check('bean: on its own bean, worked out from its batch, the line says the choice is not saved', (await pickUnder(page)) === `${made.name} · not saved to the recipe`, await pickUnder(page));
+        await sideRow(page, 'Example Decaf').click();
+        await page.waitForTimeout(400);
+        check('bean: on another, that it changes the recipe\'s bean', (await pickUnder(page)) === `${made.name} · changes the recipe's bean`, await pickUnder(page));
+        mark = seen.requests.length;
+        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await pickClosed(page);
+        await page.locator('#cafe-title').filter({ hasText: 'Adaptive Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        const madeAfter = (await records()).find(row => row && row.id === made.id);
+        check('bean: a recipe DYE2 named takes the name DYE2 gives with the new bean, in the same record write',
+            recordWrites(mark).length === 1 && madeAfter?.name === 'Adaptive Example Decaf' && madeAfter?.title === 'Adaptive Example Decaf'
+            && madeAfter?.beanId === decafBean.id && madeAfter?.beanBatchId === decaf.id && madeAfter?.workflow?.context?.beanBatchId === decaf.id,
+            `${recordWrites(mark).length} writes, ${madeAfter?.name} / ${madeAfter?.title}, ${madeAfter?.beanId}`);
+        const madeSelection = await selection();
+        check('bean: its card and the title band show the new name and bean, and it stays loaded, not called changed',
+            (await cardName(page, 4)) === 'Adaptive Example Decaf' && (await cardBean(4)) === 'Example Decaf' && (await page.locator('#cafe-title').textContent()) === 'Adaptive Example Decaf'
+            && loadedRecipeId(madeSelection) === made.id && madeSelection.modified === false,
+            `${await cardName(page, 4)} | ${await cardBean(4)} | ${await page.locator('#cafe-title').textContent()} | ${JSON.stringify(madeSelection)}`);
+        await shot(page, 'bean-renamed-light');
+        await page.waitForTimeout(11_000);
+        {
+            const held = (await records()).find(row => row && row.id === made.id);
+            const now = await selection();
+            check('bean: after DYE2\'s window it keeps the name and the bean, still loaded, and nothing wrote the record again',
+                held?.name === 'Adaptive Example Decaf' && held?.beanBatchId === decaf.id && loadedRecipeId(now) === made.id && recordWrites(mark).length === 1,
+                `${held?.name}, ${JSON.stringify(now)}, ${recordWrites(mark).length} record writes`);
+        }
+        check('bean: the recipe named by hand kept its own', (await recordNamed(house.name))?.name === house.name);
+        // DYE2's records as the step found them: the made recipe gone, the
+        // sample recipe's own bean back (the fixture's writes).
+        await decaid('POST', RECIPE_STORE, recordsBefore);
+        await lookAgain(page);
+        await page.waitForTimeout(1500);
+        if ((await card(house).getAttribute('aria-pressed')) === 'true') {
+            await card(house).click(); // a tap on the loaded card unloads it
+            await page.waitForTimeout(2500);
+        }
+        await loadCard(house);
 
         //    Lists that can't be read are not empty lists.
         for (const [what, pattern, open] of [['beans', /\/api\/v1\/beans(\?|$)/, '#dose-section .cafe-row-name'], ['baskets', /\/store\/dye2\.reaplugin\/baskets$/, '#drink-section .cafe-row-name']]) {
@@ -1320,6 +1433,7 @@ async function beanAndBasketDialogs() {
         await waitForPage(page);
         await page.waitForTimeout(3000);
         const before = writes.length;
+        const recordsUnloaded = await records();
         await openBeans(page);
         check('bean: with no recipe loaded, the line says the choice changes this machine only',
             (await pickUnder(page)) === 'No recipe loaded · changes this machine only', await pickUnder(page));
@@ -1338,7 +1452,7 @@ async function beanAndBasketDialogs() {
         check('bean and basket: with no recipe loaded, each choice writes the Workflow and its row names it',
             writes.length === before + 2 && loose.context.beanBatchId === single.id && loose.context.extras?.basketId === 'bskt-sample-20'
             && /^Sample Single Origin · roasted/.test(await dose()) && (await basket()) === '20 g sample basket', `${writes.length - before} writes, ${JSON.stringify(loose.context)}`);
-        check('bean and basket: no recipe\'s DYE2 record changed', sameJson(await records(), recordsBefore));
+        check('bean and basket: with no recipe loaded no recipe\'s DYE2 record changed', sameJson(await records(), recordsUnloaded));
         check('bean and basket: no page error', seen.errors.length === 0, seen.errors.join(' | '));
     } finally {
         await shot(page, 'bean-basket-at-end').catch(() => {});
@@ -3123,10 +3237,11 @@ if ((await decaid('GET', '/plugins')).some(plugin => plugin.id === 'decent-sync.
     process.exit(2);
 }
 
-// --only=profile (step 25), --only=preheat (step 26), --only=profile-dialog
-// (step 27) or --only=labels (step 28) alone, on a Decaid a whole run has already set up.
+// --only=bean (step 22), --only=profile (step 25), --only=preheat (step 26),
+// --only=profile-dialog (step 27) or --only=labels (step 28) alone, on a Decaid
+// a whole run has already set up.
 if (ONLY) {
-    const steps = { profile: profileChange, preheat: preheatLive, 'profile-dialog': profileDialog, labels: liveLabels };
+    const steps = { bean: beanAndBasketDialogs, profile: profileChange, preheat: preheatLive, 'profile-dialog': profileDialog, labels: liveLabels };
     try {
         if (!steps[ONLY]) throw new Error(`no step named "${ONLY}": ${Object.keys(steps).join(', ')}`);
         await setSetting(true);

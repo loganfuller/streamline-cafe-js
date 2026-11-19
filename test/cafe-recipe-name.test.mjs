@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { profileWord, baseName, generatedFrom, renamedFor, recordName } from '../src/cafe/recipe-name.js';
+import { profileWord, baseName, generatedFrom, renamedFor, renamedForBean, renamedWith, recordName } from '../src/cafe/recipe-name.js';
 
 // A record as DYE2's `save-recipe` writes it: the name twice, the profile's
 // title, the bean's name and the beverage typed.
@@ -127,4 +127,38 @@ test('a record\'s name is its name, else its title', () => {
     assert.equal(recordName({ name: 'A', title: 'B' }), 'A');
     assert.equal(recordName({ name: ' ', title: 'B' }), 'B');
     assert.equal(recordName(null), '');
+});
+
+test('the bean changed: a name DYE2 gave follows the new bean, with its profile word and beverage', () => {
+    assert.equal(renamedForBean(record('Turbo Hill Farm'), 'Valley Decaf'), 'Turbo Valley Decaf');
+    assert.equal(renamedForBean(record('Turbo Hill Farm 2'), 'Valley Decaf'), 'Turbo Valley Decaf', 'the count is dropped where not needed');
+    assert.equal(renamedForBean(record('Turbo Hill Farm Cappuccino', { beverage: 'Cappuccino' }), 'Valley Decaf'), 'Turbo Valley Decaf Cappuccino');
+    assert.equal(renamedForBean(record('Hill Farm', { title: 'Default espresso' }), 'Valley Decaf'), 'Valley Decaf');
+});
+
+test('the bean changed: a name someone typed, or the same bean again, renames nothing', () => {
+    assert.equal(renamedForBean(record('Morning house'), 'Valley Decaf'), null);
+    assert.equal(renamedForBean(record('Turbo Hill Farm'), 'Hill Farm'), null);
+    assert.equal(renamedForBean(record('Turbo Hill Farm'), 'hill farm'), null, 'compared without case');
+});
+
+test('the bean changed: a recipe with no bean gains one and loses the day', () => {
+    assert.equal(renamedForBean(record('Turbo 26 Oct', { bean: '' }), 'Valley Decaf'), 'Turbo Valley Decaf');
+    assert.equal(renamedForBean(record('Recipe 3 Nov', { bean: '', title: 'Default' }), 'Valley Decaf'), 'Valley Decaf');
+});
+
+test('the bean changed: a bean with no name renames nothing', () => {
+    assert.equal(renamedForBean(record('Turbo Hill Farm'), ''), null);
+    assert.equal(renamedForBean(record('Turbo Hill Farm'), null), null);
+});
+
+test('the bean changed: a name another record has takes the next free count, the record itself not counted', () => {
+    const row = record('Turbo Hill Farm', { id: 'r1' });
+    const others = [row, record('Turbo Valley Decaf', { id: 'r2' }), record('turbo valley decaf 2', { id: 'r3' })];
+    assert.equal(renamedForBean(row, 'Valley Decaf', others), 'Turbo Valley Decaf 3');
+});
+
+test('the profile and the bean changed together', () => {
+    assert.equal(renamedWith(record('Turbo Hill Farm'), { title: 'Bloom slow', bean: 'Valley Decaf' }), 'Bloom Valley Decaf');
+    assert.equal(renamedWith(record('Turbo Hill Farm'), { title: 'Turbo again' }), null);
 });
