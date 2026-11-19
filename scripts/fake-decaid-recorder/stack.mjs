@@ -49,6 +49,25 @@ function baseImage() {
 }
 
 /**
+ * Until `socket` is open. Fails if it errors or closes first, or is not open in
+ * 10 s, so a refused socket ends the run (and its container) rather than hang.
+ */
+export function opened(socket) {
+    if (socket.readyState === 1) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => fail(new Error(`${socket.url}: not open in 10 s`)), 10_000);
+        const done = () => { clearTimeout(timer); socket.removeEventListener('open', onOpen); socket.removeEventListener('error', onError); socket.removeEventListener('close', onClose); };
+        const fail = error => { done(); reject(error); };
+        const onOpen = () => { done(); resolve(); };
+        const onError = () => fail(new Error(`${socket.url}: the socket failed to open`));
+        const onClose = event => fail(new Error(`${socket.url}: closed before it opened (${event.code})`));
+        socket.addEventListener('open', onOpen);
+        socket.addEventListener('error', onError);
+        socket.addEventListener('close', onClose);
+    });
+}
+
+/**
  * Starts the pinned Decaid. Returns its API's address, its extensions token, the
  * container's id, and `stop()`, which removes the container.
  *
@@ -65,13 +84,16 @@ export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
     const dye2Archive = await asset(PINS.dye2.repo, `v${PINS.dye2.version}`, PINS.dye2.asset);
     const image = baseImage();
     const name = `cafe-fake-decaid-recorder-${randomBytes(4).toString('hex')}`;
-    const id = docker('run', '-d', '--name', name, '--label', `${LABEL}=recorder`, '-e', `TZ=${timezone}`,
+    // Created, then started, so a start that fails (its port taken, say) still
+    // leaves an id to remove.
+    const id = docker('create', '--name', name, '--label', `${LABEL}=recorder`, '-e', `TZ=${timezone}`,
         '-p', `127.0.0.1:${port}:8080`, image, 'sleep', 'infinity');
     const stop = () => { try { docker('rm', '-f', id); } catch { /* gone */ } };
     const exec = command => docker('exec', id, 'bash', '-c', command);
     const token = randomBytes(32).toString('hex');
     const api = `http://127.0.0.1:${port}/api/v1`;
     try {
+        docker('start', id);
         docker('cp', decaidArchive, `${id}:/tmp/decaid.tar.gz`);
         docker('cp', dye2Archive, `${id}:/tmp/dye2.zip`);
         exec('mkdir -p /opt/decaid && tar -xzf /tmp/decaid.tar.gz -C /opt/decaid');

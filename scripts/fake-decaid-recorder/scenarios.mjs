@@ -152,7 +152,7 @@ export const SCENARIOS = [
  * Records every scenario against the real stack. `sample` is the sample data
  * as recorded at the start (recordings/sample-data.json).
  */
-export async function recordScenarios({ decaid, raw, ws, write, sleep, sample, only = null }) {
+export async function recordScenarios({ decaid, raw, ws, write, sleep, opened, sample, only = null }) {
     const state = {
         workflow: sample.workflow,
         recipes: sample.store['dye2.reaplugin'].recipes,
@@ -166,7 +166,7 @@ export async function recordScenarios({ decaid, raw, ws, write, sleep, sample, o
         if (scenario.socket) {
             socket = new WebSocket(`${ws}${scenario.socket.replace('/ws/v1', '')}`);
             socket.onmessage = event => pushes.push(JSON.parse(String(event.data)));
-            await new Promise(resolve => { socket.onopen = resolve; });
+            await opened(socket);
         }
         // The Workflow and DYE2's keys as they stand, which the replay starts
         // from: a write can add to a Workflow but not take away what an earlier

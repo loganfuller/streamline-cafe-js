@@ -5,9 +5,19 @@
 //
 // A request is matched by its method, path and query as the page sent them. A
 // write among them (Streamline saving a setting of Decaid's own, the display's
-// wake lock) is answered as recorded and changes nothing.
+// wake lock) is matched by its body too, answered as recorded, and changes
+// nothing; a write of another body has no answer.
 
 import { copy } from './workflow.js';
+
+// The recorded body is the text the page sent; `body` is it parsed, as the
+// adapter hands it on, or undefined for none.
+function sameBody(recorded, body) {
+    if (recorded == null) return body === undefined;
+    let parsed;
+    try { parsed = JSON.parse(recorded); } catch { parsed = recorded; }
+    return JSON.stringify(parsed) === JSON.stringify(body);
+}
 
 export function createBoot(recording) {
     const requests = new Map(Object.entries(recording.requests || {}).map(([key, value]) => [key, copy(value)]));
@@ -17,9 +27,11 @@ export function createBoot(recording) {
         return `${method} ${path}${search}`;
     };
     return {
-        answer(method, path, query) {
+        answer(method, path, query, body) {
             const found = requests.get(key(method, path, query));
-            return found ? { status: found.status, body: copy(found.body) } : null;
+            if (!found) return null;
+            if (method !== 'GET' && !sameBody(found.requestBody, body)) return null;
+            return { status: found.status, body: copy(found.body) };
         },
         body(method, pathAndQuery) {
             const found = requests.get(`${method} ${pathAndQuery}`);

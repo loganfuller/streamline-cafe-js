@@ -37,7 +37,6 @@ class Cafe {
     /** Another page on the same fake, as a page opened afresh on the tablet. */
     async another() {
         const page = await this.page.context().newPage();
-        page.on('pageerror', error => this.errors.push(error.message));
         await page.goto(`${PAGE_ORIGIN}/index.html`);
         await page.locator('#cafe-strip .cafe-card').first().waitFor();
         await this.settle(page);
@@ -145,8 +144,9 @@ export const test = base.extend({
         await use(fake);
     },
     cafe: async ({ page, context, fake }, use) => {
+        // Every page of the context, one it opens itself included.
         const errors = [];
-        page.on('pageerror', error => errors.push(error.message));
+        context.on('weberror', error => errors.push(`${error.page()?.url() ?? 'a page'}: ${error.error().message}`));
         await servePage(context, ROOT);
         const routes = await attach(context, fake);
         await context.addInitScript(css => {

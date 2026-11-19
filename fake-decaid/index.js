@@ -154,7 +154,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             return { status: 200, body: {} };
         }
         if (OWNED(method, path)) return null;
-        return cannedBoot.answer(method, path, query);
+        return cannedBoot.answer(method, path, query, body);
     }
 
     return {

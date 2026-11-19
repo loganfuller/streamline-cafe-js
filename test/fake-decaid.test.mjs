@@ -205,12 +205,20 @@ test('the sample data\'s Shots are moved so the newest was pulled an hour before
     assert.equal(newest.timestamp.slice(0, 16), '2026-11-18T13:00');
 });
 
-test('boot: the recorded answers, matched by method, path and query; anything else has none', () => {
+test('boot: the recorded answers, matched by method, path and query, and a write by its body too; anything else has none', () => {
     const boot = createBoot({ requests: { 'GET /api/v1/profiles?includeHidden=true': { status: 200, body: [1] } }, sockets: { '/ws/v1/devices': { frames: [{ a: 1 }] } } });
     assert.deepEqual(boot.answer('GET', '/api/v1/profiles', new URLSearchParams('includeHidden=true')), { status: 200, body: [1] });
     assert.equal(boot.answer('GET', '/api/v1/profiles', new URLSearchParams()), null);
     assert.deepEqual(boot.socket('/ws/v1/devices'), [{ a: 1 }]);
     assert.equal(boot.socket('/ws/v1/other'), null);
+    const writes = createBoot({ requests: {
+        'POST /api/v1/settings': { status: 200, body: null, requestBody: '{"gatewayMode":"tracking"}' },
+        'POST /api/v1/display/wakelock': { status: 200, body: { on: true }, requestBody: null },
+    } });
+    assert.deepEqual(writes.answer('POST', '/api/v1/settings', new URLSearchParams(), { gatewayMode: 'tracking' }), { status: 200, body: null });
+    assert.equal(writes.answer('POST', '/api/v1/settings', new URLSearchParams(), { gatewayMode: 'full' }), null, 'a write of another body has none');
+    assert.deepEqual(writes.answer('POST', '/api/v1/display/wakelock', new URLSearchParams(), undefined), { status: 200, body: { on: true } });
+    assert.equal(writes.answer('POST', '/api/v1/display/wakelock', new URLSearchParams(), { on: false }), null);
 });
 
 test('a request or socket the model keeps no answer for has none (a machine state no recording asks for among them), and a refusal is answered as the test asked', () => {

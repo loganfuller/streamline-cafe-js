@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { standUp, CACHE, PINS, ROOT } from './stack.mjs';
+import { standUp, opened, CACHE, PINS, ROOT } from './stack.mjs';
 import { seed } from './seed.mjs';
 import { RECIPES } from '../../test/cafe-smoke/sample-data.mjs';
 import { servePage, PAGE_ORIGIN } from '../../test/page/support/page-files.mjs';
@@ -76,7 +76,7 @@ function listen(paths) {
     });
     return {
         frames,
-        opened: () => Promise.all(sockets.map(s => new Promise(resolve => { if (s.readyState === 1) resolve(); else s.onopen = resolve; }))),
+        opened: () => Promise.all(sockets.map(opened)).catch(error => { sockets.forEach(s => s.close()); throw error; }),
         start: () => { zero = Date.now(); frames.length = 0; },
         elapsed: () => Date.now() - zero,
         close: () => sockets.forEach(s => s.close()),
@@ -242,7 +242,7 @@ try {
     if (ONLY.includes('sample-data')) await sampleData();
     if (ONLY.includes('scenarios')) {
         const sample = JSON.parse(await readFile(join(OUT, 'sample-data.json'), 'utf8'));
-        await (await import('./scenarios.mjs')).recordScenarios({ decaid, raw, ws, write, sleep, sample, only: SCENARIO });
+        await (await import('./scenarios.mjs')).recordScenarios({ decaid, raw, ws, write, sleep, opened, sample, only: SCENARIO });
     }
     if (ONLY.includes('boot')) await boot();
     if (ONLY.includes('pour')) await pour();
