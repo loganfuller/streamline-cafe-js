@@ -176,11 +176,18 @@ class Cafe {
 }
 
 export const test = base.extend({
-    fake: async ({}, use) => {
-        const fake = createFakeDecaid({ sampleData: recording('sample-data'), boot: recording('boot'), pour: recording('pour'), now: START });
+    /**
+     * The page's time when the test starts. A test sets its own with
+     * `test.use({ start })`. The page's zone is Playwright's `timezoneId`
+     * (playwright.config.mjs, CAFE_TZ), and Decaid's is the same, as on a
+     * tablet.
+     */
+    start: [START, { option: true }],
+    fake: async ({ start, timezoneId }, use) => {
+        const fake = createFakeDecaid({ sampleData: recording('sample-data'), boot: recording('boot'), pour: recording('pour'), now: start, timeZone: timezoneId ?? 'UTC' });
         await use(fake);
     },
-    cafe: async ({ page, context, fake }, use) => {
+    cafe: async ({ page, context, fake, start }, use) => {
         // Every page of the context, one it opens itself included.
         const errors = [];
         context.on('weberror', error => errors.push(`${error.page()?.url() ?? 'a page'}: ${error.error().message}`));
@@ -193,7 +200,7 @@ export const test = base.extend({
                 document.head.appendChild(style);
             });
         }, NO_MOTION);
-        await page.clock.install({ time: START });
+        await page.clock.install({ time: start });
         const cafe = new Cafe(page, fake, routes, errors);
         await use(cafe);
         // What the test's last step asked, answered, before reading what failed.

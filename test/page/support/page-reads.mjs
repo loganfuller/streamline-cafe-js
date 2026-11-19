@@ -3,7 +3,26 @@
 
 import { expect } from './test.mjs';
 
-export { legend, chartLines, row, keys, sides, stageNames, paint, noteDialog, REFERENCE_LINES } from '../../cafe-smoke/page-helpers.mjs';
+export { legend, chartLines, row, keys, sides, stageNames, paint, noteDialog, remarks, legendFits, shotsHeader, REFERENCE_LINES } from '../../cafe-smoke/page-helpers.mjs';
+
+/**
+ * Starts counting how the chart in `id` is drawn: frames appended to its first
+ * line, and times it is given lines in full. `drawCounts(page)` reads the
+ * counts since. The smoke run's `countDraws` waited on the page's clock for
+ * this; a page test plays the frames in between (`cafe.pour`).
+ */
+export const watchDraws = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
+    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+    const counts = { appended: 0, full: 0 };
+    const { setOption, appendData } = chart;
+    chart.setOption = function (option, ...rest) { if (option.series?.some(series => series.data)) counts.full += 1; return setOption.call(this, option, ...rest); };
+    chart.appendData = function (...args) { if (args[0].seriesIndex === 0) counts.appended += 1; return appendData.apply(this, args); };
+    window.__cafeDraws = counts;
+}, id);
+
+/** The counts since `watchDraws`: `{ appended, full }`. */
+export const drawCounts = page => page.evaluate(() => ({ ...window.__cafeDraws }));
 
 /** The page, with a tablet's numbers opening the numpad, as Streamline decides at start. */
 export async function openPage(cafe) {

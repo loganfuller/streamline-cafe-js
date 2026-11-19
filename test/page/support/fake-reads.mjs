@@ -35,6 +35,23 @@ export function matchMachine(fake, name) {
     }));
 }
 
+/**
+ * The `measurements` and `annotations` of what Decaid stores for a shot of
+ * `stored`'s stopped two seconds into its profile: its Preheat and its first
+ * two seconds of preinfusion, nothing on the scale, the machine never pouring,
+ * and only the weighed dose kept. `isUnfinished` (src/cafe/shot-model.js)
+ * calls it Unfinished. The fake can't stop a pour early, so a test adds such a
+ * Shot with `fake.shots.add`.
+ */
+export function unfinishedParts(stored) {
+    const startedAt = stored.measurements.find(m => m.machine.state.substate !== 'preparingForShot').machine.timestamp;
+    const cut = Date.parse(startedAt) + 2000;
+    const measurements = stored.measurements
+        .filter(m => m.machine.state.substate === 'preparingForShot' || (m.machine.state.substate === 'preinfusion' && Date.parse(m.machine.timestamp) <= cut))
+        .map(m => ({ ...m, scale: m.scale ? { ...m.scale, weight: 0, weightFlow: 0 } : m.scale }));
+    return { measurements, annotations: { actualDoseWeight: stored.annotations.actualDoseWeight } };
+}
+
 /** Decaid's profiles, as the page reads them at boot. */
 export const PROFILES = recording('boot').requests['GET /api/v1/profiles?includeHidden=true'].body;
 

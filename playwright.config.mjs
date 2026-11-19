@@ -5,6 +5,7 @@
 //   npx playwright test                         every page test
 //   npx playwright test test/page/grinder-dialog.spec.mjs
 //   npx playwright test --grep @grinder
+//   CAFE_TZ=Asia/Tokyo npx playwright test   in another zone than UTC
 
 import { defineConfig } from 'playwright/test';
 
@@ -21,7 +22,9 @@ export default defineConfig({
     use: {
         browserName: 'chromium',
         viewport: { width: 1920, height: 1200 },
-        timezoneId: 'UTC',
+        // The tablet's zone, which Decaid's is too. CAFE_TZ runs the tests in
+        // another: CAFE_TZ=Pacific/Auckland npx playwright test
+        timezoneId: process.env.CAFE_TZ || 'UTC',
         locale: 'en-US',
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
