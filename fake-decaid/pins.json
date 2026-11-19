@@ -1,0 +1,27 @@
+{
+  "about": "The real stack the fake Decaid is recorded against (docs/cafe/TESTING.md). A bump is its own pull request, and records again.",
+  "decaid": {
+    "version": "0.9.2",
+    "repo": "decentespresso/decaid",
+    "assets": {
+      "arm64": { "name": "decaid-linux-arm64-0.9.2.tar.gz", "sha256": "a2c5d0bb8c54a53bbb4923c5427f3a3a2bd6d9daaad56f78a25fb2b80e233016" },
+      "x64": { "name": "decaid-linux-x64-0.9.2.tar.gz", "sha256": "5a4be953f70cc5788424c15f169fbd53b94a189c8fddba2367154a12452e02cb" }
+    }
+  },
+  "dye2": {
+    "version": "0.1.42",
+    "repo": "decentespresso/dye2",
+    "asset": { "name": "dye2.reaplugin-v0.1.42.zip", "sha256": "d319c75d00d97fd6d9005739cb5f4253745ed60fdcd87e6eb079405ba1a510b5" }
+  },
+  "decentSync": {
+    "version": "1.11.1",
+    "image": "ghcr.io/loganfuller/decent-sync:1.11.1",
+    "repo": "loganfuller/decent-sync",
+    "asset": { "name": "decent-sync.reaplugin-v1.11.1.zip", "sha256": "51122975e2c67a03d978300f93bfde1a1aee345ac58fbe4e86d0771e298c3be8" }
+  },
+  "streamline": {
+    "version": "0.2.28",
+    "repo": "decentespresso/streamline-js",
+    "commit": "33970aa7e4c7d4ab4c5d1f58cc267dd972667042"
+  }
+}

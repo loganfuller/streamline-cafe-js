@@ -35,7 +35,6 @@ import { compareVersions } from '../../src/modules/skin-version.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
-import { shotNumbers } from '../../src/cafe/comparison.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -339,7 +338,8 @@ const FINISHED_LANGUAGES = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !
 // Rating and notes, on a page whose graph shows `latest` against the reference
 // `reference`, two of the tablet's own Shots, with no Decent Sync: the edit is
 // Decaid's own.
-async function ratingAndNotes(page, latest, reference) {
+async function ratingAndNotes(page, latest, reference, seen) {
+    const errorsBefore = seen.errors.length;
     const record = id => decaid('GET', `/shots/${id}`);
     const others = annotations => JSON.stringify(Object.fromEntries(Object.entries(annotations || {}).filter(([key]) => !['enjoyment', 'espressoNotes'].includes(key)).sort()));
     const edits = [];
@@ -536,7 +536,7 @@ async function ratingAndNotes(page, latest, reference) {
     await decaid('PUT', `/shots/${reference.id}`, { workflow: { profile: { title }, context: { baristaName: null } } });
     await decaid('PUT', `/shots/${latest.id}`, { workflow: { context: { baristaName: null } } });
     await lookAgain(page);
-    check('no page error from rating and notes', true);
+    check('no page error from rating and notes', seen.errors.length === errorsBefore, seen.errors.slice(errorsBefore).join(' | '));
     page.off('request', listen);
 }
 
@@ -796,186 +796,15 @@ const workflowWrites = page => {
     return writes;
 };
 
-// 18. The grinder dialog (docs/cafe/DESIGN.md, "What the screen shows"): a tap
-//     on the Grind row's name lists the tablet's grinders, and a choice sets the
-//     machine to that grinder at the setting it was last used at, in one write
-//     of the Workflow and nothing else.
-async function grinderDialog() {
+// 18. The grinder dialog is a page test now (test/page/grinder-dialog.spec.mjs).
+//     Its grinders stay: the second run chooses the second one, and the dialogs'
+//     sizes (step 20) are measured with more than one listed.
+async function grinderFixtures() {
     const listed = await decaid('GET', '/grinders?includeArchived=true');
     const grinders = Array.isArray(listed) ? listed : listed.items || [];
-    const first = grinderNamed(grinders, GRINDER.model);
-    const second = grinderNamed(grinders, SECOND_GRINDER.model) || await decaid('POST', '/grinders', SECOND_GRINDER);
+    if (!grinderNamed(grinders, SECOND_GRINDER.model)) await decaid('POST', '/grinders', SECOND_GRINDER);
     const retired = grinderNamed(grinders, ARCHIVED_GRINDER.model) || await decaid('POST', '/grinders', ARCHIVED_GRINDER);
     if (!retired.archived) await decaid('PUT', `/grinders/${retired.id}`, { ...retired, archived: true });
-    // A shot on each grinder, at a setting of its own. The simulated machine
-    // takes a moment after a shot before it pulls another.
-    await unloadRecipe();
-    const pulled = [];
-    const newestId = async () => (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
-    for (const [grinder, use] of [[first, GRINDER_USE.first], [second, GRINDER_USE.second]]) {
-        await decaid('PUT', '/workflow', { context: { grinderId: grinder.id, grinderModel: grinder.model, grinderSetting: use.setting, extras: { rpm: use.rpm } } });
-        const before = await newestId();
-        await pullShot(4);
-        for (let waited = 0; waited < 30_000 && (await newestId()) === before; waited += 1000) await sleep(1000);
-        const newest = (await decaid('GET', `/shots?grinderId=${grinder.id}&limit=1`)).items?.[0];
-        if (newest && newest.id !== before) pulled.push(newest.id);
-        await sleep(5000);
-    }
-    check('grinder: a shot was pulled on each of the two grinders', pulled.length === 2);
-    const house = RECIPES[0];
-    const other = RECIPES[2];
-    const view = await openPage();
-    const { page, seen } = view;
-    try {
-        // A tablet's numbers open the numpad, which Streamline decides at start.
-        await page.addInitScript(() => { window._forceNumpadMobile = true; });
-        await page.reload();
-        await waitForPage(page);
-        const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
-        const loadCard = async recipe => {
-            await card(recipe).click();
-            await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
-            await page.waitForTimeout(3000);
-        };
-        const grindName = () => page.locator('#cafe-grind-desc').textContent();
-        await loadCard(house);
-        const writes = workflowWrites(page);
-        const record = await recordNamed(house.name);
-        check('grinder: the loaded recipe names its grinder under Grind', (await grindName()) === GRINDER.model, await grindName());
-
-        //    The value still opens the numpad.
-        await page.locator('#grind-value').click();
-        const numpad = await page.locator('#numpad-modal-overlay').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
-        check('grinder: a tap on the Grind value opens the numpad, and no dialog', numpad && !(await pickDialog(page).count()));
-        if (numpad) await page.locator('#numpad-cancel').click();
-        await page.waitForTimeout(800);
-
-        //    The row's name opens the dialog, and so does the grinder's under it.
-        check('grinder: a tap on the Grind row\'s name opens the grinder dialog', await openGrinders(page));
-        check('grinder: the dialog is titled "Grinder"', (await page.locator('#cafe-pick-title').textContent()) === 'Grinder');
-        check('grinder: with a recipe loaded and no Decent Sync, the line under it says the choice is not saved to the recipe',
-            (await page.locator('#cafe-pick-under').textContent()) === `${house.name} · not saved to the recipe`, await page.locator('#cafe-pick-under').textContent());
-        const rows = await pickRows(page);
-        const rowOf = model => rows.find(row => row.name === model);
-        check('grinder: it lists the tablet\'s grinders, not the archived one',
-            !!rowOf(GRINDER.model) && !!rowOf(SECOND_GRINDER.model) && !rowOf(ARCHIVED_GRINDER.model), rows.map(row => row.name).join(', '));
-        check('grinder: each row says where the grinder was last used, after its burrs',
-            rowOf(GRINDER.model)?.detail === `last used at ${GRINDER_USE.first.setting}` && rowOf(SECOND_GRINDER.model)?.detail === `Conical burrs · last used at ${GRINDER_USE.second.setting}`,
-            rows.map(row => `${row.name}: ${row.detail}`).join(' | '));
-        check('grinder: the grinder in use, and only it, is marked "In use"',
-            rowOf(GRINDER.model)?.inUse && rows.filter(row => row.inUse).length === 1
-            && (await pickRow(page, GRINDER.model).locator('.cafe-pick-in-use').textContent()).trim() === 'In use');
-        await shot(page, 'grinder-dialog-light');
-        check('grinder: the dialog opened none of DYE2\'s pages', page.url().startsWith(BASE) && !seen.requests.some(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)),
-            seen.requests.filter(r => /dye2\.reaplugin\/(grinder|ui)/.test(r)).join(', '));
-        await page.mouse.click(40, 40);
-        check('grinder: a tap outside closes it', await pickClosed(page));
-        check('grinder: a tap on the grinder\'s name under Grind opens it too', await openGrinders(page, '#cafe-grind-desc'));
-        await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
-        check('grinder: Close closes it, and nothing was written', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
-
-        //    The grinder in use: a tap closes the dialog and writes nothing.
-        await openGrinders(page);
-        await pickRow(page, GRINDER.model).click();
-        await page.waitForTimeout(1500);
-        check('grinder: a tap on the grinder in use closes the dialog and writes nothing', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
-
-        //    A choice: one write, of the grinder, its last setting and its RPM.
-        await openGrinders(page);
-        await pickRow(page, SECOND_GRINDER.model).click();
-        await pickClosed(page);
-        await page.locator('#cafe-grind-desc').filter({ hasText: SECOND_GRINDER.model }).waitFor({ timeout: 10_000 }).catch(() => {});
-        await page.waitForTimeout(2500);
-        check('grinder: a choice is one write of the grinder, the setting it was last used at and its RPM',
-            writes.length === 1 && JSON.stringify(writes[0]) === JSON.stringify({ context: { grinderId: second.id, grinderModel: SECOND_GRINDER.model, grinderSetting: GRINDER_USE.second.setting, extras: { rpm: GRINDER_USE.second.rpm } } }),
-            JSON.stringify(writes));
-        const workflow = await decaid('GET', '/workflow');
-        check('grinder: the Workflow holds it, and the recipe stays loaded',
-            workflow.context.grinderId === second.id && workflow.context.grinderModel === SECOND_GRINDER.model && String(workflow.context.grinderSetting) === GRINDER_USE.second.setting
-            && workflow.context.extras?.rpm === GRINDER_USE.second.rpm && workflow.context.extras?.dye?.recipeId === record.id,
-            JSON.stringify(workflow.context));
-        check('grinder: Grind names the new grinder and shows its setting', (await grindName()) === SECOND_GRINDER.model && parseFloat(await page.locator('#grind-value').textContent()) === parseFloat(GRINDER_USE.second.setting),
-            `${await grindName()}, ${await page.locator('#grind-value').textContent()}`);
-        await page.locator('#grind-plus').click();
-        const stepped = parseFloat(await page.locator('#grind-value').textContent());
-        check('grinder: + steps by the new grinder\'s own step', stepped === parseFloat(GRINDER_USE.second.setting) + SECOND_GRINDER.settingSmallStep, String(stepped));
-        await page.locator('#grind-minus').click();
-        await page.waitForTimeout(3000);
-        check('grinder: the recipe\'s DYE2 record is unchanged by the choice', JSON.stringify(await recordNamed(house.name)) === JSON.stringify(record));
-        check('grinder: the skin asked DYE2 to save nothing, and wrote none of its records',
-            !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r)));
-        check('grinder: Grind names the new grinder after the page goes out of view and comes back', await lookAgain(page).then(grindName) === SECOND_GRINDER.model);
-        {
-            const again = await openPage();
-            await waitForPage(again.page);
-            await again.page.waitForTimeout(3000);
-            check('grinder: and on a page opened afresh', (await again.page.locator('#cafe-grind-desc').textContent()) === SECOND_GRINDER.model);
-            await again.close();
-        }
-
-        //    Another recipe, then this one again: the recipe's own grinder is back.
-        await loadCard(other);
-        await loadCard(house);
-        const back = await decaid('GET', '/workflow');
-        check('grinder: loading another recipe and this one again brings the recipe\'s own grinder back',
-            (await grindName()) === GRINDER.model && back.context.grinderId === first.id && parseFloat(back.context.grinderSetting) === Number(record.dashboardVariables?.grind),
-            `${await grindName()}, ${back.context.grinderId}, ${back.context.grinderSetting}`);
-
-        //    A list that can't be read is not an empty list.
-        await page.route(/\/api\/v1\/grinders(\?|$)/, route => route.abort());
-        await tapAt(page, '#grind-section .cafe-row-name');
-        await page.locator('#app-toast').filter({ hasText: 'Could not read the grinders' }).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        check('grinder: grinders that can\'t be read are a toast, and no dialog',
-            (await page.locator('#app-toast-message').textContent()) === 'Could not read the grinders' && !(await pickDialog(page).count()));
-        await page.unroute(/\/api\/v1\/grinders(\?|$)/);
-        await page.waitForTimeout(2500);
-
-        //    A shot that starts closes the dialog, and it does not open during one.
-        await openGrinders(page);
-        const run = pullShot(6);
-        await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-        check('grinder: a shot that starts closes the dialog', await pickClosed(page));
-        await tapAt(page, '#grind-section .cafe-row-name');
-        await page.waitForTimeout(1500);
-        check('grinder: the dialog does not open during a shot', !(await pickDialog(page).count()));
-        await run;
-        await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
-        await page.waitForTimeout(4000);
-        const during = await decaid('GET', '/shots?limit=1');
-        if (during.items?.[0]) pulled.push(during.items[0].id);
-
-        //    With no recipe loaded the choice changes this machine only.
-        await unloadRecipe();
-        await page.reload();
-        await waitForPage(page);
-        await page.waitForTimeout(3000);
-        await openGrinders(page);
-        check('grinder: with no recipe loaded, the line says the choice changes this machine only',
-            (await page.locator('#cafe-pick-under').textContent()) === 'No recipe loaded · changes this machine only', await page.locator('#cafe-pick-under').textContent());
-        await shot(page, 'grinder-dialog-no-recipe-light');
-        const before = writes.length;
-        await pickRow(page, SECOND_GRINDER.model).click();
-        await page.locator('#cafe-grind-desc').filter({ hasText: SECOND_GRINDER.model }).waitFor({ timeout: 10_000 }).catch(() => {});
-        await page.waitForTimeout(2000);
-        const loose = await decaid('GET', '/workflow');
-        check('grinder: with no recipe loaded, a choice writes the Workflow and Grind names the grinder',
-            writes.length === before + 1 && loose.context.grinderId === second.id && (await grindName()) === SECOND_GRINDER.model && String(loose.context.grinderSetting) === GRINDER_USE.second.setting,
-            JSON.stringify(loose.context));
-        check('grinder: no page error', seen.errors.length === 0, seen.errors.join(' | '));
-    } finally {
-        await shot(page, 'grinder-at-end').catch(() => {});
-        await view.close();
-    }
-    {
-        const dark = await openPage({ theme: 'dark' });
-        await waitForPage(dark.page, 'dark');
-        await dark.page.waitForTimeout(2500);
-        await openGrinders(dark.page);
-        await shot(dark.page, 'grinder-dialog-dark');
-        await dark.close();
-    }
-    // The Shots this step pulled go, so a later run reads its own.
-    for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
 }
 
 // 21. The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen
@@ -3575,29 +3404,12 @@ try {
     const steamNow = (await decaid('GET', '/workflow')).steamSettings;
     check('the flow reaches the Workflow, and the steam time is untouched', Math.abs(steamNow.flow - flowAfter) < 0.001 && steamNow.duration === timeBefore, JSON.stringify(steamNow));
 
-    // 8. A shot: the state, the time and the weight against its target, then the
-    //    Shot in the graph and its time in the legend.
-    const shotRun = pullShot(14);
-    await page.locator('#cafe-live').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
-    await page.waitForTimeout(7000);
-    check('during a shot the weight shows against its target', /^\d+\.\d \/ \d+(\.\d)? g$/.test(await page.locator('#cafe-live-weight').textContent()), await page.locator('#cafe-live-weight').textContent());
-    check('during a shot the status line has the stage and its seconds', /\d+s/.test(await page.locator('#machine-status').textContent()), await page.locator('#machine-status').textContent());
-    {
-        const live = await row(page);
-        check('when the shot starts six live cards take the row\'s place', live.mode === 'live' && keys(live) === LIVE, JSON.stringify(live));
-        check('the live cards read the running shot', /^\d+\.\d s$/.test(live.cards[0].value) && /^\d+\.\d bar$/.test(live.cards[4].value) && /^\d+\.\d °C$/.test(live.cards[5].value) && /^\d+\.\d ml\/s$/.test(live.cards[3].value), JSON.stringify(live.cards.map(c => c.value)));
-        check('with no reference the live cards read "No reference" and show no difference', sides(live).every(side => side === 'No reference') && live.cards.every(card => card.diff === ''), JSON.stringify(live));
-        const named = await stageNames(page);
-        check('during a shot each stage reached has its line, named where there is room', named.length > 0 && named.some(name => name), JSON.stringify(named));
-    }
-    await shot(page, 'page-shot-running-light');
-    await shotRun;
+    // 8. A shot with the recipe loaded, which the reference's checks below
+    //    start from. What the page shows during it and once it is stored is a
+    //    page test now (test/page/live-shot.spec.mjs, once step 7 in SMOKE.md).
+    await pullShot(14);
     await page.locator('#cafe-shot-when').filter({ hasText: /\d{2}:\d{2}/ }).waitFor({ timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(4000);
-    check('after the shot the status reads Ready', (await page.locator('#machine-status').textContent()).trim() === 'Ready', await page.locator('#machine-status').textContent());
-    check('the weight readout goes when the shot ends', !(await page.locator('#cafe-live').isVisible()));
-    check('the legend shows the latest Shot\'s label and time', (await page.locator('#cafe-shot-label').textContent()) === 'Latest' && /^Today \d{2}:\d{2}/.test(await page.locator('#cafe-shot-when').textContent()), JSON.stringify(await legend(page)));
-    await shot(page, 'page-after-shot-light');
 
     //    The reference (docs/cafe/DESIGN.md, "Shots and the reference"). The Shot
     //    just pulled is the recipe's latest, and no reference is chosen yet.
@@ -3611,26 +3423,7 @@ try {
             lines.names.length === 10 && JSON.stringify(lines.names.slice(7)) === JSON.stringify(REFERENCE_LINES) && lines.points.slice(7).every(n => n === 0)
             && [2, 3, 5].every(i => lines.points[i] === 0) && lines.points[0] > 10, JSON.stringify(lines));
         check('Make reference ends the latest Shot\'s row', now.make === 'Make reference');
-        let cardsNow = await row(page);
-        check('when the finished Shot is in the graph the five cards return', cardsNow.mode === 'rest' && keys(cardsNow) === REST_REFERENCE, JSON.stringify(cardsNow));
-        check('with no reference chosen each card reads "No reference" and shows no difference', sides(cardsNow).every(side => side === 'No reference') && cardsNow.cards.every(card => card.diff === ''), JSON.stringify(cardsNow));
-        check('the row has the Shot\'s time and peak pressure, and "—" for what the simulated scale never weighed',
-            /^\d+\.\d s$/.test(cardsNow.cards[0].value) && /^\d+\.\d bar$/.test(cardsNow.cards[4].value) && cardsNow.cards[1].value === '—' && cardsNow.cards[2].value === '—', JSON.stringify(cardsNow.cards.map(c => c.value)));
-        {
-            const whole = await decaid('GET', `/shots/${first.id}`);
-            const numbers = shotNumbers(whole);
-            check('the row\'s time and peak are the Shot\'s own, its Preheat left out', cardsNow.cards[0].value === `${numbers.time.toFixed(1)} s` && cardsNow.cards[4].value === `${numbers.peak.toFixed(1)} bar`, `${cardsNow.cards[0].value}, ${cardsNow.cards[4].value} for ${numbers.time} s, ${numbers.peak} bar`);
-            const named = await stageNames(page);
-            const stages = shotStages(whole.measurements, whole.workflow);
-            check('at rest each stage the Shot reached has its line, named from the Shot\'s own profile where there is room',
-                named.length === stages.length && named.every((name, index) => name === null || name === stages[index].name.trim()) && named.some(name => name), `${JSON.stringify(named)} of ${JSON.stringify(stages.map(stage => stage.name))}`);
-        }
-        const boxes = await page.evaluate(() => {
-            const box = id => document.getElementById(id).getBoundingClientRect();
-            return { chartBottom: box('plotly-chart').bottom, chartHeight: box('plotly-chart').height, rowTop: box('cafe-compare').top, rowBottom: box('cafe-compare').bottom, page: window.innerHeight };
-        });
-        check('the graph gives up the row\'s height: the row sits under it, inside the page', cardsNow.height > 60 && boxes.rowTop >= boxes.chartBottom && boxes.rowTop - boxes.chartBottom < 24 && boxes.rowBottom <= boxes.page && boxes.chartHeight >= 450, JSON.stringify(boxes));
-        await shot(page, 'graph-no-reference-light');
+        let cardsNow;
 
         //    With no reference yet, Make reference chooses at once.
         await page.locator('#cafe-make-reference').click();
@@ -3708,7 +3501,7 @@ try {
         check('a value neither Shot recorded is "—", with no difference', cardsNow.cards[1].value === '—' && cardsNow.cards[1].side === 'Ref —' && cardsNow.cards[1].diff === '', JSON.stringify(cardsNow.cards[1]));
 
         //    Rating and notes, for the Shot in the graph and its reference.
-        await ratingAndNotes(page, latestShot, first);
+        await ratingAndNotes(page, latestShot, first, seen);
         await shot(page, 'graph-overlay-light');
         await paint(page, 'dark');
         await page.waitForTimeout(800);
@@ -4569,7 +4362,7 @@ try {
         await decaid('POST', REFERENCES, choicesBefore);
     }
 
-    await grinderDialog();
+    await grinderFixtures();
 
     // 19. A touchscreen whose screen rests short of its window (issue #38). A
     //     button takes focus as it is pressed, and Streamline's keyboard lift used

@@ -1,0 +1,4536 @@
+{
+ "recordedWith": {
+  "decaid": "0.9.2",
+  "dye2": "0.1.42",
+  "streamline": "0.2.28"
+ },
+ "rule": "fake-decaid/workflow.js",
+ "about": "Decaid merges a Workflow write into the Workflow and rebuilds it: objects key by key, a context field written as null dropped, nulls inside extras kept, unknown fields dropped, a profile's steps replaced whole; nulls and wrong types refused.",
+ "given": {
+  "workflow": {
+   "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+   "name": "Workflow",
+   "description": "Description",
+   "profile": {
+    "version": "2",
+    "title": "Default",
+    "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+    "author": "Decent",
+    "beverage_type": "espresso",
+    "steps": [
+     {
+      "name": "preinfusion temp boost",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 2,
+      "weight": 0,
+      "temperature": 90,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "preinfusion",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 18,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "rise and hold",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 1,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "decline",
+      "pump": "pressure",
+      "transition": "smooth",
+      "exit": null,
+      "volume": 0,
+      "seconds": 32,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 6,
+      "limiter": null
+     }
+    ],
+    "target_volume": 36,
+    "target_weight": 36,
+    "target_volume_count_start": 2,
+    "tank_temperature": 0
+   },
+   "context": {
+    "targetDoseWeight": 18,
+    "targetYield": 36,
+    "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+    "grinderModel": "Sample Grinder 38",
+    "grinderSetting": "11.5",
+    "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+    "coffeeName": "Sample Single Origin",
+    "coffeeRoaster": "Sample Roasters",
+    "extras": {
+     "dye": {
+      "selection": null,
+      "v": 1,
+      "recipeId": null
+     },
+     "basketId": null,
+     "basketName": null,
+     "rpm": 800
+    }
+   },
+   "steamSettings": {
+    "targetTemperature": 150,
+    "duration": 50,
+    "flow": 0.8,
+    "stopAtTemperature": 0
+   },
+   "hotWaterData": {
+    "targetTemperature": 75,
+    "duration": 30,
+    "volume": 50,
+    "flow": 10
+   },
+   "rinseData": {
+    "targetTemperature": 90,
+    "duration": 10,
+    "flow": 6
+   }
+  },
+  "store": {
+   "dye2.reaplugin": {
+    "autoFavourites": [
+     {
+      "id": "recent:b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+      "auto": true,
+      "recentRank": 1,
+      "sourceShotId": "b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+      "title": "Sample Single Origin · Default · Sample Grinder 38",
+      "subtitle": "Sample Roasters · Default · Sample Grinder 38",
+      "beverage": "",
+      "alwaysOnDashboard": true,
+      "favSlot": 1,
+      "copyMask": {
+       "profile": true,
+       "beans": true,
+       "grinder": true,
+       "grindSetting": true,
+       "dose": true,
+       "drink": true,
+       "roastDate": false,
+       "basket": false,
+       "equipment": false,
+       "barista": false,
+       "drinker": false,
+       "note": false
+      },
+      "snapshot": {
+       "profileTitle": "Default",
+       "profileSnapshot": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       },
+       "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+       "coffeeName": "Sample Single Origin",
+       "coffeeRoaster": "Sample Roasters",
+       "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+       "grinderModel": "Sample Grinder 38",
+       "grindSetting": "11.5",
+       "rpm": 800,
+       "feedRate": null,
+       "dose": 18,
+       "drink": 36
+      },
+      "capturedAt": "2026-11-19T04:35:48.343152",
+      "workflow": {
+       "context": {
+        "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+        "coffeeName": "Sample Single Origin",
+        "coffeeRoaster": "Sample Roasters",
+        "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+        "grinderModel": "Sample Grinder 38",
+        "grinderSetting": "11.5",
+        "targetDoseWeight": 18,
+        "targetYield": 36,
+        "extras": {
+         "rpm": 800
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       }
+      }
+     },
+     {
+      "id": "recent:2c43a079-0854-4d71-85c6-b41438ef0ed6",
+      "auto": true,
+      "recentRank": 2,
+      "sourceShotId": "2c43a079-0854-4d71-85c6-b41438ef0ed6",
+      "title": "Sample Single Origin · Default · Sample Grinder 64",
+      "subtitle": "Sample Roasters · Default · Sample Grinder 64",
+      "beverage": "",
+      "alwaysOnDashboard": true,
+      "favSlot": 2,
+      "copyMask": {
+       "profile": true,
+       "beans": true,
+       "grinder": true,
+       "grindSetting": true,
+       "dose": true,
+       "drink": true,
+       "roastDate": false,
+       "basket": false,
+       "equipment": false,
+       "barista": false,
+       "drinker": false,
+       "note": false
+      },
+      "snapshot": {
+       "profileTitle": "Default",
+       "profileSnapshot": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       },
+       "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+       "coffeeName": "Sample Single Origin",
+       "coffeeRoaster": "Sample Roasters",
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64",
+       "grindSetting": "2.6",
+       "rpm": null,
+       "feedRate": null,
+       "dose": 18,
+       "drink": 36
+      },
+      "capturedAt": "2026-11-19T04:35:22.447318",
+      "workflow": {
+       "context": {
+        "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+        "coffeeName": "Sample Single Origin",
+        "coffeeRoaster": "Sample Roasters",
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "2.6",
+        "targetDoseWeight": 18,
+        "targetYield": 36
+       },
+       "profile": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       }
+      }
+     }
+    ],
+    "baskets": [
+     {
+      "id": "bskt-sample-18",
+      "name": "18 g sample basket",
+      "size": "double",
+      "diameterMm": 58,
+      "notes": "",
+      "createdAt": "2026-11-01T00:00:00.000Z"
+     },
+     {
+      "id": "bskt-sample-20",
+      "name": "20 g sample basket",
+      "size": "double",
+      "diameterMm": 58,
+      "notes": "",
+      "createdAt": "2026-11-01T00:00:01.000Z"
+     },
+     {
+      "id": "bskt-sample-retired",
+      "name": "Retired sample basket",
+      "size": "single",
+      "diameterMm": 58,
+      "notes": "",
+      "createdAt": "2026-11-01T00:00:02.000Z",
+      "archived": true
+     }
+    ],
+    "favBeansMigrated": true,
+    "favProfilesMigrated": true,
+    "favSlotsMigrated": true,
+    "recipeBeansMigrated": true,
+    "recipes": [
+     {
+      "id": "recipe-mwn2476cm1q0",
+      "stripSlot": 1,
+      "name": "House espresso",
+      "title": "House espresso",
+      "beverage": "",
+      "beanName": "Sample Blend",
+      "beanRoaster": "Sample Roasters",
+      "beanBatchId": "435a23fe-407f-4aa3-b69b-4d4c01ab272c",
+      "profileTitle": "Default",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Default",
+       "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "preinfusion temp boost",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 2,
+         "weight": 0,
+         "temperature": 90,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "preinfusion",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 18,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "rise and hold",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 1,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "decline",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 0,
+         "seconds": 32,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 6,
+         "limiter": null
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 2,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 18,
+       "drink": 36,
+       "grind": 2.4,
+       "basketId": "bskt-sample-18",
+       "basketName": "18 g sample basket",
+       "brewC": 90,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 18,
+        "targetYield": 36,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "2.4",
+        "beanBatchId": "435a23fe-407f-4aa3-b69b-4d4c01ab272c",
+        "coffeeName": "Sample Blend",
+        "coffeeRoaster": "Sample Roasters",
+        "extras": {
+         "basketId": "bskt-sample-18",
+         "basketName": "18 g sample basket",
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": true,
+          "basketName": true
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.073Z",
+      "showOnStreamlineDashboard": true
+     },
+     {
+      "id": "recipe-mwn24778o1ed",
+      "stripSlot": 2,
+      "name": "Single origin",
+      "title": "Single origin",
+      "beverage": "",
+      "beanName": "Sample Single Origin",
+      "beanRoaster": "Sample Roasters",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "profileTitle": "Adaptive v3",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Adaptive v3",
+       "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "Prefill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": null,
+         "volume": 100,
+         "seconds": 5,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Fill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Compressing",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": {
+          "type": "flow",
+          "condition": "under",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 3,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Dripping",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 0.1,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Pressurize",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 7.7
+         },
+         "volume": 100,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 11,
+         "limiter": {
+          "value": 3.5,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction start",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 0
+         },
+         "volume": 0,
+         "seconds": 0,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 1.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction",
+         "pump": "flow",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 100,
+         "seconds": 60,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 3.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 3,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 18,
+       "drink": 40,
+       "grind": 2.1,
+       "basketId": "bskt-sample-18",
+       "basketName": "18 g sample basket",
+       "brewC": 93,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 18,
+        "targetYield": 40,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "2.1",
+        "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+        "coffeeName": "Sample Single Origin",
+        "coffeeRoaster": "Sample Roasters",
+        "extras": {
+         "basketId": "bskt-sample-18",
+         "basketName": "18 g sample basket",
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": true,
+          "basketName": true
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Adaptive v3",
+        "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "Prefill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": null,
+          "volume": 100,
+          "seconds": 5,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Fill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Compressing",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": {
+           "type": "flow",
+           "condition": "under",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 3,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Dripping",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 0.1,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Pressurize",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 7.7
+          },
+          "volume": 100,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 11,
+          "limiter": {
+           "value": 3.5,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction start",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 0
+          },
+          "volume": 0,
+          "seconds": 0,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 1.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction",
+          "pump": "flow",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 100,
+          "seconds": 60,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 3.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 3,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.100Z",
+      "showOnStreamlineDashboard": true
+     },
+     {
+      "id": "recipe-mwn247804e5y",
+      "stripSlot": 3,
+      "name": "Decaf",
+      "title": "Decaf",
+      "beverage": "",
+      "beanName": "Example Decaf",
+      "beanRoaster": "Example Coffee Co",
+      "beanBatchId": "3f8d5e92-0c86-43b6-81bc-0f0ccfea8eea",
+      "profileTitle": "Default",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Default",
+       "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "preinfusion temp boost",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 2,
+         "weight": 0,
+         "temperature": 90,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "preinfusion",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 18,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "rise and hold",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 1,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "decline",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 0,
+         "seconds": 32,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 6,
+         "limiter": null
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 2,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 17,
+       "drink": 34,
+       "grind": 1.9,
+       "basketId": "bskt-sample-18",
+       "basketName": "18 g sample basket",
+       "brewC": 90,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 17,
+        "targetYield": 34,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "1.9",
+        "beanBatchId": "3f8d5e92-0c86-43b6-81bc-0f0ccfea8eea",
+        "coffeeName": "Example Decaf",
+        "coffeeRoaster": "Example Coffee Co",
+        "extras": {
+         "basketId": "bskt-sample-18",
+         "basketName": "18 g sample basket",
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": true,
+          "basketName": true
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.128Z",
+      "showOnStreamlineDashboard": true
+     },
+     {
+      "id": "recipe-mwn2478x3av3",
+      "stripSlot": 5,
+      "name": "Long black",
+      "title": "Long black",
+      "beverage": "",
+      "beanName": "Sample Blend",
+      "beanRoaster": "Sample Roasters",
+      "beanBatchId": "435a23fe-407f-4aa3-b69b-4d4c01ab272c",
+      "profileTitle": "Default",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Default",
+       "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "preinfusion temp boost",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 2,
+         "weight": 0,
+         "temperature": 90,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "preinfusion",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 4
+         },
+         "volume": 0,
+         "seconds": 18,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "rise and hold",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 1,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "forced rise without limit",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 3,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 8.6,
+         "limiter": null
+        },
+        {
+         "name": "decline",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 0,
+         "seconds": 32,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 6,
+         "limiter": null
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 2,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 20,
+       "drink": 50,
+       "grind": 2.8,
+       "basketId": "bskt-sample-20",
+       "basketName": "20 g sample basket",
+       "brewC": 90,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 20,
+        "targetYield": 50,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "2.8",
+        "beanBatchId": "435a23fe-407f-4aa3-b69b-4d4c01ab272c",
+        "coffeeName": "Sample Blend",
+        "coffeeRoaster": "Sample Roasters",
+        "extras": {
+         "basketId": "bskt-sample-20",
+         "basketName": "20 g sample basket",
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": true,
+          "basketName": true
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Default",
+        "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "preinfusion temp boost",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 2,
+          "weight": 0,
+          "temperature": 90,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "preinfusion",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 4
+          },
+          "volume": 0,
+          "seconds": 18,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "rise and hold",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 1,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "forced rise without limit",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 3,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 8.6,
+          "limiter": null
+         },
+         {
+          "name": "decline",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 0,
+          "seconds": 32,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 6,
+          "limiter": null
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 2,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.161Z",
+      "showOnStreamlineDashboard": true
+     },
+     {
+      "id": "recipe-mwn2479wdde4",
+      "stripSlot": 7,
+      "name": "Guest roast with a long name",
+      "title": "Guest roast with a long name",
+      "beverage": "",
+      "beanName": "Sample Single Origin",
+      "beanRoaster": "Sample Roasters",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "profileTitle": "Adaptive v3",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Adaptive v3",
+       "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "Prefill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": null,
+         "volume": 100,
+         "seconds": 5,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Fill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Compressing",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": {
+          "type": "flow",
+          "condition": "under",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 3,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Dripping",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 0.1,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Pressurize",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 7.7
+         },
+         "volume": 100,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 11,
+         "limiter": {
+          "value": 3.5,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction start",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 0
+         },
+         "volume": 0,
+         "seconds": 0,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 1.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction",
+         "pump": "flow",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 100,
+         "seconds": 60,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 3.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 3,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 18.5,
+       "drink": 42,
+       "grind": 2.2,
+       "basketId": "bskt-sample-18",
+       "basketName": "18 g sample basket",
+       "brewC": 93,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 18.5,
+        "targetYield": 42,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "2.2",
+        "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+        "coffeeName": "Sample Single Origin",
+        "coffeeRoaster": "Sample Roasters",
+        "extras": {
+         "basketId": "bskt-sample-18",
+         "basketName": "18 g sample basket",
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": true,
+          "basketName": true
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Adaptive v3",
+        "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "Prefill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": null,
+          "volume": 100,
+          "seconds": 5,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Fill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Compressing",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": {
+           "type": "flow",
+           "condition": "under",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 3,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Dripping",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 0.1,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Pressurize",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 7.7
+          },
+          "volume": 100,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 11,
+          "limiter": {
+           "value": 3.5,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction start",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 0
+          },
+          "volume": 0,
+          "seconds": 0,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 1.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction",
+          "pump": "flow",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 100,
+          "seconds": 60,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 3.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 3,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.196Z",
+      "showOnStreamlineDashboard": true
+     },
+     {
+      "id": "recipe-mwn247b0pl2q",
+      "stripSlot": 9,
+      "name": "Filter",
+      "title": "Filter",
+      "beverage": "",
+      "beanName": "Sample Single Origin",
+      "beanRoaster": "Sample Roasters",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "profileTitle": "Adaptive v3",
+      "profileSnapshot": {
+       "version": "2",
+       "title": "Adaptive v3",
+       "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+       "author": "Decent",
+       "beverage_type": "espresso",
+       "steps": [
+        {
+         "name": "Prefill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": null,
+         "volume": 100,
+         "seconds": 5,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Fill",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 93,
+         "sensor": "coffee",
+         "flow": 8,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Compressing",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": {
+          "type": "flow",
+          "condition": "under",
+          "value": 3
+         },
+         "volume": 100,
+         "seconds": 12,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 3,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Dripping",
+         "pump": "pressure",
+         "transition": "fast",
+         "exit": null,
+         "volume": 0,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 0.1,
+         "limiter": {
+          "value": 0,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Pressurize",
+         "pump": "pressure",
+         "transition": "smooth",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 7.7
+         },
+         "volume": 100,
+         "seconds": 6,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "pressure": 11,
+         "limiter": {
+          "value": 3.5,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction start",
+         "pump": "flow",
+         "transition": "fast",
+         "exit": {
+          "type": "pressure",
+          "condition": "over",
+          "value": 0
+         },
+         "volume": 0,
+         "seconds": 0,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 1.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        },
+        {
+         "name": "Extraction",
+         "pump": "flow",
+         "transition": "smooth",
+         "exit": null,
+         "volume": 100,
+         "seconds": 60,
+         "weight": 0,
+         "temperature": 88,
+         "sensor": "coffee",
+         "flow": 3.5,
+         "limiter": {
+          "value": 8.6,
+          "range": 0.6
+         }
+        }
+       ],
+       "target_volume": 36,
+       "target_weight": 36,
+       "target_volume_count_start": 3,
+       "tank_temperature": 0
+      },
+      "dashboardVariables": {
+       "dose": 15,
+       "drink": 250,
+       "grind": 6.5,
+       "brewC": 93,
+       "steamTempC": 150,
+       "steamTimeS": 50,
+       "steamFlowMls": 0.8,
+       "steamStopAtTempC": 0,
+       "hotWaterTempC": 75,
+       "hotWaterTimeS": 30,
+       "hotWaterMl": 50,
+       "hotWaterFlowMls": 10,
+       "flushTempC": 25,
+       "flushS": 10,
+       "flushFlowMls": 6,
+       "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "grinderModel": "Sample Grinder 64"
+      },
+      "workflow": {
+       "context": {
+        "targetDoseWeight": 15,
+        "targetYield": 250,
+        "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+        "grinderModel": "Sample Grinder 64",
+        "grinderSetting": "6.5",
+        "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+        "coffeeName": "Sample Single Origin",
+        "coffeeRoaster": "Sample Roasters",
+        "extras": {
+         "basketId": null,
+         "basketName": null,
+         "dye": {
+          "v": 1,
+          "beanBatchId": true,
+          "coffeeName": true,
+          "coffeeRoaster": true,
+          "grinderId": true,
+          "grinderModel": true,
+          "basketId": null,
+          "basketName": null
+         }
+        }
+       },
+       "profile": {
+        "version": "2",
+        "title": "Adaptive v3",
+        "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+        "author": "Decent",
+        "beverage_type": "espresso",
+        "steps": [
+         {
+          "name": "Prefill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": null,
+          "volume": 100,
+          "seconds": 5,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Fill",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 93,
+          "sensor": "coffee",
+          "flow": 8,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Compressing",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": {
+           "type": "flow",
+           "condition": "under",
+           "value": 3
+          },
+          "volume": 100,
+          "seconds": 12,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 3,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Dripping",
+          "pump": "pressure",
+          "transition": "fast",
+          "exit": null,
+          "volume": 0,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 0.1,
+          "limiter": {
+           "value": 0,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Pressurize",
+          "pump": "pressure",
+          "transition": "smooth",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 7.7
+          },
+          "volume": 100,
+          "seconds": 6,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "pressure": 11,
+          "limiter": {
+           "value": 3.5,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction start",
+          "pump": "flow",
+          "transition": "fast",
+          "exit": {
+           "type": "pressure",
+           "condition": "over",
+           "value": 0
+          },
+          "volume": 0,
+          "seconds": 0,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 1.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         },
+         {
+          "name": "Extraction",
+          "pump": "flow",
+          "transition": "smooth",
+          "exit": null,
+          "volume": 100,
+          "seconds": 60,
+          "weight": 0,
+          "temperature": 88,
+          "sensor": "coffee",
+          "flow": 3.5,
+          "limiter": {
+           "value": 8.6,
+           "range": 0.6
+          }
+         }
+        ],
+        "target_volume": 36,
+        "target_weight": 36,
+        "target_volume_count_start": 3,
+        "tank_temperature": 0
+       },
+       "steamSettings": {
+        "targetTemperature": 150,
+        "duration": 50,
+        "flow": 0.8,
+        "stopAtTemperature": 0
+       },
+       "hotWaterData": {
+        "targetTemperature": 75,
+        "duration": 30,
+        "volume": 50,
+        "flow": 10
+       },
+       "rinseData": {
+        "targetTemperature": 25,
+        "duration": 10,
+        "flow": 6
+       }
+      },
+      "capturedAt": "2026-11-19T04:35:22.236Z",
+      "showOnStreamlineDashboard": true
+     }
+    ],
+    "recipesMigrated": true,
+    "selection": {},
+    "selectionMigrated": true,
+    "shotIndex": {
+     "v": 3,
+     "builtAt": 1795062971466,
+     "newestShotId": "b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+     "newestTs": 1795062948343,
+     "total": 2,
+     "etag": "\"0d4195c3cb6c300b\"",
+     "reps": {
+      "name:sample roasters::sample single origin|profile:default|gid:3d8f1595-bfda-4975-8de7-2a6d0696b057": {
+       "id": "2c43a079-0854-4d71-85c6-b41438ef0ed6",
+       "timestamp": "2026-11-19T04:35:22.447318",
+       "workflow": {
+        "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+        "name": "Workflow",
+        "description": "Description",
+        "profile": {
+         "version": "2",
+         "title": "Default",
+         "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+         "author": "Decent",
+         "beverage_type": "espresso",
+         "steps": [
+          {
+           "name": "preinfusion temp boost",
+           "pump": "flow",
+           "transition": "fast",
+           "exit": {
+            "type": "pressure",
+            "condition": "over",
+            "value": 4
+           },
+           "volume": 0,
+           "seconds": 2,
+           "weight": 0,
+           "temperature": 90,
+           "sensor": "coffee",
+           "flow": 8,
+           "limiter": null
+          },
+          {
+           "name": "preinfusion",
+           "pump": "flow",
+           "transition": "fast",
+           "exit": {
+            "type": "pressure",
+            "condition": "over",
+            "value": 4
+           },
+           "volume": 0,
+           "seconds": 18,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "flow": 8,
+           "limiter": null
+          },
+          {
+           "name": "forced rise without limit",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 3,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "rise and hold",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 1,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "forced rise without limit",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 3,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "decline",
+           "pump": "pressure",
+           "transition": "smooth",
+           "exit": null,
+           "volume": 0,
+           "seconds": 32,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 6,
+           "limiter": null
+          }
+         ],
+         "target_volume": 36,
+         "target_weight": 36,
+         "target_volume_count_start": 2,
+         "tank_temperature": 0
+        },
+        "context": {
+         "targetDoseWeight": 18,
+         "targetYield": 36,
+         "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+         "grinderModel": "Sample Grinder 64",
+         "grinderSetting": "2.6",
+         "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+         "coffeeName": "Sample Single Origin",
+         "coffeeRoaster": "Sample Roasters",
+         "extras": {
+          "dye": {
+           "selection": null,
+           "v": 1,
+           "recipeId": null
+          },
+          "basketId": null,
+          "basketName": null,
+          "rpm": null
+         }
+        },
+        "steamSettings": {
+         "targetTemperature": 150,
+         "duration": 50,
+         "flow": 0.8,
+         "stopAtTemperature": 0
+        },
+        "hotWaterData": {
+         "targetTemperature": 75,
+         "duration": 30,
+         "volume": 50,
+         "flow": 10
+        },
+        "rinseData": {
+         "targetTemperature": 90,
+         "duration": 10,
+         "flow": 6
+        },
+        "machine": {
+         "provenanceStatus": "captured",
+         "flowCalibration": 1,
+         "serialNumber": "mock-de1",
+         "model": "DE1Pro",
+         "firmwareVersion": "1337"
+        }
+       }
+      },
+      "name:sample roasters::sample single origin|profile:default|gid:4ff951c8-e5db-4167-8b54-c54a9aad0783": {
+       "id": "b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+       "timestamp": "2026-11-19T04:35:48.343152",
+       "workflow": {
+        "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+        "name": "Workflow",
+        "description": "Description",
+        "profile": {
+         "version": "2",
+         "title": "Default",
+         "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+         "author": "Decent",
+         "beverage_type": "espresso",
+         "steps": [
+          {
+           "name": "preinfusion temp boost",
+           "pump": "flow",
+           "transition": "fast",
+           "exit": {
+            "type": "pressure",
+            "condition": "over",
+            "value": 4
+           },
+           "volume": 0,
+           "seconds": 2,
+           "weight": 0,
+           "temperature": 90,
+           "sensor": "coffee",
+           "flow": 8,
+           "limiter": null
+          },
+          {
+           "name": "preinfusion",
+           "pump": "flow",
+           "transition": "fast",
+           "exit": {
+            "type": "pressure",
+            "condition": "over",
+            "value": 4
+           },
+           "volume": 0,
+           "seconds": 18,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "flow": 8,
+           "limiter": null
+          },
+          {
+           "name": "forced rise without limit",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 3,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "rise and hold",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 1,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "forced rise without limit",
+           "pump": "pressure",
+           "transition": "fast",
+           "exit": null,
+           "volume": 0,
+           "seconds": 3,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 8.6,
+           "limiter": null
+          },
+          {
+           "name": "decline",
+           "pump": "pressure",
+           "transition": "smooth",
+           "exit": null,
+           "volume": 0,
+           "seconds": 32,
+           "weight": 0,
+           "temperature": 88,
+           "sensor": "coffee",
+           "pressure": 6,
+           "limiter": null
+          }
+         ],
+         "target_volume": 36,
+         "target_weight": 36,
+         "target_volume_count_start": 2,
+         "tank_temperature": 0
+        },
+        "context": {
+         "targetDoseWeight": 18,
+         "targetYield": 36,
+         "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+         "grinderModel": "Sample Grinder 38",
+         "grinderSetting": "11.5",
+         "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+         "coffeeName": "Sample Single Origin",
+         "coffeeRoaster": "Sample Roasters",
+         "extras": {
+          "dye": {
+           "selection": null,
+           "v": 1,
+           "recipeId": null
+          },
+          "basketId": null,
+          "basketName": null,
+          "rpm": 800
+         }
+        },
+        "steamSettings": {
+         "targetTemperature": 150,
+         "duration": 50,
+         "flow": 0.8,
+         "stopAtTemperature": 0
+        },
+        "hotWaterData": {
+         "targetTemperature": 75,
+         "duration": 30,
+         "volume": 50,
+         "flow": 10
+        },
+        "rinseData": {
+         "targetTemperature": 90,
+         "duration": 10,
+         "flow": 6
+        },
+        "machine": {
+         "provenanceStatus": "captured",
+         "flowCalibration": 1,
+         "serialNumber": "mock-de1",
+         "model": "DE1Pro",
+         "firmwareVersion": "1337"
+        }
+       }
+      }
+     },
+     "tail": [
+      {
+       "id": "2c43a079-0854-4d71-85c6-b41438ef0ed6",
+       "ts": 1795062922447,
+       "key": "name:sample roasters::sample single origin|profile:default|gid:3d8f1595-bfda-4975-8de7-2a6d0696b057",
+       "rid": null,
+       "rating": null
+      },
+      {
+       "id": "b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+       "ts": 1795062948343,
+       "key": "name:sample roasters::sample single origin|profile:default|gid:4ff951c8-e5db-4167-8b54-c54a9aad0783",
+       "rid": null,
+       "rating": null
+      }
+     ],
+     "uses": {}
+    }
+   }
+  }
+ },
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+      "grinderModel": "Sample Grinder 38",
+      "grinderSetting": "11.5",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": 800
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+      "grinderModel": "Sample Grinder 38",
+      "grinderSetting": "11.5",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": 800
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "/plugins/dye2.reaplugin/selection",
+    "body": {}
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "kind": "favourite",
+     "id": "recent:b7cf6af5-0e18-4d1a-a296-6ca4e68aeee4",
+     "modified": false,
+     "auto": true
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/workflow"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+      "grinderModel": "Sample Grinder 38",
+      "grinderSetting": "11.5",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": 800
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": {
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "2.6",
+      "extras": {
+       "rpm": null
+      }
+     }
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "2.6",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": {
+      "coffeeName": null,
+      "baristaName": "Sample Barista",
+      "unknownField": 1,
+      "extras": {
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "unknownTop": true
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "2.6",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": {
+      "targetDoseWeight": "18.5",
+      "grinderSetting": 3,
+      "grinderRpm": 900
+     }
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18.5,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "3",
+      "grinderRpm": 900,
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0,
+      "id": "dropped"
+     }
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18.5,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "3",
+      "grinderRpm": 900,
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": null
+    }
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "error": "Invalid request",
+     "message": "FormatException: Field \"context\" cannot be null"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": {
+      "targetYield": null
+     }
+    }
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "error": "Invalid request",
+     "message": "FormatException: Field \"targetYield\" cannot be null"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "context": {
+      "targetYield": "36"
+     }
+    }
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "error": "Invalid request",
+     "message": "FormatException: Field \"targetYield\" must be a number or null"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "steamSettings": {
+      "flow": null
+     }
+    }
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "error": "Invalid request",
+     "message": "FormatException: Field \"flow\" cannot be null"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "hotWaterData": null
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18.5,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "3",
+      "grinderRpm": 900,
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/workflow"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18.5,
+      "targetYield": 36,
+      "grinderId": "3d8f1595-bfda-4975-8de7-2a6d0696b057",
+      "grinderModel": "Sample Grinder 64",
+      "grinderSetting": "3",
+      "grinderRpm": 900,
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": null,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/workflow",
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+      "grinderModel": "Sample Grinder 38",
+      "grinderSetting": "11.5",
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": 800
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+     "name": "Workflow",
+     "description": "Description",
+     "profile": {
+      "version": "2",
+      "title": "Default",
+      "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+      "author": "Decent",
+      "beverage_type": "espresso",
+      "steps": [
+       {
+        "name": "preinfusion temp boost",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 2,
+        "weight": 0,
+        "temperature": 90,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "preinfusion",
+        "pump": "flow",
+        "transition": "fast",
+        "exit": {
+         "type": "pressure",
+         "condition": "over",
+         "value": 4
+        },
+        "volume": 0,
+        "seconds": 18,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "flow": 8,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "rise and hold",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 1,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "forced rise without limit",
+        "pump": "pressure",
+        "transition": "fast",
+        "exit": null,
+        "volume": 0,
+        "seconds": 3,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 8.6,
+        "limiter": null
+       },
+       {
+        "name": "decline",
+        "pump": "pressure",
+        "transition": "smooth",
+        "exit": null,
+        "volume": 0,
+        "seconds": 32,
+        "weight": 0,
+        "temperature": 88,
+        "sensor": "coffee",
+        "pressure": 6,
+        "limiter": null
+       }
+      ],
+      "target_volume": 36,
+      "target_weight": 36,
+      "target_volume_count_start": 2,
+      "tank_temperature": 0
+     },
+     "context": {
+      "targetDoseWeight": 18,
+      "targetYield": 36,
+      "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+      "grinderModel": "Sample Grinder 38",
+      "grinderSetting": "11.5",
+      "grinderRpm": 900,
+      "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+      "coffeeName": "Sample Single Origin",
+      "coffeeRoaster": "Sample Roasters",
+      "baristaName": "Sample Barista",
+      "extras": {
+       "dye": {
+        "selection": null,
+        "v": 1,
+        "recipeId": null
+       },
+       "basketId": null,
+       "basketName": null,
+       "rpm": 800,
+       "feedRate": null,
+       "sample": {
+        "nested": true
+       }
+      }
+     },
+     "steamSettings": {
+      "targetTemperature": 150,
+      "duration": 50,
+      "flow": 0.8,
+      "stopAtTemperature": 0
+     },
+     "hotWaterData": {
+      "targetTemperature": 75,
+      "duration": 30,
+      "volume": 50,
+      "flow": 10
+     },
+     "rinseData": {
+      "targetTemperature": 90,
+      "duration": 10,
+      "flow": 6
+     }
+    }
+   }
+  }
+ ]
+}

@@ -548,8 +548,13 @@ The screen's new text covers the languages Streamline supports.
 
 ## Tests
 
-- Streamline's convention, in CI on every pull request: pure modules under `node:test`.
-- Before each release, a Playwright smoke run by hand against headless Decaid with a simulated machine, with screenshots on the pull request. It is not in CI yet. It has two setups: Decaid alone, and Decaid with Decent Sync's plugin and a local Decent Sync server, with a second Decaid as a second Machine at the same Location. `SMOKE.md` says how to set them up, and `test/cafe-smoke/` holds the runs and their made-up data.
+Three layers, all of them run by every pull request but the real stack's journeys ([`TESTING.md`](TESTING.md) says how each works and how to run it):
+
+- **Unit tests**, Streamline's convention: pure modules under `node:test`, in `npm test`.
+- **Page tests**: the real page in Chromium, through Playwright Test, against a fake Decaid (`fake-decaid/`), a plain model of Decaid, DYE2 and the simulated machine with no timers, which keeps what they hold and answers as they do. A second job in the checks workflow. A request the fake has no answer for, and an error on the page, fail the test. They write the screenshots for the pull request.
+- **The real stack, pinned** (`fake-decaid/pins.json`): every rule the fake follows is backed by a scenario recorded from the pinned Decaid and DYE2, committed, and replayed against the fake in `npm test`. The recorder stands the stack up in Docker. A few journeys only the real stack can show will run on a version bump, before a release, on demand and weekly (#62).
+
+The by-hand smoke run (`SMOKE.md`, `test/cafe-smoke/`) is the page tests' forerunner. Its steps are moving to page tests, and until a step has moved, a change to its part of the page still does it. It has two setups: Decaid alone, and Decaid with Decent Sync's plugin and a local Decent Sync server, with a second Decaid as a second Machine at the same Location.
 
 ## Builds and installs
 

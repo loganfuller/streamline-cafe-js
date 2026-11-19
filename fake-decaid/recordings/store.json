@@ -1,0 +1,323 @@
+{
+ "recordedWith": {
+  "decaid": "0.9.2",
+  "dye2": "0.1.42",
+  "streamline": "0.2.28"
+ },
+ "rule": "fake-decaid/store.js",
+ "about": "Decaid's store: a key never written answers null, a write answers {} and is read back as written, a namespace lists its keys or, with full=1, its values, and a delete answers {}.",
+ "given": {
+  "workflow": {
+   "id": "2768e48d-8239-44b3-9e2f-fd1dc8c865ce",
+   "name": "Workflow",
+   "description": "Description",
+   "profile": {
+    "version": "2",
+    "title": "Default",
+    "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+    "author": "Decent",
+    "beverage_type": "espresso",
+    "steps": [
+     {
+      "name": "preinfusion temp boost",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 2,
+      "weight": 0,
+      "temperature": 90,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "preinfusion",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 18,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "rise and hold",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 1,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "decline",
+      "pump": "pressure",
+      "transition": "smooth",
+      "exit": null,
+      "volume": 0,
+      "seconds": 32,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 6,
+      "limiter": null
+     }
+    ],
+    "target_volume": 36,
+    "target_weight": 36,
+    "target_volume_count_start": 2,
+    "tank_temperature": 0
+   },
+   "context": {
+    "targetDoseWeight": 18,
+    "targetYield": 36,
+    "grinderId": "4ff951c8-e5db-4167-8b54-c54a9aad0783",
+    "grinderModel": "Sample Grinder 38",
+    "grinderSetting": "11.5",
+    "grinderRpm": 900,
+    "beanBatchId": "679f86e3-9a14-42f2-aa23-17b04721fde4",
+    "coffeeName": "Sample Single Origin",
+    "coffeeRoaster": "Sample Roasters",
+    "baristaName": "Sample Barista",
+    "extras": {
+     "dye": {
+      "selection": null,
+      "v": 1,
+      "recipeId": null
+     },
+     "basketId": null,
+     "basketName": null,
+     "rpm": 800,
+     "feedRate": null,
+     "sample": {
+      "nested": true
+     }
+    }
+   },
+   "steamSettings": {
+    "targetTemperature": 150,
+    "duration": 50,
+    "flow": 0.8,
+    "stopAtTemperature": 0
+   },
+   "hotWaterData": {
+    "targetTemperature": 75,
+    "duration": 30,
+    "volume": 50,
+    "flow": 10
+   },
+   "rinseData": {
+    "targetTemperature": 90,
+    "duration": 10,
+    "flow": 6
+   }
+  }
+ },
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario/never"
+   },
+   "answer": {
+    "status": 200,
+    "body": null
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "/store/fakeDecaidScenario/object",
+    "body": {
+     "a": 1,
+     "list": [
+      1,
+      "two",
+      null
+     ]
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {}
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario/object"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "a": 1,
+     "list": [
+      1,
+      "two",
+      null
+     ]
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "/store/fakeDecaidScenario/text",
+    "body": "true"
+   },
+   "answer": {
+    "status": 200,
+    "body": {}
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario/text"
+   },
+   "answer": {
+    "status": 200,
+    "body": "true"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "/store/fakeDecaidScenario/profile%3Aab12",
+    "body": {
+     "grinderSetting": "11.5"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {}
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario/profile%3Aab12"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "grinderSetting": "11.5"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     "object",
+     "profile%3Aab12",
+     "text"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario?full=1"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "object": {
+      "a": 1,
+      "list": [
+       1,
+       "two",
+       null
+      ]
+     },
+     "profile%3Aab12": {
+      "grinderSetting": "11.5"
+     },
+     "text": "true"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "/store/fakeDecaidScenario/object"
+   },
+   "answer": {
+    "status": 200,
+    "body": {}
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario/object"
+   },
+   "answer": {
+    "status": 200,
+    "body": null
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/store/fakeDecaidScenario?full=1"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "profile%3Aab12": {
+      "grinderSetting": "11.5"
+     },
+     "text": "true"
+    }
+   }
+  }
+ ]
+}
