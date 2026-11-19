@@ -152,7 +152,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         if (path.startsWith(`${API}/store/`)) return store.answer(method, path.slice(`${API}/store/`.length), query, body);
         if (path === `${API}/plugins` && method === 'GET') return { status: 200, body: copy(plugins) };
         if (path.startsWith(`${API}/plugins/${DYE2_ID}/`)) {
-            if (!dye2Loaded()) return { status: 404, body: { error: `Plugin ${DYE2_ID} is not loaded` } };
+            if (!dye2Loaded()) return { status: 404, body: { error: `plugin with ${DYE2_ID} not loaded` } };
             return dye2.answer(method, path.slice(`${API}/plugins/${DYE2_ID}/`.length), body);
         }
         if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
@@ -244,8 +244,8 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         },
         /**
          * DYE2 disabled in Decaid's plugins: listed as not loaded and not
-         * loaded at start (`autoLoad`), and its routes answered 404 "Plugin
-         * dye2.reaplugin is not loaded" (recordings/dye2-plugin.json, which
+         * loaded at start (`autoLoad`), and its routes answered 404 "plugin
+         * with dye2.reaplugin not loaded" (recordings/dye2-plugin.json, which
          * replays the status). Its socket is refused too, which no recording
          * covers.
          */

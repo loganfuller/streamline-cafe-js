@@ -132,6 +132,30 @@ function workflowOf(record, machine) {
     };
 }
 
+/**
+ * A record given hot water and a steam stop of its own. The sample records hold
+ * the machine's (`matchMachine`), so a load that wrote none of them would leave
+ * the Workflow as `workflowOf` expects it. Written in both the record's
+ * dashboard values, which Streamline's apply writes, and its own Workflow,
+ * which `workflowOf` reads, so DYE2 does not call the recipe changed.
+ */
+function ownLiveSettings(fake, name) {
+    const machine = fake.workflow();
+    const water = { volume: machine.hotWaterData.volume + 70, targetTemperature: machine.hotWaterData.targetTemperature + 10, duration: machine.hotWaterData.duration + 15, flow: machine.hotWaterData.flow - 2 };
+    const stopAtTemperature = machine.steamSettings.stopAtTemperature + 65;
+    fake.store.set('dye2.reaplugin', 'recipes', records(fake).map(row => {
+        if (!row || row.name !== name) return row;
+        return {
+            ...row,
+            dashboardVariables: { ...row.dashboardVariables, hotWaterMl: water.volume, hotWaterTempC: water.targetTemperature, hotWaterTimeS: water.duration, hotWaterFlowMls: water.flow, steamStopAtTempC: stopAtTemperature },
+            workflow: { ...row.workflow, hotWaterData: { ...row.workflow.hotWaterData, ...water }, steamSettings: { ...row.workflow.steamSettings, stopAtTemperature } },
+        };
+    }));
+    const record = recordOf(fake, name);
+    expect([record.workflow.hotWaterData, record.workflow.steamSettings.stopAtTemperature], `${name}'s hot water and steam stop differ from the machine's`)
+        .not.toEqual([machine.hotWaterData, machine.steamSettings.stopAtTemperature]);
+}
+
 /** The recipe ids each Workflow write and each DYE2 selection named, in order. */
 function loadsWritten(entries) {
     const all = writes(entries);
@@ -232,6 +256,7 @@ test.describe('the strip', { tag: '@strip' }, () => {
 
     test('two quick taps: only the second recipe is the machine\'s, whole', async ({ cafe, fake }) => {
         matchMachine(fake, decaf.name);
+        ownLiveSettings(fake, decaf.name);
         setStripMode(fake, 'R');
         const page = await cafe.open();
         const machine = fake.workflow();
@@ -260,6 +285,7 @@ test.describe('the strip', { tag: '@strip' }, () => {
 
     test('three quick taps: the one between is never written, and the newest is the machine\'s', async ({ cafe, fake }) => {
         matchMachine(fake, decaf.name);
+        ownLiveSettings(fake, decaf.name);
         const page = await cafe.open();
         const machine = fake.workflow();
         const first = recordOf(fake, house.name);
@@ -280,6 +306,7 @@ test.describe('the strip', { tag: '@strip' }, () => {
 
     test('a tap loads a recipe: the Workflow, DYE2\'s selection and every row are its record\'s', async ({ cafe, fake }) => {
         matchMachine(fake, single.name);
+        ownLiveSettings(fake, single.name);
         setStripMode(fake, 'R');
         const page = await cafe.open();
         const machine = fake.workflow();

@@ -143,7 +143,7 @@ test('plugins: DYE2 disabled is listed not loaded, its routes 404, its socket re
     assert.deepEqual([dye2().loaded, dye2().autoLoad], [true, true]);
     const selection = get(fake, '/api/v1/plugins/dye2.reaplugin/selection');
     assert.equal(selection.status, 200);
-    assert.equal(selection.body.id, record.id, 'enabled again, DYE2 reads the Workflow written while it was off');
+    assert.equal(selection.body.id, record.id, 'enabled again, DYE2 reads the Workflow afresh, as restartDye2() does (recordings/dye2-restart.json; no recording writes one while DYE2 is off)');
 });
 
 test('Shots: newest first without measurements, paged, filtered; by ids, whole; the latest; one, or 404', () => {

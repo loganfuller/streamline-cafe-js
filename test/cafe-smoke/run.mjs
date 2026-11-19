@@ -1842,6 +1842,8 @@ try {
 
     // SMOKE.md's step 10, the rest of step 6, and steps 11 to 13 are page tests
     // now (test/page/: full-screen-and-settings, dial-in, slot-menu, languages).
+    // The main page from the setup through step 8's reference journey.
+    check('no page error on the main page', seen.errors.length === 0, seen.errors.join(' | '));
     await view.close();
     await unloadRecipe();
 
