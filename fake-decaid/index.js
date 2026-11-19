@@ -232,7 +232,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             refusals.push({ method, path, status, body, abort, times });
             return () => { const at = refusals.findIndex(r => r.path === path); if (at >= 0) refusals.splice(at, 1); };
         },
-        /** DYE2's `record` has read its recipes list; the function it answers writes that list back (dye2.js). */
+        /** DYE2's `record` has read its recipes list; the function it answers writes that list back, pushes and mirrors (dye2.js). */
         dye2RecordReads: () => dye2.recordReads(),
         /** DYE2 starts again, as Decaid's plugin disable and enable leave it (dye2.js). */
         restartDye2() {

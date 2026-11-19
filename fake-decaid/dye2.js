@@ -1,8 +1,8 @@
 // DYE2's selection, as DYE2 v0.1.42 derives it, mirrors it and pushes it.
 //
 // Read from dye2 v0.1.42: dye2-plugin/src/plugin.ts (`derive`, `workflowChanged`,
-// `mirror`, `announce`, `handleSelection`, the `skin` answer, `refreshRecents` on
-// `shotStored`) and dye2-plugin/src/utils/workflow-record.ts (`recipeFields`,
+// `mirror`, `announce`, `handleSelection`, `handleRecord`, the `skin` answer,
+// `refreshRecents` on `shotStored`) and dye2-plugin/src/utils/workflow-record.ts (`recipeFields`,
 // `recipeModified`, `deriveSelection`, `favouriteMatches`, `profileFingerprint`,
 // `resolveRecipeFromHistory`); guided by decent-sync's
 // server/test/support/simulated-dye2.ts, which follows DYE2 v0.1.40.
@@ -383,10 +383,17 @@ export function createDye2({ decaid, announce }) {
 
     return {
         workflowChanged,
-        /** DYE2's `record` has read the recipes list: the answer writes that list back. */
+        /**
+         * DYE2's `record` has read the recipes list: the answer writes that list
+         * back, then pushes on `changed` and mirrors the selection from the
+         * Workflow it read. With no recipe loaded `record` writes nothing, and
+         * the answer does nothing.
+         */
         recordReads() {
             const read = copy(kv('recipes'));
             const wf = copy(decaid.workflow());
+            const sel = derive(wf);
+            if (!sel || sel.kind !== 'recipe') return () => {};
             return () => {
                 decaid.store.set(NS, 'recipes', copy(read));
                 // `handleRecord` once it has written: a push, then the selection
@@ -399,10 +406,12 @@ export function createDye2({ decaid, announce }) {
          * DYE2 starts again: what it noted is forgotten, and its selection is
          * mirrored and pushed afresh. The load-time look notes no profile, so
          * the next Workflow change is the one DYE2 notes the profile from. That
-         * is a guess: Decaid's source says `onLoad`'s look should run, and
-         * neither reading explains why it cleared nothing on the pinned stack.
-         * A step to a third profile after a restart, at the next re-record,
-         * would settle it; no page test changes the profile after a restart.
+         * is a guess: by DYE2's code, `onLoad`'s cold look (`trackWorkflow(wf,
+         * true)`) should clear a recipe whose record holds another profile, and
+         * Decaid's source says that look runs; on the pinned stack it didn't
+         * clear, and why was not found. A step to a third profile after a
+         * restart, at the next re-record, would settle what DYE2 notes; no page
+         * test changes the profile after a restart.
          */
         restart() {
             baseline = null;
