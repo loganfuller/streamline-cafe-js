@@ -238,6 +238,46 @@ test('in Reference the labels name the Shot\'s own lines, never the reference or
     assert.equal(main().xAxis[0].max, 30);
 });
 
+test('in Reference the ticks keep the reference\'s spacing as the axis starts to grow past it, and the frames are appended', async () => {
+    const { options, appends, instances } = harness();
+    const chart = await import(`../src/modules/chart.js?cafe-live-labels-ticks=${Date.now()}`);
+    chart.initChart();
+    chart.setLiveLineLabels(true);
+    const mainCalls = () => options.filter(call => call.instance === instances[0]).map(call => call.option);
+    let live = true;
+    // 15.5 s: its ticks are every 5 s. The labels' room passes its end at about
+    // 14.55 s, while the shot itself is still under 15 s, whose ticks are every 1 s.
+    const reference = { pressure: { x: [0, 15.5], y: [1, 6] }, flow: { x: [0, 15.5], y: [0, 2] }, weight: { x: [0, 15.5], y: [0, 3] }, seconds: 15.5 };
+    chart.setChartOverlay((traces, shown, mode, which) => referenceOverlay(traces, shown, overlayAxis(live, mode, which), { curves: reference }));
+    chart.clearChart();
+    await settle();
+    for (const seconds of [1, 2, 13]) chart.updateChart(start, frame(seconds), seconds);
+    await settle(120);
+    for (const seconds of [14, 14.6, 14.8, 14.9, 15.1, 16]) {
+        const callsBefore = mainCalls().length;
+        const appendsBefore = appends.length;
+        chart.updateChart(start, frame(seconds), seconds);
+        await settle(120);
+        const frameCalls = mainCalls().slice(callsBefore);
+        assert.equal(frameCalls.length, 1, `one call at ${seconds} s`);
+        assert.equal(frameCalls[0].series.some(entry => 'data' in entry), false, `no line sent again at ${seconds} s`);
+        assert.ok(appends.slice(appendsBefore).some(call => call.seriesIndex === 0), `appended at ${seconds} s`);
+        assert.equal(frameCalls[0].xAxis[0].interval, 5, `ticks every 5 s at ${seconds} s`);
+        assert.equal(frameCalls[0].xAxis[0].max, Math.max(15.5, restEnd(seconds)));
+    }
+    // A shot that stops in that window keeps them at rest.
+    live = false;
+    chart.clearChart();
+    await settle();
+    live = true;
+    for (const seconds of [1, 2, 14.8]) chart.updateChart(start, frame(seconds), seconds);
+    await settle(120);
+    live = false;
+    chart.finalizeLiveChart();
+    await settle();
+    assert.equal(instances[0].getOption().xAxis[0].interval, 5);
+});
+
 test('a reference that ends at the Shot\'s own last second and value takes no label', async () => {
     const { instances } = harness();
     const chart = await import(`../src/modules/chart.js?cafe-live-labels-same-end=${Date.now()}`);
