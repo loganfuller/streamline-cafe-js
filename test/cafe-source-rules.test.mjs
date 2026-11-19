@@ -117,6 +117,19 @@ test('the bean dialog writes a batch through changeBean alone', () => {
     assert.match(SOURCES.find(source => source.name === 'bean-model.js').text, /if \(!writesRecord\(recipe, ownBeanId, highlightedId\)\) return line;/);
 });
 
+test('the bean dialog alone confirms its choice with a button; the grinder, basket and barista choose on a tap', () => {
+    // The profile's button is its description pane's; the bean's is `confirm`.
+    assert.deepEqual(filesWith(/^\s*confirm: \{/m), ['bean-dialog.js']);
+    for (const name of ['grinder-dialog.js', 'basket-dialog.js', 'barista-dialog.js']) {
+        const text = SOURCES.find(source => source.name === name).text;
+        assert.match(text, /\bchoose\(\{/, `${name} still opens the shared dialog`);
+        assert.doesNotMatch(text, /\b(confirm|pane):/, `${name} chooses on one tap`);
+    }
+    // The button chooses only a row it offers: never the row in use with nothing to confirm.
+    const pick = SOURCES.find(source => source.name === 'pick-dialog.js').text;
+    assert.match(pick, /confirmed\.use\.onclick = \(\) => \{ if \(heldRow && confirm\.use\(heldRow\)\) pick\(heldRow\); \};/);
+});
+
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
     // Decaid's own Shot edit, and its delete, are named by the seam alone.
     assert.deepEqual(filesWith(/\b(updateShot|deleteShot)\b/), ['shot-seam.js', 'tablet-shots.js']);

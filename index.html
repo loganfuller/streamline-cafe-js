@@ -474,6 +474,13 @@
                     <div class="cafe-pick-column">
                         <p id="cafe-pick-heading" class="cafe-pick-heading" hidden></p>
                         <div id="cafe-pick-list" class="cafe-pick-rows" role="group"></div>
+                        <!-- The bean dialog's "Use this batch", under the batches: a tap on a batch highlights it,
+                             and this chooses it, with the bean and its roast date beside it, or "In use". -->
+                        <div id="cafe-pick-confirm" class="cafe-pick-pane-actions cafe-pick-confirm" hidden>
+                            <span id="cafe-pick-confirm-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
+                            <span id="cafe-pick-confirm-note" hidden></span>
+                            <button id="cafe-pick-confirm-use" type="button" class="cafe-btn cafe-btn-primary" disabled></button>
+                        </div>
                         <!-- The barista dialog's "New barista", set apart under the names: it shows the field below. -->
                         <button id="cafe-pick-add" type="button" class="cafe-pick-row cafe-pick-add" hidden>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>

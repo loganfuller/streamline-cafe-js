@@ -4,10 +4,12 @@
 // is touched: the phrases go through `t`, the roast day through `formatDay`,
 // and Decaid's answers and today's date are handed in.
 //
-// A choice writes the bean's name, its roaster and the batch's id into the
-// Workflow, under Streamline's own bean writer (`beans.select`). With a recipe
-// loaded, a batch of another bean than the recipe's own is saved onto the
-// recipe first (bean-change.js), and the line under the title says so.
+// A tap on a batch highlights it, and "Use this batch" under the batches
+// chooses it (`batchUse`). A choice writes the bean's name, its roaster and
+// the batch's id into the Workflow, under Streamline's own bean writer
+// (`beans.select`). With a recipe loaded, a batch of another bean than the
+// recipe's own is saved onto the recipe first (bean-change.js), and the line
+// under the title says so.
 import { selectableBeans, selectableBatches, currentBeanContext } from '../modules/bean-selection.js';
 import { pickSubtitle, roastDay } from './page-model.js';
 import { writesRecord } from './bean-change.js';
@@ -26,6 +28,7 @@ export const BEAN_PHRASES = {
     noRoastDate: 'No roast date',
     unnamed: 'Unnamed',
     otherBean: '{recipe} · changes the recipe\'s bean',
+    use: 'Use this batch',
 };
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
@@ -159,6 +162,20 @@ export function batchRows(entry, context, today, formatDay, t) {
             inUse: sameId(batch.id, context?.beanBatchId),
         };
     });
+}
+
+/**
+ * The button under the batches, for a batch row highlighted (`batchRows`):
+ * "Use this batch", with the bean's name and the row's "Roasted" date beside
+ * it, or null where there is nothing to confirm, which is the batch in use
+ * unless it is of another bean than the loaded recipe's own (`ownBeanId`):
+ * choosing that one still saves its bean onto the recipe (`writesRecord`).
+ */
+export function batchUse(row, recipe, ownBeanId, t) {
+    if (!row) return null;
+    if (row.inUse && !writesRecord(recipe, ownBeanId, row.bean?.id)) return null;
+    const bean = text(row.bean?.name) || t(BEAN_PHRASES.unnamed);
+    return { label: t(BEAN_PHRASES.use), note: `${bean} · ${row.name}` };
 }
 
 /**

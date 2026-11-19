@@ -6,7 +6,9 @@
 // bean's has a second list on the left, whose rows choose nothing: a tap there
 // shows that bean's batches on the right. The profile's has the same list on
 // the left and, in place of a second list, a description of the row tapped
-// there, with a button under it that chooses that row. The barista's has a row
+// there, with a button under it that chooses that row. The bean's batches, on
+// the right, are chosen the same way: a tap highlights a batch, and a button
+// under them chooses it. The barista's has a row
 // set apart under the list that turns the dialog into a text field, for a name
 // to type. The markup is in index.html; this module fills it in, shows it and
 // answers with the row that was tapped or confirmed, or the text typed. What a
@@ -67,11 +69,14 @@ function inUseMark() {
     return mark;
 }
 
-function rowButton(row, onPick) {
+// A row of the list on the right: a name over a detail, the one in use marked
+// "In use". A tap chooses it, or, where the list is `confirm`ed, highlights
+// it, and `aria-pressed` then says which row is highlighted.
+function rowButton(row, onPick, held = !!row.inUse) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'cafe-pick-row';
-    button.setAttribute('aria-pressed', String(!!row.inUse));
+    button.setAttribute('aria-pressed', String(held));
     button.dataset.id = row.id ?? '';
     const words = span('cafe-pick-row-text');
     words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
@@ -132,6 +137,41 @@ function describe(parts, described) {
     parts.note.hidden = !shown.use?.note;
     parts.use.textContent = shown.use?.label || '';
     parts.use.hidden = !shown.use;
+}
+
+// The parts of the button `confirm` adds under the list, or null where the
+// page lacks one.
+function confirmParts() {
+    const parts = {
+        column: el('cafe-pick-confirm'),
+        inUse: el('cafe-pick-confirm-in-use'),
+        note: el('cafe-pick-confirm-note'),
+        use: el('cafe-pick-confirm-use'),
+    };
+    return Object.values(parts).every(Boolean) ? parts : null;
+}
+
+// The button under a `confirm`ed list, for the row highlighted, or none.
+// `offer` is that row's `{ label, note }`, or null where it is the row in use
+// and there is nothing to confirm: "In use" then stands in the button's place.
+// With no row highlighted the button is shown, `idle` its label, and can't be
+// tapped.
+function offerUse(parts, row, offer, idle) {
+    const settled = !!row && !offer;
+    parts.inUse.hidden = !settled;
+    parts.note.textContent = offer?.note || '';
+    parts.note.hidden = !offer?.note;
+    parts.use.textContent = offer?.label || idle;
+    parts.use.hidden = settled;
+    parts.use.disabled = !offer;
+}
+
+// No button under the list, and no handler.
+function closeConfirm(parts, list) {
+    list.classList.remove('cafe-pick-confirming');
+    if (!parts) return;
+    parts.column.hidden = true;
+    parts.use.onclick = null;
 }
 
 // The dialog's own list again, with no description and no handler.
@@ -212,13 +252,22 @@ function closeEntry(parts) {
  * description's button resolves the row it describes, which is the one
  * highlighted, and the dialog opens on the row `highlighted` names, or on none.
  *
+ * `confirm`, where given, makes a tap on the right-hand list highlight a row
+ * and choose nothing, and adds a button under the list that chooses the row
+ * highlighted: `{ idle, use }`, where `idle` is the button's label with no row
+ * highlighted, already in the page's language, and `use(row)` answers that
+ * row's `{ label, note }` for the button and the words beside it, or null
+ * where it is the row in use and there is nothing to confirm. Each time the
+ * list is filled, its row in use is highlighted, or none. The rows on the left
+ * still choose nothing: with `side`, a tap there fills the list again.
+ *
  * `entry`, where given, adds a row set apart under the list that turns the
  * dialog into a text field: `{ action, title, label, back, use }`, each a key,
  * for the row, the title while the field shows, the field's label and its two
  * buttons. "Back" shows the list again; the other resolves `{ entered }`, the
  * text as it was typed, once it holds more than spaces.
  */
-export function choose({ title, subtitle, label, heading: listHeading = null, rows = [], empty = null, side = null, pane = null, entry = null }) {
+export function choose({ title, subtitle, label, heading: listHeading = null, rows = [], empty = null, side = null, pane = null, confirm = null, entry = null }) {
     const dialog = document.getElementById('cafe-pick-dialog');
     const list = document.getElementById('cafe-pick-list');
     const sideColumn = document.getElementById('cafe-pick-side-column');
@@ -226,8 +275,11 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
     const parts = entryParts();
     const paneEls = paneParts();
     const described = pane ? paneEls : null;
+    const confirmEls = confirmParts();
+    const confirmed = confirm && !pane ? confirmEls : null;
     if (!dialog || !list || typeof dialog.showModal !== 'function' || dialog.open) return Promise.resolve(null);
     if (active || (side && (!sideColumn || !sideList)) || (entry && !parts) || (pane && (!side || !described))) return Promise.resolve(null);
+    if (confirm && (pane || entry || !confirmed)) return Promise.resolve(null);
     wire(dialog);
     active = true;
     return new Promise(resolve => {
@@ -237,9 +289,23 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         const titled = document.getElementById('cafe-pick-title');
         const listColumn = list.closest('.cafe-pick-column');
         const say = line => setText(under, line.key, { translate: true, vars: line.vars });
+        // The row highlighted in a `confirm`ed list, which its button chooses.
+        let heldRow = null;
+        const hold = row => {
+            heldRow = row;
+            for (const button of list.children) {
+                if (button.classList.contains('cafe-pick-row')) button.setAttribute('aria-pressed', String(!!row && button.dataset.id === String(row.id ?? '')));
+            }
+            offerUse(confirmed, row, row ? confirm.use(row) : null, confirm.idle);
+        };
         const fill = (next, line) => {
             say(line);
-            list.replaceChildren(...(next.length || !empty ? next.map(row => rowButton(row, pick)) : [emptyLine(empty)]));
+            const onRow = confirmed ? hold : pick;
+            list.replaceChildren(...(next.length || !empty ? next.map(row => rowButton(row, onRow)) : [emptyLine(empty)]));
+            if (!confirmed) return;
+            // No button under "No beans with a batch".
+            confirmed.column.hidden = !next.length;
+            hold(next.find(row => row.inUse) || null);
         };
         // The row the description is of, which its button chooses.
         let describedRow = null;
@@ -268,6 +334,12 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
             sideList.replaceChildren(...(sideRows.length || !side.empty ? sideRows : [emptyLine(side.empty)]));
         }
         closePane(paneEls, listColumn);
+        closeConfirm(confirmEls, list);
+        if (confirmed) {
+            list.classList.add('cafe-pick-confirming');
+            confirmed.column.hidden = false;
+            confirmed.use.onclick = () => { if (heldRow && confirm.use(heldRow)) pick(heldRow); };
+        }
         if (pane) {
             say(subtitle);
             list.replaceChildren();
@@ -311,6 +383,7 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
             list.replaceChildren();
             sideList?.replaceChildren();
             closePane(paneEls, listColumn);
+            closeConfirm(confirmEls, list);
             closeEntry(parts);
             fit(null);
             active = false;

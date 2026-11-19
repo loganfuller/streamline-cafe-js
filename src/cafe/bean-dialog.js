@@ -1,6 +1,7 @@
 // The bean and batch dialog: a tap on the Dose row's name lists the tablet's
 // beans that have a batch on the left and the highlighted bean's batches on
-// the right, and a tap on a batch sets the machine to it (docs/cafe/DESIGN.md,
+// the right; a tap on a batch highlights it, and "Use this batch" under them
+// sets the machine to the one highlighted (docs/cafe/DESIGN.md,
 // "The grinder, bean and basket dialogs" and "The bean and batch dialog").
 // What a row says, the line under the title and whether a choice writes the
 // recipe are bean-model.js's and bean-change.js's. This module reads what they
@@ -17,7 +18,7 @@ import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
-import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchPick, beanSubtitle } from './bean-model.js';
+import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle } from './bean-model.js';
 import { writesRecord } from './bean-change.js';
 import { changeBean } from './bean-changer.js';
 import { choose } from './pick-dialog.js';
@@ -102,6 +103,8 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
                 rows: beanRows(list, first, cafeText),
                 show: shown => ({ subtitle: beanSubtitle(loaded, isSaved, shown.id, own), rows: batchesOf(shown.id) }),
             } : null,
+            // A tap on a batch highlights it; the button chooses it.
+            confirm: { idle: cafeText('Use this batch'), use: batch => batchUse(batch, loaded, own, cafeText) },
         });
         if (!row) return; // closed
         // A recipe loaded, or its bean changed elsewhere, while the dialog was
