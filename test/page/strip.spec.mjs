@@ -133,9 +133,9 @@ function workflowOf(record, machine) {
 }
 
 /**
- * A record given hot water and a steam stop of its own. The sample records hold
- * the machine's (`matchMachine`), so a load that wrote none of them would leave
- * the Workflow as `workflowOf` expects it. Written in both the record's
+ * A record given hot water, a steam stop and a flush duration of its own. The
+ * sample records hold the machine's (`matchMachine`), so a load that wrote none
+ * of them would leave the Workflow as `workflowOf` expects it. Written in both the record's
  * dashboard values, which Streamline's apply writes, and its own Workflow,
  * which `workflowOf` reads, so DYE2 does not call the recipe changed.
  */
@@ -143,17 +143,19 @@ function ownLiveSettings(fake, name) {
     const machine = fake.workflow();
     const water = { volume: machine.hotWaterData.volume + 70, targetTemperature: machine.hotWaterData.targetTemperature + 10, duration: machine.hotWaterData.duration + 15, flow: machine.hotWaterData.flow - 2 };
     const stopAtTemperature = machine.steamSettings.stopAtTemperature + 65;
+    const flushS = machine.rinseData.duration + 5;
     fake.store.set('dye2.reaplugin', 'recipes', records(fake).map(row => {
         if (!row || row.name !== name) return row;
         return {
             ...row,
-            dashboardVariables: { ...row.dashboardVariables, hotWaterMl: water.volume, hotWaterTempC: water.targetTemperature, hotWaterTimeS: water.duration, hotWaterFlowMls: water.flow, steamStopAtTempC: stopAtTemperature },
-            workflow: { ...row.workflow, hotWaterData: { ...row.workflow.hotWaterData, ...water }, steamSettings: { ...row.workflow.steamSettings, stopAtTemperature } },
+            dashboardVariables: { ...row.dashboardVariables, hotWaterMl: water.volume, hotWaterTempC: water.targetTemperature, hotWaterTimeS: water.duration, hotWaterFlowMls: water.flow, steamStopAtTempC: stopAtTemperature, flushS },
+            workflow: { ...row.workflow, hotWaterData: { ...row.workflow.hotWaterData, ...water }, steamSettings: { ...row.workflow.steamSettings, stopAtTemperature }, rinseData: { ...row.workflow.rinseData, duration: flushS } },
         };
     }));
     const record = recordOf(fake, name);
-    expect([record.workflow.hotWaterData, record.workflow.steamSettings.stopAtTemperature], `${name}'s hot water and steam stop differ from the machine's`)
-        .not.toEqual([machine.hotWaterData, machine.steamSettings.stopAtTemperature]);
+    expect(record.workflow.hotWaterData, `${name}'s hot water differs from the machine's`).not.toEqual(machine.hotWaterData);
+    expect([record.workflow.steamSettings.stopAtTemperature, record.workflow.rinseData.duration], 'and its steam stop and flush duration')
+        .toEqual([machine.steamSettings.stopAtTemperature + 65, machine.rinseData.duration + 5]);
 }
 
 /** The recipe ids each Workflow write and each DYE2 selection named, in order. */
