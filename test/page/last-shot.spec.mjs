@@ -14,7 +14,9 @@
 // locale is en-US, whose hours are twelve: src/cafe/text.js, `cafeDateLocale`;
 // src/cafe/shot-model.js, `whenText`), and a Shot pulled before midnight and
 // drawn after it, which reads with its date: the day is the Shot's against the
-// page's clock when the legend is painted.
+// page's clock when the legend is painted, and the legend is painted again as
+// the local day turns, so a page left at rest past midnight reads yesterday's
+// Shot, and a recipe's reference, with their dates (#80).
 //
 // The fake replays one pour, so the two shots are the same measurements (the
 // smoke run pulled 10 s then 16 s, so each drawing told the two apart by its
@@ -26,15 +28,38 @@
 // first and a Shot's edit are Decaid's (fake-decaid/shots.js).
 
 import { test, expect } from './support/test.mjs';
-import { legend, chartLines, remarks, noteDialog } from './support/page-reads.mjs';
+import { legend, chartLines, remarks, noteDialog, load } from './support/page-reads.mjs';
 import { shotCurves, drawnShot } from '../../src/cafe/shot-model.js';
-import { BARISTAS } from '../cafe-smoke/sample-data.mjs';
+import { BARISTAS, RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { recordOf } from './support/fake-reads.mjs';
+import { localTime } from '../../fake-decaid/index.js';
 
 // A zone with no daylight saving, nine hours from Decaid's recorded UTC.
 const ZONE = 'Asia/Tokyo';
 const WORKFLOW = '/api/v1/workflow';
 const NOTE = 'No recipe, and noted all the same.';
 const PICK = 'Pick a recipe to compare';
+const [house] = RECIPES;
+
+/**
+ * A Shot pulled with `recipeId` `minutesAgo` before the test's start: a copy of
+ * the sample data's newest Shot under an id of its own.
+ */
+function shotWithRecipe(fake, start, recipeId, minutesAgo, id) {
+    const sample = fake.shots.get(fake.shots.newest(1)[0].id);
+    const at = start - minutesAgo * 60_000;
+    const dye = { ...sample.workflow.context.extras.dye, recipeId };
+    const shot = {
+        ...sample,
+        id,
+        timestamp: localTime(at, fake.timeZone),
+        createdAt: new Date(at).toISOString(),
+        updatedAt: new Date(at).toISOString(),
+        workflow: { ...sample.workflow, context: { ...sample.workflow.context, extras: { ...sample.workflow.context.extras, dye } } },
+    };
+    fake.shots.add(shot);
+    return shot;
+}
 
 /** The history arrows and the shot panel, where a finger could reach them. */
 const reachable = page => page.evaluate(() => [
@@ -181,15 +206,78 @@ test.describe('"Last shot" across midnight', { tag: '@lastshot' }, () => {
         expect(now.when, 'its day as a date in en-US, on the twelve-hour clock').toBe(`Nov 18 11:59 PM · ${BARISTAS[0]}`);
     });
 
-    // Page bug: the legend's day is worked out only when it is painted
-    // (graph.js, `creditParts`), and nothing paints it again as the day turns,
-    // so a tablet left at rest overnight still reads "Today" for yesterday's
-    // Shot (DESIGN.md, "The legend": "Today" for today).
-    test.fixme('a Shot drawn before midnight reads with its date once the day turns, the page left at rest', async ({ cafe }) => {
+    test('a Shot drawn before midnight reads with its date once the day turns, the page left at rest', async ({ cafe }) => {
         const page = await cafe.open();
         expect((await legend(page)).when).toBe('Today 10:59 PM');
         await cafe.advance(90_000, { step: 2000 });
         expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
-        await expect.poll(async () => (await legend(page)).when).toBe('Nov 18 10:59 PM');
+        await expect.poll(async () => (await legend(page)).when, 'painted again as the day turns, with nothing touched').toBe('Nov 18 10:59 PM');
+    });
+
+    // Chromium's timers on Android need not count the time a tablet sleeps, so
+    // one set for midnight before a sleep can fire long after it. Here the page
+    // opens at 23:00, and the clock is moved on to 23:59:50 with no timer
+    // counting the time, as a sleep would: the timer set at 23:00 would fire
+    // near 01:00, and the one set again as the page shows fires at midnight.
+    test.describe('opened at 23:00', () => {
+        test.use({ start: START - 59 * 60_000 });
+
+        test('the midnight timer is set again as the page comes back into view, so a sleep before midnight leaves it on time', async ({ cafe }) => {
+            const page = await cafe.open();
+            expect((await legend(page)).when).toBe('Today 10:00 PM');
+            await page.clock.setSystemTime(START + 50_000);
+            // Read in the turn the page shows: the clock runs on by itself, so
+            // a later read could fall past midnight.
+            const shown = await page.evaluate(() => {
+                document.dispatchEvent(new Event('visibilitychange'));
+                return document.getElementById('cafe-shot-when').textContent;
+            });
+            expect(shown, 'back in view before midnight: "Today"').toBe('Today 10:00 PM');
+            await cafe.advance(15_000, { step: 1000 });
+            expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
+            expect(await page.evaluate(() => new Date().getMinutes()), 'within the first minute').toBe(0);
+            // The timer fired within the advance, and writes as it fires.
+            expect((await legend(page)).when, 'written as the day turns, not an hour late').toBe('Nov 18 10:00 PM');
+        });
+    });
+
+    // Woken past midnight with the timer not yet fired: the page writes the
+    // date as it comes into view, before any read of the Shots, which on a
+    // tablet that wakes offline may fail and, with no recipe loaded, paint
+    // nothing. Anything else may paint the legend after the clock moves, as a
+    // read still on its way does on a slow runner, so the row is blanked and
+    // read again in the turn the page shows: only the page showing writes it.
+    test('a page that comes back into view past midnight writes the date at once, before reading anything', async ({ cafe, start }) => {
+        const page = await cafe.open();
+        expect((await legend(page)).when).toBe('Today 10:59 PM');
+        await page.clock.setSystemTime(start + 2 * 60_000);
+        const written = await page.evaluate(() => {
+            const when = document.getElementById('cafe-shot-when');
+            when.textContent = '';
+            document.dispatchEvent(new Event('visibilitychange'));
+            return when.textContent;
+        });
+        expect(written, 'past midnight, no timer fired, written in the turn the page shows').toBe('Nov 18 10:59 PM');
+    });
+
+    test('with a recipe loaded, its latest Shot and its reference both read with their dates once the day turns, the page left at rest', async ({ cafe, fake, start }) => {
+        const houseId = String(recordOf(fake, house.name).id);
+        // The reference is the sample data's newest Shot, at 22:59; the
+        // recipe's latest a copy of it at 23:29, so the two rows are two Shots.
+        const reference = fake.shots.get(fake.shots.newest(1)[0].id);
+        shotWithRecipe(fake, start, houseId, 30, '00000000-0000-4000-8000-0000000e0080');
+        fake.store.set('streamlineCafe', 'references', { [houseId]: reference.id });
+        const page = await cafe.open();
+        await load(cafe, house);
+        let now = await legend(page);
+        expect([now.label, now.when, now.reference], 'before midnight, both rows read "Today"').toEqual(['Latest', 'Today 11:29 PM', 'Today 10:59 PM']);
+        await cafe.screenshot('legend-before-midnight-light');
+        await cafe.advance(90_000, { step: 2000 });
+        expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
+        await expect.poll(async () => {
+            now = await legend(page);
+            return [now.when, now.reference];
+        }, 'both painted again as the day turns, with nothing touched').toEqual(['Nov 18 11:29 PM', 'Nov 18 10:59 PM']);
+        await cafe.screenshot('legend-past-midnight-light');
     });
 });
