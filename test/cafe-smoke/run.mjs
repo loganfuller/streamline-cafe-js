@@ -2916,11 +2916,13 @@ async function liveLabels() {
     const house = RECIPES[0];
     const pulled = [];
     const newestId = async () => (await decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
-    const pull = async (seconds, during = null) => {
+    // `beforeStop` runs while the shot is still live, just before the stop.
+    const pull = async (seconds, during = null, beforeStop = null) => {
         const before = await newestId();
         await decaid('PUT', '/machine/state/espresso');
         if (during) await during();
         await sleep(seconds * 1000);
+        if (beforeStop) await beforeStop();
         await decaid('PUT', '/machine/state/idle');
         return before;
     };
@@ -2952,9 +2954,10 @@ async function liveLabels() {
                 });
                 if (width > best.width) best = { code, width };
             }
-            await setLanguage(probe.page, 'en');
             return best;
         } finally {
+            // The language is kept in Decaid: put English back, however the probe ended.
+            await setLanguage(probe.page, 'en').catch(() => {});
             await probe.close();
         }
     })();
@@ -2979,6 +2982,7 @@ async function liveLabels() {
             let preheat = null;
             let draws = null;
             let lastLive = null;
+            let liveAtLast = false;
             feed.hold();
             const before = await pull(seconds, async () => {
                 await page.waitForTimeout(2000);
@@ -2989,10 +2993,15 @@ async function liveLabels() {
                 const counting = countDraws(page, 1500);
                 for (let i = 0; i < 6; i += 1) { await page.waitForTimeout(250); samples.push(await lineLabels(page)); }
                 draws = await counting;
+            }, async () => {
+                // The pull's own wait ran the shot on. The screenshot, then the
+                // last frame looked at before the stop, while the page is live.
+                await shot(page, `${name}-live`);
+                lastLive = await lineLabels(page);
+                liveAtLast = await page.locator('#main-page.cafe-shot-live').count() === 1;
             });
-            // The pull's own wait ran the shot on; the last frame before the stop.
-            lastLive = await lineLabels(page);
             samples.push(lastLive);
+            check(`live labels (${tag}): the last look was taken during the shot`, liveAtLast);
             check(`live labels (${tag}): none during the Preheat`, preheat && preheat.labelled.length === 0, JSON.stringify(preheat?.labelled));
             const ok = samples.every(sample => sample && sample.labels.map(l => l.name).join() === OWN_LABELLED);
             check(`live labels (${tag}): Pressure, Flow, °C and Weight named through the shot, and no target or reference line`, ok, JSON.stringify(samples.map(sample => sample?.labels.map(l => l.name))));
@@ -3009,9 +3018,11 @@ async function liveLabels() {
             check(`live labels (${tag}): no label reaches past the chart's right edge`, reach.every(r => r !== null && r <= 0),
                 JSON.stringify({ reach: reach.map(Math.round), width: lastLive?.width, plotRight: lastLive?.plotRight, worst: worst && { end: worst.end, drawnEnd: worst.drawnEnd, labels: worst.labels.map(l => [l.name, l.coord, Math.round(l.x), Math.round(l.right)]) } }));
             check(`live labels (${tag}): the frames were appended, the lines not drawn again in full`, draws && draws.appended > 0 && draws.full === 0, JSON.stringify(draws));
-            await shot(page, `${name}-live`);
-            // The shot's end, before Decaid has saved it: nothing moves.
-            await page.waitForTimeout(600);
+            // The shot's end, before Decaid has saved it: once the page has left
+            // the shot, nothing has moved.
+            const leftLive = await page.waitForFunction(() => !document.getElementById('main-page')?.classList.contains('cafe-shot-live'), null, { timeout: 10_000 }).then(() => true, () => false);
+            check(`live labels (${tag}): the page left the shot when it stopped`, leftLive);
+            await page.waitForTimeout(300);
             const ended = await lineLabels(page);
             const moved = lastLive && ended ? Math.max(...ended.labels.map((l, i) => Math.hypot(l.x - lastLive.labels[i].x, l.y - lastLive.labels[i].y))) : null;
             check(`live labels (${tag}): when the shot ends the labels stay where they were (within a frame's travel)`,
