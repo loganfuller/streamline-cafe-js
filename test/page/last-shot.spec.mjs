@@ -224,9 +224,13 @@ test.describe('"Last shot" across midnight', { tag: '@lastshot' }, () => {
         const page = await cafe.open();
         expect((await legend(page)).when).toBe('Today 10:59 PM');
         await page.clock.setSystemTime(start + 50_000);
-        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-        await cafe.advance(1000);
-        expect((await legend(page)).when, 'back in view before midnight: "Today"').toBe('Today 10:59 PM');
+        // Read in the turn the page shows: the clock runs on by itself, so a
+        // later read could fall past midnight.
+        const shown = await page.evaluate(() => {
+            document.dispatchEvent(new Event('visibilitychange'));
+            return document.getElementById('cafe-shot-when').textContent;
+        });
+        expect(shown, 'back in view before midnight: "Today"').toBe('Today 10:59 PM');
         await cafe.advance(15_000, { step: 1000 });
         expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
         expect(await page.evaluate(() => new Date().getMinutes()), 'within the first minute').toBe(0);
