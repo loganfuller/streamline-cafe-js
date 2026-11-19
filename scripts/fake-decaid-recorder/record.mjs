@@ -44,18 +44,21 @@ if (!KEEP) {
 const PORT_USED = new URL(stack.api).port;
 
 // The versions written on each recording are the pins: the stack and the page
-// recorded must be them, a stack reached with --api= included.
-{
+// recorded must be them, a stack reached with --api= included. A check that
+// fails, or can't be made, removes the stack it stood up.
+try {
     const { version: decaidVersion } = await (await fetch(`${stack.api}/info`)).json();
+    const dye2 = (await (await fetch(`${stack.api}/plugins`)).json()).find(plugin => plugin.id === 'dye2.reaplugin');
     const skin = JSON.parse(await readFile(join(ROOT, 'skin-manifest.json'), 'utf8')).version;
     const problems = [
         decaidVersion !== PINS.decaid.version && `Decaid ${decaidVersion} is running, pinned ${PINS.decaid.version}`,
+        dye2?.version !== PINS.dye2.version && `DYE2 ${dye2?.version ?? 'is not'} loaded, pinned ${PINS.dye2.version}`,
         !String(skin).startsWith(`${PINS.streamline.version}-`) && String(skin) !== PINS.streamline.version && `the page is Streamline ${skin}, pinned ${PINS.streamline.version}`,
     ].filter(Boolean);
-    if (problems.length) {
-        stack.stop();
-        throw new Error(`not recording: ${problems.join('; ')}`);
-    }
+    if (problems.length) throw new Error(`not recording: ${problems.join('; ')}`);
+} catch (error) {
+    stack.stop();
+    throw error;
 }
 const ws = `ws://127.0.0.1:${PORT_USED}/ws/v1`;
 

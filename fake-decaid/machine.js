@@ -161,12 +161,14 @@ export function createMachine({ pour, timeZone, now, emit, nextId, workflow, sto
             delete shot.annotations.actualDoseWeight;
             if (current.context?.targetDoseWeight != null) shot.annotations.actualDoseWeight = current.context.targetDoseWeight;
             run.stored = true;
-            store(shot);
+            // The shot-state socket says the shot finished, then DYE2, told of
+            // the Shot stored, pushes: the order the recording has them in.
             for (const entry of afterStore) {
                 const frame = rebased(entry, run.shotId);
                 state.shotState = frame;
                 emit(`/ws/v1/${entry.socket}`, frame);
             }
+            store(shot);
             return shot.id;
         },
     };
