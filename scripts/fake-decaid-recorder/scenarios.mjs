@@ -13,7 +13,8 @@
 //
 // A step `{ event: 'restart-dye2' }` is no request: the recorder disables DYE2
 // and enables it again through Decaid's plugin routes and waits for it to load,
-// and the replay calls the model's `restartDye2()`. Its recording has no answer.
+// and the replay calls the model's `restartDye2()`. Its recording has no answer,
+// and what DYE2 pushes as it loads is neither kept nor compared.
 //
 // Each scenario keeps the Workflow it started from, which the replay starts
 // from too, and puts back what else it relies on (no recipe loaded) with its

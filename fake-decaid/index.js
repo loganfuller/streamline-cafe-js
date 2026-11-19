@@ -236,8 +236,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         dye2RecordReads: () => dye2.recordReads(),
         /** DYE2 starts again, as Decaid's plugin disable and enable leave it (dye2.js). */
         restartDye2() {
-            const own = dye2.restart();
-            if (own) setWorkflow(own);
+            dye2.restart();
         },
         /** A recorded answer of the boot, changed: `patch(body)` answers the new body. */
         patchBoot: (key, patch) => cannedBoot.patch(key, patch),
