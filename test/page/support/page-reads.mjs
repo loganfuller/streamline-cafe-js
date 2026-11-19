@@ -54,3 +54,19 @@ export async function tapAt(page, selector) {
 export const isWrite = entry => entry.method !== 'GET' && entry.method !== 'HEAD' && entry.method !== 'OPTIONS';
 /** The writes since a mark, as "METHOD path" with the body, for a test to compare whole. */
 export const writes = entries => entries.filter(isWrite).map(({ method, path, body }) => ({ write: `${method} ${path}`, body }));
+
+/** The menu a press held on a card opens (Streamline's context menu). */
+export const menu = page => page.locator('#app-context-menu.context-menu--open');
+/** Its items' text, in order. */
+export const menuItems = page => menu(page).locator('.context-menu__item').allTextContents();
+
+/** A finger held on a card past Streamline's half second, let go, and the menu it opened. */
+export async function holdCard(cafe, slot) {
+    const { page } = cafe;
+    const box = await card(page, slot).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await cafe.advance(600);
+    await page.mouse.up();
+    await expect(menu(page)).toBeVisible();
+}

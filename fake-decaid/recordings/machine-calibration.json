@@ -8,7 +8,7 @@
  "about": "The simulated machine's calibration, as Streamline's settings page reads it: each target's current and factory values; an unknown target or source refused.",
  "given": {
   "workflow": {
-   "id": "bd4e6708-b35a-42c3-9613-d0b9aa9ad508",
+   "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "b4604fad-efca-4826-adf8-8cf277e9b021",
+    "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "4e827f3d-5dd6-4b3c-85a0-32cba0f74479",
+    "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",

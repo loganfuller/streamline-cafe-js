@@ -11,11 +11,10 @@
 //   node test/cafe-smoke/run.mjs --token=... --only=profile-dialog   (step 27 alone, after a whole run)
 //   node test/cafe-smoke/run.mjs --token=... --only=labels   (step 28 alone, after a whole run)
 //
-// It changes the Decaid it is pointed at: it removes and reinstalls DYE2,
-// switches Streamline's "DYE2 on" setting, writes made-up beans, grinders and
-// recipes, makes recipes and moves them between slots from the page, chooses
-// grinders from the page, changes the language, sets the barista, puts the
-// machine to sleep and wakes it, and pulls simulated shots. Point it at a throwaway Decaid only.
+// It changes the Decaid it is pointed at: it installs or enables DYE2 if it
+// must, turns Streamline's "DYE2 on" setting on, writes made-up beans, grinders
+// and recipes, moves recipes between slots from the page, changes the language,
+// sets the barista, and pulls simulated shots. Point it at a throwaway Decaid only.
 
 import { chromium } from 'playwright';
 import { mkdir, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
@@ -493,11 +492,6 @@ async function ratingAndNotes(page, latest, reference, seen) {
     page.off('request', listen);
 }
 
-const gateLine = page => page.locator('#cafe-gate-line');
-async function waitForGate(page, theme = 'light') {
-    await page.locator('#main-page.cafe-gated').waitFor({ timeout: 20_000 });
-    await paint(page, theme);
-}
 async function waitForPage(page, theme = 'light') {
     await page.locator('#cafe-strip .cafe-card').first().waitFor({ timeout: 20_000 });
     await paint(page, theme);
@@ -512,9 +506,9 @@ async function longPress(page, locator) {
     await page.waitForTimeout(900);
     await page.mouse.up().catch(() => {});
 }
-// The menu a long-press opens on a card, and the list a recipe is chosen from.
+// The menu a long-press opens on a card, and the list a recipe is chosen from
+// (step 14 arranges the strip).
 const menu = page => page.locator('#app-context-menu.context-menu--open');
-const menuItems = page => menu(page).locator('.context-menu__item').allTextContents();
 async function openMenu(page, slot) {
     await longPress(page, page.locator('#cafe-strip .cafe-card').nth(slot - 1));
     await menu(page).waitFor({ timeout: 5000 });
@@ -526,34 +520,12 @@ async function pick(page, index) {
     await page.waitForTimeout(3500);
 }
 const dialog = page => page.locator('#cafe-recipe-dialog[open]');
-const dialogRows = page => page.locator('#cafe-recipe-list .cafe-recipe-row-name').allTextContents();
 const cardName = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1).locator('.cafe-card-name').textContent();
 // The Settings page's language list calls this same function.
 const setLanguage = (page, language) => page.evaluate(async code => {
     const { setLanguage: set } = await import('/src/modules/i18n.js');
     await set(code);
 }, language);
-// Text that does not fit its place: wider than its own box, cut short where a
-// card clamps its lines, broken over two lines where a label has one, or
-// reaching outside the page.
-const overflowing = page => page.evaluate(() => [...document.querySelectorAll('#main-page [data-cafe-text], #main-page [data-i18n-key], #cafe-strip .cafe-card span, #cafe-compare .cafe-compare-title, #cafe-compare .cafe-compare-side, #cafe-compare span')]
-    .filter(el => el.offsetParent !== null)
-    .filter(el => {
-        const box = el.getBoundingClientRect();
-        const text = document.createRange();
-        text.selectNodeContents(el);
-        const lines = new Set([...text.getClientRects()].map(rect => Math.round(rect.top))).size;
-        const clamped = el.closest('.cafe-card') && el.scrollHeight > el.clientHeight + 1;
-        const wrapped = !el.closest('.cafe-card') && lines > 1;
-        return el.scrollWidth > el.clientWidth + 1 || text.getBoundingClientRect().width > box.width + 1 || clamped || wrapped
-            || box.right > window.innerWidth + 1 || box.left < -1;
-    })
-    .map(el => `${el.id || el.className}: "${el.textContent}"`));
-// The smallest a fitted label has been shrunk to, so a fit that is unreadable
-// shows up as a number and not only on a screenshot.
-const smallestLabel = page => page.evaluate(() => Math.min(...[...document.querySelectorAll('#main-page [data-fit-text]')]
-    .filter(el => el.offsetParent !== null).map(el => parseFloat(getComputedStyle(el).fontSize))));
-
 const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const REST_TARGETS = 'time dose yield ratio peak';
 const LIVE = 'time weight weightFlow flow pressure temperature';
@@ -563,21 +535,6 @@ const SIGNED = /^([+\u2212]\d|0\.0)/;
 const loadedRecipeId = selection => (selection?.kind === 'recipe' ? selection.id ?? null : null);
 // The newest of Decaid's Shots pulled with a recipe.
 const newestShotWith = async recipeId => ((await decaid('GET', '/shots?limit=100')).items || []).find(row => shotRecipeId(row.workflow) === String(recipeId)) || null;
-// The gate took the page's place: nothing behind it, no recipe read or loaded,
-// and no install asked of Decaid.
-async function checkGate(name, { page, seen }, line) {
-    await waitForGate(page, seen.theme);
-    await page.waitForTimeout(1500);
-    check(`${name}: the line reads "${line}"`, (await gateLine(page).textContent()) === line, await gateLine(page).textContent());
-    check(`${name}: the title is "Streamline Cafe needs DYE2"`, (await page.locator('#cafe-gate-title').textContent()) === 'Streamline Cafe needs DYE2');
-    check(`${name}: nothing is drawn behind the card`,
-        !(await page.locator('#cafe-header').isVisible()) && !(await page.locator('#shot-settings').isVisible()) && !(await page.locator('#chart-wrap').isVisible()));
-    check(`${name}: Reload and Settings are offered`,
-        (await page.locator('#cafe-gate-reload').isVisible()) && (await page.locator('#cafe-gate-settings').isVisible()));
-    const touched = seen.requests.filter(r => /dye2\.reaplugin\/(recipes|selection)|\/plugins\/install|^PUT .*\/workflow$/.test(r));
-    check(`${name}: no recipe is read or loaded, and nothing is installed`, touched.length === 0, touched.join(', '));
-    check(`${name}: no page error`, seen.errors.length === 0, seen.errors.join(' | '));
-}
 
 // ── The grinder dialog ───────────────────────────────────────────────────────
 
@@ -611,164 +568,8 @@ async function grinderFixtures() {
     if (!retired.archived) await decaid('PUT', `/grinders/${retired.id}`, { ...retired, archived: true });
 }
 
-const sorted = value => (value && typeof value === 'object' && !Array.isArray(value)
-    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sorted(value[key])])) : value);
-// ── A tap on the loaded card unloads it (#53) ────────────────────────────────
-
-// On a page at 1920 by 1200 and on one at 1340 by 800: a tap on the loaded
-// card unloads the recipe, with the machine set as it was; a step afterwards
-// changes the Workflow and no DYE2 record; a tap on the card loads it as
-// stored; a double tap on another card loads it; no card takes a tap during a
-// shot; an unload tapped just after a pour leaves the Shot naming the recipe;
-// and an unload DYE2 refuses is a toast with the card still highlighted.
-async function unloadByTap() {
-    const [house, single] = RECIPES;
-    const selection = () => decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
-    const loadedId = async () => loadedRecipeId(await selection());
-    // What the machine is set to, without the marker that says which recipe is loaded.
-    const settings = async () => {
-        const wf = await decaid('GET', '/workflow');
-        const { extras, ...context } = wf.context;
-        const { dye, ...rest } = extras || {};
-        return JSON.stringify({ profile: wf.profile.title, context, rest, steam: wf.steamSettings, water: wf.hotWaterData, rinse: wf.rinseData });
-    };
-    const waitFor = async (test, ms = 15_000) => {
-        for (let waited = 0; waited < ms; waited += 250) {
-            if (await test()) return true;
-            await sleep(250);
-        }
-        return false;
-    };
-    for (const viewport of [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }]) {
-        const size = `${viewport.width}x${viewport.height}`;
-        await decaid('PUT', '/machine/state/idle').catch(() => {});
-        await unloadRecipe();
-        const view = await openPage({ viewport });
-        const { page, seen } = view;
-        try {
-            await waitForPage(page);
-            await page.waitForTimeout(2500);
-            const card = recipe => page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1);
-            const title = () => page.locator('#cafe-title').textContent();
-            const pressed = () => page.locator('#cafe-strip [aria-pressed="true"]').count();
-            const toastShown = () => page.locator('#app-toast').isVisible();
-            const loadCard = async recipe => {
-                await card(recipe).click();
-                await page.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
-                await page.waitForTimeout(3000);
-            };
-            await loadCard(house);
-            const record = await recordNamed(house.name);
-            check(`unload ${size}: the recipe is loaded before the tap`, (await loadedId()) === record.id && (await pressed()) === 1, `${await loadedId()}`);
-            await shot(page, `unload-before-${size}-light`);
-
-            //     The tap: only the marker is cleared, and the page is the no-recipe page.
-            const before = await settings();
-            const doseShown = await page.locator('#dose-in-value').textContent();
-            const writesFrom = seen.requests.length;
-            await card(house).click();
-            await page.locator('#cafe-title').filter({ hasText: 'No recipe selected' }).waitFor({ timeout: 10_000 }).catch(() => {});
-            await page.waitForTimeout(2500);
-            check(`unload ${size}: a tap on the loaded card unloads it: DYE2's selection names no recipe`, (await loadedId()) === null, JSON.stringify(await selection()));
-            check(`unload ${size}: the page is the no-recipe page`,
-                (await title()) === 'No recipe selected' && (await page.locator('#cafe-subtitle').textContent()) === 'Tap a recipe to load it'
-                && (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe' && (await pressed()) === 0,
-                `${await title()} | ${await page.locator('#cafe-subtitle').textContent()} | ${await page.locator('#cafe-dial-label').textContent()} | ${await pressed()} filled`);
-            check(`unload ${size}: the graph shows "Last shot"`, (await legend(page)).label === 'Last shot', (await legend(page)).label);
-            check(`unload ${size}: the machine is set as it was, and the steppers show it`, (await settings()) === before && (await page.locator('#dose-in-value').textContent()) === doseShown);
-            const unloadWrites = seen.requests.slice(writesFrom).filter(r => /^PUT .*\/workflow$|^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2/.test(r));
-            check(`unload ${size}: the page wrote no Workflow and no record: DYE2 cleared the marker`, unloadWrites.length === 0, unloadWrites.join(', '));
-            check(`unload ${size}: it asked nothing first and showed no toast`, !(await toastShown()) && !(await page.locator('dialog[open]').count()));
-            await shot(page, `unload-after-${size}-light`);
-
-            //     A step afterwards changes this machine only.
-            const recordBefore = JSON.stringify(await recordNamed(house.name));
-            const dose = parseFloat(await page.locator('#dose-in-value').textContent());
-            await page.locator('#dose-in-plus').click();
-            const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
-            await page.waitForTimeout(5000);
-            check(`unload ${size}: a step afterwards reaches the Workflow`, stepped > dose && Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001, `${dose}g to ${stepped}g`);
-            check(`unload ${size}: and the recipe's DYE2 record did not change`, JSON.stringify(await recordNamed(house.name)) === recordBefore);
-
-            //     A tap on the card loads the recipe as stored, over the step.
-            const held = (await recordNamed(house.name)).dashboardVariables;
-            await loadCard(house);
-            const workflow = await decaid('GET', '/workflow');
-            check(`unload ${size}: a tap on the unloaded card loads it as stored`,
-                (await loadedId()) === record.id && workflow.context.targetDoseWeight === held.dose && workflow.context.targetYield === held.drink
-                && (await page.locator('#dose-in-value').textContent()) === `${held.dose}g` && (await card(house).getAttribute('aria-pressed')) === 'true',
-                `${workflow.context.targetDoseWeight}g / ${workflow.context.targetYield}g, selection ${await loadedId()}`);
-
-            //     A double tap on another card loads it.
-            await card(single).dblclick();
-            await page.locator('#cafe-title').filter({ hasText: single.name }).waitFor({ timeout: 20_000 }).catch(() => {});
-            await page.waitForTimeout(4000);
-            const singleId = (await recordNamed(single.name)).id;
-            check(`unload ${size}: a double tap on a card leaves its recipe loaded`,
-                (await loadedId()) === singleId && (await title()) === single.name && (await card(single).getAttribute('aria-pressed')) === 'true',
-                `${await title()}, selection ${await loadedId()}`);
-
-            //     During a shot no card takes a tap.
-            const duringBefore = { settings: await settings(), loaded: await loadedId() };
-            const running = pullShot(8);
-            await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-            await page.waitForTimeout(500);
-            await card(single).click();
-            await card(house).click();
-            await page.waitForTimeout(1500);
-            check(`unload ${size}: while a shot runs a tap on the loaded card and on another change nothing`,
-                (await page.locator('#main-page.cafe-shot-live').count()) === 1 && (await loadedId()) === duringBefore.loaded
-                && (await settings()) === duringBefore.settings && (await title()) === single.name && (await card(single).getAttribute('aria-pressed')) === 'true',
-                `${await title()}, selection ${await loadedId()}`);
-            await running;
-            await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
-            await page.waitForTimeout(6000);
-
-            //     An unload tapped just after a pour waits for the Shot to be
-            //     stored, and the Shot names the recipe.
-            const newestBefore = ((await decaid('GET', '/shots?limit=1')).items || [])[0]?.id;
-            await decaid('PUT', '/machine/state/espresso');
-            await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-            await sleep(6000);
-            await decaid('PUT', '/machine/state/idle');
-            await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
-            await card(single).click();
-            await page.waitForTimeout(800);
-            const waiting = { shown: await pressed(), loaded: await loadedId() };
-            let newest = null;
-            await waitFor(async () => {
-                newest = ((await decaid('GET', '/shots?limit=1')).items || [])[0];
-                return newest && newest.id !== newestBefore;
-            }, 20_000);
-            const stored = newest && newest.id !== newestBefore ? await decaid('GET', `/shots/${newest.id}`) : null;
-            const unloaded = await waitFor(async () => (await loadedId()) === null, 15_000);
-            check(`unload ${size}: tapped just after a pour, the highlight leaves at once and DYE2 still names the recipe while the Shot is stored`,
-                waiting.shown === 0 && waiting.loaded === singleId, JSON.stringify(waiting));
-            check(`unload ${size}: the Shot just pulled names the recipe`, !!stored && shotRecipeId(stored.workflow) === String(singleId), `${stored?.id}: ${shotRecipeId(stored?.workflow)}`);
-            check(`unload ${size}: and the recipe is unloaded once the Shot is stored`, unloaded && (await title()) === 'No recipe selected', `${await title()}, selection ${await loadedId()}`);
-
-            //     An unload DYE2 refuses: a toast, and the card highlighted again.
-            await loadCard(house);
-            await page.route(`**/api/v1/plugins/${DYE2_PLUGIN_ID}/selection`, route => (route.request().method() === 'POST'
-                ? route.fulfill({ status: 500, body: 'Sample refusal.' }) : route.fallback()));
-            await card(house).click();
-            await page.locator('#app-toast').filter({ hasText: `Could not unload ${house.name}` }).waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
-            check(`unload ${size}: an unload DYE2 refuses shows "Could not unload ${house.name}"`,
-                (await page.locator('#app-toast-message').textContent()) === `Could not unload ${house.name}`, await page.locator('#app-toast-message').textContent());
-            await page.waitForTimeout(1500);
-            check(`unload ${size}: and the card is highlighted with the recipe still loaded`,
-                (await card(house).getAttribute('aria-pressed')) === 'true' && (await title()) === house.name && (await loadedId()) === record.id,
-                `${await title()}, selection ${await loadedId()}`);
-            await shot(page, `unload-refused-${size}-light`);
-            await page.unroute(`**/api/v1/plugins/${DYE2_PLUGIN_ID}/selection`);
-            check(`unload ${size}: no page error`, seen.errors.length === 0, seen.errors.join(' | '));
-        } finally {
-            await view.close();
-        }
-    }
-    // As the run leaves it: no recipe loaded.
-    await unloadRecipe();
-}
+// 24. A tap on the loaded card unloads it is a page test now
+//     (test/page/unload-tap.spec.mjs).
 
 // The simulated machine's Workflow reports a flush at 90 °C, whatever its
 // settings hold, and the sample recipes hold 25 °C, so DYE2 calls every recipe
@@ -1747,199 +1548,38 @@ if (ONLY) {
 }
 
 try {
-    // 1. An older DYE2. A fresh Decaid v0.9.2 bundles one; a second run finds the
-    //    current one and has nothing to show here.
+    // SMOKE.md's steps 1 to 6 are page tests now (test/page/: dye2-gate, strip,
+    // dial-in), and step 3's seed is the fake Decaid's sample data. What the
+    // steps left here stand on is set up instead: a current DYE2, loaded, the
+    // setting on, the sample data, no recipe loaded, no reference chosen, the
+    // graph in Reference, and one recipe loaded on a page.
+    if (!(await dye2()) || compareVersions((await dye2()).version, MIN_DYE2_VERSION) < 0) {
+        const installed = await decaid('POST', '/plugins/install/github-release', { repo: 'decentespresso/dye2' }, { manage: true });
+        note(`installed DYE2 ${installed.version}`);
+    }
+    if (!(await dye2()).loaded) await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/enable`, undefined, { manage: true });
+    for (let waited = 0; !(await dye2()).loaded; waited += 500) {
+        if (waited > 60_000) throw new Error('DYE2 did not load within 60 s');
+        await sleep(500);
+    }
     await setSetting(true);
-    const before = await dye2();
-    if (before && compareVersions(before.version, MIN_DYE2_VERSION) < 0) {
-        const view = await openPage();
-        await checkGate('older DYE2', view, `DYE2 is older than v${MIN_DYE2_VERSION}`);
-        check('older DYE2: it says where to update, and offers no button for the setting',
-            (await view.page.locator('#cafe-gate-hint').isVisible()) && !(await view.page.locator('#cafe-gate-turn-on').isVisible()));
-        await shot(view.page, 'gate-older-dye2');
-        await view.close();
-    } else {
-        note(`skipped the "older than" screen: Decaid has DYE2 ${before ? before.version : 'not installed'}`);
-    }
-
-    // 2. DYE2 not installed, in light and dark. Settings stays reachable, and
-    //    leaving it comes back to the check.
-    if (before) await decaid('DELETE', `/plugins/${DYE2_PLUGIN_ID}`, undefined, { manage: true });
-    for (const theme of ['light', 'dark']) {
-        const view = await openPage({ theme });
-        await checkGate(`not installed (${theme})`, view, "DYE2 isn't installed");
-        await shot(view.page, `gate-not-installed-${theme}`);
-        if (theme === 'light') {
-            await view.page.locator('#cafe-gate-settings').click();
-            await view.page.locator('#subpage-host #settings-content-area').waitFor({ timeout: 20_000 });
-            check('not installed: Settings opens the settings page', true);
-            await view.page.goBack();
-            await waitForGate(view.page);
-            check('not installed: leaving the settings page comes back to the check',
-                (await gateLine(view.page).textContent()) === "DYE2 isn't installed");
-        }
-        await view.close();
-    }
-
-    // 3. Installed, then switched off in Decaid: installed but not loaded. Reload
-    //    runs the check again once it is back on.
-    const installed = await decaid('POST', '/plugins/install/github-release', { repo: 'decentespresso/dye2' }, { manage: true });
-    note(`installed DYE2 ${installed.version}`);
-    check(`DYE2 ${installed.version} is at least v${MIN_DYE2_VERSION}`, compareVersions(installed.version, MIN_DYE2_VERSION) >= 0);
-    await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/disable`, undefined, { manage: true });
-    await setSetting(false);
-    {
-        const view = await openPage();
-        await checkGate('not loaded', view, 'DYE2 is installed but not loaded');
-        await shot(view.page, 'gate-not-loaded');
-        await decaid('POST', `/plugins/${DYE2_PLUGIN_ID}/enable`, undefined, { manage: true });
-        await view.page.locator('#cafe-gate-reload').click();
-        await gateLine(view.page).filter({ hasText: 'DYE2 is turned off in Settings' }).waitFor({ timeout: 20_000 });
-        check('not loaded: Reload runs the check again', true);
-        await view.close();
-    }
-
-    // 4. The setting off, in light and dark. The button turns it on and the page
-    //    starts.
     await seed();
     await unloadRecipe();
-    // No reference chosen, and the graph in its first view, whatever an earlier
-    // run left in Decaid's store.
     await decaid('POST', REFERENCES, {});
     await decaid('POST', GRAPH_VIEW, 'reference');
-    for (const theme of ['dark', 'light']) {
-        await setSetting(false);
-        const view = await openPage({ theme });
-        await checkGate(`setting off (${theme})`, view, 'DYE2 is turned off in Settings');
-        check(`setting off (${theme}): "Turn DYE2 on" is offered, and no plugin hint`,
-            (await view.page.locator('#cafe-gate-turn-on').isVisible()) && !(await view.page.locator('#cafe-gate-hint').isVisible()));
-        await shot(view.page, `gate-setting-off-${theme}`);
-        if (theme === 'light') {
-            await view.page.locator('#cafe-gate-turn-on').click();
-            await waitForPage(view.page);
-            check('setting off: "Turn DYE2 on" starts the page', await view.page.locator('#cafe-header').isVisible());
-            await sleep(1500);
-            check('setting off: the setting is on in Decaid\'s store, where Streamline reads it too', (await (await fetch(SETTING)).json()) === 'true');
-        }
-        await view.close();
-    }
+    // Step 14 puts Streamline's strip mode back as it found it.
+    const modeBefore = await storeValue(STRIP_MODE);
 
-    // 5. The page, with no recipe loaded.
     const view = await openPage();
     const { page, seen } = view;
     await waitForPage(page);
     await page.waitForTimeout(2500);
     const cards = page.locator('#cafe-strip .cafe-card');
-    check('nine cards in one row', (await cards.count()) === 9);
-    const tops = await cards.evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
-    check('the cards are in one row', new Set(tops).size === 1, tops.join(','));
-    for (const recipe of RECIPES) {
-        const card = cards.nth(recipe.slot - 1);
-        check(`slot ${recipe.slot} shows "${recipe.name}" and its bean`,
-            (await card.locator('.cafe-card-name').textContent()) === recipe.name && (await card.locator('.cafe-card-bean').textContent()) === recipe.bean);
-    }
-    for (const slot of [4, 6, 8]) {
-        check(`slot ${slot} is an outline reading "Slot ${slot}" and "Hold to add"`,
-            (await cards.nth(slot - 1).locator('.cafe-card-name').textContent()) === `Slot ${slot}`
-            && (await cards.nth(slot - 1).locator('.cafe-card-bean').textContent()) === 'Hold to add'
-            && (await cards.nth(slot - 1).evaluate(e => getComputedStyle(e).borderTopStyle)) === 'dashed');
-    }
-    await cards.nth(3).click();
-    await page.waitForTimeout(1500);
-    check('a tap on an empty slot does nothing', (await page.locator('#cafe-title').textContent()) === 'No recipe selected' && page.url().startsWith(BASE));
-    check('no recipe: the title reads "No recipe selected"', (await page.locator('#cafe-title').textContent()) === 'No recipe selected');
-    check('no recipe: the line under it says to tap a recipe', (await page.locator('#cafe-subtitle').textContent()) === 'Tap a recipe to load it');
-    check('no recipe: the column is labelled "Dial-in · not saved to a recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe');
-    check('no recipe: no card is filled', (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 0);
-    const column = await page.evaluate(() => {
-        const style = (el, ...props) => props.map(p => getComputedStyle(el)[p]).join(' ');
-        const all = selector => [...document.querySelectorAll(`#shot-settings ${selector}`)];
-        return {
-            names: all('.cafe-row-name').map(el => style(el, 'fontSize', 'fontWeight')),
-            values: ['dose-in-value', 'drink-out-value', 'grind-value', 'temp-value', 'flush-value', 'steam-flow-value', 'hot-water-vol-value']
-                .map(id => style(document.getElementById(id), 'fontSize', 'fontWeight')),
-            buttons: all('.cafe-stepper > button').map(el => style(el, 'width', 'height')),
-        };
-    });
-    check('the dial-in column: seven rows, each label the same size and weight', column.names.length === 7 && new Set(column.names).size === 1, [...new Set(column.names)].join(' | '));
-    check('the dial-in column: each value the same size and weight', new Set(column.values).size === 1, [...new Set(column.values)].join(' | '));
-    check('the dial-in column: fourteen − and + buttons, all the same size', column.buttons.length === 14 && new Set(column.buttons).size === 1, [...new Set(column.buttons)].join(' | '));
-    check('the machine buttons show, with Settings and Sleep above them',
-        (await page.locator('#ghc-controls').isVisible()) && (await page.locator('#ghc-controls #settings-btn').isVisible()) && (await page.locator('#ghc-controls #sleep-button').isVisible()));
-    for (const gone of ['#dye-strip-toggle', '#profile-fav-nav', '#dye-open-btn', '#shot-history-panel', '#shot-data-panel', '#temp-presets', '#steam-mode-toggle']) {
-        check(`gone from the page: ${gone}`, (await page.locator(gone).count()) === 0);
-    }
-    await shot(page, 'page-no-recipe-light');
-
-    // 6. Two taps in quick succession: the machine ends on the second, which is
-    //    the one the page names.
-    const stripModeBefore = await page.evaluate(() => localStorage.getItem('streamline.dyeStripMode'));
-    const [first, second] = [RECIPES[0], RECIPES[2]];
-    await cards.nth(first.slot - 1).click();
-    await cards.nth(second.slot - 1).click();
-    await page.waitForTimeout(6000);
-    const afterTwo = await decaid('GET', '/workflow');
-    check('two quick taps: the page names the second recipe', (await page.locator('#cafe-title').textContent()) === second.name, await page.locator('#cafe-title').textContent());
-    check('two quick taps: the Workflow holds the second recipe', afterTwo.context.coffeeName === second.bean && afterTwo.context.targetYield === second.yield,
-        `${afterTwo.context.coffeeName}, ${afterTwo.context.targetYield} g`);
-    check('two quick taps: only the second card is filled',
-        (await cards.nth(second.slot - 1).getAttribute('aria-pressed')) === 'true' && (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 1);
-
-    //    A tap loads a recipe, through Streamline's apply. Its numbers are the
-    //    ones DYE2 holds, which an earlier run's steps may have changed.
     const target = RECIPES[1];
     const recordOf = async recipe => (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)).find(row => row.name === recipe.name);
-    const held = (await recordOf(target)).dashboardVariables;
     await cards.nth(target.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(3000);
-    check('a tap loads the recipe: its card is filled', (await cards.nth(target.slot - 1).getAttribute('aria-pressed')) === 'true');
-    check('a tap loads the recipe: only one card is filled', (await page.locator('#cafe-strip [aria-pressed="true"]').count()) === 1);
-    check('the title is the recipe, over its bean and profile',
-        (await page.locator('#cafe-subtitle').textContent()) === `${target.bean} · ${target.profile}`, await page.locator('#cafe-subtitle').textContent());
-    check('with no Decent Sync the column is labelled "Dial-in · not saved to the recipe"', (await page.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to the recipe', await page.locator('#cafe-dial-label').textContent());
-    const workflow = await decaid('GET', '/workflow');
-    check('the Workflow holds the recipe', workflow.context.targetYield === held.drink && workflow.context.targetDoseWeight === held.dose && workflow.context.coffeeName === target.bean && workflow.profile.title === target.profile);
-    const selection = await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`);
-    check('DYE2 says the recipe is loaded', selection?.kind === 'recipe');
-    check('Dose names the bean and its roast date', /^Sample Single Origin · roasted .*28/.test(await page.locator('#cafe-dose-desc').textContent()), await page.locator('#cafe-dose-desc').textContent());
-    check('Yield names the basket', (await page.locator('#cafe-yield-desc').textContent()) === target.basket);
-    check('Grind names the grinder', (await page.locator('#cafe-grind-desc').textContent()) === GRINDER.model);
-    check('Brew names the profile', (await page.locator('#profile-name').textContent()).trim() === target.profile);
-    check('the steppers show the recipe\'s numbers',
-        (await page.locator('#dose-in-value').textContent()) === `${held.dose}g` && (await page.locator('#drink-out-value').textContent()) === `${held.drink}g` && parseFloat(await page.locator('#grind-value').textContent()) === held.grind);
-    check('the skin never wrote Streamline\'s strip mode to anything else',
-        (await page.evaluate(() => localStorage.getItem('streamline.dyeStripMode'))) === stripModeBefore);
-    await shot(page, 'page-recipe-light');
-
-    // 7. Stepping a value.
-    await page.locator('#dose-in-plus').click();
-    const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
-    check('+ steps the dose once', stepped > held.dose && stepped <= held.dose + 1, `${held.dose}g to ${stepped}g`);
-    await page.waitForTimeout(2500);
-    check('the step reaches the Workflow', Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001);
-    //    The skin saves nothing onto the recipe itself: that is Decent Sync's to do.
-    await page.waitForTimeout(3000);
-    check('the step changes this machine only: DYE2\'s record of the recipe keeps its dose', (await recordOf(target)).dashboardVariables.dose === held.dose, `record dose ${(await recordOf(target)).dashboardVariables.dose}`);
-    check('the skin asks DYE2 to save nothing', !seen.requests.some(r => /^POST .*dye2\.reaplugin\/(record|save-recipe)$/.test(r)), seen.requests.filter(r => /dye2\.reaplugin\/(record|save-recipe)/.test(r)).join(', '));
-    await page.locator('#hot-water-mode-toggle').click();
-    check('Temp | Vol picks which of the two the buttons step',
-        (await page.locator('#hot-water-temp-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px'
-        && (await page.locator('#hot-water-vol-value').evaluate(e => getComputedStyle(e).fontSize)) === '16px');
-    await page.locator('#hot-water-mode-toggle').click();
-    await page.evaluate(() => { window._forceNumpadMobile = true; });
-    // Streamline's steam tile put into time mode, as loading a recipe saved in
-    // that mode leaves it: the row is still the flow, and still steps it.
-    await page.evaluate(() => window.app.ui.setSteamTileModeIfSafe('time'));
-    const flowBefore = parseFloat(await page.locator('#steam-flow-value').textContent());
-    const timeBefore = (await decaid('GET', '/workflow')).steamSettings.duration;
-    await page.locator('#cafe-steam-plus').click();
-    const flowAfter = parseFloat(await page.locator('#steam-flow-value').textContent());
-    check('the steam row steps the flow, whatever mode Streamline\'s steam tile is in', Math.abs(flowAfter - (flowBefore + 0.1)) < 0.001, `${flowBefore} to ${flowAfter}`);
-    check('the steam row still shows the flow large', (await page.locator('#steam-flow-value').evaluate(e => getComputedStyle(e).fontSize)) === '30px');
-    await page.waitForTimeout(2500);
-    const steamNow = (await decaid('GET', '/workflow')).steamSettings;
-    check('the flow reaches the Workflow, and the steam time is untouched', Math.abs(steamNow.flow - flowAfter) < 0.001 && steamNow.duration === timeBefore, JSON.stringify(steamNow));
 
     // 8. A shot with the recipe loaded, which the reference's checks below
     //    start from. What the page shows during it and once it is stored is a
@@ -2200,311 +1840,12 @@ try {
         await weighed.close();
     }
 
-    // 9. The full-screen chart, and back.
-    await page.locator('#plotly-chart').click();
-    await page.locator('#main-page.chart-zoomed').waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(1500);
-    check('a tap on the graph opens the full-screen chart', await page.locator('#expanded-chart').isVisible());
-    await shot(page, 'page-chart-full-screen-light');
-    await page.locator('#expanded-chart').click();
-    await page.waitForTimeout(800);
-    check('a tap on it comes back', (await page.locator('#shot-settings').isVisible()) && (await page.locator('#plotly-chart').isVisible()));
-
-    //     A change made just before another recipe is tapped is written before
-    //     that recipe loads, so it does not land on it. Then back: the first
-    //     recipe comes back with its own numbers.
-    const other = RECIPES[3];
-    const flowStart = parseFloat(await page.locator('#steam-flow-value').textContent());
-    await page.locator(flowStart >= 2 ? '#cafe-steam-minus' : '#cafe-steam-plus').click();
-    const flowStepped = parseFloat(await page.locator('#steam-flow-value').textContent());
-    await page.locator('#flush-plus').click();
-    const flushStepped = parseFloat(await page.locator('#flush-value').textContent());
-    await cards.nth(other.slot - 1).click();
-    await page.locator('#cafe-title').filter({ hasText: other.name }).waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(5000);
-    check('a change made just before another recipe is tapped does not land on that recipe', (await recordOf(other)).dashboardVariables.flushS === (await decaid('GET', '/workflow')).rinseData.duration,
-        `stepped to ${flushStepped}s (and steam flow ${flowStepped}) on the recipe before; record ${(await recordOf(other)).dashboardVariables.flushS}, Workflow ${(await decaid('GET', '/workflow')).rinseData.duration}`);
-    await cards.nth(target.slot - 1).click();
-    await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(5000);
-    check('coming back to a recipe brings back the recipe\'s own numbers',
-        parseFloat(await page.locator('#dose-in-value').textContent()) === held.dose && parseFloat(await page.locator('#flush-value').textContent()) === held.flushS,
-        `dose ${await page.locator('#dose-in-value').textContent()}, flush ${await page.locator('#flush-value').textContent()}`);
-
-    // 10. Settings and back; the page is still there.
-    await page.locator('#settings-btn').click();
-    await page.locator('#subpage-host #settings-content-area').waitFor({ timeout: 20_000 });
-    await page.goBack();
-    await page.locator('#cafe-header').waitFor({ state: 'visible', timeout: 20_000 });
-    check('Settings opens, and leaving it comes back to the page', (await page.locator('#cafe-title').textContent()) === target.name);
+    // SMOKE.md's step 10, the rest of step 6, and steps 11 to 13 are page tests
+    // now (test/page/: full-screen-and-settings, dial-in, slot-menu, languages).
+    // The main page from the setup through step 8's reference journey.
     check('no page error on the main page', seen.errors.length === 0, seen.errors.join(' | '));
-
-    //     DYE2 switched off while the page runs, as the settings page's own toggle
-    //     writes it: leaving Settings lands on the "DYE2 is needed" screen.
-    await page.locator('#settings-btn').click();
-    await page.locator('#subpage-host #settings-content-area').waitFor({ timeout: 20_000 });
-    await page.evaluate(() => localStorage.setItem('streamline.dye2Enabled', 'false'));
-    await page.goBack();
-    await page.locator('#main-page.cafe-gated').waitFor({ timeout: 30_000 });
-    check('DYE2 switched off in Settings: the page gives way to the "DYE2 is needed" screen',
-        (await gateLine(page).textContent()) === 'DYE2 is turned off in Settings');
     await view.close();
-    await setSetting(true);
-
-
-    // 11. The long-press: a menu on the card. Nothing here opens DYE2's editor,
-    //     and the page is never left.
-    const modeBefore = await storeValue(STRIP_MODE);
-    // The run makes recipes and moves them between slots. DYE2's records are put
-    // back as they were afterwards, so the run can be repeated on the same Decaid.
-    const recordsBefore = await records();
-    const restoreRecords = () => decaid('POST', RECIPE_STORE, recordsBefore);
-    {
-        const trip = await openPage();
-        const tp = trip.page;
-        await waitForPage(tp);
-        await tp.waitForTimeout(2500);
-        const tcards = tp.locator('#cafe-strip .cafe-card');
-        const [house, single, decaf, long] = RECIPES;
-        const title = () => tp.locator('#cafe-title').textContent();
-        // The recipe DYE2's selection names, or null. With no recipe loaded DYE2
-        // may answer a `recent:` favourite it matched the Workflow against,
-        // which names no recipe.
-        const selectionId = async () => loadedRecipeId(await decaid('GET', `/plugins/${DYE2_PLUGIN_ID}/selection`));
-        // What the machine is set to, without the marker that says which recipe is loaded.
-        const settings = async () => {
-            const wf = await decaid('GET', '/workflow');
-            const { extras, ...context } = wf.context;
-            const { dye, ...rest } = extras || {};
-            return JSON.stringify({ profile: wf.profile.title, context, rest, steam: wf.steamSettings, water: wf.hotWaterData, rinse: wf.rinseData });
-        };
-        const skinWrites = from => trip.seen.requests.slice(from).filter(r => r === `POST /api/v1${RECIPE_STORE}`).length;
-        const load = async recipe => {
-            await tcards.nth(recipe.slot - 1).click();
-            await tp.locator('#cafe-title').filter({ hasText: recipe.name }).waitFor({ timeout: 20_000 });
-            await tp.waitForTimeout(3000);
-        };
-        if ((await title()) !== single.name) await load(single);
-
-        //     Nothing to choose yet: every sample recipe is in a slot.
-        await openMenu(tp, 4);
-        check('holding an empty slot opens a menu on the card with two items',
-            JSON.stringify(await menuItems(tp)) === JSON.stringify(['New recipe from current settings', 'Choose a recipe…']), (await menuItems(tp)).join(' | '));
-        await shot(tp, 'menu-empty-slot-light');
-        await pick(tp, 1);
-        await dialog(tp).waitFor({ timeout: 5000 });
-        check('with every recipe in a slot, the list says there is nothing to choose',
-            (await tp.locator('#cafe-recipe-dialog-title').textContent()) === 'Choose a recipe for slot 4'
-            && (await tp.locator('#cafe-recipe-dialog-empty').isVisible()) && (await dialogRows(tp)).length === 0);
-        await tp.locator('#cafe-recipe-dialog .modal-action button').click();
-        await tp.waitForTimeout(800);
-        check('Cancel closes the list, and nothing changed', !(await dialog(tp).isVisible()) && (await cardName(tp, 4)) === 'Slot 4');
-
-        //     A new recipe from what the machine is set to, in a slot above 5.
-        const settingsBefore = await settings();
-        let mark = trip.seen.requests.length;
-        await openMenu(tp, 8);
-        await pick(tp, 0);
-        const made = (await records()).find(row => row && !recordsBefore.some(old => old && old.id === row.id));
-        check('"New recipe from current settings" makes a recipe and puts it in held slot 8',
-            !!made && made.stripSlot === 8 && (await cardName(tp, 8)) === made.name, `${made?.name}, slot ${made?.stripSlot}, card "${await cardName(tp, 8)}"`);
-        check('DYE2 named it, from the profile and the bean', /Sample Single Origin/.test(made?.name || ''), made?.name);
-        check('the new recipe is the loaded one', (await title()) === made?.name && (await selectionId()) === made?.id && (await tcards.nth(7).getAttribute('aria-pressed')) === 'true', await title());
-        check('what the machine is set to did not change', (await settings()) === settingsBefore);
-        check('the skin placed it with one write of DYE2\'s records', skinWrites(mark) === 1, `${skinWrites(mark)} writes`);
-        await shot(tp, 'page-new-recipe-slot-8-light');
-
-        //     A tap still loads.
-        await load(single);
-        check('a tap still loads a recipe', (await selectionId()) === (await recordNamed(single.name)).id);
-
-        //     A filled card: three items. Taking a recipe out leaves it in DYE2.
-        await openMenu(tp, decaf.slot);
-        check('holding a filled card opens a menu with three items, and loads nothing',
-            JSON.stringify(await menuItems(tp)) === JSON.stringify(['Replace with a new recipe', 'Replace with another recipe…', 'Remove from slot'])
-            && (await title()) === single.name, (await menuItems(tp)).join(' | '));
-        await shot(tp, 'menu-filled-card-light');
-        await paint(tp, 'dark');
-        await tp.waitForTimeout(500);
-        await shot(tp, 'menu-filled-card-dark');
-        await paint(tp, 'light');
-        await pick(tp, 2);
-        check('"Remove from slot" empties the card, and the recipe stays in DYE2 with no slot',
-            (await cardName(tp, decaf.slot)) === `Slot ${decaf.slot}` && (await recordNamed(decaf.name))?.stripSlot === null, JSON.stringify((await recordNamed(decaf.name))?.stripSlot));
-        check('removing a recipe that is not loaded leaves the loaded one loaded', (await title()) === single.name && (await selectionId()) === (await recordNamed(single.name)).id);
-        await openMenu(tp, long.slot);
-        await pick(tp, 2);
-
-        //     Choosing: the list holds the recipes in no slot, sorted by name.
-        await openMenu(tp, 4);
-        await pick(tp, 1);
-        await dialog(tp).waitFor({ timeout: 5000 });
-        check('the list holds the recipes in no slot, sorted by name', JSON.stringify(await dialogRows(tp)) === JSON.stringify([decaf.name, long.name]), (await dialogRows(tp)).join(' | '));
-        check('a row shows the bean and the profile under the name',
-            (await tp.locator('#cafe-recipe-list .cafe-recipe-row-detail').first().textContent()) === `${decaf.bean} · ${decaf.profile}`,
-            await tp.locator('#cafe-recipe-list .cafe-recipe-row-detail').first().textContent());
-        await shot(tp, 'dialog-choose-light');
-        await paint(tp, 'dark');
-        await tp.waitForTimeout(500);
-        await shot(tp, 'dialog-choose-dark');
-        await paint(tp, 'light');
-        await tp.locator('#cafe-recipe-list .cafe-recipe-row').first().click();
-        await tp.waitForTimeout(3500);
-        check('choosing a recipe puts it in the slot from 1 to 5 that was held',
-            (await cardName(tp, 4)) === decaf.name && (await recordNamed(decaf.name))?.stripSlot === 4, await cardName(tp, 4));
-        check('choosing loads nothing', (await title()) === single.name && (await selectionId()) === (await recordNamed(single.name)).id);
-
-        //     Replacing a card's recipe with another: the one replaced keeps no slot.
-        await openMenu(tp, house.slot);
-        await pick(tp, 1);
-        await dialog(tp).waitFor({ timeout: 5000 });
-        await tp.locator('#cafe-recipe-list .cafe-recipe-row').filter({ hasText: long.name }).click();
-        await tp.waitForTimeout(3500);
-        check('"Replace with another recipe" puts the chosen one on the card, and the one replaced stays in DYE2 with no slot',
-            (await cardName(tp, house.slot)) === long.name && (await recordNamed(long.name))?.stripSlot === house.slot && (await recordNamed(house.name))?.stripSlot === null,
-            `${await cardName(tp, house.slot)}; replaced recipe's slot ${(await recordNamed(house.name))?.stripSlot}`);
-
-        //     The loaded recipe's card removed: it is unloaded, and the machine is
-        //     set as it was.
-        const beforeUnload = await settings();
-        const doseShown = await tp.locator('#dose-in-value').textContent();
-        await openMenu(tp, single.slot);
-        await pick(tp, 2);
-        check('removing the loaded recipe\'s card unloads it: the page reads "No recipe selected"',
-            (await title()) === 'No recipe selected' && (await selectionId()) === null && (await tp.locator('#cafe-dial-label').textContent()) === 'Dial-in · not saved to a recipe',
-            `${await title()}, selection ${await selectionId()}`);
-        check('and what the machine is set to did not change', (await settings()) === beforeUnload && (await tp.locator('#dose-in-value').textContent()) === doseShown);
-
-        //     The loaded recipe's card replaced by a new recipe: the new one is loaded.
-        await tcards.nth(3).click();
-        await tp.locator('#cafe-title').filter({ hasText: decaf.name }).waitFor({ timeout: 20_000 });
-        await tp.waitForTimeout(3000);
-        const known = (await records()).map(row => row && row.id);
-        await openMenu(tp, 4);
-        await pick(tp, 0);
-        const second = (await records()).find(row => row && !known.includes(row.id));
-        check('"Replace with a new recipe" on the loaded card: the new recipe takes the card and is loaded, and the one replaced keeps no slot',
-            !!second && second.stripSlot === 4 && (await title()) === second.name && (await selectionId()) === second.id && (await recordNamed(decaf.name))?.stripSlot === null,
-            `${second?.name}, slot ${second?.stripSlot}, title "${await title()}"`);
-
-        //     While a shot runs the menu does not open.
-        const running = pullShot(8);
-        await tp.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
-        await longPress(tp, tcards.nth(5));
-        await tp.waitForTimeout(600);
-        check('while a shot runs a long-press opens no menu', (await tp.locator('#main-page.cafe-shot-live').count()) === 1 && !(await menu(tp).isVisible()));
-        await running;
-        await tp.waitForTimeout(4000);
-
-        check('the page never left for one of DYE2\'s pages', tp.url().startsWith(BASE) && !trip.seen.requests.some(r => /dye2\.reaplugin\/(recipe-edit|dashboard|select-recipe)/.test(r)));
-        check('the skin never wrote Streamline\'s strip mode', (await storeValue(STRIP_MODE)) === modeBefore, `${modeBefore} then ${await storeValue(STRIP_MODE)}`);
-        check('the skin kept no state of its own in Decaid\'s store', !trip.seen.requests.some(r => /^(POST|DELETE) .*\/store\/streamlineCafe\//.test(r)));
-        check('no page error while arranging the strip', trip.seen.errors.length === 0, trip.seen.errors.join(' | '));
-        await trip.close();
-        await unloadRecipe();
-        await restoreRecords();
-    }
-
-    // 12. Languages. German has the longest text; Arabic is translated and the
-    //     layout stays left to right.
-    {
-        const lang = await openPage();
-        const lp = lang.page;
-        await waitForPage(lp);
-        await lp.waitForTimeout(2500);
-        // Making recipes above left none loaded: load one, for the fullest page.
-        await lp.locator('#cafe-strip .cafe-card').nth(RECIPES[1].slot - 1).click();
-        await lp.locator('#cafe-title').filter({ hasText: RECIPES[1].name }).waitFor({ timeout: 20_000 });
-        await lp.waitForTimeout(3000);
-        // The row's titles are written in capitals.
-        const ROW_TITLES = { de: 'DAUER | ERSTER TROPFEN | ERTRAG | VERHÄLTNIS | SPITZENDRUCK', ar: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' };
-        check('in English nothing overflows its place', (await overflowing(lp)).length === 0, (await overflowing(lp)).join(' | '));
-        for (const [code, expected] of [
-            ['de', { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', row: ROW_TITLES.de, roasted: /geröstet am 28\. Okt/ }],
-            ['ar', { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', row: ROW_TITLES.ar, roasted: /حمص في/ }],
-        ]) {
-            await setLanguage(lp, code);
-            await lp.waitForTimeout(2500);
-            const empty = lp.locator('#cafe-strip .cafe-card').nth(3);
-            const got = {
-                hint: await empty.locator('.cafe-card-bean').textContent(),
-                slot: await empty.locator('.cafe-card-name').textContent(),
-                dial: await lp.locator('#cafe-dial-label').textContent(),
-                dose: (await lp.locator('#dose-label .cafe-row-name').textContent()).trim(),
-                yield: await lp.locator('#drink-label .cafe-row-name').textContent(),
-                settings: (await lp.locator('#settings-btn').textContent()).trim(),
-                latest: await lp.locator('#cafe-shot-label').textContent(),
-                view: (await lp.locator('#cafe-view button').allTextContents()).join(' | '),
-                row: (await row(lp)).cards.map(card => card.title.split(' · ')[0]).join(' | '),
-            };
-            for (const [what, text] of Object.entries(got)) {
-                check(`${code}: ${what} reads "${expected[what]}"`, text === expected[what], text);
-            }
-            check(`${code}: the roast date is in the language too`, expected.roasted.test(await lp.locator('#cafe-dose-desc').textContent()), await lp.locator('#cafe-dose-desc').textContent());
-            const over = await overflowing(lp);
-            check(`${code}: no label overflows its place`, over.length === 0, over.join(' | '));
-            check(`${code}: no fitted label is shrunk below 14px`, (await smallestLabel(lp)) >= 14, `${await smallestLabel(lp)}px`);
-            check(`${code}: the layout stays left to right`, (await lp.evaluate(() => getComputedStyle(document.getElementById('main-page')).direction)) === 'ltr'
-                && (await lp.locator('#shot-settings').evaluate(e => e.getBoundingClientRect().left)) < 10);
-            for (const theme of ['light', 'dark']) {
-                await paint(lp, theme);
-                await lp.waitForTimeout(600);
-                await shot(lp, `page-recipe-${code}-${theme}`);
-            }
-            await paint(lp, 'light');
-        }
-        //     The menu and the list, in German.
-        await setLanguage(lp, 'de');
-        await lp.waitForTimeout(1500);
-        await openMenu(lp, 4);
-        check('de: the menu is translated', JSON.stringify(await menuItems(lp)) === JSON.stringify(['Neues Rezept aus den aktuellen Einstellungen', 'Rezept auswählen…']), (await menuItems(lp)).join(' | '));
-        const menuBox = await menu(lp).boundingBox();
-        check('de: the menu is inside the page', menuBox.x >= 0 && menuBox.x + menuBox.width <= 1920, JSON.stringify(menuBox));
-        await shot(lp, 'menu-empty-slot-de');
-        await pick(lp, 1);
-        await dialog(lp).waitFor({ timeout: 5000 });
-        check('de: the list is translated',
-            (await lp.locator('#cafe-recipe-dialog-title').textContent()) === 'Rezept für Platz 4 auswählen'
-            && (await lp.locator('#cafe-recipe-dialog-empty').textContent()) === 'Keine Rezepte ohne Platz'
-            && (await lp.locator('#cafe-recipe-dialog .modal-action button').textContent()).trim() === 'Abbrechen',
-            await lp.locator('#cafe-recipe-dialog-title').textContent());
-        await shot(lp, 'dialog-choose-de');
-        await lp.locator('#cafe-recipe-dialog .modal-action button').click();
-        await lp.waitForTimeout(600);
-
-        //     No recipe loaded, and the "DYE2 is needed" screen, in German.
-        await unloadRecipe();
-        await lp.reload();
-        await waitForPage(lp);
-        await lp.waitForTimeout(3000);
-        check('de: with no recipe the title and the line under it are translated',
-            (await lp.locator('#cafe-title').textContent()) === 'Kein Rezept ausgewählt' && (await lp.locator('#cafe-subtitle').textContent()) === 'Tippe auf ein Rezept, um es zu laden',
-            await lp.locator('#cafe-title').textContent());
-        check('de: with no recipe no label overflows its place', (await overflowing(lp)).length === 0, (await overflowing(lp)).join(' | '));
-        await shot(lp, 'page-no-recipe-de-light');
-        await setSetting(false);
-        await lp.reload();
-        await waitForGate(lp);
-        await lp.locator('#cafe-gate-title').filter({ hasText: 'benötigt' }).waitFor({ timeout: 20_000 }).catch(() => {});
-        check('de: the "DYE2 is needed" screen is translated',
-            (await lp.locator('#cafe-gate-title').textContent()) === 'Streamline Cafe benötigt DYE2'
-            && (await gateLine(lp).textContent()) === 'DYE2 ist in den Einstellungen ausgeschaltet'
-            && (await lp.locator('#cafe-gate-turn-on').textContent()) === 'DYE2 einschalten'
-            && (await lp.locator('#cafe-gate-reload').textContent()) === 'Neu laden',
-            `${await lp.locator('#cafe-gate-title').textContent()} / ${await gateLine(lp).textContent()}`);
-        await shot(lp, 'gate-setting-off-de');
-        //     Text drawn after the page loaded follows a change of language too.
-        await setLanguage(lp, 'fr');
-        await lp.waitForTimeout(1500);
-        check('changing the language changes the screen\'s text where it stands',
-            (await lp.locator('#cafe-gate-title').textContent()) === 'Streamline Cafe a besoin de DYE2' && (await gateLine(lp).textContent()) === 'DYE2 est désactivé dans les paramètres',
-            await gateLine(lp).textContent());
-        await setLanguage(lp, 'en');
-        await lp.waitForTimeout(2500);
-        check('back in English', (await lp.locator('#cafe-gate-title').textContent()) === 'Streamline Cafe needs DYE2');
-        await lang.close();
-        await setSetting(true);
-    }
+    await unloadRecipe();
 
     // 13. Official Streamline on the same Decaid, and back: the settings the two
     //     skins share are kept, and Streamline's strip mode is as it was left.
@@ -2901,7 +2242,6 @@ try {
 
     await grinderFixtures();
 
-    await unloadByTap();
     await preheatLive();
     await profileDialog();
     await liveLabels();

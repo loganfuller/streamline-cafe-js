@@ -9,6 +9,10 @@
 //
 // Each rule names the source it was read from, in the file that keeps it, and
 // is backed by a recording in recordings/ that `npm test` replays against it.
+//
+// Kept here: Decaid's plugin list, and a plugin that is not loaded answering
+// 404 on its routes (Decaid v0.9.2, `plugins_handler.dart`); DYE2 disabled and
+// enabled through it. Recorded: recordings/dye2-plugin.json.
 
 import { copy, updateWorkflow } from './workflow.js';
 import { createStore } from './store.js';
@@ -148,7 +152,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         if (path.startsWith(`${API}/store/`)) return store.answer(method, path.slice(`${API}/store/`.length), query, body);
         if (path === `${API}/plugins` && method === 'GET') return { status: 200, body: copy(plugins) };
         if (path.startsWith(`${API}/plugins/${DYE2_ID}/`)) {
-            if (!dye2Loaded()) return { status: 404, body: { error: `Plugin ${DYE2_ID} is not loaded` } };
+            if (!dye2Loaded()) return { status: 404, body: { error: `plugin with ${DYE2_ID} not loaded` } };
             return dye2.answer(method, path.slice(`${API}/plugins/${DYE2_ID}/`.length), body);
         }
         if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
@@ -236,6 +240,24 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         dye2RecordReads: () => dye2.recordReads(),
         /** DYE2 starts again, as Decaid's plugin disable and enable leave it (dye2.js). */
         restartDye2() {
+            dye2.restart();
+        },
+        /**
+         * DYE2 disabled in Decaid's plugins: listed as not loaded and not
+         * loaded at start (`autoLoad`), and its routes answered 404 "plugin
+         * with dye2.reaplugin not loaded" (recordings/dye2-plugin.json, which
+         * replays the status). Its socket is refused too, which no recording
+         * covers.
+         */
+        disableDye2() {
+            const plugin = plugins.find(p => p.id === DYE2_ID);
+            if (plugin) Object.assign(plugin, { loaded: false, autoLoad: false });
+        },
+        /** DYE2 enabled again: listed as loaded and loaded at start, and started afresh as `restartDye2()` leaves it. */
+        enableDye2() {
+            const plugin = plugins.find(p => p.id === DYE2_ID);
+            if (!plugin) throw new Error('DYE2 is not installed in the fake');
+            Object.assign(plugin, { loaded: true, autoLoad: true });
             dye2.restart();
         },
         /** A recorded answer of the boot, changed: `patch(body)` answers the new body. */

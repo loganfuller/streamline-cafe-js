@@ -13,8 +13,10 @@
 //
 // A step `{ event: 'restart-dye2' }` is no request: the recorder disables DYE2
 // and enables it again through Decaid's plugin routes and waits for it to load,
-// and the replay calls the model's `restartDye2()`. Its recording has no answer,
-// and what DYE2 pushes as it loads is neither kept nor compared.
+// and the replay calls the model's `restartDye2()`. `{ event: 'disable-dye2' }`
+// and `{ event: 'enable-dye2' }` are each half of that, and the replay calls
+// `disableDye2()` and `enableDye2()`. An event's recording has no answer, and
+// what DYE2 pushes as it loads is neither kept nor compared.
 //
 // Each scenario keeps the Workflow it started from, which the replay starts
 // from too, and puts back what else it relies on (no recipe loaded) with its
@@ -200,6 +202,21 @@ export const SCENARIOS = [
         ],
     },
     {
+        name: 'dye2-plugin',
+        rule: 'fake-decaid/index.js',
+        about: 'DYE2 disabled in Decaid: listed as not loaded, its routes answered 404; enabled again: listed as loaded, its routes answered as before.',
+        steps: [
+            { method: 'GET', path: '/plugins' },
+            { event: 'disable-dye2' },
+            { method: 'GET', path: '/plugins' },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { method: 'GET', path: `${DYE2}/skin` },
+            { event: 'enable-dye2' },
+            { method: 'GET', path: '/plugins' },
+            { method: 'GET', path: `${DYE2}/selection` },
+        ],
+    },
+    {
         name: 'machine-calibration',
         rule: 'fake-decaid/machine.js',
         about: 'The simulated machine\'s calibration, as Streamline\'s settings page reads it: each target\'s current and factory values; an unknown target or source refused.',
@@ -269,17 +286,19 @@ export async function recordScenarios({ decaid, raw, ws, write, sleep, opened, s
         };
         const steps = [];
         for (const step of scenario.steps) {
-            if (step.event === 'restart-dye2') {
-                await decaid('POST', '/plugins/dye2.reaplugin/disable', undefined, { manage: true });
-                await decaid('POST', '/plugins/dye2.reaplugin/enable', undefined, { manage: true });
+            if (step.event) {
+                if (!['restart-dye2', 'disable-dye2', 'enable-dye2'].includes(step.event)) throw new Error(`no such event: ${step.event}`);
+                const loadedAfter = step.event !== 'disable-dye2';
+                if (step.event !== 'enable-dye2') await decaid('POST', '/plugins/dye2.reaplugin/disable', undefined, { manage: true });
+                if (loadedAfter) await decaid('POST', '/plugins/dye2.reaplugin/enable', undefined, { manage: true });
                 for (let waited = 0; ; waited += 500) {
                     const plugins = await decaid('GET', '/plugins');
-                    if (plugins.find(p => p.id === 'dye2.reaplugin')?.loaded) break;
-                    if (waited > 60_000) throw new Error('DYE2 did not load again within 60 s');
+                    if (!!plugins.find(p => p.id === 'dye2.reaplugin')?.loaded === loadedAfter) break;
+                    if (waited > 60_000) throw new Error(`DYE2 did not ${loadedAfter ? 'load again' : 'unload'} within 60 s`);
                     await sleep(500);
                 }
                 // DYE2 reads the Workflow as it loads, and may write it.
-                await sleep(3000);
+                if (loadedAfter) await sleep(3000);
                 steps.push({ event: step.event });
                 continue;
             }

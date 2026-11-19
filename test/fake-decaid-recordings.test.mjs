@@ -47,7 +47,7 @@ test('every recording was made with the pinned versions', () => {
 
 test('every rule file has a recorded scenario', () => {
     const rules = new Set(scenarios.map(({ recording }) => recording.rule));
-    for (const rule of ['fake-decaid/workflow.js', 'fake-decaid/store.js', 'fake-decaid/dye2.js', 'fake-decaid/shots.js', 'fake-decaid/library.js']) {
+    for (const rule of ['fake-decaid/index.js', 'fake-decaid/workflow.js', 'fake-decaid/store.js', 'fake-decaid/dye2.js', 'fake-decaid/shots.js', 'fake-decaid/library.js']) {
         assert.ok(rules.has(rule), `no recorded scenario for ${rule}`);
     }
 });
@@ -63,8 +63,10 @@ for (const { name, recording } of scenarios) {
         const made = new Map();
         recording.steps.forEach((step, index) => {
             pushes.length = 0;
-            if (step.event === 'restart-dye2') {
-                fake.restartDye2();
+            if (step.event) {
+                const events = { 'restart-dye2': () => fake.restartDye2(), 'disable-dye2': () => fake.disableDye2(), 'enable-dye2': () => fake.enableDye2() };
+                assert.ok(events[step.event], `step ${index + 1}: no such event in the model: ${step.event}`);
+                events[step.event]();
                 fake.flush();
                 return;
             }
