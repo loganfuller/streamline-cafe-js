@@ -283,9 +283,10 @@ function creditParts(shot) {
 // two times are written again as the local day turns: a page left at rest
 // overnight would read "Today" for yesterday's Shot. Only the times: the rest
 // of `paint()` writes the live cards, which a timer never does. Chromium's
-// timers on Android need not count the time a tablet sleeps, so the timer is
-// set again when the page comes back into view; that is the `inView` cue too,
-// whose read of the Shots ends in a draw that writes the legend.
+// timers on Android need not count the time a tablet sleeps, so a page coming
+// back into view writes the times at once and sets the timer again: the
+// `inView` cue's read of the Shots may fail, as on a tablet that wakes
+// offline, and with no recipe loaded paints nothing then.
 function watchDay() {
     clearTimeout(dayTimer);
     dayTimer = setTimeout(() => {
@@ -630,6 +631,7 @@ export function initGraph() {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         inView();
+        paintDays();
         watchDay();
     });
     watchDay();
