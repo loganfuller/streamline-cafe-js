@@ -305,6 +305,33 @@ test.describe('the Location\'s Shots with Decent Sync serving', { tag: '@sync-sh
         await expect(page.locator('#cafe-back')).toBeVisible();
     });
 
+    test('a Shot of this tablet\'s pulled with no recipe loaded lists as "No recipe", as the plugin gives it none', async ({ cafe, fake, start }) => {
+        // A copy of A with no recipe in its Workflow, as a Shot pulled after an
+        // unload, counted at the Location two hours before the test starts.
+        const a = fake.shots.get(A);
+        const at = start - 2 * 60 * 60_000;
+        const id = '00000000-0000-4000-8000-0000000e0001';
+        const { dye, ...extras } = a.workflow.context.extras;
+        fake.shots.add({
+            ...a,
+            id,
+            timestamp: localTime(at, fake.timeZone),
+            createdAt: new Date(at + 30_000).toISOString(),
+            updatedAt: new Date(at + 30_000).toISOString(),
+            workflow: { ...a.workflow, context: { ...a.workflow.context, extras } },
+        });
+        fake.decentSync.atLocation(id);
+        const listed = fake.request({ method: 'GET', url: `${PLUGIN}/shots?limit=50` }).body.shots.find(item => item.id === id);
+        expect(listed.recipe, 'the plugin names no Recipe for it').toBeNull();
+
+        await openServed(cafe, fake);
+        await openList(cafe);
+        const shown = (await listRows(cafe.page)).find(item => item.id === id);
+        expect(shown, 'listed').toBeTruthy();
+        expect(shown.name).toBe('No recipe');
+        expect(shown.mine, 'this tablet\'s').toBe(true);
+    });
+
     test('past 50 of the Location\'s Shots, the next page is read with the plugin\'s cursor, none twice', async ({ cafe, fake, start }) => {
         // Fifty more of this tablet's Shots at the Location, copies of A a
         // minute apart from three hours before the test starts, older than A

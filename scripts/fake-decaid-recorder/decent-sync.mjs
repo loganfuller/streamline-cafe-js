@@ -113,6 +113,8 @@ export async function standUpSync({ first, port = 18159, secondPort = 18158 }) {
 
         return {
             server, url, location, machine, machineTwo,
+            /** The server's container, and its address as the Decaids reach it. */
+            serverName, forTablet,
             first: firstDecaid,
             second: { ...made.second, decaid: secondDecaid },
             /** The server stopped and started, as an outage: its container, so the plugin loses its connection. */
