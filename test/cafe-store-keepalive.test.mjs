@@ -1,8 +1,9 @@
 // Which of Decaid's store writes go with `keepalive` (fork issue #74). The
 // browser refuses a keepalive request once its body, with the keepalive bodies
 // still in flight, passes 64 KiB, so DYE2's whole-list writes go without it;
-// every other store write keeps it, for settingsSync's write fired just before
-// the page may navigate away (docs/cafe/UPSTREAM_EDITS.md, api.js).
+// setKVValue and deleteKVValue keep it by default, for settingsSync's write
+// fired just before the page may navigate away (docs/cafe/UPSTREAM_EDITS.md,
+// api.js). Streamline's setValueInStore never sent it.
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -44,7 +45,7 @@ test('DYE2\'s lists are written without keepalive, whatever their size', async (
     assert.equal(calls[1].keepalive, false);
 });
 
-test('every other store write keeps keepalive, as Streamline sends it', async () => {
+test('setKVValue and deleteKVValue keep keepalive by default, as Streamline sends it', async () => {
     const { api, calls } = apiWith();
     await api.setKVValue('streamline', 'some.setting', 1);
     await api.setKVValue('streamlineCafe', 'view', { mode: 'reference' });
