@@ -129,6 +129,23 @@ test('DYE2: a profile changed under a recipe clears its id; POST selection write
     assert.equal(cold.workflow().context.extras.dye.recipeId, null, 'the write DYE2 makes as it loads');
 });
 
+test('plugins: DYE2 disabled is listed not loaded, its routes 404, its socket refused, and it hears no Workflow write; enabled, it answers again', () => {
+    const fake = fresh();
+    const dye2 = () => get(fake, '/api/v1/plugins').body.find(plugin => plugin.id === 'dye2.reaplugin');
+    assert.deepEqual([dye2().loaded, dye2().autoLoad], [true, true]);
+    fake.disableDye2();
+    assert.deepEqual([dye2().loaded, dye2().autoLoad], [false, false]);
+    assert.equal(get(fake, '/api/v1/plugins/dye2.reaplugin/selection').status, 404);
+    assert.equal(fake.connect('/ws/v1/plugins/dye2.reaplugin/changed', () => {}), null);
+    const record = houseRecord(fake);
+    send(fake, 'PUT', '/api/v1/workflow', applied(record));
+    fake.enableDye2();
+    assert.deepEqual([dye2().loaded, dye2().autoLoad], [true, true]);
+    const selection = get(fake, '/api/v1/plugins/dye2.reaplugin/selection');
+    assert.equal(selection.status, 200);
+    assert.equal(selection.body.id, record.id, 'enabled again, DYE2 reads the Workflow written while it was off');
+});
+
 test('Shots: newest first without measurements, paged, filtered; by ids, whole; the latest; one, or 404', () => {
     const shot = (id, timestamp, grinderId) => ({ id, timestamp, createdAt: 'c', updatedAt: 'u', measurements: [{ m: 1 }], workflow: { context: { grinderId }, profile: { title: 'P' } }, annotations: {} });
     const shots = createShots([shot('a', '2026-11-18T10:00:00.000', 'g1'), shot('c', '2026-11-18T12:00:00.000', 'g2'), shot('b', '2026-11-18T11:00:00.000', 'g1')], () => 'now');
