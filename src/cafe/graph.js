@@ -9,8 +9,8 @@
 // when the Shots are read again, is decided in `graph-state.js`, which touches
 // no browser global: this module tells it what happened, does what it answers
 // (the reads through the Shot seam, the timers, the drawing) and draws through
-// the two hooks the fork adds to chart.js.
-import { setChartOverlay, setShotChooser, plotHistoricalShot, clearChart } from '../modules/chart.js';
+// the hooks the fork adds to chart.js.
+import { setChartOverlay, setShotChooser, setLiveLineLabels, plotHistoricalShot, clearChart } from '../modules/chart.js';
 import { getCurrentShot } from '../modules/shotData.js';
 import { getScaleReading, currentMachineState } from '../modules/api.js';
 import { getTempUnit } from '../modules/units.js';
@@ -23,7 +23,7 @@ import { graphModel, shotCredit, whenText, viewFrom } from './shot-model.js';
 import { graphStep, initialGraphState, shownRemarks, inGraph, shotInGraphId } from './graph-state.js';
 import { starFills, ratingForTap, ratingOf, ratingText, noteToSave, editedRemarks } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
-import { referenceOverlay, referenceColor, liveAxis } from './reference-overlay.js';
+import { referenceOverlay, referenceColor, liveAxis, overlayAxis } from './reference-overlay.js';
 import { recipeName } from './strip-model.js';
 import { cafeText, cafeDateLocale, setText } from './text.js';
 import { shotNumbers, restCards, liveCards, liveFrame } from './comparison.js';
@@ -169,8 +169,9 @@ function overlay(traces, layout, mode, chart) {
     const { curves, stages } = overlayFor;
     // Through a shot's Preheat the chart is drawn as at rest, empty, and the
     // time axis is the live one already, starting at zero in both views, so the
-    // profile's start moves nothing.
-    const axis = state.live ? 'live' : mode;
+    // profile's start moves nothing. On the main graph that live axis is the
+    // one the shot will have once it is over (`overlayAxis`).
+    const axis = overlayAxis(state.live, mode, chart);
     let drawn = view === 'reference' ? referenceOverlay(traces, layout, axis, { curves, dark: isDark() }) : { traces, layout };
     if (state.live) drawn = { traces: drawn.traces, layout: liveAxis(traces, drawn.layout) };
     if (chart !== 'main') return drawn;
@@ -562,6 +563,8 @@ export function onShotChanges(listen) {
 export function initGraph() {
     state = initialGraphState();
     setShotChooser(chooseShot);
+    // The main graph's lines carry their names through a shot, as after it.
+    setLiveLineLabels(true);
     applyOverlay();
     paint();
     // A page opened during a shot, in its Preheat as much as later, is live: the

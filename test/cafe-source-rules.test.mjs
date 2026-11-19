@@ -160,6 +160,10 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
     assert.match(chart, /const drawn = traces === chartTraces \? withCafeOverlay\(traces, layout, mode, 'main'\) : \{ traces, layout \};/, 'the overlay is on the chart\'s own lines only');
     assert.match(chart, /const \{ traces, layout \} = withCafeOverlay\(own, expandedLayout\(currentTheme, own, expandedXRange\(mode, own\)\), mode, 'expanded'\);/, 'and on the full-screen chart');
     assert.match(chart, /yref: 'paper',\s*name: stepName,/, 'a stage line keeps its step\'s name');
+    assert.match(chart, /export function setLiveLineLabels\(on\) \{/);
+    assert.match(chart, /layout\.annotations = isLiveShot && !cafeLiveLabels \? \[\] : getAnnotations\(\);/, 'live labels keep the end labels through a shot');
+    assert.match(chart, /range: cafeLiveLabels \? cafeLiveXRange\(pendingTime\) : liveXRange\(pendingTime\),/, 'and leave them room on the live axis');
+    assert.match(chart, /\.\.\.\(cafeLiveLabels \? \{ series: trace\.name \} : \{\}\),/, 'each label names its line');
     const renderer = readFileSync(new URL('../src/modules/echarts-renderer.js', import.meta.url), 'utf8');
     assert.match(renderer, /function cafeShapeLabel\(shape\) \{/);
     assert.match(renderer, /\.\.\.cafeShapeLabel\(shape\)/, 'and the renderer writes a stage line\'s name');
