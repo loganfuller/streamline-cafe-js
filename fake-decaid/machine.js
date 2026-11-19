@@ -56,7 +56,7 @@ const CALIBRATION = { flow: 1.0, pressure: 9.0, temperature: 93.0 };
 
 /** `GET /machine/calibration/<target>?source=`, as the simulated machine answers it. */
 export function calibration(target, source = 'current') {
-    if (!(target in CALIBRATION)) return { status: 400, body: { error: `Unknown calibration target: ${target}` } };
+    if (!Object.hasOwn(CALIBRATION, target)) return { status: 400, body: { error: `Unknown calibration target: ${target}` } };
     if (source !== 'current' && source !== 'factory') return { status: 400, body: { error: `Unknown calibration source: ${source}` } };
     return { status: 200, body: { target, source, de1ReportedValue: target === 'temperature' ? 0 : 1, measuredValue: CALIBRATION[target] } };
 }

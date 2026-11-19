@@ -7,7 +7,9 @@
 // `_getBatches`, `_getBatch`) and lib/src/services/database/daos/bean_dao.dart
 // (`getAllBeans`, `getBatchesForBean`: the archived left out unless asked, the
 // most recently changed first).
-// Recorded: recordings/grinders.json, recordings/beans.json.
+// Recorded: recordings/grinders.json, recordings/beans.json. The sample data
+// holds no archived bean, so the beans' archive rule is read from bean_dao.dart
+// and held by the unit test alone; the batches' and grinders' are recorded.
 //
 // - `GET /grinders`, `GET /beans`: a bare list; the archived only with
 //   `includeArchived=true`, the most recently changed first.

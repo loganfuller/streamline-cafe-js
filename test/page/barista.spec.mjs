@@ -208,6 +208,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await page.locator('#cafe-shots-btn').click();
                 await page.locator(`[data-shot-id="${older.id}"]`).click();
                 await expect(page.locator('#cafe-back')).toBeVisible();
+                await expect(page.locator('#cafe-barista'), 'the barista button still shown').toBeVisible();
                 await expect(page.locator('#cafe-shots-dialog:not([open])')).toBeAttached();
                 await cafe.settle();
                 const viewing = await page.evaluate(() => {
@@ -272,11 +273,14 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await keyboard(page, { keyboardUp: true, visibleHeight: above });
                 const fitted = () => page.evaluate(() => {
                     const box = document.querySelector('#cafe-pick-dialog .cafe-pick-box').getBoundingClientRect();
+                    const field = document.getElementById('cafe-pick-entry-text').getBoundingClientRect();
                     const use = document.getElementById('cafe-pick-entry-use').getBoundingClientRect();
-                    return { top: Math.round(box.top), bottom: Math.round(box.bottom), use: Math.round(use.bottom) };
+                    // Each laid out: a box hidden measures all zeros, which would fit.
+                    const shown = [box, field, use].every(r => r.width > 0 && r.height > 0);
+                    return { shown, top: Math.round(box.top), bottom: Math.round(box.bottom), field: Math.round(field.bottom), use: Math.round(use.bottom) };
                 });
-                await expect.poll(async () => { const box = await fitted(); return box.top >= 0 && box.bottom <= above && box.use <= above; },
-                    `the box and "Use this name" inside the ${above} px above the keyboard`).toBe(true);
+                await expect.poll(async () => { const box = await fitted(); return box.shown && box.top >= 0 && box.bottom <= above && box.field <= above && box.use <= above; },
+                    `the box, the field and "Use this name" shown inside the ${above} px above the keyboard`).toBe(true);
                 await cafe.screenshot(`barista-name-field-keyboard-${size}-light`);
                 await keyboard(page, { keyboardUp: false, visibleHeight: viewport.height });
 

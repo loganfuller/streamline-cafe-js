@@ -60,7 +60,12 @@ const transform = page => page.evaluate(() => document.getElementById('scaled-co
 const forget = page => page.evaluate(() => { window.__cafeTransforms.length = 0; });
 const moved = page => page.evaluate(() => window.__cafeTransforms.slice());
 const focused = page => page.evaluate(() => document.activeElement?.id || document.activeElement?.tagName);
-const bottomOf = locator => locator.evaluate(element => Math.round(element.getBoundingClientRect().bottom));
+// The element's bottom on the screen, or null when it has no size: a hidden
+// one measures all zeros, which would pass for one above the keyboard.
+const bottomOf = locator => locator.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 ? Math.round(rect.bottom) : null;
+});
 
 /** A keyboard that leaves the screen `short` px short of the window, as its resize reaches the page. */
 async function keyboard(cafe, short) {
@@ -137,6 +142,7 @@ test.describe('a short touchscreen and the soft keyboard', { tag: '@touch' }, ()
                 expect(typing, 'the note\'s dialog is open').not.toBeNull();
                 expect(await focused(page)).toBe('cafe-note-text');
                 await cafe.screenshot(`touch-${short}px-note-keyboard`);
+                expect(typing.box.bottom, 'the dialog laid out').toBeGreaterThan(typing.box.top);
                 expect(typing.box.top, 'the dialog\'s top on the screen').toBeGreaterThanOrEqual(0);
                 expect(typing.box.bottom, `the dialog above the keyboard, in ${visible}`).toBeLessThanOrEqual(visible + 1);
 

@@ -246,6 +246,7 @@ test('machine: its calibration as the simulated machine reports it; an unknown t
     assert.deepEqual(get(fake, '/api/v1/machine/calibration/pressure').body, { target: 'pressure', source: 'current', de1ReportedValue: 1, measuredValue: 9 });
     assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=factory').body.measuredValue, 1);
     assert.equal(get(fake, '/api/v1/machine/calibration/weight').status, 400);
+    assert.equal(get(fake, '/api/v1/machine/calibration/constructor').status, 400, 'an object\'s own keys only');
     assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=other').status, 400);
     assert.equal(fake.request({ method: 'PUT', url: '/api/v1/machine/calibration/flow', body: {} }), null, 'a write has no answer');
 });
