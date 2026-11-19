@@ -10,8 +10,8 @@ Everything the run writes is made up. The sample beans, grinders and recipes are
 
 ## What it needs
 
-- Docker, for a throwaway Decaid. The run removes and reinstalls DYE2, switches Streamline's "DYE2 on" setting, writes beans, batches, grinders, DYE2's baskets and recipes, makes recipes and moves them between slots from the page, chooses grinders, batches, baskets and profiles from the page, hides a profile and shows it again, chooses reference Shots and clears the choices an earlier run left, rates Shots and writes notes on them, changes the language, sets the Workflow's barista from the page and through Decaid's API, puts the simulated machine to sleep and wakes it, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
-- Network access to GitHub, where Decaid fetches DYE2's latest release from.
+- Docker, for a throwaway Decaid. The run installs DYE2 when it is missing or older than v0.1.40 and turns it on when it is not loaded, switches Streamline's "DYE2 on" setting, writes beans, batches, grinders, DYE2's baskets and recipes, makes recipes and moves them between slots from the page, chooses grinders, batches, baskets and profiles from the page, hides a profile and shows it again, chooses reference Shots and clears the choices an earlier run left, rates Shots and writes notes on them, changes the language, sets the Workflow's barista from the page and through Decaid's API, puts the simulated machine to sleep and wakes it, and pulls simulated shots. Never point it at a tablet or at a Decaid someone uses.
+- Network access to GitHub, where Decaid fetches DYE2's latest release from, when the Decaid has no DYE2 of v0.1.40 or later.
 - Node, and this repository's dependencies (`npm ci`). Once per machine: `npx playwright install chromium`.
 - For the second run, Docker images of the Decent Sync server and PostgreSQL as well, and a second throwaway Decaid.
 
@@ -53,7 +53,7 @@ Decaid publishes a Linux build with each release. It needs a display server and 
      'xvfb-run -a dbus-run-session -- /opt/decaid/bundle/decaid --serial --bypass-onboarding --no-account > /tmp/decaid.log 2>&1'
    ```
 
-   Give it half a minute: `curl http://127.0.0.1:8080/api/v1/plugins` answers once it is up. A fresh Decaid v0.9.2 bundles DYE2 v0.1.37, which is older than the skin needs, so the first run starts on the "DYE2 is older than v0.1.40" screen.
+   Give it half a minute: `curl http://127.0.0.1:8080/api/v1/plugins` answers once it is up. A fresh Decaid v0.9.2 bundles DYE2 v0.1.37, which is older than the skin needs, so the first run installs DYE2's latest release from GitHub at its start.
 
 ## The skin
 
@@ -113,7 +113,7 @@ In order, it:
 
 28. the line names during a shot (issue #66). It finds the language whose labels are widest, as the chart measures them, then pulls a six-second shot with a recipe loaded and makes it the reference. Then it watches ten-second shots with that recipe, each with its Preheat held two seconds through `machineFeed()`: in Reference and in Targets at 1920 by 1200 and at 1340 by 800 in English, in Targets at both sizes in the widest language, and an eight-second shot with no recipe loaded in Targets at 1920 by 1200. For each it checks that nothing is labelled during the Preheat; that from the profile's start Pressure, Flow, °C and Weight are named, in the page's language and each line's colour, and no target or reference line; that each label sits on its line's newest point at every look and moves with the shot; that no label's text reaches past the chart's right edge; and that the frames were appended with no full draw. When the shot ends it checks the labels have not moved by more than one frame's travel. Once Decaid has saved the Shot it checks the four labels are on the Shot drawn and inside the chart, and says how far each moved: the saved Shot is Decaid's record, which can end a sample away from what the page drew live. `--only=labels` runs it alone. Screenshots `live-labels-*-live.png`. It puts the language back to English, and the choices of reference and the graph's view, unloads the recipe, and deletes the shots it pulled.
 
-The run seeds DYE2's records afresh at its start and puts them back after the steps that change them, so it can be repeated on the same Decaid. It leaves behind what the seed's fixtures made, which a repeat finds and uses: Sample Blend's two further batches and DYE2's three sample baskets.
+The run seeds DYE2's records at its start when the sample recipes are not there, keeps them when they are, and puts them back after the steps that change them, so it can be repeated on the same Decaid. It leaves behind what the seed's fixtures made, which a repeat finds and uses: Sample Blend's two further batches and DYE2's three sample baskets.
 
 Thirteen things are not Decaid's own answers:
 

@@ -7,9 +7,12 @@
 // with its own numbers.
 //
 // The page's steppers write a moment after their last tap (Streamline's
-// `API_DEBOUNCE_MS`, src/modules/workflow-watch.js), and a load first waits for
-// those writes (`settleDialIn`, src/cafe/page.js): both run on the page's
-// clock, which the tests move.
+// `API_DEBOUNCE_MS`, src/modules/workflow-watch.js), on the page's clock, which
+// the tests move. The page's clock also runs on by itself, so by the time the
+// tapped recipe's load writes, those writes have usually been made already:
+// the test checks the order the writes reach the machine in, not that a load
+// waits for a write still on the wire (`settleDialIn`, src/cafe/page.js),
+// which no page test holds a request open to check.
 
 import { test, expect } from './support/test.mjs';
 import { card, load, isWrite, writes } from './support/page-reads.mjs';

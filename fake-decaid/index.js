@@ -244,8 +244,10 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         },
         /**
          * DYE2 disabled in Decaid's plugins: listed as not loaded and not
-         * loaded at start (`autoLoad`), its routes
-         * answered 404 "plugin with … not loaded" and its socket refused (recordings/dye2-plugin.json).
+         * loaded at start (`autoLoad`), and its routes answered 404 "Plugin
+         * dye2.reaplugin is not loaded" (recordings/dye2-plugin.json, which
+         * replays the status). Its socket is refused too, which no recording
+         * covers.
          */
         disableDye2() {
             const plugin = plugins.find(p => p.id === DYE2_ID);

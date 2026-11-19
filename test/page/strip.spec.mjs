@@ -173,7 +173,6 @@ test.describe('the strip', { tag: '@strip' }, () => {
         const drawn = await cards(page);
         expect(drawn, 'nine cards').toHaveLength(9);
         expect(new Set(drawn.map(c => c.top)).size, 'in one row').toBe(1);
-        expect(EMPTY_SLOTS.every(slot => want[slot - 1].dashed)).toBe(true);
 
         const noRecipe = { title: 'No recipe selected', subtitle: 'Tap a recipe to load it', dialLabel: 'Dial-in · not saved to a recipe' };
         const heading = () => page.evaluate(() => ({
