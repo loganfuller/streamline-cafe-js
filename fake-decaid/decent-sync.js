@@ -55,7 +55,9 @@
 // (`stopServer`, `startServer`), sharing off and on (`setSharing`), any other
 // state (`setState`), the plugin never connected yet (`firstStart`), a Reference
 // Shot chosen or cleared on the server, a Recipe renamed there, a Shot rated
-// or noted there.
+// or noted there; and, as faults rather than rules, a frame of the test's own
+// on `changes` (`push`) and a Shot of the tablet's counted at the Location
+// without a pour (`atLocation`).
 //
 // Not kept: the server's own matching of a Shot's Profile (title, steps,
 // temperatures and weight; the model matches the title alone, which tells the
@@ -477,6 +479,23 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 if (shotId !== null && !wholeOf(shotId)) throw new Error(`the server holds no Shot ${shotId}`);
                 recipe.referenceShotId = shotId;
                 refreshCopies();
+            },
+            /**
+             * A frame on `changes` that no event of the model sends: a push the
+             * plugin repeats, or a `what` a later release may add. A fault the
+             * test makes, as `fake.refuse` is, not a rule.
+             */
+            push(frame) {
+                announce(frame);
+            },
+            /**
+             * The tablet's own Shot, already in Decaid, counted at the
+             * Location, as one pulled while the Machine was there: for a test
+             * that needs more of the Location's Shots than a pour each makes cheap.
+             */
+            atLocation(shotId) {
+                if (!decaid.shots.get(shotId)) throw new Error(`Decaid holds no Shot ${shotId}`);
+                if (!own.has(shotId)) own.set(shotId, { unfinished: false });
             },
             /** A Recipe renamed on the server, by its DYE2 record's id. */
             renameRecipe(recordId, name) {
