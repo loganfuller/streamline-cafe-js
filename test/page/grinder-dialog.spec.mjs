@@ -69,6 +69,8 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         // The value still opens the numpad.
         await page.locator('#grind-value').click();
         await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
+        // Past the grinders' read a dialog would wait for.
+        await cafe.settle();
         await expect(pickDialog(page)).toHaveCount(0);
         await page.locator('#numpad-cancel').click();
         await expect(page.locator('#numpad-modal-overlay')).toBeHidden();

@@ -157,7 +157,10 @@ export const test = base.extend({
             });
         }, NO_MOTION);
         await page.clock.install({ time: START });
-        await use(new Cafe(page, fake, routes, errors));
+        const cafe = new Cafe(page, fake, routes, errors);
+        await use(cafe);
+        // What the test's last step asked, answered, before reading what failed.
+        if (!page.isClosed()) await cafe.settle();
         expect(routes.unanswered, 'requests and sockets the fake Decaid has no answer for').toEqual([]);
         expect(errors, 'errors on the page').toEqual([]);
     },

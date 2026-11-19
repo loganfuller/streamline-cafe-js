@@ -101,7 +101,9 @@ test(`pour: the replayed pour stores the Shot Decaid ${pour.recordedWith.decaid}
     const recorded = pour.shot;
     assert.equal(stored.timestamp, recorded.timestamp, 'its time is the shot\'s start');
     assert.deepEqual(normal(stored.workflow), normal(recorded.workflow), 'the Workflow as it was at the end of the pour');
-    assert.deepEqual(stored.annotations, recorded.annotations, 'the dose is the Workflow\'s, the yield the scale\'s');
+    // The yield, the stop reason and the measurements are replayed from the
+    // recorded Shot, so only the dose (the Workflow's) is the model's own here.
+    assert.deepEqual(stored.annotations, recorded.annotations, 'the dose is the Workflow\'s; the yield is the recording\'s');
     assert.equal(stored.stopReason, recorded.stopReason);
     assert.deepEqual(stored.measurements, recorded.measurements);
     const row = fake.request({ method: 'GET', url: '/api/v1/shots?limit=1' }).body.items[0];

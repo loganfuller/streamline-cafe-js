@@ -88,7 +88,9 @@ export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
     // leaves an id to remove.
     const id = docker('create', '--name', name, '--label', `${LABEL}=recorder`, '-e', `TZ=${timezone}`,
         '-p', `127.0.0.1:${port}:8080`, image, 'sleep', 'infinity');
-    const stop = () => { try { docker('rm', '-f', id); } catch { /* gone */ } };
+    const stop = () => {
+        try { docker('rm', '-f', id); } catch (error) { console.error(`could not remove container ${id.slice(0, 12)}: ${error.message.split('\n')[0]}`); }
+    };
     const exec = command => docker('exec', id, 'bash', '-c', command);
     const token = randomBytes(32).toString('hex');
     const api = `http://127.0.0.1:${port}/api/v1`;

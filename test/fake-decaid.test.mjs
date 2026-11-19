@@ -120,6 +120,13 @@ test('DYE2: a profile changed under a recipe clears its id; POST selection write
     send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/selection', {});
     assert.equal(fake.workflow().context.extras.dye.recipeId, null);
     assert.deepEqual(get(fake, '/api/v1/plugins/dye2.reaplugin/skin').body, { version: 1, surfaces: [], live: { endpoint: 'changed' } });
+
+    // As DYE2 loads, too: a Workflow it finds with the recipe's id on another profile loses the id.
+    const cold = fresh();
+    const whole = cold.workflow();
+    const extras = { ...whole.context.extras, dye: { v: 1, recipeId: record.id } };
+    cold.given({ workflow: { ...whole, context: { ...whole.context, extras }, profile: other.workflow.profile } });
+    assert.equal(cold.workflow().context.extras.dye.recipeId, null, 'the write DYE2 makes as it loads');
 });
 
 test('Shots: newest first without measurements, paged, filtered; by ids, whole; the latest; one, or 404', () => {

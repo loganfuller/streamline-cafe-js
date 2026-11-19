@@ -7,7 +7,9 @@
 // lib/src/controllers/de1_state_manager.dart (`_persistShotIfNeeded`: the Shot
 // is stored once the shot is finished, with the Workflow as it is then and the
 // shot's start as its time) and lib/src/models/data/shot_annotations.dart (the
-// dose is the Workflow's target, the yield the scale's last weight).
+// dose is the Workflow's target, which the model sets; the yield, the scale's
+// last weight there, is the recorded Shot's, as are its measurements and stop
+// reason).
 // Recorded: recordings/pour.json, one pour of the simulated machine on the
 // pinned Decaid with its frames through the store, and the Shot it stored.
 //

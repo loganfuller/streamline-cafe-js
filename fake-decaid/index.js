@@ -118,8 +118,13 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         },
         announce: payload => emit(`/ws/v1/plugins/${DYE2_ID}/changed`, payload),
     });
-    // DYE2 as it loads: it reads the Workflow and mirrors the selection, pushing to no one.
-    if (dye2Loaded()) dye2.workflowChanged(copy(workflow), true);
+    // DYE2 as it loads: it reads the Workflow and mirrors the selection, pushing
+    // to no one, and makes the write of its own it answers, as it does live.
+    const dye2Loads = () => {
+        const own = dye2.workflowChanged(copy(workflow), true);
+        if (own) setWorkflow(own);
+    };
+    if (dye2Loaded()) dye2Loads();
 
     const machine = createMachine({
         pour, timeZone, emit, nextId,
@@ -202,7 +207,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
                 for (const [key, value] of Object.entries(values || {})) store.set(namespace, key, value);
             }
             workflow = copy(next);
-            if (dye2Loaded()) dye2.workflowChanged(copy(workflow), true);
+            if (dye2Loaded()) dye2Loads();
             outbox.length = 0;
         },
         /** The page's time, which the test moves. */

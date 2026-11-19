@@ -37,6 +37,10 @@ const write = (name, data) => writeFile(join(OUT, `${name}.json`), `${JSON.strin
 const stack = flag('api', '')
     ? { api: flag('api', ''), token: flag('token-file', '') ? (await readFile(flag('token-file', ''), 'utf8')).trim() : '', stop: () => {} }
     : await standUp({ port: PORT });
+// Ctrl-C or a kill skips the `finally` below: the container goes with it.
+if (!KEEP) {
+    for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { stack.stop(); process.exit(signal === 'SIGINT' ? 130 : 143); });
+}
 const PORT_USED = new URL(stack.api).port;
 const ws = `ws://127.0.0.1:${PORT_USED}/ws/v1`;
 
