@@ -634,7 +634,8 @@ const pickClosed = page => page.locator('#cafe-pick-dialog:not([open])').waitFor
 const pickRows = page => page.locator('#cafe-pick-list .cafe-pick-row').evaluateAll(rows => rows.map(row => ({
     name: row.querySelector('.cafe-pick-row-name').textContent,
     detail: row.querySelector('.cafe-pick-row-detail').textContent,
-    inUse: row.getAttribute('aria-pressed') === 'true' && !!row.querySelector('.cafe-pick-in-use'),
+    // Marked "In use". In the bean dialog `aria-pressed` is the batch highlighted (#70).
+    inUse: !!row.querySelector('.cafe-pick-in-use'),
 })));
 const pickRow = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
 // A tap where a finger would land: on the row's name, or on the grinder's name
@@ -670,7 +671,7 @@ const DIALOG_SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 
 const DIALOG_PARTS = {
     'cafe-recipe-dialog': ['h3', '.cafe-recipe-row', '.cafe-recipe-row-name', '.modal-action .cafe-btn'],
     'cafe-pick-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
-    'cafe-bean-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '#cafe-pick-side-heading', '.cafe-pick-side-row', '#cafe-pick-list .cafe-pick-row'],
+    'cafe-bean-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '#cafe-pick-side-heading', '.cafe-pick-side-row', '#cafe-pick-list .cafe-pick-row', '#cafe-pick-confirm'],
     'cafe-basket-dialog': ['h3', '#cafe-pick-under', '.cafe-pick-head .cafe-btn', '.cafe-pick-row'],
     'cafe-shots-dialog': ['h3', '.cafe-shots-head .cafe-btn', '.cafe-shots-columns', '.cafe-shots-row', '.cafe-shots-star'],
     'cafe-reference-dialog': ['h3', '#cafe-reference-dialog-recipe', '.cafe-reference-dialog-shots', '#cafe-reference-dialog-replace'],
@@ -1115,6 +1116,22 @@ const sideRows = page => page.locator('#cafe-pick-side .cafe-pick-row').evaluate
 })));
 const sideRow = (page, name) => page.locator('#cafe-pick-side .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
 const pickUnder = page => page.locator('#cafe-pick-under').textContent();
+// The button under the batches (#70): its words, whether it can be tapped, the
+// note beside it, "In use" in its place, and the batches highlighted.
+const batchConfirm = page => page.evaluate(() => {
+    const visible = id => { const element = document.getElementById(id); return !!element && !element.hidden && element.offsetParent !== null; };
+    const button = document.getElementById('cafe-pick-confirm-use');
+    return {
+        shown: visible('cafe-pick-confirm'),
+        use: visible('cafe-pick-confirm-use') ? button.textContent : null,
+        enabled: visible('cafe-pick-confirm-use') && !button.disabled,
+        note: visible('cafe-pick-confirm-note') ? document.getElementById('cafe-pick-confirm-note').textContent : null,
+        inUse: visible('cafe-pick-confirm-in-use'),
+        held: [...document.querySelectorAll('#cafe-pick-list .cafe-pick-row[aria-pressed="true"]')].map(row => row.querySelector('.cafe-pick-row-name').textContent),
+    };
+});
+const batchRow = (page, n) => page.locator('#cafe-pick-list .cafe-pick-row').nth(n);
+const useBatch = page => page.locator('#cafe-pick-confirm-use').click();
 const openBeans = (page, on = '#dose-section .cafe-row-name') => openGrinders(page, on);
 const openBaskets = (page, on = '#drink-section .cafe-row-name') => openGrinders(page, on);
 // What the batch rows should say of a roast day: the days from it to the
@@ -1133,8 +1150,9 @@ const sorted = value => (value && typeof value === 'object' && !Array.isArray(va
 //     "The grinder, bean and basket dialogs" and "The bean and batch dialog"),
 //     without Decent Sync: a tap on Dose's name lists the beans with a batch
 //     beside the highlighted bean's batches, a tap on Yield's lists DYE2's
-//     baskets. A batch of the recipe's own bean and a basket write the Workflow
-//     and nothing else; with a recipe loaded a batch of another bean becomes the
+//     baskets. A tap on a batch highlights it and writes nothing, and "Use
+//     this batch" under the batches chooses it (#70). A batch of the recipe's
+//     own bean and a basket write the Workflow and nothing else; with a recipe loaded a batch of another bean becomes the
 //     recipe's bean (#52): its DYE2 record first, then the Workflow, the recipe
 //     kept loaded, a name DYE2 gave following the bean and one named by hand
 //     kept. With no recipe loaded each choice writes the Workflow alone. The
@@ -1218,6 +1236,9 @@ async function beanAndBasketDialogs() {
             JSON.stringify(rows));
         check('bean: each batch says its days off roast', rows[0].detail === await daysOff(page, '2026-11-02') && rows[1].detail === await daysOff(page, '2026-10-15'),
             rows.map(r => r.detail).join(' | '));
+        let held = await batchConfirm(page);
+        check('bean: it opens with the batch in use highlighted, and "In use" in the button\'s place, with nothing to confirm',
+            held.shown && held.inUse && held.use === null && sameJson(held.held, [rows[0].name]), JSON.stringify(held));
         await shot(page, 'bean-dialog-light');
         await sideRow(page, 'Sample Single Origin').click();
         await page.waitForTimeout(500);
@@ -1225,6 +1246,9 @@ async function beanAndBasketDialogs() {
         check('bean: a tap on a bean shows its batches, and chooses nothing',
             rows.length === 1 && !rows[0].inUse && (await pickDialog(page).count()) === 1 && writes.length === 0
             && sameJson((await sideRows(page)).filter(b => b.highlighted).map(b => b.name), ['Sample Single Origin']), JSON.stringify(rows));
+        held = await batchConfirm(page);
+        check('bean: on another bean no batch is highlighted, and "Use this batch" is shown but can\'t be tapped',
+            held.held.length === 0 && held.use === 'Use this batch' && !held.enabled && !held.inUse && held.note === null, JSON.stringify(held));
         check('bean: with another bean highlighted, the line says the choice changes the recipe\'s bean, without Decent Sync too',
             (await pickUnder(page)) === `${house.name} · changes the recipe's bean`, await pickUnder(page));
         await shot(page, 'bean-dialog-other-bean-light');
@@ -1234,13 +1258,39 @@ async function beanAndBasketDialogs() {
         await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
         check('bean: Close closes it, and nothing was written', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
         check('bean: a tap on the bean\'s name under Dose opens it too', await openBeans(page, '#cafe-dose-desc'));
-        await pickRow(page, 'Roasted').first().click();
+
+        //    A tap on a batch highlights it and writes nothing (#70).
+        await batchRow(page, 1).click();
         await page.waitForTimeout(1500);
-        check('bean: a tap on the batch in use closes the dialog and writes nothing', (await pickClosed(page)) && writes.length === 0, JSON.stringify(writes));
+        held = await batchConfirm(page);
+        rows = await pickRows(page);
+        check('bean: a tap on another batch highlights it, keeps the dialog open and writes nothing',
+            (await pickDialog(page).count()) === 1 && writes.length === 0 && recordWrites(0).length === 0 && sameJson(held.held, [rows[1].name]) && rows[0].inUse,
+            JSON.stringify({ held, writes }));
+        check('bean: "Use this batch" can be tapped, with the bean and the batch\'s roast date beside it',
+            held.use === 'Use this batch' && held.enabled && !held.inUse && held.note === `Sample Blend · ${rows[1].name}`, JSON.stringify(held));
+        check('bean: the line under the title still follows the bean', (await pickUnder(page)) === `${house.name} · not saved to the recipe`, await pickUnder(page));
+        await shot(page, 'bean-dialog-highlighted-light');
+        await batchRow(page, 0).click();
+        await page.waitForTimeout(400);
+        held = await batchConfirm(page);
+        check('bean: a tap on the batch in use highlights it again, with "In use" in the button\'s place',
+            held.inUse && held.use === null && sameJson(held.held, [rows[0].name]) && writes.length === 0, JSON.stringify(held));
+        await batchRow(page, 1).click();
+        await page.waitForTimeout(400);
+        await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+        check('bean: Close with a batch highlighted writes nothing', (await pickClosed(page)) && writes.length === 0 && recordWrites(0).length === 0, JSON.stringify(writes));
+        await openBeans(page);
+        await batchRow(page, 1).click();
+        await page.waitForTimeout(400);
+        await page.mouse.click(30, 30);
+        check('bean: a tap outside with a batch highlighted closes it, and writes nothing', (await pickClosed(page)) && writes.length === 0 && recordWrites(0).length === 0, JSON.stringify(writes));
 
         //    A batch of the same bean: one write, of its name, roaster and the batch.
         await openBeans(page);
-        await page.locator('#cafe-pick-list .cafe-pick-row').nth(1).click();
+        await batchRow(page, 1).click();
+        await page.waitForTimeout(300);
+        await useBatch(page);
         await pickClosed(page);
         await page.locator('#cafe-dose-desc').filter({ hasText: /15/ }).waitFor({ timeout: 10_000 }).catch(() => {});
         await page.waitForTimeout(1500);
@@ -1262,7 +1312,9 @@ async function beanAndBasketDialogs() {
         await openBeans(page);
         await sideRow(page, 'Example Decaf').click();
         await page.waitForTimeout(400);
-        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await batchRow(page, 0).click();
+        await page.waitForTimeout(300);
+        await useBatch(page);
         await pickClosed(page);
         await page.locator('#cafe-dose-desc').filter({ hasText: 'Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
         await page.waitForTimeout(1500);
@@ -1367,7 +1419,9 @@ async function beanAndBasketDialogs() {
         await page.waitForTimeout(400);
         check('bean: on another, that it changes the recipe\'s bean', (await pickUnder(page)) === `${made.name} · changes the recipe's bean`, await pickUnder(page));
         mark = seen.requests.length;
-        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await batchRow(page, 0).click();
+        await page.waitForTimeout(300);
+        await useBatch(page);
         await pickClosed(page);
         await page.locator('#cafe-title').filter({ hasText: 'Adaptive Example Decaf' }).waitFor({ timeout: 10_000 }).catch(() => {});
         await page.waitForTimeout(1500);
@@ -1415,6 +1469,14 @@ async function beanAndBasketDialogs() {
 
         //    A shot that starts closes the dialog, and neither opens during one.
         const openBefore = await openBeans(page);
+        // A batch highlighted, of another bean, which the shot must not choose (#70).
+        await sideRow(page, 'Sample Blend').click();
+        await page.waitForTimeout(400);
+        await batchRow(page, 0).click();
+        await page.waitForTimeout(300);
+        const heldBefore = (await batchConfirm(page)).enabled;
+        const writesBeforeShot = writes.length;
+        const recordsBeforeShot = recordWrites(0).length;
         const run = pullShot(6);
         await page.locator('#main-page.cafe-shot-live').waitFor({ timeout: 20_000 }).catch(() => {});
         check('bean: a shot that starts closes the dialog', openBefore && (await pickClosed(page)), `open before the shot: ${openBefore}`);
@@ -1424,6 +1486,9 @@ async function beanAndBasketDialogs() {
         await run;
         await page.locator('#main-page:not(.cafe-shot-live)').waitFor({ timeout: 20_000 }).catch(() => {});
         await page.waitForTimeout(4000);
+        check('bean: the batch highlighted when the shot started was not chosen: no bean written, no record written',
+            heldBefore && !writes.slice(writesBeforeShot).some(write => write?.context && 'beanBatchId' in write.context) && recordWrites(0).length === recordsBeforeShot
+            && /^Example Decaf/.test(await dose()), `${heldBefore}, ${JSON.stringify(writes.slice(writesBeforeShot))}, ${await dose()}`);
         const during = await decaid('GET', '/shots?limit=1');
         if (during.items?.[0]) pulled.push(during.items[0].id);
 
@@ -1439,7 +1504,9 @@ async function beanAndBasketDialogs() {
             (await pickUnder(page)) === 'No recipe loaded · changes this machine only', await pickUnder(page));
         await sideRow(page, 'Sample Single Origin').click();
         await page.waitForTimeout(400);
-        await page.locator('#cafe-pick-list .cafe-pick-row').first().click();
+        await batchRow(page, 0).click();
+        await page.waitForTimeout(300);
+        await useBatch(page);
         await page.locator('#cafe-dose-desc').filter({ hasText: 'Sample Single Origin' }).waitFor({ timeout: 10_000 }).catch(() => {});
         await openBaskets(page);
         check('basket: with no recipe loaded, the line says the choice changes this machine only',
@@ -1469,6 +1536,57 @@ async function beanAndBasketDialogs() {
         await openBaskets(dark.page);
         await shot(dark.page, 'basket-dialog-dark');
         await dark.close();
+    }
+    //    At 1340 by 800, a batch highlighted: "Use this batch" and the note
+    //    beside it fit the dialog in English and every language Streamline has
+    //    finished (#70). English is put back after, as the language is Decaid's.
+    {
+        const small = await openPage({ viewport: { width: 1340, height: 800 } });
+        const { page, seen } = small;
+        const unfit = [];
+        try {
+            await waitForPage(page);
+            await page.waitForTimeout(2500);
+            for (const code of ['en', ...FINISHED_LANGUAGES]) {
+                if (code !== 'en') await setLanguage(page, code);
+                await page.waitForTimeout(500);
+                if (!(await openBeans(page))) {
+                    unfit.push(`${code}: no dialog`);
+                    continue;
+                }
+                await sideRow(page, 'Sample Blend').click();
+                await page.waitForTimeout(300);
+                await batchRow(page, 1).click();
+                await page.waitForTimeout(300);
+                const fit = await page.evaluate(() => {
+                    const rect = element => element.getBoundingClientRect();
+                    const box = rect(document.querySelector('#cafe-pick-dialog .cafe-pick-box'));
+                    const row = rect(document.getElementById('cafe-pick-confirm'));
+                    const button = document.getElementById('cafe-pick-confirm-use');
+                    const note = document.getElementById('cafe-pick-confirm-note');
+                    const at = rect(button);
+                    return {
+                        label: button.textContent,
+                        enabled: !button.hidden && !button.disabled,
+                        cut: button.scrollWidth > button.clientWidth + 1,
+                        inside: at.left >= row.left - 1 && at.right <= row.right + 1 && at.bottom <= box.bottom && box.right <= innerWidth && box.bottom <= innerHeight,
+                        noteBeside: !note.hidden && rect(note).right <= at.left + 1 && rect(note).height < at.height,
+                    };
+                });
+                const translated = code === 'en' ? fit.label === 'Use this batch' : !!fit.label && fit.label !== 'Use this batch';
+                if (!fit.enabled || fit.cut || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
+                if (code === 'en') await shot(page, 'bean-dialog-highlighted-1340x800-light');
+                if (code === 'de') await shot(page, 'bean-dialog-highlighted-1340x800-de-light');
+                await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
+                await pickClosed(page);
+            }
+        } finally {
+            await setLanguage(page, 'en').catch(() => {});
+            await page.waitForTimeout(500);
+        }
+        check('bean 1340x800: "Use this batch", translated, and the note beside it fit the dialog in every finished language', unfit.length === 0, unfit.join('; '));
+        check('bean 1340x800: no page error', seen.errors.length === 0, seen.errors.join(' | '));
+        await small.close();
     }
     for (const id of pulled) await decaid('DELETE', `/shots/${id}`).catch(() => {});
 }

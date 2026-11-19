@@ -483,13 +483,25 @@ const listRowNamed = (page, name) => page.locator('#cafe-pick-list .cafe-pick-ro
 const under = page => page.locator('#cafe-pick-under').textContent();
 const doseRow = page => page.locator('#cafe-dose-desc').textContent();
 const yieldRow = page => page.locator('#cafe-yield-desc').textContent();
-// Choose a batch: highlight its bean, then tap the batch roasted on `dayText`, as the row says it.
-async function chooseBatch(page, beanName, dayPattern) {
+// Choose a batch: highlight its bean, then the batch roasted on `dayPattern`,
+// as the row says it, and confirm it with "Use this batch" (#70). The tap on
+// the batch alone is checked to write nothing first. Answers when the button
+// was tapped, which the write is timed from.
+async function chooseBatch(page, seen, beanName, dayPattern) {
     await tapName(page, '#dose-section .cafe-row-name');
     await sideRowNamed(page, beanName).click();
     await page.waitForTimeout(400);
+    const mark = seen.requests.length;
     await listRowNamed(page, dayPattern).first().click();
+    await page.waitForTimeout(1500);
+    const written = seen.requests.slice(mark).filter(r => /^PUT \/api\/v1\/workflow$|^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r));
+    check(`bean: a tap on a batch of ${beanName} highlights it, keeps the dialog open and writes nothing, and "Use this batch" can be tapped`,
+        (await pickDialog(page).count()) === 1 && written.length === 0 && await page.locator('#cafe-pick-confirm-use').isEnabled()
+        && (await page.locator('#cafe-pick-confirm-use').textContent()) === 'Use this batch', written.join(', '));
+    const tapped = Date.now();
+    await page.locator('#cafe-pick-confirm-use').click();
     await pickClosed(page);
+    return tapped;
 }
 async function chooseBasket(page, name) {
     await tapName(page, '#drink-section .cafe-row-name');
@@ -564,7 +576,7 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
 
         //     A batch of the Recipe's own Bean: the Recipe's, everywhere.
         let mark = seen.requests.length;
-        await chooseBatch(page, 'Sample Blend', /15/);
+        await chooseBatch(page, seen, 'Sample Blend', /15/);
         const older = onDay(ready.blendHere, '2026-10-15');
         const olderThere = onDay(ready.blendThere, '2026-10-15');
         check('bean: a batch of the Recipe\'s Bean is one write of the Workflow, and the skin writes no DYE2 record',
@@ -598,8 +610,7 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
         const decafHere = (await batchesThere(decaid, 'Example Decaf'))[0];
         const loadedThere = await named(decaid2);
         mark = seen.requests.length;
-        const started = Date.now();
-        await chooseBatch(page, 'Example Decaf', /Roasted/);
+        const started = await chooseBatch(page, seen, 'Example Decaf', /Roasted/);
         let reached = false;
         let setBack = null;
         let serverAt = null;

@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchRows, batchPick, beanSubtitle,
+    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchRows, batchUse, batchPick, beanSubtitle,
 } from '../src/cafe/bean-model.js';
 import { assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
@@ -114,6 +114,41 @@ test('a tap on the batch in use writes nothing', () => {
     assert.equal(batchPick(house, houseNew, { beanBatchId: 'b-house-new' }), null);
     assert.equal(batchPick(house, null, {}), null);
     assert.equal(batchPick(single, houseNew, {}), null, 'a batch of another bean than its row\'s is not written');
+});
+
+test('"Use this batch" is offered for a batch highlighted, with the bean and its roast date beside it', () => {
+    const context = { beanBatchId: 'b-house-new' };
+    const [inUse, older, undated] = batchRows(LIST.find(entry => entry.bean.id === 'bean-house'), context, TODAY, day, t);
+    const [other] = batchRows(LIST.find(entry => entry.bean.id === 'bean-single'), context, TODAY, day, t);
+    const recipe = { id: 'r', title: 'Sample Espresso', beanId: 'bean-house' };
+    const use = note => ({ label: 'Use this batch', note });
+    assert.equal(BEAN_PHRASES.use, 'Use this batch');
+    // Another batch of the recipe's own bean, and a batch of another bean.
+    assert.deepEqual(batchUse(older, recipe, 'bean-house', t), use('Sample House Blend · Roasted day 2026-10-28'));
+    assert.deepEqual(batchUse(undated, recipe, 'bean-house', t), use('Sample House Blend · No roast date'));
+    assert.deepEqual(batchUse(other, recipe, 'bean-house', t), use('Sample Single Origin · Roasted day 2026-11-16'));
+    // The batch in use of the recipe's own bean: "In use", nothing to confirm.
+    assert.equal(batchUse(inUse, recipe, 'bean-house', t), null);
+    // With no recipe loaded: the batch in use is "In use", any other is offered.
+    assert.equal(batchUse(inUse, null, null, t), null);
+    assert.deepEqual(batchUse(older, null, null, t), use('Sample House Blend · Roasted day 2026-10-28'));
+    // Nothing highlighted: nothing to offer, and the dialog greys the button.
+    assert.equal(batchUse(null, recipe, 'bean-house', t), null);
+});
+
+test('the batch in use of another bean than the recipe\'s own is still offered, since choosing it saves the bean onto the recipe', () => {
+    const [inUse] = batchRows(LIST.find(entry => entry.bean.id === 'bean-single'), { beanBatchId: 'b-single' }, TODAY, day, t);
+    assert.equal(inUse.inUse, true);
+    const offer = { label: 'Use this batch', note: 'Sample Single Origin · Roasted day 2026-11-16' };
+    assert.deepEqual(batchUse(inUse, { id: 'r', title: 'Sample Espresso', beanId: 'bean-house' }, 'bean-house', t), offer);
+    assert.deepEqual(batchUse(inUse, { id: 'r', title: 'No bean yet' }, null, t), offer, 'a recipe that names no Bean takes it as its first');
+    assert.equal(batchUse(inUse, { id: 'r', title: 'Sample Espresso', beanId: 'bean-single' }, 'bean-single', t), null, 'its own bean: "In use"');
+});
+
+test('a batch of a bean with no name is offered as "Unnamed"', () => {
+    const nameless = { id: 'bean-nameless', name: '  ', roaster: 'Sample Roastery' };
+    const [row] = batchRows({ bean: nameless, batches: [batch('b-nameless', 'bean-nameless', null)] }, {}, TODAY, day, t);
+    assert.deepEqual(batchUse(row, null, null, t), { label: 'Use this batch', note: 'Unnamed · No roast date' });
 });
 
 test('the Recipe\'s own Bean is the one its record names, else its batch\'s', () => {

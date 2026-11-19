@@ -1639,7 +1639,9 @@ button.cafe-card {
     gap: 14px;
 }
 
-.cafe-pick-pane [hidden] {
+.cafe-pick-pane [hidden],
+.cafe-pick-confirm[hidden],
+.cafe-pick-confirm [hidden] {
     display: none !important;
 }
 
@@ -1701,17 +1703,32 @@ button.cafe-card {
     font-size: 18px;
 }
 
-#cafe-pick-pane-note {
+#cafe-pick-pane-note,
+#cafe-pick-confirm-note {
     min-width: 0;
     font-size: 18px;
     font-weight: 500;
     color: var(--data-card-title-text-color);
 }
 
-#cafe-pick-pane-use {
+/* The bean and its roast date beside "Use this batch": cut short, on one
+   line, where a long bean name meets a long translation. */
+#cafe-pick-confirm-note {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+#cafe-pick-pane-use,
+#cafe-pick-confirm-use {
     flex: none;
     min-width: 160px;
     padding: 0 30px;
+}
+
+/* Under the batches, set off from the last row. */
+.cafe-pick-confirm {
+    padding-top: 6px;
 }
 
 /* The highlighted row in use: the mark takes the row's own text colour. */
@@ -1719,14 +1736,22 @@ button.cafe-card {
     color: inherit;
 }
 
-/* The bean whose batches are shown: filled in the accent colour. */
-.cafe-pick-side-row[aria-pressed="true"] {
+/* The bean whose batches are shown, and the batch highlighted for "Use this
+   batch": filled in the accent colour. A batch in use, not highlighted, keeps
+   its "In use" mark and no outline. */
+.cafe-pick-side-row[aria-pressed="true"],
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] {
     border-color: var(--mimoja-blue-v2);
     background: var(--mimoja-blue-v2);
     color: #fff;
 }
 
-.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-row-detail {
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] .cafe-pick-in-use {
+    color: inherit;
+}
+
+.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-row-detail,
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] .cafe-pick-row-detail {
     opacity: 0.85;
 }
 
@@ -1734,7 +1759,8 @@ button.cafe-card {
     border-color: var(--button-primary-bg);
 }
 
-[data-theme="dark"] .cafe-pick-side-row[aria-pressed="true"] {
+[data-theme="dark"] .cafe-pick-side-row[aria-pressed="true"],
+[data-theme="dark"] .cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] {
     background: var(--button-primary-bg);
     color: var(--button-primary-text, #fff);
 }
