@@ -125,8 +125,12 @@ export function beanAfterCheck({ rows, recipeId, bean, batch, befores }) {
  * - `now()` is the time in milliseconds.
  * - `onChecked(outcome, recipeId)` is told what each check afterwards found.
  *
- * Returns `change({ bean, batch, recipeId })`. `recipeId` is the recipe whose
- * record the pick writes (`writesRecord`), or null for the Workflow write alone.
+ * Returns `change({ bean, batch, recipeId, still })`. `recipeId` is the recipe
+ * whose record the pick writes (`writesRecord`), or null for the Workflow write
+ * alone. `still()`, asked again in the pick's turn and just before the record
+ * is written, says whether what the dialog showed still holds (the recipe
+ * loaded and its bean, as the page knows them); where it doesn't, nothing is
+ * written, and the reason is `recipe`.
  * Resolves `{ ok: true, recipeId, name, checked }` or `{ ok: false, reason }`:
  * `name` is the recipe's new name, or null where it kept its own; `checked`
  * resolves what the check afterwards found, or is null where no record was
@@ -158,7 +162,8 @@ export function createBeanChange({
     const notNow = () => new Error('not now');
     const open = entry => !!entry && !entry.done && (entry.rewroteAt == null || now() - entry.rewroteAt <= AFTER_CHECK_MS);
 
-    async function changeNow(bean, batch, expected) {
+    async function changeNow(bean, batch, expected, still) {
+        if (!still()) return { ok: false, reason: 'recipe' };
         let workflow;
         try {
             workflow = await readWorkflow();
@@ -177,6 +182,7 @@ export function createBeanChange({
         let before;
         let name = null;
         let first = true;
+        let asked = 0;
         const result = await saveRecord(recipeId, (row, rows) => {
             if (first) before = heldBean(row);
             first = false;
@@ -184,7 +190,13 @@ export function createBeanChange({
             name = fields.name ?? null;
             return fields;
         }, {
-            unless: () => (settled() ? null : 'busy'),
+            // `still` before the first write only: a write that threw may have
+            // landed, and the page may already show its bean.
+            unless: () => {
+                if (!settled()) return 'busy';
+                asked += 1;
+                return asked === 1 && !still() ? 'recipe' : null;
+            },
         });
         // A record write that can't be confirmed writes no Workflow: the batch
         // would be the machine's alone, with the recipe saying otherwise.
@@ -286,24 +298,33 @@ export function createBeanChange({
                 // the change before it never landed, or a shot or an arrangement began
             }
         }
+        // Given up, with nothing written: by now any DYE2 save begun before the
+        // change has written, so a later change takes over none of its beans.
+        const entry = entryOf(change);
+        if (entry) entry.done = true;
         return 'skipped';
     }
 
-    async function change({ bean, batch, recipeId: expected = null } = {}) {
+    async function change({ bean, batch, recipeId: expected = null, still = () => true } = {}) {
         const context = currentBeanContext(bean, batch);
         if (!context) return { ok: false, reason: 'pick' };
         if (expected == null) {
             // The Workflow write alone, as Streamline's own bean picker makes it.
+            let stale = false;
             try {
-                await queue(() => writeWorkflow({ context }));
+                await queue(() => {
+                    stale = !still();
+                    return stale ? null : writeWorkflow({ context });
+                });
             } catch (error) {
                 return { ok: false, reason: 'workflow' };
             }
+            if (stale) return { ok: false, reason: 'recipe' };
             return { ok: true, recipeId: null, name: null, checked: null };
         }
         let made;
         try {
-            made = await queue(() => changeNow(bean, batch, String(expected)));
+            made = await queue(() => changeNow(bean, batch, String(expected), still));
         } catch (error) {
             return { ok: false, reason: 'busy' };
         }

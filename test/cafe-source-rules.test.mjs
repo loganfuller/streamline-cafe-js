@@ -109,7 +109,9 @@ test('the bean dialog writes a batch through changeBean alone', () => {
     assert.deepEqual(filesWith(/\bchangeBean\(/), ['bean-changer.js', 'bean-dialog.js']);
     assert.deepEqual(filesWith(/from '\.\/bean-changer\.js'/), ['bean-dialog.js', 'page.js']);
     const dialog = SOURCES.find(source => source.name === 'bean-dialog.js').text;
-    assert.deepEqual([...dialog.matchAll(/\bchangeBean\(([^)]*)\)/g)].map(match => match[1]), ['{ bean: row.bean, batch: row.batch, recipeId: named }']);
+    assert.deepEqual([...dialog.matchAll(/\bchangeBean\(([^)]*)\)/g)].map(match => match[1]), ['{ bean: row.bean, batch: row.batch, recipeId: named, still }']);
+    // What the dialog showed is asked again in the pick's turn.
+    assert.match(dialog, /const still = \(\) => epoch\(\) === at && sameRecipeBean\(loaded, recipe\(\), own, read\.batches, read\.recipeBatch\);/);
     // Whether it writes the record is the same rule the line under the title follows.
     assert.match(dialog, /const named = writesRecord\(loaded, own, row\.bean\?\.id\) \? String\(loaded\.id\) : null;/);
     assert.match(SOURCES.find(source => source.name === 'bean-model.js').text, /if \(!writesRecord\(recipe, ownBeanId, highlightedId\)\) return line;/);

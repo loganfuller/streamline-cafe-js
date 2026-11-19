@@ -105,12 +105,9 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
         });
         if (!row) return; // closed
         // A recipe loaded, or its bean changed elsewhere, while the dialog was
-        // open: the line under the title no longer says what a pick would do.
-        if (epoch() !== at || !sameRecipeBean(loaded, recipe(), own, read.batches, read.recipeBatch)) {
-            logger.warn('Cafe: the recipe changed while the bean dialog was open');
-            showToast(cafeText('Could not change the bean'), 4000, 'error');
-            return;
-        }
+        // open, or while the pick waits its turn: the line under the title no
+        // longer says what it would do, and nothing is written.
+        const still = () => epoch() === at && sameRecipeBean(loaded, recipe(), own, read.batches, read.recipeBatch);
         // Another bean than the recipe's own is saved onto the recipe, the batch
         // in use too where it stayed this machine's own before; any other batch
         // in use writes nothing.
@@ -119,10 +116,12 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
         // The write waits its turn behind a dial-in change still on its way, and
         // is not made where a shot has begun since, or where DYE2 has another
         // recipe loaded than the line under the title named.
-        const result = await changeBean({ bean: row.bean, batch: row.batch, recipeId: named });
+        const result = await changeBean({ bean: row.bean, batch: row.batch, recipeId: named, still });
         if (!result.ok) {
             logger.warn(`Cafe: could not change the bean: ${result.reason}`);
             showToast(cafeText('Could not change the bean'), 4000, 'error');
+            // A record that took the bean all the same: the card and names follow it.
+            if (result.checked) document.dispatchEvent(new Event('streamline:workflow-refresh'));
             return;
         }
         // The page reads the names again, the roast date with them.

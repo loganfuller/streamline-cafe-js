@@ -257,6 +257,27 @@ test('another recipe loaded since the dialog named one, or none, writes nothing'
     assert.equal(w.workflowWrites.length, 0);
 });
 
+test('what the dialog showed, changed by the pick\'s turn or just before the record write, writes nothing', async () => {
+    // The Workflow write alone.
+    const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    assert.deepEqual(await w.change({ bean: HILL, batch: HILL_OLD, still: () => false }), { ok: false, reason: 'recipe' });
+    assert.equal(w.workflowWrites.length, 0);
+    assert.equal(w.log.includes('turn'), true, 'asked in the turn');
+    // The record, stale at the turn.
+    assert.deepEqual(await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1', still: () => false }), { ok: false, reason: 'recipe' });
+    // The record, stale only once DYE2 has been read.
+    let fresh = true;
+    const v = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
+    const readV = v.deps.readSelection;
+    v.deps.readSelection = async () => { const answer = await readV(); fresh = false; return answer; };
+    v.change = createBeanChange(v.deps).change;
+    assert.deepEqual(await v.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1', still: () => fresh }), { ok: false, reason: 'recipe' });
+    assert.equal(v.log.includes('record'), false);
+    assert.equal(v.workflowWrites.length, 0);
+    assert.equal(holdsBean(v.get('r1'), HILL, HILL_NEW), true);
+    assert.equal(w.log.includes('record'), false);
+});
+
 test('a recipe deleted meanwhile writes no Workflow', async () => {
     const w = tablet({ rows: [recipe('r2', 'Other')], loaded: 'r1' });
     assert.deepEqual(await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' }), { ok: false, reason: 'gone' });
@@ -434,13 +455,18 @@ test('a check whose turn finds a shot started tries once more after it', async (
     assert.ok(holdsBean(w.get('r1'), VALLEY, VALLEY_1));
 });
 
-test('a check whose every turn is refused gives up', async () => {
+test('a check whose every turn is refused gives up, and a later change takes over none of its beans', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     const original = copy(w.rows[0]);
-    w.onWait = world => { world.rows = [copy(original)]; world.refuseNext = 3; };
+    w.onWait = world => { world.rows = [copy(original)]; world.refuseNext = 3; world.onWait = () => {}; };
     const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
     assert.equal(await answer.checked, 'skipped');
     assert.equal(holdsBean(w.get('r1'), VALLEY, VALLEY_1), false);
+    // Later, Hill's other batch; while its check waits, Valley is chosen elsewhere.
+    w.onWait = world => { Object.assign(world.rows[0], { beanId: VALLEY.id, beanBatchId: VALLEY_1.id }); world.onWait = () => {}; };
+    const later = await w.change({ bean: HILL, batch: HILL_OLD, recipeId: 'r1' });
+    assert.equal(await later.checked, 'moved');
+    assert.equal(w.get('r1').beanBatchId, VALLEY_1.id, 'the choice made elsewhere stays');
 });
 
 test('a shot begun as the check writes again gives up that turn, and the next one writes', async () => {
