@@ -240,6 +240,16 @@ test('DYE2: a list its record read, written back, loses a record written since; 
     assert.equal(fake.selection().id, house.id, 'started again with the record on another profile: still loaded, as on the pinned stack');
 });
 
+test('machine: its calibration as the simulated machine reports it; an unknown target or source refused', () => {
+    const fake = fresh();
+    assert.deepEqual(get(fake, '/api/v1/machine/calibration/temperature?source=current').body, { target: 'temperature', source: 'current', de1ReportedValue: 0, measuredValue: 93 });
+    assert.deepEqual(get(fake, '/api/v1/machine/calibration/pressure').body, { target: 'pressure', source: 'current', de1ReportedValue: 1, measuredValue: 9 });
+    assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=factory').body.measuredValue, 1);
+    assert.equal(get(fake, '/api/v1/machine/calibration/weight').status, 400);
+    assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=other').status, 400);
+    assert.equal(fake.request({ method: 'PUT', url: '/api/v1/machine/calibration/flow', body: {} }), null, 'a write has no answer');
+});
+
 test('machine: the recorded pour is replayed at the page\'s time, and Decaid stores its Shot with the Workflow as it is then', () => {
     const fake = fresh();
     const frames = [];

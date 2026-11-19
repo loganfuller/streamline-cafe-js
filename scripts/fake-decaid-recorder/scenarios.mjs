@@ -199,6 +199,20 @@ export const SCENARIOS = [
         ],
     },
     {
+        name: 'machine-calibration',
+        rule: 'fake-decaid/machine.js',
+        about: 'The simulated machine\'s calibration, as Streamline\'s settings page reads it: each target\'s current and factory values; an unknown target or source refused.',
+        steps: [
+            { method: 'GET', path: '/machine/calibration/temperature?source=current' },
+            { method: 'GET', path: '/machine/calibration/pressure?source=current' },
+            { method: 'GET', path: '/machine/calibration/flow?source=current' },
+            { method: 'GET', path: '/machine/calibration/flow?source=factory' },
+            { method: 'GET', path: '/machine/calibration/flow' },
+            { method: 'GET', path: '/machine/calibration/weight?source=current' },
+            { method: 'GET', path: '/machine/calibration/flow?source=other' },
+        ],
+    },
+    {
         name: 'shots',
         rule: 'fake-decaid/shots.js',
         about: 'Decaid\'s Shots: newest first, without measurements, with total, limit and offset; filtered by grinder; by ids, a bare list of whole Shots; the latest; one by id or 404; an edit merged, a note cleared to "", a rating out of range and measurements refused.',

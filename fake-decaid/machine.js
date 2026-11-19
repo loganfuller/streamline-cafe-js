@@ -13,6 +13,14 @@
 // Recorded: recordings/pour.json, one pour of the simulated machine on the
 // pinned Decaid with its frames through the store, and the Shot it stored.
 //
+// The machine's calibration, which Streamline's settings page reads as it
+// opens (`GET /machine/calibration/<target>?source=`): as de1handler.dart
+// answers it from the simulated machine (mock_de1.dart, `readCalibration`):
+// flow 1.0, pressure 9.0 and temperature 93.0 measured, current and factory
+// alike, reported as 1.0 for flow and pressure and 0.0 for temperature; an
+// unknown target or source is a 400. Writes have no answer.
+// Recorded: recordings/machine-calibration.json.
+//
 // The model keeps no clock. `now()` is the page's time, which the test sets;
 // each replayed frame keeps its distance in time from the pour's start, read
 // from the recording's own timestamps.
@@ -42,6 +50,15 @@ export function shiftTime(text, shift, timeZone) {
     const millis = String(((ms % 1000) + 1000) % 1000).padStart(3, '0');
     const written = fraction ? `.${(millis + fraction.slice(3)).slice(0, Math.max(3, fraction.length))}` : '';
     return `${seconds}${written}${utc ? 'Z' : ''}`;
+}
+
+const CALIBRATION = { flow: 1.0, pressure: 9.0, temperature: 93.0 };
+
+/** `GET /machine/calibration/<target>?source=`, as the simulated machine answers it. */
+export function calibration(target, source = 'current') {
+    if (!(target in CALIBRATION)) return { status: 400, body: { error: `Unknown calibration target: ${target}` } };
+    if (source !== 'current' && source !== 'factory') return { status: 400, body: { error: `Unknown calibration source: ${source}` } };
+    return { status: 200, body: { target, source, de1ReportedValue: target === 'temperature' ? 0 : 1, measuredValue: CALIBRATION[target] } };
 }
 
 /** A recorded local time, written in the recording's zone, as epoch milliseconds. */

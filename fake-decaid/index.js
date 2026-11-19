@@ -15,7 +15,7 @@ import { createStore } from './store.js';
 import { createDye2, DYE2_ID } from './dye2.js';
 import { createShots } from './shots.js';
 import { createLibrary } from './library.js';
-import { createMachine, localTime, shiftTime } from './machine.js';
+import { createMachine, calibration, localTime, shiftTime } from './machine.js';
 import { createBoot } from './boot.js';
 
 export { localTime };
@@ -31,6 +31,7 @@ const OWNED_REST = [
     /^\/api\/v1\/beans(\/|$)/,
     /^\/api\/v1\/shots(\/|$)/,
     /^\/api\/v1\/machine\/state(\/|$)/,
+    /^\/api\/v1\/machine\/calibration\//,
 ];
 const OWNED_SOCKETS = [
     '/ws/v1/machine/snapshot',
@@ -153,6 +154,8 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
         if (/^\/api\/v1\/shots(\/|$)/.test(path)) return shots.answer(method, path.slice(`${API}/shots`.length), query, body);
         if (path === `${API}/machine/state` && method === 'GET') return { status: 200, body: machine.snapshot() };
+        const calibrated = /^\/api\/v1\/machine\/calibration\/([^/]+)$/.exec(path);
+        if (calibrated && method === 'GET') return calibration(decodeURIComponent(calibrated[1]), query.get('source') ?? 'current');
         // Only the states a recording or the page's tests ask for; any other
         // is left unanswered, so a test asking for it fails naming it.
         const state = /^\/api\/v1\/machine\/state\/(espresso|idle|sleeping)$/.exec(path);
