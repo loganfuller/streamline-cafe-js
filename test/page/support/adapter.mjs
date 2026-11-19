@@ -16,14 +16,37 @@ export function recording(name) {
 }
 
 /**
- * Routes `context` to `fake`. Answers `{ unanswered, inflight, sockets }`:
- * what had no answer, the requests being answered now ("METHOD url"), and the
- * paths of the sockets open.
+ * Routes `context` to `fake`. Answers `{ unanswered, inflight, sockets,
+ * intercept, interceptSocket }`: what had no answer, the requests being
+ * answered now ("METHOD url"), the paths of the sockets open, and two ways for
+ * a test to stand between the page and the fake (support/faults.mjs and
+ * support/decent-sync-stub.mjs use them).
  */
 export async function attach(context, fake) {
     const unanswered = [];
     const inflight = new Set();
     const sockets = new Set();
+    const interceptors = [];
+    const socketInterceptors = [];
+
+    /**
+     * The first request `match({ method, path, search })` is true of goes to
+     * `handler({ method, url, body, forward })` instead, which answers
+     * `{ status, body }`, `{ abort: true }` or null (unanswered), at once or
+     * later; `forward()` is the fake's own answer. The request counts as being
+     * answered until the handler answers. Answers a function that removes it.
+     */
+    const intercept = (match, handler) => {
+        const entry = { match, handler };
+        interceptors.push(entry);
+        return () => { const at = interceptors.indexOf(entry); if (at >= 0) interceptors.splice(at, 1); };
+    };
+    /** A socket to `path` is opened by `open(send)`, which answers `{ close }`, instead of the fake. */
+    const interceptSocket = (path, open) => {
+        const entry = { path, open };
+        socketInterceptors.push(entry);
+        return () => { const at = socketInterceptors.indexOf(entry); if (at >= 0) socketInterceptors.splice(at, 1); };
+    };
 
     // Anything else the page asks for, a file elsewhere included, has no answer.
     await context.route(url => url.origin !== PAGE_ORIGIN && url.origin !== DECAID_ORIGIN, route => {
@@ -41,7 +64,12 @@ export async function attach(context, fake) {
             if (text) {
                 try { body = JSON.parse(text); } catch { body = text; }
             }
-            const answer = fake.request({ method: request.method(), url: request.url(), body });
+            const method = request.method();
+            const url = request.url();
+            const parsed = new URL(url);
+            const forward = () => fake.request({ method, url, body });
+            const hit = interceptors.find(i => i.match({ method, path: parsed.pathname, search: parsed.search }));
+            const answer = hit ? await hit.handler({ method, url, body, forward }) : forward();
             if (!answer) {
                 const url = new URL(request.url());
                 unanswered.push(`${request.method()} ${url.pathname}${url.search}`);
@@ -63,7 +91,9 @@ export async function attach(context, fake) {
     await context.routeWebSocket(() => true, socket => {
         const url = new URL(socket.url());
         const path = url.pathname;
-        const handle = url.origin === DECAID_SOCKETS ? fake.connect(path, text => socket.send(text)) : null;
+        const own = url.origin === DECAID_SOCKETS ? socketInterceptors.find(i => i.path === path) : null;
+        const send = text => socket.send(text);
+        const handle = own ? own.open(send) : url.origin === DECAID_SOCKETS ? fake.connect(path, send) : null;
         if (!handle) {
             unanswered.push(`WS ${socket.url()}`);
             socket.close({ code: 1011, reason: 'the fake Decaid has no such socket' });
@@ -78,5 +108,5 @@ export async function attach(context, fake) {
         fake.flush();
     });
 
-    return { unanswered, inflight, sockets };
+    return { unanswered, inflight, sockets, intercept, interceptSocket };
 }
