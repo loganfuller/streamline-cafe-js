@@ -33,6 +33,7 @@ import { sleep, decaidClient, paint, legend, chartLines, countDraws, row, keys, 
 import { MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../../src/cafe/dye2-gate.js';
 import { compareVersions } from '../../src/modules/skin-version.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
+import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { isUnfinished, shotRecipeId, shotCurves } from '../../src/cafe/shot-model.js';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
@@ -1574,7 +1575,9 @@ async function beanAndBasketDialogs() {
                         noteBeside: !note.hidden && rect(note).right <= at.left + 1 && rect(note).height < at.height,
                     };
                 });
-                const translated = code === 'en' ? fit.label === 'Use this batch' : !!fit.label && fit.label !== 'Use this batch';
+                // The label in this language's own words, so a label left in the
+                // last language, or in English, isn't measured in its place.
+                const translated = fit.label === (code === 'en' ? 'Use this batch' : CAFE_TRANSLATIONS['Use this batch'][code]);
                 if (!fit.enabled || fit.cut || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
                 if (code === 'en') await shot(page, 'bean-dialog-highlighted-1340x800-light');
                 if (code === 'de') await shot(page, 'bean-dialog-highlighted-1340x800-de-light');

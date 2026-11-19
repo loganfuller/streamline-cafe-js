@@ -495,9 +495,12 @@ async function chooseBatch(page, seen, beanName, dayPattern) {
     await listRowNamed(page, dayPattern).first().click();
     await page.waitForTimeout(1500);
     const written = seen.requests.slice(mark).filter(r => /^PUT \/api\/v1\/workflow$|^POST .*dye2\.reaplugin\/(record|save-recipe)$|^POST .*\/store\/dye2\.reaplugin\//.test(r));
+    // The tapped batch is the one row highlighted.
+    const pressed = await page.locator('#cafe-pick-list .cafe-pick-row[aria-pressed="true"]').allTextContents();
+    const held = pressed.length === 1 && dayPattern.test(pressed[0]);
     check(`bean: a tap on a batch of ${beanName} highlights it, keeps the dialog open and writes nothing, and "Use this batch" can be tapped`,
-        (await pickDialog(page).count()) === 1 && written.length === 0 && await page.locator('#cafe-pick-confirm-use').isEnabled()
-        && (await page.locator('#cafe-pick-confirm-use').textContent()) === 'Use this batch', written.join(', '));
+        held && (await pickDialog(page).count()) === 1 && written.length === 0 && await page.locator('#cafe-pick-confirm-use').isEnabled()
+        && (await page.locator('#cafe-pick-confirm-use').textContent()) === 'Use this batch', `highlighted: ${JSON.stringify(pressed)}; written: ${written.join(', ')}`);
     const tapped = Date.now();
     await page.locator('#cafe-pick-confirm-use').click();
     await pickClosed(page);
