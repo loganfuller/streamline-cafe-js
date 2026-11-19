@@ -119,11 +119,28 @@ test('a chart left to fit its own axis keeps a Shot that is longer than the refe
 });
 
 test('during a shot the axis starts at the reference\'s length and follows the shot only past it', () => {
-    const during = seconds => referenceOverlay(seven(), layout({ range: seconds > 0 ? [0, seconds / 0.93] : [-1, 1], autorange: false, dtick: 1 }), 'live', { curves: curves(30) }).layout.xaxis;
+    // The Shot's own lines reach the newest second, as during a real shot.
+    const upTo = seconds => seven().map(trace => ({ ...trace, x: [0, Math.max(1, seconds)] }));
+    const during = seconds => referenceOverlay(upTo(seconds), layout({ range: seconds > 0 ? [0, seconds / 0.93] : [-1, 1], autorange: false, dtick: 1 }), 'live', { curves: curves(30) }).layout.xaxis;
     assert.deepEqual(during(0), { range: [0, 30 / 0.93], autorange: false, dtick: 5 });
     assert.deepEqual(during(12).range, [0, 30 / 0.93]);
     assert.deepEqual(during(29.9).range, [0, 30 / 0.93]);
     assert.deepEqual(during(31), { range: [0, 31 / 0.93], autorange: false, dtick: 1 }, 'past the reference the axis is the chart\'s own');
+});
+
+test('an axis grown past a longer reference only for the labels\' room keeps the reference\'s ticks', () => {
+    // A 14.8 s Shot against a 15.5 s reference: the chart's axis, with room for
+    // the labels, is past the reference, but the reference is the longer line.
+    const shot = seven().map(trace => ({ ...trace, x: [0, 14.8] }));
+    const grown = referenceOverlay(shot, layout({ range: [0, 15.8], autorange: false, dtick: 1 }), 'full', { curves: curves(15.5) }).layout.xaxis;
+    assert.deepEqual(grown, { range: [0, 15.8], autorange: false, dtick: 5 });
+    // Once the Shot is the longer, the ticks are the chart's own.
+    const past = seven().map(trace => ({ ...trace, x: [0, 15.6] }));
+    const own = layout({ range: [0, 16.6], autorange: false, dtick: 5 });
+    assert.strictEqual(referenceOverlay(past, own, 'full', { curves: curves(15.5) }).layout, own);
+    // The full-screen chart's ticks are the renderer's: none is given.
+    const expanded = layout({ range: [0, 15.8], autorange: false });
+    assert.strictEqual(referenceOverlay(shot, expanded, 'full', { curves: curves(15.5) }).layout, expanded);
 });
 
 test('the layout the chart handed over is never changed in place', () => {

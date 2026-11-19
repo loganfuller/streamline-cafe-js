@@ -101,6 +101,17 @@ export function setShotChooser(chooser) {
     cafeShotChooser = chooser;
 }
 
+// The live labels: when on, the main chart's lines carry their end labels
+// through a live shot, as they do once it is over, and the live time axis
+// leaves room for them as the finished chart's does. They travel on the
+// renderer's live path, as the full-screen chart's do, so a frame that only
+// moves them sends no line again. Off, the chart is Streamline's.
+let cafeLiveLabels = false;
+
+export function setLiveLineLabels(on) {
+    cafeLiveLabels = Boolean(on);
+}
+
 function renderMain(traces, layout, mode = 'full') {
     latestMainRender = { traces, layout, mode };
     if (expandedOpen) {
@@ -393,6 +404,10 @@ function getAnnotations() {
         if (trace.x.length === 0) continue;
 
         annotations.push({
+            // Streamline Cafe: with live labels, each label names its line, so
+            // the renderer never hands it to another line that ends at the
+            // same point, as every line does on a live frame.
+            ...(cafeLiveLabels ? { series: trace.name } : {}),
             x: trace.x[trace.x.length - 1],
             y: trace.y[trace.y.length - 1],
             xref: 'x',
@@ -419,7 +434,7 @@ function getAnnotations() {
 // No labels while a shot is live — only once
 // it's done (see isLiveShot below).
 function applyLabelLayout(layout) {
-    layout.annotations = isLiveShot ? [] : getAnnotations();
+    layout.annotations = isLiveShot && !cafeLiveLabels ? [] : getAnnotations(); // Streamline Cafe: live labels (docs/cafe/UPSTREAM_EDITS.md)
     layout.margin = { ...(layout.margin || {}), r: 45 };
 }
 
@@ -529,6 +544,14 @@ function liveXRange(time) {
     return time > 0 ? [0, time / LIVE_X_DATA_FRACTION] : [-1, 1];
 }
 
+// Streamline Cafe: with live labels, the live axis is the one the finished
+// chart gets at the same time, with room for the widest label, so neither the
+// axis nor a label moves when the shot ends.
+function cafeLiveXRange(time) {
+    const end = time > 0 ? rangeMaxForLabels(time) : 0;
+    return end > time ? [0, end] : liveXRange(time);
+}
+
 function flushChart() {
     if (!hasVisibleChart()) {
         liveRenderDirty = true;
@@ -544,7 +567,7 @@ function flushChart() {
     const { range: _range, ...liveXAxis } = layout.xaxis;
     layout.xaxis = {
         ...liveXAxis,
-        range: liveXRange(pendingTime),
+        range: cafeLiveLabels ? cafeLiveXRange(pendingTime) : liveXRange(pendingTime),
         autorange: false,
         dtick: dtickValue
     };

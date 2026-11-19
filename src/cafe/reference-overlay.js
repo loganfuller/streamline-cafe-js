@@ -15,9 +15,10 @@
 //   chart keeps appending live frames without a full redraw.
 // - The arrays of the reference's lines, and of a hidden target, are the same
 //   arrays from one frame to the next.
-// - A line-end label finds its line by colour on the main chart and by name on
-//   the full-screen one, so the reference's lines have colours and names no
-//   line of Streamline's has, and are never labelled.
+// - A line-end label finds its line by name on the main chart (by colour
+//   without the live labels' hook) and on the full-screen one, so the
+//   reference's lines have colours and names no line of Streamline's has, and
+//   are never labelled.
 
 // A live shot's time axis ends here as a share of its width, as in chart.js.
 const LIVE_X_DATA_FRACTION = 0.93;
@@ -65,7 +66,14 @@ function withRoomFor(layout, seconds, mode, traces) {
     const xaxis = layout.xaxis || {};
     const shown = xaxis.autorange !== true && Array.isArray(xaxis.range) ? xaxis.range[1] : ownEnd(traces);
     const wanted = mode === 'live' ? seconds / LIVE_X_DATA_FRACTION : seconds;
-    if (shown >= wanted) return layout;
+    if (shown >= wanted) {
+        // The axis is the chart's own, grown past the reference only for its
+        // labels' room: while the reference is still the longer, the ticks keep
+        // its spacing, so they don't change twice as the shot passes its end.
+        if (!('dtick' in xaxis) || !(seconds > ownEnd(traces))) return layout;
+        const dtick = dtickForTime(seconds);
+        return dtick === xaxis.dtick ? layout : { ...layout, xaxis: { ...xaxis, dtick } };
+    }
     const next = { ...xaxis, range: [0, wanted], autorange: false };
     // The main chart spaces its ticks by the time shown; the full-screen chart
     // leaves that to the renderer.
@@ -87,6 +95,20 @@ export function liveAxis(traces, layout) {
     if (!fitted && xaxis.range[0] === 0 && xaxis.range[1] >= 1) return layout;
     const end = fitted ? ownEnd(traces) / LIVE_X_DATA_FRACTION : xaxis.range[0] >= 0 ? xaxis.range[1] : 0;
     return { ...layout, xaxis: { ...xaxis, range: [0, Math.max(1, end)], autorange: false } };
+}
+
+/**
+ * Which time axis the reference is fitted to, as `referenceOverlay`'s `mode`:
+ * `live` keeps the room past the newest second that Streamline's live axis
+ * has, `full` is the axis at rest. Through a shot, from its Preheat on
+ * (`live`), the full-screen chart has the live one. The main graph has the one
+ * it will have once the shot is over: its own live axis already leaves its end
+ * labels their room, so neither the axis nor a label moves when the shot ends.
+ * At rest it is the chart's own mode.
+ */
+export function overlayAxis(live, mode, chart) {
+    if (!live) return mode;
+    return chart === 'main' ? 'full' : 'live';
 }
 
 /**
