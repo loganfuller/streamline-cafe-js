@@ -19,7 +19,7 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { latestShot, referenceShot, makeReference, watchReference, newestShot, editShot, shotById } from './shot-seam.js';
 import { readCafe, writeCafe, VIEW_KEY } from './cafe-store.js';
-import { graphModel, shotCredit, whenText, viewFrom } from './shot-model.js';
+import { graphModel, shotCredit, whenText, untilNextDay, viewFrom } from './shot-model.js';
 import { graphStep, initialGraphState, shownRemarks, inGraph, shotInGraphId } from './graph-state.js';
 import { starFills, ratingForTap, ratingOf, ratingText, noteToSave, editedRemarks } from './remarks.js';
 import { editNote, readNote } from './note-dialog.js';
@@ -44,6 +44,7 @@ let liveFailed = false; // the live cards threw once: said once, not on every fr
 let busy = false;       // a reference is being chosen
 let rating = false;     // a rating is on its way
 const timers = {};      // the timers `graph-state.js` asked for, by name
+let dayTimer = null;    // the next local midnight, when the legend's "Today" may be yesterday
 let listener = {};      // what the Shots list is told: `edited(shotId, remarks)`, `chosen(recipeId, shotId)`, `sourceMoved()`
 
 const el = id => document.getElementById(id);
@@ -276,6 +277,19 @@ function creditParts(shot) {
     if (!shot) return { time: '', who: '' };
     const { when, who } = shotCredit(shot);
     return { time: whenText(when, new Date(), cafeDateLocale(), cafeText('Today')), who };
+}
+
+// The legend's day is the Shot's against the clock when it is painted, so it
+// is painted again as the local day turns: a page left at rest overnight
+// would read "Today" for yesterday's Shot. A timer that fires late, as one
+// can on a tablet that slept, is set again when the page comes back into view.
+function watchDay() {
+    clearTimeout(dayTimer);
+    dayTimer = setTimeout(() => {
+        dayTimer = null;
+        paint();
+        watchDay();
+    }, untilNextDay(new Date()));
 }
 
 // "Today 14:32 · Ana", for a dialog that names a Shot.
@@ -603,7 +617,13 @@ export function initGraph() {
     // Streamline's history module asks to draw then too, which is the same cue.
     const inView = () => dispatch({ type: 'inView' });
     document.addEventListener('streamline:mainpagevisible', inView);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) inView(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        inView();
+        paint();
+        watchDay();
+    });
+    watchDay();
     // A time is written in the page's language, and the reference's swatch in
     // the theme's colour.
     document.addEventListener('streamline:languagechange', paint);
