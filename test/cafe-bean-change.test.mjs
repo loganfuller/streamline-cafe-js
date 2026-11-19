@@ -57,6 +57,7 @@ function tablet({ rows, loaded = null, batchId = HILL_NEW.id } = {}) {
         onWait: () => {},
         checked: [],
         settled: () => true,
+        clock: 0,
     };
     w.recipeId = () => w.workflow.context.extras.dye.recipeId;
     let reads = 0;
@@ -92,6 +93,7 @@ function tablet({ rows, loaded = null, batchId = HILL_NEW.id } = {}) {
         },
         idle: async () => { w.log.push('idle'); },
         wait: async ms => { w.waits.push(ms); await w.onWait(w); },
+        now: () => w.clock,
         onChecked: (outcome, id) => w.checked.push([outcome, id]),
     };
     w.change = createBeanChange(w.deps).change;
@@ -264,16 +266,56 @@ test('a recipe deleted meanwhile writes no Workflow', async () => {
 test('another recipe loaded, or a shot begun, while the record is written: the record keeps the bean, and no Workflow is written', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso'), recipe('r2', 'Other', { stripSlot: 2 })], loaded: 'r1' });
     w.onRecordWrite = world => { world.workflow.context.extras.dye.recipeId = 'r2'; };
-    assert.deepEqual(await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' }), { ok: false, reason: 'workflow' });
+    const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(answer.ok, false);
+    assert.equal(answer.reason, 'workflow');
     assert.ok(holdsBean(w.get('r1'), VALLEY, VALLEY_1));
     assert.equal(w.workflowWrites.length, 0);
+    assert.equal(await answer.checked, 'held', 'the record written is checked all the same');
 
     const v = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     let shot = false;
     v.settled = () => !shot;
     v.onRecordWrite = () => { shot = true; };
-    assert.deepEqual(await v.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' }), { ok: false, reason: 'workflow' });
+    v.onWait = () => { shot = false; };
+    const second = await v.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(second.reason, 'workflow');
     assert.equal(v.workflowWrites.length, 0);
+    assert.equal(await second.checked, 'held');
+});
+
+test('a shot begun once the record is written, and DYE2 writing its old copy back meanwhile: the check writes the bean again after the shot', async () => {
+    const original = madeByDye2('r1');
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    let shot = false;
+    w.settled = () => !shot;
+    w.onRecordWrite = () => { shot = true; w.onRecordWrite = () => {}; };
+    // DYE2's save read the list before the change, and the shot ends while the check waits.
+    w.onWait = world => { world.rows = [copy(original)]; shot = false; world.onWait = () => {}; };
+    const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(answer.ok, false);
+    assert.equal(answer.reason, 'workflow');
+    assert.equal(await answer.checked, 'rewritten');
+    assert.ok(holdsBean(w.get('r1'), VALLEY, VALLEY_1));
+    assert.equal(w.get('r1').name, 'Turbo Valley Decaf');
+    assert.deepEqual(w.checked, [['rewritten', 'r1']]);
+});
+
+test('a second change\'s failed Workflow write still checks what the first change wrote', async () => {
+    const original = recipe('r1', 'House espresso');
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    w.onWait = () => gate;
+    const first = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    w.failWorkflowWrite = true;
+    const second = await w.change({ bean: HILL, batch: HILL_OLD, recipeId: 'r1' });
+    assert.equal(second.reason, 'workflow');
+    // A DYE2 save begun before either writes the first record back.
+    w.rows = [copy(original)];
+    release();
+    assert.deepEqual(await Promise.all([first.checked, second.checked]), ['superseded', 'rewritten']);
+    assert.equal(w.get('r1').beanBatchId, HILL_OLD.id);
 });
 
 test('a shot or an arrangement begun while DYE2 is read: nothing is written', async () => {
@@ -290,8 +332,11 @@ test('a shot or an arrangement begun while DYE2 is read: nothing is written', as
 test('a Workflow write that fails says so; the record holds the bean', async () => {
     const w = tablet({ rows: [recipe('r1', 'House espresso')], loaded: 'r1' });
     w.failWorkflowWrite = true;
-    assert.deepEqual(await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' }), { ok: false, reason: 'workflow' });
+    const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(answer.ok, false);
+    assert.equal(answer.reason, 'workflow');
     assert.ok(holdsBean(w.get('r1'), VALLEY, VALLEY_1));
+    assert.equal(await answer.checked, 'held');
 });
 
 test('the batch in use, of another bean than the recipe\'s, is saved onto the recipe with no Workflow write', async () => {
@@ -359,6 +404,23 @@ test('two changes to the same recipe inside DYE2\'s window: the first one\'s che
     release();
     assert.deepEqual(await Promise.all([first.checked, second.checked]), ['superseded', 'held']);
     assert.equal(w.get('r1').beanBatchId, HILL_OLD.id, 'the later choice stays on the record');
+});
+
+test('a record written again keeps its old bean as DYE2\'s for one window only: a later change after it leaves that bean, chosen elsewhere, alone', async () => {
+    for (const [gap, want] of [[AFTER_CHECK_MS - 1, 'rewritten'], [AFTER_CHECK_MS + 1, 'moved']]) {
+        const original = recipe('r1', 'House espresso');
+        const w = tablet({ rows: [original], loaded: 'r1' });
+        // Hill to Valley; DYE2 writes Hill back, and the check writes Valley again.
+        w.onWait = world => { world.rows = [copy(original)]; world.onWait = () => {}; };
+        const first = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+        assert.equal(await first.checked, 'rewritten');
+        // Later, Valley to Hill's other batch; while its check waits, Hill's first batch is chosen again.
+        w.clock += gap;
+        w.onWait = world => { Object.assign(world.rows[0], { beanId: HILL.id, beanBatchId: HILL_NEW.id }); world.onWait = () => {}; };
+        const second = await w.change({ bean: HILL, batch: HILL_OLD, recipeId: 'r1' });
+        assert.equal(await second.checked, want, `${gap} ms after the rewrite`);
+        assert.equal(w.get('r1').beanBatchId, want === 'moved' ? HILL_NEW.id : HILL_OLD.id);
+    }
 });
 
 test('a check whose turn finds a shot started tries once more after it', async () => {

@@ -17,7 +17,7 @@ import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
-import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, beanRows, batchRows, batchPick, beanSubtitle } from './bean-model.js';
+import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchPick, beanSubtitle } from './bean-model.js';
 import { writesRecord } from './bean-change.js';
 import { changeBean } from './bean-changer.js';
 import { choose } from './pick-dialog.js';
@@ -104,6 +104,13 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
             } : null,
         });
         if (!row) return; // closed
+        // A recipe loaded, or its bean changed elsewhere, while the dialog was
+        // open: the line under the title no longer says what a pick would do.
+        if (epoch() !== at || !sameRecipeBean(loaded, recipe(), own, read.batches, read.recipeBatch)) {
+            logger.warn('Cafe: the recipe changed while the bean dialog was open');
+            showToast(cafeText('Could not change the bean'), 4000, 'error');
+            return;
+        }
         // Another bean than the recipe's own is saved onto the recipe, the batch
         // in use too where it stayed this machine's own before; any other batch
         // in use writes nothing.

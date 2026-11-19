@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, beanRows, daysOffRoast, batchRows, batchPick, beanSubtitle,
+    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchRows, batchPick, beanSubtitle,
 } from '../src/cafe/bean-model.js';
 import { assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
@@ -125,6 +125,24 @@ test('the Recipe\'s own Bean is the one its record names, else its batch\'s', ()
     assert.equal(recipeBeanId({ beanBatchId: 'b-far' }, BATCHES), null, 'a batch nowhere to be read gives no Bean');
     assert.equal(recipeBeanId({ name: 'No bean' }, BATCHES), null, 'a record that names neither has no Bean');
     assert.equal(recipeBeanId(null, BATCHES), null);
+});
+
+test('a pick is acted on only while the recipe loaded, and its bean, are the ones the dialog opened on', () => {
+    const opened = { id: 'r1', beanId: 'bean-house', beanBatchId: 'b-house-new' };
+    const own = recipeBeanId(opened, BATCHES);
+    assert.equal(sameRecipeBean(opened, opened, own, BATCHES), true);
+    assert.equal(sameRecipeBean(opened, { ...opened, beanBatchId: 'b-house-old' }, own, BATCHES), true, 'another batch of the same bean');
+    assert.equal(sameRecipeBean(opened, { ...opened, beanId: 'bean-single', beanBatchId: 'b-single' }, own, BATCHES), false, 'its bean changed elsewhere');
+    assert.equal(sameRecipeBean(opened, { id: 'r2', beanId: 'bean-house' }, own, BATCHES), false, 'another recipe loaded');
+    assert.equal(sameRecipeBean(opened, null, own, BATCHES), false, 'unloaded');
+    assert.equal(sameRecipeBean(null, opened, null, BATCHES), false, 'loaded since');
+    assert.equal(sameRecipeBean(null, null, null, BATCHES), true, 'none loaded, then or now');
+    const none = { id: 'r3', name: 'No bean' };
+    assert.equal(sameRecipeBean(none, { ...none }, recipeBeanId(none, BATCHES), BATCHES), true, 'a recipe with no bean, still none');
+    assert.equal(sameRecipeBean(none, { ...none, beanBatchId: 'b-single' }, null, BATCHES), false, 'a recipe with no bean that took one');
+    const made = { id: 'r4', beanBatchId: 'b-far' };
+    const far = batch('b-far', 'bean-far', null);
+    assert.equal(sameRecipeBean(made, made, recipeBeanId(made, BATCHES, far), BATCHES, far), true, 'a bean told by the batch read on its own');
 });
 
 test('the line under the title follows the bean highlighted on the left', () => {

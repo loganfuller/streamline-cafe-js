@@ -102,6 +102,18 @@ export function recipeBeanId(recipe, batches, recipeBatch = null) {
 }
 
 /**
+ * Is the recipe loaded now (`now`, the page's) still the one the dialog
+ * opened on (`before`), with the bean the line under the title was worked out
+ * from (`ownBeanId`)? Another tablet may change the recipe's bean while the
+ * dialog stays open, and the line, and which write a pick makes, would then be
+ * wrong.
+ */
+export function sameRecipeBean(before, now, ownBeanId, batches, recipeBatch = null) {
+    if (!before || !now) return !before && !now;
+    return sameId(before.id, now.id) && recipeBeanId(now, batches, recipeBatch) === (ownBeanId == null ? null : String(ownBeanId));
+}
+
+/**
  * The left list's rows: each bean's name over its roaster and how many
  * batches it has, the one shown on the right `highlighted`.
  */

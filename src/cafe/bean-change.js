@@ -122,6 +122,7 @@ export function beanAfterCheck({ rows, recipeId, bean, batch, befores }) {
  * - `writeWorkflow(patch)` is the one Workflow write, and rejects when it failed.
  * - `idle()` resolves once no shot runs and Decaid has stored the last one.
  * - `wait(ms)` waits.
+ * - `now()` is the time in milliseconds.
  * - `onChecked(outcome, recipeId)` is told what each check afterwards found.
  *
  * Returns `change({ bean, batch, recipeId })`. `recipeId` is the recipe whose
@@ -136,21 +137,26 @@ export function beanAfterCheck({ rows, recipeId, bean, batch, befores }) {
  * read, or they disagree on which recipe is loaded), the writer's reasons
  * (`gone`, `unconfirmed`), and `workflow` (the record took the bean and the
  * Workflow did not: its write failed, or a shot started, the strip began to
- * change or another recipe was loaded first). The check's outcomes are
+ * change or another recipe was loaded first; as the record was written, this
+ * answer carries `checked` too). The check's outcomes are
  * `beanAfterCheck`'s, and `superseded` (a later change to the same recipe has
  * its own check), `lost`, `moved` and `skipped`.
  */
 export function createBeanChange({
     settled = () => true, queue, readSelection, readWorkflow, readRecords,
-    saveRecord, writeWorkflow, idle = async () => {}, wait, onChecked = () => {},
+    saveRecord, writeWorkflow, idle = async () => {}, wait, now = Date.now, onChecked = () => {},
 }) {
     // The latest change made to each recipe's record, as the profile's change
     // keeps them (profile-change.js): a check for an earlier one is superseded,
     // and the later check takes over the beans the earlier one found and wrote
-    // while that one's check has not run or had to write the record again.
+    // while that one's check has not run, or wrote the record again less than
+    // one DYE2 window before (`rewroteAt`): a DYE2 save that read the list
+    // before the rewrite has written it back by then, so an old bean found on a
+    // later change is someone's choice.
     const latest = new Map();
     let changes = 0;
     const notNow = () => new Error('not now');
+    const open = entry => !!entry && !entry.done && (entry.rewroteAt == null || now() - entry.rewroteAt <= AFTER_CHECK_MS);
 
     async function changeNow(bean, batch, expected) {
         let workflow;
@@ -186,28 +192,32 @@ export function createBeanChange({
         changes += 1;
         const generation = changes;
         const earlier = latest.get(recipeId);
-        const befores = earlier && !earlier.done ? [...earlier.befores, earlier.mine, before] : [before];
+        const befores = open(earlier) ? [...earlier.befores, earlier.mine, before] : [before];
         const mine = { beanId: String(bean.id), batchId: String(batch.id) };
-        latest.set(recipeId, { generation, befores, mine, rewrote: false, done: false });
+        latest.set(recipeId, { generation, befores, mine, rewrote: false, rewroteAt: null, done: false });
+        // From here the record is this change's, whatever comes of the Workflow:
+        // its check runs either way, as it has taken over the earlier one's.
+        const written = { recipeId, name, bean, batch, generation };
+        const noWorkflow = { ok: false, reason: 'workflow', written };
         // Read again: another recipe loaded elsewhere while the record was
         // written gets no Workflow write, as one that failed, and nor does a
         // shot or an arrangement begun meanwhile.
         try {
             workflow = await readWorkflow();
         } catch (error) {
-            return { ok: false, reason: 'workflow' };
+            return noWorkflow;
         }
-        if (!settled() || String(workflow?.context?.extras?.dye?.recipeId ?? '') !== recipeId) return { ok: false, reason: 'workflow' };
+        if (!settled() || String(workflow?.context?.extras?.dye?.recipeId ?? '') !== recipeId) return noWorkflow;
         // A batch already the Workflow's (picked before, while it stayed this
         // machine's own) needs the record alone.
         if (!sameId(workflow?.context?.beanBatchId, batch.id)) {
             try {
                 await writeWorkflow({ context: currentBeanContext(bean, batch) });
             } catch (error) {
-                return { ok: false, reason: 'workflow' };
+                return noWorkflow;
             }
         }
-        return { ok: true, recipeId, name, bean, batch, generation };
+        return { ok: true, ...written };
     }
 
     const entryOf = change => {
@@ -247,7 +257,10 @@ export function createBeanChange({
             });
             if (!result.ok && result.reason === 'busy') throw notNow();
             if (!result.ok) outcome = result.reason === 'moved' ? 'moved' : 'lost';
-            else entry.rewrote = true;
+            else {
+                entry.rewrote = true;
+                entry.rewroteAt = now();
+            }
         }
         if (!entry.rewrote) entry.done = true;
         return outcome;
@@ -294,10 +307,10 @@ export function createBeanChange({
         } catch (error) {
             return { ok: false, reason: 'busy' };
         }
-        if (!made.ok) return made;
+        const checkOf = written => checkLater(written).then(outcome => { onChecked(outcome, written.recipeId); return outcome; });
+        if (!made.ok) return made.written ? { ok: false, reason: made.reason, checked: checkOf(made.written) } : made;
         const { recipeId, name } = made;
-        const checked = checkLater(made).then(outcome => { onChecked(outcome, recipeId); return outcome; });
-        return { ok: true, recipeId, name, checked };
+        return { ok: true, recipeId, name, checked: checkOf(made) };
     }
 
     return { change };
