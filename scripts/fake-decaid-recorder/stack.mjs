@@ -80,8 +80,11 @@ export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
         exec('mkdir -p ~/.local/share/decaid/plugins && unzip -q -o /tmp/dye2.zip -d ~/.local/share/decaid/plugins');
         exec(`echo '{"simulateDevices":["machine","scale"],"onboardingCompleted":true,"accountStepSeen":true}' > ~/.local/share/decaid/shared_preferences.json`);
         exec('mkdir -p /run/dbus && (dbus-daemon --system --fork || true) && (avahi-daemon -D || true)');
-        docker('exec', '-d', '-e', `DECAID_EXTENSIONS_TOKEN=${token}`, id, 'bash', '-c',
-            'xvfb-run -a dbus-run-session -- /opt/decaid/bundle/decaid --serial --bypass-onboarding --no-account > /tmp/decaid.log 2>&1');
+        // The token goes through the environment, never the command line, so
+        // no process list or failed command's message shows it.
+        execFileSync('docker', ['exec', '-d', '-e', 'DECAID_EXTENSIONS_TOKEN', id, 'bash', '-c',
+            'xvfb-run -a dbus-run-session -- /opt/decaid/bundle/decaid --serial --bypass-onboarding --no-account > /tmp/decaid.log 2>&1'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, DECAID_EXTENSIONS_TOKEN: token } });
         const deadline = Date.now() + 120_000;
         for (;;) {
             try {

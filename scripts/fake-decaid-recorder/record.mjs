@@ -31,10 +31,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const recordedWith = { decaid: PINS.decaid.version, dye2: PINS.dye2.version, streamline: PINS.streamline.version };
 const write = (name, data) => writeFile(join(OUT, `${name}.json`), `${JSON.stringify({ recordedWith, ...data }, null, 1)}\n`);
 
-// --api= and --token= point it at a Decaid already running, for working on a
+// --api= and --token-file= (the file --keep names) point it at a Decaid already
+// running, the token read from the file so it is on no command line, for working on a
 // scenario; a recording to commit comes from a fresh stack.
 const stack = flag('api', '')
-    ? { api: flag('api', ''), token: flag('token', ''), stop: () => {} }
+    ? { api: flag('api', ''), token: flag('token-file', '') ? (await readFile(flag('token-file', ''), 'utf8')).trim() : '', stop: () => {} }
     : await standUp({ port: PORT });
 const PORT_USED = new URL(stack.api).port;
 const ws = `ws://127.0.0.1:${PORT_USED}/ws/v1`;
@@ -216,6 +217,9 @@ async function pour() {
     const before = await decaid('GET', '/workflow');
     const { shot, idleAt, storedAt } = await pullShot(null, watch);
     watch.close();
+    // A pour asked to stop has no moment the machine stopped itself: the fake
+    // and the page tests replay to that moment, so it is no recording.
+    if (idleAt === null) throw new Error('the simulated pour did not stop by itself within 30 s; nothing written');
     const stored = await decaid('GET', `/shots/${shot.id}`);
     await write('pour', {
         about: 'One simulated pour on the pinned Decaid: each socket frame with its time from the request that started it, through the Shot\'s store, and the Shot Decaid stored (fake-decaid/machine.js).',

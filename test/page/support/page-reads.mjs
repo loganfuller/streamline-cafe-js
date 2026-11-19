@@ -21,7 +21,7 @@ export async function tapAt(page, selector) {
     await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + box.height / 2);
 }
 
-/** The writes a test watches: the Workflow, and anything asked of DYE2 but a read. */
-export const isWrite = entry => entry.method !== 'GET'
-    && (entry.path === '/api/v1/workflow' || /^\/api\/v1\/(store\/dye2\.reaplugin\/|plugins\/dye2\.reaplugin\/)/.test(entry.path));
-export const workflowWrites = entries => entries.filter(entry => entry.method === 'PUT' && entry.path === '/api/v1/workflow');
+/** Every write to Decaid, the store and DYE2 included: anything asked but a read. */
+export const isWrite = entry => entry.method !== 'GET' && entry.method !== 'HEAD' && entry.method !== 'OPTIONS';
+/** The writes since a mark, as "METHOD path" with the body, for a test to compare whole. */
+export const writes = entries => entries.filter(isWrite).map(({ method, path, body }) => ({ write: `${method} ${path}`, body }));

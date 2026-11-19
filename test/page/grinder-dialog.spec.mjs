@@ -11,7 +11,7 @@
 
 import { test, expect } from './support/test.mjs';
 import { PAGE_ORIGIN } from './support/page-files.mjs';
-import { pickDialog, pickClosed, pickRows, pickRow, tapAt, isWrite, workflowWrites, paint } from './support/page-reads.mjs';
+import { pickDialog, pickClosed, pickRows, pickRow, tapAt, isWrite, writes, paint } from './support/page-reads.mjs';
 import { GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES } from '../cafe-smoke/sample-data.mjs';
 
 const [house, , decaf] = RECIPES;
@@ -47,6 +47,13 @@ async function openGrinders(cafe, on = NAME) {
     await tapAt(cafe.page, on);
     await expect(pickDialog(cafe.page)).toBeVisible();
 }
+
+// Streamline's own profile overrides (src/modules/profile-overrides.js) keep the
+// grind setting a Workflow write leaves, for the profile in the Workflow.
+const profileOverride = grinderSetting => ({
+    write: expect.stringMatching(/^POST \/api\/v1\/store\/streamlineProfileOverrides\/profile%3A[0-9a-f]+$/),
+    body: { grinderSetting },
+});
 
 test.describe('the grinder dialog', { tag: '@grinder' }, () => {
     test('opens from the row\'s name, lists the tablet\'s grinders and closes writing nothing', async ({ cafe }) => {
@@ -105,8 +112,9 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         await closed(cafe);
         await expect(page.locator('#cafe-grind-desc')).toHaveText(SECOND_GRINDER.model);
         await cafe.advance(3000);
-        expect(workflowWrites(cafe.since(mark)).map(entry => entry.body), 'one write').toEqual([
-            { context: { grinderId: second.id, grinderModel: SECOND_GRINDER.model, grinderSetting: GRINDER_USE.second.setting, extras: { rpm: GRINDER_USE.second.rpm } } },
+        expect(writes(cafe.since(mark)), 'one write of the Workflow, and Streamline\'s own note of the setting for the profile').toEqual([
+            { write: 'PUT /api/v1/workflow', body: { context: { grinderId: second.id, grinderModel: SECOND_GRINDER.model, grinderSetting: GRINDER_USE.second.setting, extras: { rpm: GRINDER_USE.second.rpm } } } },
+            profileOverride(GRINDER_USE.second.setting),
         ]);
         const workflow = fake.workflow();
         expect(workflow.context).toMatchObject({ grinderId: second.id, grinderModel: SECOND_GRINDER.model, grinderSetting: GRINDER_USE.second.setting });
@@ -154,6 +162,7 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         await load(cafe, house);
         const allow = fake.refuse({ method: 'GET', path: /^\/api\/v1\/grinders(\?|$)/, abort: true });
         await tapAt(page, NAME);
+        await expect(page.locator('#app-toast')).toBeVisible();
         await expect(page.locator('#app-toast-message')).toHaveText('Could not read the grinders');
         await cafe.advance(1000);
         await expect(pickDialog(page)).toHaveCount(0);
@@ -171,7 +180,7 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         await tapAt(page, NAME);
         await cafe.pour(3000);
         await expect(pickDialog(page)).toHaveCount(0);
-        expect(workflowWrites(cafe.since(mark)), 'nothing written').toEqual([]);
+        expect(cafe.since(mark, isWrite), 'nothing written').toEqual([]);
     });
 
     // The sample data leaves the machine on the second grinder, its last shot's.
@@ -187,8 +196,9 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         await pickRow(page, GRINDER.model).click();
         await expect(page.locator('#cafe-grind-desc')).toHaveText(GRINDER.model);
         await cafe.advance(2000);
-        expect(workflowWrites(cafe.since(mark)).map(entry => entry.body)).toEqual([
-            { context: { grinderId: first.id, grinderModel: GRINDER.model, grinderSetting: GRINDER_USE.first.setting, extras: { rpm: null } } },
+        expect(writes(cafe.since(mark)), 'one write of the Workflow, and Streamline\'s own note of the setting for the profile').toEqual([
+            { write: 'PUT /api/v1/workflow', body: { context: { grinderId: first.id, grinderModel: GRINDER.model, grinderSetting: GRINDER_USE.first.setting, extras: { rpm: null } } } },
+            profileOverride(GRINDER_USE.first.setting),
         ]);
         expect(fake.workflow().context).toMatchObject({ grinderId: first.id, grinderSetting: GRINDER_USE.first.setting });
     });
