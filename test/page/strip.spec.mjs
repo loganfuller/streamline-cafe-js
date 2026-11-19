@@ -135,9 +135,9 @@ function workflowOf(record, machine) {
 /**
  * A record given hot water, a steam stop and a flush duration of its own. The
  * sample records hold the machine's (`matchMachine`), so a load that wrote none
- * of them would leave the Workflow as `workflowOf` expects it. Written in both the record's
- * dashboard values, which Streamline's apply writes, and its own Workflow,
- * which `workflowOf` reads, so DYE2 does not call the recipe changed.
+ * of them would leave the Workflow as `workflowOf` expects it. Written in both
+ * the record's dashboard values, which Streamline's apply writes, and its own
+ * Workflow, which `workflowOf` reads, so DYE2 does not call the recipe changed.
  */
 function ownLiveSettings(fake, name) {
     const machine = fake.workflow();
@@ -154,7 +154,7 @@ function ownLiveSettings(fake, name) {
     }));
     const record = recordOf(fake, name);
     expect(record.workflow.hotWaterData, `${name}'s hot water differs from the machine's`).not.toEqual(machine.hotWaterData);
-    expect([record.workflow.steamSettings.stopAtTemperature, record.workflow.rinseData.duration], 'and its steam stop and flush duration')
+    expect([record.workflow.steamSettings.stopAtTemperature, record.workflow.rinseData.duration], `${name}'s steam stop and flush duration are its own, not the machine's`)
         .toEqual([machine.steamSettings.stopAtTemperature + 65, machine.rinseData.duration + 5]);
 }
 
