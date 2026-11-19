@@ -11,6 +11,10 @@
 // (the sample data as Decaid answers it at the start) and `seen` (earlier
 // answers, by the step's `as`). The recording keeps the request as sent.
 //
+// A step `{ event: 'restart-dye2' }` is no request: the recorder disables DYE2
+// and enables it again through Decaid's plugin routes and waits for it to load,
+// and the replay calls the model's `restartDye2()`. Its recording has no answer.
+//
 // Each scenario keeps the Workflow it started from, which the replay starts
 // from too, and puts back what else it relies on (no recipe loaded) with its
 // first requests, so they can be recorded and replayed one at a time.
@@ -18,6 +22,12 @@
 const DYE2 = '/plugins/dye2.reaplugin';
 const recipeNamed = (sample, name) => sample.recipes.find(row => row.name === name);
 const grinderNamed = (sample, model) => sample.grinders.find(row => row.model === model);
+const beanNamed = (sample, name) => sample.beans.find(row => row.name === name);
+// DYE2's records with one of them on another profile, as the page's profile
+// change writes it: the profile, in its snapshot and its stored Workflow.
+const withProfile = (sample, name, profile) => sample.recipes.map(row => (row.name === name
+    ? { ...row, profileTitle: profile.title, profileSnapshot: profile, workflow: { ...row.workflow, profile } }
+    : row));
 // The Workflow Streamline's `applyRecipe` writes for a recipe, as the page sent
 // it on the pinned stack: the record's context, its basket and its id, its
 // profile, and the dial-in fields DYE2 holds cleared where the record has none.
@@ -123,6 +133,72 @@ export const SCENARIOS = [
         ],
     },
     {
+        name: 'beans',
+        rule: 'fake-decaid/library.js',
+        about: 'Decaid\'s beans and a bean\'s batches: bare lists, the most recently changed first, the archived left out unless asked for; no batches for a bean it doesn\'t have.',
+        steps: [
+            { method: 'GET', path: '/beans' },
+            { method: 'GET', path: '/beans?includeArchived=false' },
+            { method: 'GET', path: '/beans?includeArchived=true' },
+            { method: 'GET', path: ({ sample }) => `/beans/${beanNamed(sample, 'Sample Blend').id}/batches` },
+            { method: 'GET', path: ({ sample }) => `/beans/${beanNamed(sample, 'Sample Blend').id}/batches?includeArchived=true` },
+            { method: 'GET', path: ({ sample }) => `/beans/${beanNamed(sample, 'Example Decaf').id}/batches?includeArchived=false` },
+            { method: 'GET', path: '/beans/no-such-bean/batches?includeArchived=true' },
+        ],
+    },
+    {
+        name: 'dye2-save-recipe',
+        rule: 'fake-decaid/dye2.js',
+        dye2: true,
+        about: 'DYE2\'s save-recipe: a recipe from the live Workflow, named from the first word of its profile\'s title and its bean (a name taken gets " 2"), or by the name asked for, in the slot asked for (its holder losing the slot) or none, the Workflow\'s recipeId set to it and the recipe loaded, with a push.',
+        socket: '/ws/v1/plugins/dye2.reaplugin/changed',
+        steps: [
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            // A Workflow on Adaptive v3 with a bean, saved into slot 4: "Adaptive <bean>".
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => ({ profile: recipeNamed(sample, 'Single origin').workflow.profile, context: { coffeeName: 'Sample Blend' } }) },
+            { method: 'POST', path: `${DYE2}/save-recipe`, body: { slot: 4 } },
+            { method: 'GET', path: '/workflow' },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            // The same again, into slot 4: the name counts, and the first loses its slot.
+            { method: 'POST', path: `${DYE2}/save-recipe`, body: { slot: 4 } },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            // A name asked for, and no slot.
+            { method: 'POST', path: `${DYE2}/save-recipe`, body: { name: '  Sample Named Recipe ', slot: 9 } },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => sample.recipes },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+        ],
+    },
+    {
+        name: 'dye2-restart',
+        rule: 'fake-decaid/dye2.js',
+        dye2: true,
+        about: 'DYE2 started again keeps a recipe loaded whose record holds the Workflow\'s profile, as after a profile change written into the record first; and keeps it loaded when the record holds another profile too.',
+        steps: [
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => applied(recipeNamed(sample, 'House espresso')) },
+            { method: 'POST', path: `${DYE2}/selection`, body: ({ sample }) => ({ kind: 'recipe', id: recipeNamed(sample, 'House espresso').id }) },
+            // The record takes Adaptive v3 first, then the Workflow does: still loaded.
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => withProfile(sample, 'House espresso', recipeNamed(sample, 'Single origin').workflow.profile) },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => ({ profile: recipeNamed(sample, 'Single origin').workflow.profile }) },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { event: 'restart-dye2' },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { method: 'GET', path: '/workflow' },
+            // The record back on its own profile, and DYE2 started again: still loaded.
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => sample.recipes },
+            { event: 'restart-dye2' },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { method: 'GET', path: '/workflow' },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+        ],
+    },
+    {
         name: 'shots',
         rule: 'fake-decaid/shots.js',
         about: 'Decaid\'s Shots: newest first, without measurements, with total, limit and offset; filtered by grinder; by ids, a bare list of whole Shots; the latest; one by id or 404; an edit merged, a note cleared to "", a rating out of range and measurements refused.',
@@ -154,6 +230,7 @@ export const SCENARIOS = [
  */
 export async function recordScenarios({ decaid, raw, ws, write, sleep, opened, sample, only = null }) {
     const state = {
+        beans: sample.beans,
         workflow: sample.workflow,
         recipes: sample.store['dye2.reaplugin'].recipes,
         grinders: sample.grinders,
@@ -177,6 +254,20 @@ export async function recordScenarios({ decaid, raw, ws, write, sleep, opened, s
         };
         const steps = [];
         for (const step of scenario.steps) {
+            if (step.event === 'restart-dye2') {
+                await decaid('POST', '/plugins/dye2.reaplugin/disable', undefined, { manage: true });
+                await decaid('POST', '/plugins/dye2.reaplugin/enable', undefined, { manage: true });
+                for (let waited = 0; ; waited += 500) {
+                    const plugins = await decaid('GET', '/plugins');
+                    if (plugins.find(p => p.id === 'dye2.reaplugin')?.loaded) break;
+                    if (waited > 60_000) throw new Error('DYE2 did not load again within 60 s');
+                    await sleep(500);
+                }
+                // DYE2 reads the Workflow as it loads, and may write it.
+                await sleep(3000);
+                steps.push({ event: step.event });
+                continue;
+            }
             const path = typeof step.path === 'function' ? step.path({ sample: state }) : step.path;
             const body = typeof step.body === 'function' ? step.body({ sample: state }) : step.body;
             pushes.length = 0;

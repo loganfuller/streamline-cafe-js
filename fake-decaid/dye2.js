@@ -21,8 +21,34 @@
 // - `POST selection` writes `recipeId` (the recipe's id, or null for anything
 //   else) into the Workflow, and answers the selection.
 //
+// - `POST save-recipe` makes a recipe from the live Workflow, as DYE2's
+//   `handleSaveRecipe` does: named by the body's `name`, else by
+//   `proposeRecipeName` (utils/workflow-record.ts: the first word of the
+//   profile's title unless it says nothing, the bean, any beverage typed; the
+//   day where there is no bean; " 2", " 3" for a name taken), in the body's
+//   slot 1 to 5 (its holder keeps its row and loses the slot) or none, the
+//   Workflow's flush settings filled from the machine's; then the Workflow's
+//   `recipeId` set to it, and a push. Its id is DYE2's shape, `recipe-` and
+//   base 36, made from the page's time and a count rather than at random.
+//   Recorded: recordings/dye2-save-recipe.json.
+//
+// What the test makes happen, which no request shows:
+// - `recordReads()`: DYE2's `record` (Decent Sync's plugin asks for it after
+//   each dial-in change) has read the recipes list; the function it answers
+//   writes that list back whole, as `recordWorkflow` does once it has worked out
+//   its patch. A record written in between is lost. The patch itself is left
+//   out: what a page test needs is the list as it was read.
+// - `restart()`: DYE2 starts again (Decaid's plugin disable and enable, which
+//   unload it and load it afresh: plugin_loader_service.dart): it forgets what
+//   it noted at the last load. Its `onLoad` asks for a look at the Workflow
+//   comparing the record's profile (`trackWorkflow(wf, true)`), but on the
+//   pinned stack that look cleared no recipe, whether the record held the
+//   Workflow's profile or another: the recipe stayed loaded both times. Why
+//   was not found; the model follows the recording, and DYE2's next look at
+//   the Workflow notes the profile afresh. Recorded: recordings/dye2-restart.json.
+//
 // Not kept: DYE2's recent favourites are read from the store and never worked
-// out again from new Shots; `save-recipe` and `record` have no answer.
+// out again from new Shots; `record` has no answer.
 
 import { copy, isObject } from './workflow.js';
 
@@ -195,6 +221,36 @@ export function recipeIdOf(wf) {
     return id == null || id === '' ? null : String(id);
 }
 
+const GENERIC_PROFILE = /^(default|advanced|custom|profile|new|untitled)$/i;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** DYE2's `proposeRecipeName`; `now` is the page's time, read in UTC, Decaid's zone. */
+export function proposeRecipeName(wf, existingNames = [], beverage = '', now = 0) {
+    const word = String((wf && wf.profile && wf.profile.title) || '').trim().split(/\s+/)[0] || '';
+    const ctx = (wf && wf.context) || {};
+    const bean = String(ctx.coffeeName || '').trim();
+    const typed = String(beverage || '').trim();
+    const parts = [GENERIC_PROFILE.test(word) ? '' : word, bean, typed].filter(Boolean);
+    if (!parts.length) parts.push('Recipe');
+    if (!bean) {
+        const day = new Date(now);
+        parts.push(`${day.getUTCDate()} ${MONTHS[day.getUTCMonth()]}`);
+    }
+    const base = parts.join(' ');
+    const taken = n => existingNames.some(x => String(x).toLowerCase() === n.toLowerCase());
+    if (!taken(base)) return base;
+    let n = 2;
+    while (taken(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+}
+
+/** DYE2's `explicitRecipeSlot`: 1 to 5, else none. */
+function explicitRecipeSlot(requested) {
+    if (requested == null || requested === '') return null;
+    const want = Number(requested);
+    return [1, 2, 3, 4, 5].includes(want) ? want : null;
+}
+
 export function deriveSelection(wf, rows, armed = null) {
     if (!wf) return null;
     const rid = recipeIdOf(wf);
@@ -273,8 +329,65 @@ export function createDye2({ decaid, announce }) {
         return null;
     }
 
+    let made = 0;
+    // `handleSaveRecipe`.
+    function saveRecipe(body) {
+        let wf = decaid.workflow();
+        const recipes = kv('recipes');
+        const ctx = wf.context || {};
+        const beverage = (isObject(body) && typeof body.beverage === 'string' && body.beverage.trim()) || '';
+        const name = (isObject(body) && typeof body.name === 'string' && body.name.trim())
+            || proposeRecipeName(wf, recipes.map(r => r && (r.name || r.title)), beverage, decaid.now());
+        const stripSlot = explicitRecipeSlot(isObject(body) ? body.slot : undefined);
+        const id = `recipe-${decaid.now().toString(36)}${(++made).toString(36).padStart(4, '0')}`;
+        wf = withMachineSettings(wf, decaid.machineSettings());
+        const { dye, ...extras } = ctx.extras || {};
+        const flags = {};
+        const topKeys = ['beanBatchId', 'coffeeName', 'coffeeRoaster', 'grinderId', 'grinderModel', 'baristaName', 'drinkerName'];
+        for (const k of topKeys.concat(['basketId', 'basketName', 'rpm', 'note'])) {
+            const v = topKeys.includes(k) ? ctx[k] : extras[k];
+            if (v !== undefined) flags[k] = v === null ? null : true;
+        }
+        if (Object.keys(flags).length) extras.dye = { v: 1, ...flags };
+        const dashboardVariables = ownedRecipeFields(wf);
+        if (ctx.grinderId) {
+            dashboardVariables.grinderId = ctx.grinderId;
+            dashboardVariables.grinderModel = ctx.grinderModel;
+        }
+        const row = {
+            id, stripSlot, name, title: name, beverage,
+            barista: ctx.baristaName, drinker: ctx.drinkerName,
+            beanName: ctx.coffeeName, beanRoaster: ctx.coffeeRoaster, beanBatchId: ctx.beanBatchId,
+            profileTitle: wf.profile && wf.profile.title, profileSnapshot: wf.profile,
+            dashboardVariables,
+            workflow: {
+                context: { ...ctx, extras },
+                profile: wf.profile,
+                steamSettings: wf.steamSettings, hotWaterData: wf.hotWaterData, rinseData: wf.rinseData,
+            },
+            capturedAt: new Date(decaid.now()).toISOString(),
+        };
+        // As JSON carries it: a field left undefined is not written.
+        decaid.store.set(NS, 'recipes', JSON.parse(JSON.stringify(recipes
+            .map(r => (stripSlot != null && r && r.stripSlot === stripSlot ? { ...r, stripSlot: null } : r)).concat(row))));
+        decaid.putWorkflow({ context: { extras: { dye: { v: 1, recipeId: id } } } });
+        announce({ what: 'workflow' });
+        return { status: 200, body: { id, name } };
+    }
+
     return {
         workflowChanged,
+        /** DYE2's `record` has read the recipes list: the answer writes that list back. */
+        recordReads() {
+            const read = copy(kv('recipes'));
+            return () => decaid.store.set(NS, 'recipes', copy(read));
+        },
+        /** DYE2 starts again: what it noted is forgotten, and it reads the Workflow as it loads. */
+        restart() {
+            baseline = null;
+            mirrored = null;
+            return workflowChanged(decaid.workflow());
+        },
         /** Once a Shot is stored DYE2 works out its recents again, and pushes. */
         shotStored: () => announce({ what: 'workflow' }),
         /** Answers a request to one of DYE2's routes, or null for one it has no answer to. */
@@ -287,6 +400,7 @@ export function createDye2({ decaid, announce }) {
                 }
                 return { status: 200, body: copy(derive(decaid.workflow())) };
             }
+            if (endpoint === 'save-recipe' && method === 'POST') return saveRecipe(body);
             return null;
         },
     };

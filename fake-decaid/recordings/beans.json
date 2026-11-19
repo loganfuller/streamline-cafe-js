@@ -1,0 +1,371 @@
+{
+ "recordedWith": {
+  "decaid": "0.9.2",
+  "dye2": "0.1.42",
+  "streamline": "0.2.28"
+ },
+ "rule": "fake-decaid/library.js",
+ "about": "Decaid's beans and a bean's batches: bare lists, the most recently changed first, the archived left out unless asked for; no batches for a bean it doesn't have.",
+ "given": {
+  "workflow": {
+   "id": "9fcf8329-acaa-4b0c-9244-96b80a5ffe2a",
+   "name": "Workflow",
+   "description": "Description",
+   "profile": {
+    "version": "2",
+    "title": "Default",
+    "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+    "author": "Decent",
+    "beverage_type": "espresso",
+    "steps": [
+     {
+      "name": "preinfusion temp boost",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 2,
+      "weight": 0,
+      "temperature": 90,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "preinfusion",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 18,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "rise and hold",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 1,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "decline",
+      "pump": "pressure",
+      "transition": "smooth",
+      "exit": null,
+      "volume": 0,
+      "seconds": 32,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 6,
+      "limiter": null
+     }
+    ],
+    "target_volume": 36,
+    "target_weight": 36,
+    "target_volume_count_start": 2,
+    "tank_temperature": 0
+   },
+   "context": {
+    "targetDoseWeight": 18,
+    "targetYield": 36,
+    "grinderId": "f3d7cab2-6c98-4054-8181-2b56a34fb15f",
+    "grinderModel": "Sample Grinder 38",
+    "grinderSetting": "11.5",
+    "grinderRpm": 900,
+    "beanBatchId": "469bc3d5-8fda-40e7-a791-ad4e163c4831",
+    "coffeeName": "Sample Single Origin",
+    "coffeeRoaster": "Sample Roasters",
+    "baristaName": "Sample Barista",
+    "extras": {
+     "dye": {
+      "selection": null,
+      "v": 1,
+      "recipeId": null
+     },
+     "basketId": null,
+     "basketName": null,
+     "rpm": 800,
+     "feedRate": null,
+     "sample": {
+      "nested": true
+     }
+    }
+   },
+   "steamSettings": {
+    "targetTemperature": 150,
+    "duration": 50,
+    "flow": 0.8,
+    "stopAtTemperature": 0
+   },
+   "hotWaterData": {
+    "targetTemperature": 75,
+    "duration": 30,
+    "volume": 50,
+    "flow": 10
+   },
+   "rinseData": {
+    "targetTemperature": 90,
+    "duration": 10,
+    "flow": 6
+   }
+  }
+ },
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "db5e2021-2174-4f34-925f-d3f4d7f66312",
+      "roaster": "Example Coffee Co",
+      "name": "Example Decaf",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.321226",
+      "updatedAt": "2026-11-19T13:12:31.321226"
+     },
+     {
+      "id": "86ba85c9-836d-4cd1-a754-a188c3ed188b",
+      "roaster": "Sample Roasters",
+      "name": "Sample Single Origin",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.310220",
+      "updatedAt": "2026-11-19T13:12:31.310220"
+     },
+     {
+      "id": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roaster": "Sample Roasters",
+      "name": "Sample Blend",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.298269",
+      "updatedAt": "2026-11-19T13:12:31.298269"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans?includeArchived=false"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "db5e2021-2174-4f34-925f-d3f4d7f66312",
+      "roaster": "Example Coffee Co",
+      "name": "Example Decaf",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.321226",
+      "updatedAt": "2026-11-19T13:12:31.321226"
+     },
+     {
+      "id": "86ba85c9-836d-4cd1-a754-a188c3ed188b",
+      "roaster": "Sample Roasters",
+      "name": "Sample Single Origin",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.310220",
+      "updatedAt": "2026-11-19T13:12:31.310220"
+     },
+     {
+      "id": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roaster": "Sample Roasters",
+      "name": "Sample Blend",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.298269",
+      "updatedAt": "2026-11-19T13:12:31.298269"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans?includeArchived=true"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "db5e2021-2174-4f34-925f-d3f4d7f66312",
+      "roaster": "Example Coffee Co",
+      "name": "Example Decaf",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.321226",
+      "updatedAt": "2026-11-19T13:12:31.321226"
+     },
+     {
+      "id": "86ba85c9-836d-4cd1-a754-a188c3ed188b",
+      "roaster": "Sample Roasters",
+      "name": "Sample Single Origin",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.310220",
+      "updatedAt": "2026-11-19T13:12:31.310220"
+     },
+     {
+      "id": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roaster": "Sample Roasters",
+      "name": "Sample Blend",
+      "decaf": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.298269",
+      "updatedAt": "2026-11-19T13:12:31.298269"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans/f8437574-35a0-4605-9d92-a6affe5d915a/batches"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "5ad80b61-1d6d-4e29-8924-2847ed8e1721",
+      "beanId": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roastDate": "2026-10-15T00:00:00.000Z",
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.333784",
+      "updatedAt": "2026-11-19T13:12:31.333784"
+     },
+     {
+      "id": "8a329287-46a6-4b20-a8f1-3da3c4194de0",
+      "beanId": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roastDate": "2026-11-02T00:00:00.000Z",
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.304222",
+      "updatedAt": "2026-11-19T13:12:31.304222"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans/f8437574-35a0-4605-9d92-a6affe5d915a/batches?includeArchived=true"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "80982aa6-0b72-4aed-95e8-f2d34e711e56",
+      "beanId": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roastDate": "2026-09-20T00:00:00.000Z",
+      "frozen": false,
+      "archived": true,
+      "createdAt": "2026-11-19T13:12:31.339899",
+      "updatedAt": "2026-11-19T13:12:31.347279"
+     },
+     {
+      "id": "5ad80b61-1d6d-4e29-8924-2847ed8e1721",
+      "beanId": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roastDate": "2026-10-15T00:00:00.000Z",
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.333784",
+      "updatedAt": "2026-11-19T13:12:31.333784"
+     },
+     {
+      "id": "8a329287-46a6-4b20-a8f1-3da3c4194de0",
+      "beanId": "f8437574-35a0-4605-9d92-a6affe5d915a",
+      "roastDate": "2026-11-02T00:00:00.000Z",
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.304222",
+      "updatedAt": "2026-11-19T13:12:31.304222"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans/db5e2021-2174-4f34-925f-d3f4d7f66312/batches?includeArchived=false"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "86c83703-256d-4087-a4ab-bb4e4ba7bfea",
+      "beanId": "db5e2021-2174-4f34-925f-d3f4d7f66312",
+      "roastDate": "2026-10-20T00:00:00.000Z",
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-19T13:12:31.327427",
+      "updatedAt": "2026-11-19T13:12:31.327427"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans/no-such-bean/batches?includeArchived=true"
+   },
+   "answer": {
+    "status": 200,
+    "body": []
+   }
+  }
+ ]
+}

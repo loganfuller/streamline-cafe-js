@@ -28,6 +28,7 @@ const OWNED_REST = [
     /^\/api\/v1\/plugins\/dye2\.reaplugin\//,
     /^\/api\/v1\/grinders(\/|$)/,
     /^\/api\/v1\/bean-batches\//,
+    /^\/api\/v1\/beans(\/|$)/,
     /^\/api\/v1\/shots(\/|$)/,
     /^\/api\/v1\/machine\/state(\/|$)/,
 ];
@@ -115,6 +116,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             putWorkflow: body => setWorkflow(body),
             newestShots: count => shots.newest(count),
             machineSettings: () => cannedBoot.body('GET', '/api/v1/machine/settings'),
+            now: () => clock,
         },
         announce: payload => emit(`/ws/v1/plugins/${DYE2_ID}/changed`, payload),
     });
@@ -148,7 +150,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             if (!dye2Loaded()) return { status: 404, body: { error: `Plugin ${DYE2_ID} is not loaded` } };
             return dye2.answer(method, path.slice(`${API}/plugins/${DYE2_ID}/`.length), body);
         }
-        if (/^\/api\/v1\/(grinders|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
+        if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
         if (/^\/api\/v1\/shots(\/|$)/.test(path)) return shots.answer(method, path.slice(`${API}/shots`.length), query, body);
         if (path === `${API}/machine/state` && method === 'GET') return { status: 200, body: machine.snapshot() };
         // Only the states a recording or the page's tests ask for; any other
@@ -226,6 +228,13 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         refuse({ method, path, status = 500, body, abort = false, times }) {
             refusals.push({ method, path, status, body, abort, times });
             return () => { const at = refusals.findIndex(r => r.path === path); if (at >= 0) refusals.splice(at, 1); };
+        },
+        /** DYE2's `record` has read its recipes list; the function it answers writes that list back (dye2.js). */
+        dye2RecordReads: () => dye2.recordReads(),
+        /** DYE2 starts again, as Decaid's plugin disable and enable leave it (dye2.js). */
+        restartDye2() {
+            const own = dye2.restart();
+            if (own) setWorkflow(own);
         },
         /** A recorded answer of the boot, changed: `patch(body)` answers the new body. */
         patchBoot: (key, patch) => cannedBoot.patch(key, patch),

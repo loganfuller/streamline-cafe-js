@@ -238,8 +238,8 @@
      "parentId": "profile:b73ce54592d667d00b31",
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.673431",
-     "updatedAt": "2026-11-19T05:43:28.870457",
+     "createdAt": "2026-11-19T13:12:28.908237",
+     "updatedAt": "2026-11-19T13:12:29.102475",
      "metadata": {
       "source": "bundled",
       "filename": "best_practice_v3.json"
@@ -496,8 +496,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.852208",
-     "updatedAt": "2026-11-19T05:43:28.852208",
+     "createdAt": "2026-11-19T13:12:29.084908",
+     "updatedAt": "2026-11-19T13:12:29.084908",
      "metadata": {
       "source": "bundled",
       "filename": "weber_spring_clean.json"
@@ -627,8 +627,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.843172",
-     "updatedAt": "2026-11-19T05:43:28.843172",
+     "createdAt": "2026-11-19T13:12:29.077141",
+     "updatedAt": "2026-11-19T13:12:29.077141",
      "metadata": {
       "source": "bundled",
       "filename": "v60-22g.json"
@@ -758,8 +758,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.836679",
-     "updatedAt": "2026-11-19T05:43:28.836679",
+     "createdAt": "2026-11-19T13:12:29.069681",
+     "updatedAt": "2026-11-19T13:12:29.069681",
      "metadata": {
       "source": "bundled",
       "filename": "v60-20g.json"
@@ -876,8 +876,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.827271",
-     "updatedAt": "2026-11-19T05:43:28.827271",
+     "createdAt": "2026-11-19T13:12:29.062514",
+     "updatedAt": "2026-11-19T13:12:29.062514",
      "metadata": {
       "source": "bundled",
       "filename": "v60-15g.json"
@@ -1011,8 +1011,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.817840",
-     "updatedAt": "2026-11-19T05:43:28.817840",
+     "createdAt": "2026-11-19T13:12:29.055545",
+     "updatedAt": "2026-11-19T13:12:29.055545",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_tisane.json"
@@ -1133,8 +1133,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.810408",
-     "updatedAt": "2026-11-19T05:43:28.810408",
+     "createdAt": "2026-11-19T13:12:29.048442",
+     "updatedAt": "2026-11-19T13:12:29.048442",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_pressurized.json"
@@ -1308,8 +1308,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.802306",
-     "updatedAt": "2026-11-19T05:43:28.802306",
+     "createdAt": "2026-11-19T13:12:29.041172",
+     "updatedAt": "2026-11-19T13:12:29.041172",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_oolong_dark.json"
@@ -1443,8 +1443,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.792689",
-     "updatedAt": "2026-11-19T05:43:28.792689",
+     "createdAt": "2026-11-19T13:12:29.033164",
+     "updatedAt": "2026-11-19T13:12:29.033164",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_oolong.json"
@@ -1617,8 +1617,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.784110",
-     "updatedAt": "2026-11-19T05:43:28.784110",
+     "createdAt": "2026-11-19T13:12:29.026273",
+     "updatedAt": "2026-11-19T13:12:29.026273",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_no_pressure.json"
@@ -1752,8 +1752,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.776033",
-     "updatedAt": "2026-11-19T05:43:28.776033",
+     "createdAt": "2026-11-19T13:12:29.018386",
+     "updatedAt": "2026-11-19T13:12:29.018386",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_japanese_green.json"
@@ -1887,8 +1887,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.767324",
-     "updatedAt": "2026-11-19T05:43:28.767324",
+     "createdAt": "2026-11-19T13:12:29.011257",
+     "updatedAt": "2026-11-19T13:12:29.011257",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter_chinese_green.json"
@@ -2022,8 +2022,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.760777",
-     "updatedAt": "2026-11-19T05:43:28.760777",
+     "createdAt": "2026-11-19T13:12:29.004545",
+     "updatedAt": "2026-11-19T13:12:29.004545",
      "metadata": {
       "source": "bundled",
       "filename": "tea_portafilter.json"
@@ -2305,8 +2305,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.753781",
-     "updatedAt": "2026-11-19T05:43:28.753781",
+     "createdAt": "2026-11-19T13:12:28.997626",
+     "updatedAt": "2026-11-19T13:12:28.997626",
      "metadata": {
       "source": "bundled",
       "filename": "tea_in_a_basket.json"
@@ -2388,8 +2388,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.746040",
-     "updatedAt": "2026-11-19T05:43:28.746040",
+     "createdAt": "2026-11-19T13:12:28.990282",
+     "updatedAt": "2026-11-19T13:12:28.990282",
      "metadata": {
       "source": "bundled",
       "filename": "rohan-soup.json"
@@ -2447,8 +2447,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.739769",
-     "updatedAt": "2026-11-19T05:43:28.739769",
+     "createdAt": "2026-11-19T13:12:28.982307",
+     "updatedAt": "2026-11-19T13:12:28.982307",
      "metadata": {
       "source": "bundled",
       "filename": "rao_allonge.json"
@@ -2530,8 +2530,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.732105",
-     "updatedAt": "2026-11-19T05:43:28.732105",
+     "createdAt": "2026-11-19T13:12:28.975809",
+     "updatedAt": "2026-11-19T13:12:28.975809",
      "metadata": {
       "source": "bundled",
       "filename": "psph.json"
@@ -2596,8 +2596,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.725619",
-     "updatedAt": "2026-11-19T05:43:28.725619",
+     "createdAt": "2026-11-19T13:12:28.968599",
+     "updatedAt": "2026-11-19T13:12:28.968599",
      "metadata": {
       "source": "bundled",
       "filename": "manual_pressure.json"
@@ -2655,8 +2655,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.719312",
-     "updatedAt": "2026-11-19T05:43:28.719312",
+     "createdAt": "2026-11-19T13:12:28.961485",
+     "updatedAt": "2026-11-19T13:12:28.961485",
      "metadata": {
       "source": "bundled",
       "filename": "manual_flow.json"
@@ -2786,8 +2786,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.713100",
-     "updatedAt": "2026-11-19T05:43:28.713100",
+     "createdAt": "2026-11-19T13:12:28.954152",
+     "updatedAt": "2026-11-19T13:12:28.954152",
      "metadata": {
       "source": "bundled",
       "filename": "kalita_20.json"
@@ -2913,8 +2913,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.706728",
-     "updatedAt": "2026-11-19T05:43:28.706728",
+     "createdAt": "2026-11-19T13:12:28.945939",
+     "updatedAt": "2026-11-19T13:12:28.945939",
      "metadata": {
       "source": "bundled",
       "filename": "icbinf.json"
@@ -3052,8 +3052,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.699185",
-     "updatedAt": "2026-11-19T05:43:28.699185",
+     "createdAt": "2026-11-19T13:12:28.938760",
+     "updatedAt": "2026-11-19T13:12:28.938760",
      "metadata": {
       "source": "bundled",
       "filename": "filter3.json"
@@ -3307,8 +3307,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.692198",
-     "updatedAt": "2026-11-19T05:43:28.692198",
+     "createdAt": "2026-11-19T13:12:28.930731",
+     "updatedAt": "2026-11-19T13:12:28.930731",
      "metadata": {
       "source": "bundled",
       "filename": "easy_blooming_active_pressure_decline.json"
@@ -3409,8 +3409,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.685956",
-     "updatedAt": "2026-11-19T05:43:28.685956",
+     "createdAt": "2026-11-19T13:12:28.923277",
+     "updatedAt": "2026-11-19T13:12:28.923277",
      "metadata": {
       "source": "bundled",
       "filename": "cremina.json"
@@ -3540,8 +3540,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.679579",
-     "updatedAt": "2026-11-19T05:43:28.679579",
+     "createdAt": "2026-11-19T13:12:28.915883",
+     "updatedAt": "2026-11-19T13:12:28.915883",
      "metadata": {
       "source": "bundled",
       "filename": "cold_brew.json"
@@ -3659,8 +3659,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.666606",
-     "updatedAt": "2026-11-19T05:43:28.666606",
+     "createdAt": "2026-11-19T13:12:28.901089",
+     "updatedAt": "2026-11-19T13:12:28.901089",
      "metadata": {
       "source": "bundled",
       "filename": "best_practice_light.json"
@@ -3814,8 +3814,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.660515",
-     "updatedAt": "2026-11-19T05:43:28.660515",
+     "createdAt": "2026-11-19T13:12:28.895013",
+     "updatedAt": "2026-11-19T13:12:28.895013",
      "metadata": {
       "source": "bundled",
       "filename": "best_practice.json"
@@ -3893,8 +3893,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.654942",
-     "updatedAt": "2026-11-19T05:43:28.654942",
+     "createdAt": "2026-11-19T13:12:28.888322",
+     "updatedAt": "2026-11-19T13:12:28.888322",
      "metadata": {
       "source": "bundled",
       "filename": "baseline_ulc.json"
@@ -3976,8 +3976,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.647728",
-     "updatedAt": "2026-11-19T05:43:28.647728",
+     "createdAt": "2026-11-19T13:12:28.881240",
+     "updatedAt": "2026-11-19T13:12:28.881240",
      "metadata": {
       "source": "bundled",
       "filename": "baseline_mc.json"
@@ -4059,8 +4059,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.640234",
-     "updatedAt": "2026-11-19T05:43:28.640234",
+     "createdAt": "2026-11-19T13:12:28.874212",
+     "updatedAt": "2026-11-19T13:12:28.874212",
      "metadata": {
       "source": "bundled",
       "filename": "baseline_lc.json"
@@ -4142,8 +4142,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.633329",
-     "updatedAt": "2026-11-19T05:43:28.633329",
+     "createdAt": "2026-11-19T13:12:28.868135",
+     "updatedAt": "2026-11-19T13:12:28.868135",
      "metadata": {
       "source": "bundled",
       "filename": "baseline_hc.json"
@@ -4246,8 +4246,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.626600",
-     "updatedAt": "2026-11-19T05:43:28.626600",
+     "createdAt": "2026-11-19T13:12:28.862500",
+     "updatedAt": "2026-11-19T13:12:28.862500",
      "metadata": {
       "source": "bundled",
       "filename": "advanced_spring_lever.json"
@@ -4605,8 +4605,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.620239",
-     "updatedAt": "2026-11-19T05:43:28.620239",
+     "createdAt": "2026-11-19T13:12:28.856578",
+     "updatedAt": "2026-11-19T13:12:28.856578",
      "metadata": {
       "source": "bundled",
       "filename": "adaptive_espresso.json"
@@ -4964,8 +4964,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.613144",
-     "updatedAt": "2026-11-19T05:43:28.613144",
+     "createdAt": "2026-11-19T13:12:28.845315",
+     "updatedAt": "2026-11-19T13:12:28.845315",
      "metadata": {
       "source": "bundled",
       "filename": "adaptive_allonge.json"
@@ -5063,8 +5063,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.606811",
-     "updatedAt": "2026-11-19T05:43:28.606811",
+     "createdAt": "2026-11-19T13:12:28.838670",
+     "updatedAt": "2026-11-19T13:12:28.838670",
      "metadata": {
       "source": "bundled",
       "filename": "Weiss_advanced_spring_lever.json"
@@ -5163,8 +5163,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.600547",
-     "updatedAt": "2026-11-19T05:43:28.600547",
+     "createdAt": "2026-11-19T13:12:28.833370",
+     "updatedAt": "2026-11-19T13:12:28.833370",
      "metadata": {
       "source": "bundled",
       "filename": "Two_spring_lever_machine_to_9_bar.json"
@@ -5294,8 +5294,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.593849",
-     "updatedAt": "2026-11-19T05:43:28.593849",
+     "createdAt": "2026-11-19T13:12:28.828310",
+     "updatedAt": "2026-11-19T13:12:28.828310",
      "metadata": {
       "source": "bundled",
       "filename": "TurboTurbo.json"
@@ -5429,8 +5429,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.587742",
-     "updatedAt": "2026-11-19T05:43:28.587742",
+     "createdAt": "2026-11-19T13:12:28.823178",
+     "updatedAt": "2026-11-19T13:12:28.823178",
      "metadata": {
       "source": "bundled",
       "filename": "TurboBloom.json"
@@ -5516,8 +5516,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.582171",
-     "updatedAt": "2026-11-19T05:43:28.582171",
+     "createdAt": "2026-11-19T13:12:28.818273",
+     "updatedAt": "2026-11-19T13:12:28.818273",
      "metadata": {
       "source": "bundled",
       "filename": "Trendy_6_bar_low_pressure_shot.json"
@@ -5616,8 +5616,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.576458",
-     "updatedAt": "2026-11-19T05:43:28.576458",
+     "createdAt": "2026-11-19T13:12:28.813403",
+     "updatedAt": "2026-11-19T13:12:28.813403",
      "metadata": {
       "source": "bundled",
       "filename": "Traditional_lever_machine.json"
@@ -5759,8 +5759,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.570432",
-     "updatedAt": "2026-11-19T05:43:28.570432",
+     "createdAt": "2026-11-19T13:12:28.808523",
+     "updatedAt": "2026-11-19T13:12:28.808523",
      "metadata": {
       "source": "bundled",
       "filename": "Tea_portafilter__Blue_Willow_lunar_winter.json"
@@ -5838,8 +5838,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.564446",
-     "updatedAt": "2026-11-19T05:43:28.564446",
+     "createdAt": "2026-11-19T13:12:28.803892",
+     "updatedAt": "2026-11-19T13:12:28.803892",
      "metadata": {
       "source": "bundled",
       "filename": "Tea_portafilter__Blue_Willow_black_phoenix_2.json"
@@ -5981,8 +5981,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.558385",
-     "updatedAt": "2026-11-19T05:43:28.558385",
+     "createdAt": "2026-11-19T13:12:28.798501",
+     "updatedAt": "2026-11-19T13:12:28.798501",
      "metadata": {
       "source": "bundled",
       "filename": "Tea_portafilter__Blue_Willow_black_phoenix_1.json"
@@ -6124,8 +6124,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.552917",
-     "updatedAt": "2026-11-19T05:43:28.552917",
+     "createdAt": "2026-11-19T13:12:28.792969",
+     "updatedAt": "2026-11-19T13:12:28.792969",
      "metadata": {
       "source": "bundled",
       "filename": "Tea_portafilter__Blue_Willow_Tsuyuhikari_Sencha.json"
@@ -6194,8 +6194,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.546628",
-     "updatedAt": "2026-11-19T05:43:28.546628",
+     "createdAt": "2026-11-19T13:12:28.787232",
+     "updatedAt": "2026-11-19T13:12:28.787232",
      "metadata": {
       "source": "bundled",
       "filename": "Preinfuse_then_45ml_of_water.json"
@@ -6312,8 +6312,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.540498",
-     "updatedAt": "2026-11-19T05:43:28.540498",
+     "createdAt": "2026-11-19T13:12:28.782833",
+     "updatedAt": "2026-11-19T13:12:28.782833",
      "metadata": {
       "source": "bundled",
       "filename": "Pour_over.json"
@@ -6445,8 +6445,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.534188",
-     "updatedAt": "2026-11-19T05:43:28.534188",
+     "createdAt": "2026-11-19T13:12:28.777467",
+     "updatedAt": "2026-11-19T13:12:28.777467",
      "metadata": {
       "source": "bundled",
       "filename": "Londonium.json"
@@ -6584,8 +6584,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.528245",
-     "updatedAt": "2026-11-19T05:43:28.528245",
+     "createdAt": "2026-11-19T13:12:28.772068",
+     "updatedAt": "2026-11-19T13:12:28.772068",
      "metadata": {
       "source": "bundled",
       "filename": "I_got_your_back.json"
@@ -6690,8 +6690,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.522127",
-     "updatedAt": "2026-11-19T05:43:28.522127",
+     "createdAt": "2026-11-19T13:12:28.766082",
+     "updatedAt": "2026-11-19T13:12:28.766082",
      "metadata": {
       "source": "bundled",
       "filename": "Gentle_and_sweet1.json"
@@ -6783,8 +6783,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.516529",
-     "updatedAt": "2026-11-19T05:43:28.516529",
+     "createdAt": "2026-11-19T13:12:28.760208",
+     "updatedAt": "2026-11-19T13:12:28.760208",
      "metadata": {
       "source": "bundled",
       "filename": "Flow_profile_for_straight_espresso.json"
@@ -6876,8 +6876,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.510624",
-     "updatedAt": "2026-11-19T05:43:28.510624",
+     "createdAt": "2026-11-19T13:12:28.754065",
+     "updatedAt": "2026-11-19T13:12:28.754065",
      "metadata": {
       "source": "bundled",
       "filename": "Flow_profile_for_milky_drinks.json"
@@ -7003,8 +7003,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.504857",
-     "updatedAt": "2026-11-19T05:43:28.504857",
+     "createdAt": "2026-11-19T13:12:28.748546",
+     "updatedAt": "2026-11-19T13:12:28.748546",
      "metadata": {
       "source": "bundled",
       "filename": "Filter_21.json"
@@ -7094,8 +7094,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.499329",
-     "updatedAt": "2026-11-19T05:43:28.499329",
+     "createdAt": "2026-11-19T13:12:28.742793",
+     "updatedAt": "2026-11-19T13:12:28.742793",
      "metadata": {
       "source": "bundled",
       "filename": "Filter_20.json"
@@ -7197,8 +7197,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.493535",
-     "updatedAt": "2026-11-19T05:43:28.493535",
+     "createdAt": "2026-11-19T13:12:28.737416",
+     "updatedAt": "2026-11-19T13:12:28.737416",
      "metadata": {
       "source": "bundled",
       "filename": "Extractamundo_Dos.json"
@@ -7297,8 +7297,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.487569",
-     "updatedAt": "2026-11-19T05:43:28.487569",
+     "createdAt": "2026-11-19T13:12:28.731439",
+     "updatedAt": "2026-11-19T13:12:28.731439",
      "metadata": {
       "source": "bundled",
       "filename": "EspressoForge_Light.json"
@@ -7380,8 +7380,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.482079",
-     "updatedAt": "2026-11-19T05:43:28.482079",
+     "createdAt": "2026-11-19T13:12:28.725887",
+     "updatedAt": "2026-11-19T13:12:28.725887",
      "metadata": {
       "source": "bundled",
       "filename": "EspressoForge_Dark.json"
@@ -7493,8 +7493,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.476102",
-     "updatedAt": "2026-11-19T05:43:28.476102",
+     "createdAt": "2026-11-19T13:12:28.719466",
+     "updatedAt": "2026-11-19T13:12:28.719466",
      "metadata": {
       "source": "bundled",
       "filename": "Default1.json"
@@ -7572,8 +7572,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.470766",
-     "updatedAt": "2026-11-19T05:43:28.470766",
+     "createdAt": "2026-11-19T13:12:28.713083",
+     "updatedAt": "2026-11-19T13:12:28.713083",
      "metadata": {
       "source": "bundled",
       "filename": "Damians_Q.json"
@@ -7722,8 +7722,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.465208",
-     "updatedAt": "2026-11-19T05:43:28.465208",
+     "createdAt": "2026-11-19T13:12:28.707132",
+     "updatedAt": "2026-11-19T13:12:28.707132",
      "metadata": {
       "source": "bundled",
       "filename": "Damian_s_LRv3.json"
@@ -7855,8 +7855,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.459499",
-     "updatedAt": "2026-11-19T05:43:28.459499",
+     "createdAt": "2026-11-19T13:12:28.701328",
+     "updatedAt": "2026-11-19T13:12:28.701328",
      "metadata": {
       "source": "bundled",
       "filename": "Damian_s_LRv2.json"
@@ -7979,8 +7979,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.454291",
-     "updatedAt": "2026-11-19T05:43:28.454291",
+     "createdAt": "2026-11-19T13:12:28.695291",
+     "updatedAt": "2026-11-19T13:12:28.695291",
      "metadata": {
       "source": "bundled",
       "filename": "Damian_s_LM_Leva.json"
@@ -8058,8 +8058,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.448632",
-     "updatedAt": "2026-11-19T05:43:28.448632",
+     "createdAt": "2026-11-19T13:12:28.690004",
+     "updatedAt": "2026-11-19T13:12:28.690004",
      "metadata": {
       "source": "bundled",
       "filename": "D-Flow____default.json"
@@ -8229,8 +8229,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.442641",
-     "updatedAt": "2026-11-19T05:43:28.442641",
+     "createdAt": "2026-11-19T13:12:28.684920",
+     "updatedAt": "2026-11-19T13:12:28.684920",
      "metadata": {
       "source": "bundled",
       "filename": "Cleaning__Forward_Flush_x5_2.json"
@@ -8319,8 +8319,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.437101",
-     "updatedAt": "2026-11-19T05:43:28.437101",
+     "createdAt": "2026-11-19T13:12:28.679914",
+     "updatedAt": "2026-11-19T13:12:28.679914",
      "metadata": {
       "source": "bundled",
       "filename": "Classic_Italian_espresso.json"
@@ -8434,8 +8434,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.431990",
-     "updatedAt": "2026-11-19T05:43:28.431990",
+     "createdAt": "2026-11-19T13:12:28.674355",
+     "updatedAt": "2026-11-19T13:12:28.674355",
      "metadata": {
       "source": "bundled",
       "filename": "Blooming_espresso.json"
@@ -8556,8 +8556,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.426474",
-     "updatedAt": "2026-11-19T05:43:28.426474",
+     "createdAt": "2026-11-19T13:12:28.668682",
+     "updatedAt": "2026-11-19T13:12:28.668682",
      "metadata": {
       "source": "bundled",
       "filename": "Blooming_allonge.json"
@@ -8747,8 +8747,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.420569",
-     "updatedAt": "2026-11-19T05:43:28.420569",
+     "createdAt": "2026-11-19T13:12:28.662689",
+     "updatedAt": "2026-11-19T13:12:28.662689",
      "metadata": {
       "source": "bundled",
       "filename": "A-Flow____default-very-dark.json"
@@ -8938,8 +8938,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.414537",
-     "updatedAt": "2026-11-19T05:43:28.414537",
+     "createdAt": "2026-11-19T13:12:28.657339",
+     "updatedAt": "2026-11-19T13:12:28.657339",
      "metadata": {
       "source": "bundled",
       "filename": "A-Flow____default-medium.json"
@@ -9133,8 +9133,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.408431",
-     "updatedAt": "2026-11-19T05:43:28.408431",
+     "createdAt": "2026-11-19T13:12:28.651158",
+     "updatedAt": "2026-11-19T13:12:28.651158",
      "metadata": {
       "source": "bundled",
       "filename": "A-Flow____default-like-dflow.json"
@@ -9324,8 +9324,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.402268",
-     "updatedAt": "2026-11-19T05:43:28.402268",
+     "createdAt": "2026-11-19T13:12:28.645056",
+     "updatedAt": "2026-11-19T13:12:28.645056",
      "metadata": {
       "source": "bundled",
       "filename": "A-Flow____default-light.json"
@@ -9515,8 +9515,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.396614",
-     "updatedAt": "2026-11-19T05:43:28.396614",
+     "createdAt": "2026-11-19T13:12:28.639353",
+     "updatedAt": "2026-11-19T13:12:28.639353",
      "metadata": {
       "source": "bundled",
       "filename": "A-Flow____default-dark.json"
@@ -9610,8 +9610,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.390389",
-     "updatedAt": "2026-11-19T05:43:28.390389",
+     "createdAt": "2026-11-19T13:12:28.634169",
+     "updatedAt": "2026-11-19T13:12:28.634169",
      "metadata": {
       "source": "bundled",
       "filename": "80s_Espresso.json"
@@ -9716,8 +9716,8 @@
      "parentId": null,
      "visibility": "visible",
      "isDefault": true,
-     "createdAt": "2026-11-19T05:43:28.385145",
-     "updatedAt": "2026-11-19T05:43:28.385145",
+     "createdAt": "2026-11-19T13:12:28.628074",
+     "updatedAt": "2026-11-19T13:12:28.628074",
      "metadata": {
       "source": "bundled",
       "filename": "7g_basket.json"
@@ -9781,8 +9781,8 @@
       "commitHash": "v0.2.7",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:53.811493",
-      "lastChecked": "2026-11-19T05:43:53.811493"
+      "installedAt": "2026-11-19T13:12:53.649695",
+      "lastChecked": "2026-11-19T13:12:53.649696"
      }
     },
     {
@@ -9800,8 +9800,8 @@
       "commitHash": "v0.0.13",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:36.713714",
-      "lastChecked": "2026-11-19T05:43:36.713714"
+      "installedAt": "2026-11-19T13:12:36.682251",
+      "lastChecked": "2026-11-19T13:12:36.682251"
      }
     },
     {
@@ -9819,8 +9819,8 @@
       "commitHash": "nova-v0.1.3",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:38.807953",
-      "lastChecked": "2026-11-19T05:43:38.807953"
+      "installedAt": "2026-11-19T13:12:38.512771",
+      "lastChecked": "2026-11-19T13:12:38.512771"
      }
     },
     {
@@ -9828,18 +9828,18 @@
      "name": "Beanie",
      "path": "/root/.local/share/decaid/web-ui/beanie",
      "description": "Bean-first dial-in workflow for Decent.app.",
-     "version": "0.3.10",
+     "version": "0.3.11",
      "isBundled": true,
      "reaMetadata": {
       "skinId": "beanie",
-      "sourceUrl": "github_release:giladger/Beanie@v0.3.10",
-      "lastModified": "2026-10-28T13:33:59Z",
+      "sourceUrl": "github_release:giladger/Beanie@v0.3.11",
+      "lastModified": "2026-11-19T09:37:27Z",
       "etag": null,
-      "commitHash": "v0.3.10",
+      "commitHash": "v0.3.11",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:37.646200",
-      "lastChecked": "2026-11-19T05:43:37.646200"
+      "installedAt": "2026-11-19T13:12:37.572780",
+      "lastChecked": "2026-11-19T13:12:37.572780"
      }
     },
     {
@@ -9857,8 +9857,8 @@
       "commitHash": "v0.9.6",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:35.539611",
-      "lastChecked": "2026-11-19T05:43:35.539611"
+      "installedAt": "2026-11-19T13:12:35.562517",
+      "lastChecked": "2026-11-19T13:12:35.562517"
      }
     },
     {
@@ -9876,8 +9876,8 @@
       "commitHash": "v0.4.8",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:39.962549",
-      "lastChecked": "2026-11-19T05:43:39.962549"
+      "installedAt": "2026-11-19T13:12:39.757846",
+      "lastChecked": "2026-11-19T13:12:39.757846"
      }
     },
     {
@@ -9885,18 +9885,18 @@
      "name": "Streamline.js",
      "path": "/root/.local/share/decaid/web-ui/streamline.js",
      "description": "Modern, feature-complete WebUI skin for Streamline-Bridge",
-     "version": "0.2.28",
+     "version": "0.2.30",
      "isBundled": true,
      "reaMetadata": {
       "skinId": "streamline.js",
-      "sourceUrl": "github_release:allofmeng/streamline_project@v0.2.28",
-      "lastModified": "2026-11-16T02:17:17Z",
+      "sourceUrl": "github_release:allofmeng/streamline_project@v0.2.30",
+      "lastModified": "2026-11-19T09:31:00Z",
       "etag": null,
-      "commitHash": "v0.2.28",
+      "commitHash": "v0.2.30",
       "releaseAssetName": null,
       "includePrerelease": false,
-      "installedAt": "2026-11-19T05:43:34.266601",
-      "lastChecked": "2026-11-19T05:43:34.266602"
+      "installedAt": "2026-11-19T13:12:34.423340",
+      "lastChecked": "2026-11-19T13:12:34.423341"
      }
     }
    ],
@@ -9927,7 +9927,7 @@
   "/ws/v1/devices": {
    "frames": [
     {
-     "timestamp": "2026-11-19T05:43:30.687858Z",
+     "timestamp": "2026-11-19T13:12:30.874982Z",
      "devices": [
       {
        "name": "Mock Scale",
@@ -10016,7 +10016,7 @@
      "message": "Target temperature reached",
      "currentTemp": 90,
      "targetTemp": 90,
-     "timestamp": 1795067119694
+     "timestamp": 1795094095582
     }
    ]
   }
