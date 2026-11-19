@@ -52,7 +52,7 @@ try {
     const skin = JSON.parse(await readFile(join(ROOT, 'skin-manifest.json'), 'utf8')).version;
     const problems = [
         decaidVersion !== PINS.decaid.version && `Decaid ${decaidVersion} is running, pinned ${PINS.decaid.version}`,
-        dye2?.version !== PINS.dye2.version && `DYE2 ${dye2?.version ?? 'is not'} loaded, pinned ${PINS.dye2.version}`,
+        (!dye2?.loaded || dye2.version !== PINS.dye2.version) && `DYE2 ${dye2?.version ?? ''} is ${dye2?.loaded ? 'loaded' : 'not loaded'}, pinned ${PINS.dye2.version}`,
         !String(skin).startsWith(`${PINS.streamline.version}-`) && String(skin) !== PINS.streamline.version && `the page is Streamline ${skin}, pinned ${PINS.streamline.version}`,
     ].filter(Boolean);
     if (problems.length) throw new Error(`not recording: ${problems.join('; ')}`);

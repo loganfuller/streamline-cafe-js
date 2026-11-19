@@ -12,19 +12,45 @@ const files = [
     ...readdirSync(new URL('support/', DIR)).filter(name => name.endsWith('.mjs')).map(name => new URL(`support/${name}`, DIR)),
 ];
 
+// The arguments of the call whose `(` is at `open`: the text to its matching
+// `)`, and whether a comma stands at its top level (a second argument).
+function call(source, open) {
+    let depth = 0;
+    let comma = false;
+    for (let at = open; at < source.length; at += 1) {
+        const ch = source[at];
+        if ('([{'.includes(ch)) depth += 1;
+        else if (')]}'.includes(ch)) {
+            depth -= 1;
+            if (depth === 0) return { text: source.slice(open, at + 1), comma };
+        } else if (ch === ',' && depth === 1) comma = true;
+    }
+    return { text: source.slice(open), comma };
+}
+
 test('no page test holds a fixed sleep or swallows a timeout', () => {
     assert.ok(files.length > 0);
     for (const file of files) {
         // Comments only: a // that starts a line or follows a space, not one in a URL.
         const source = readFileSync(file, 'utf8').replace(/(^|\s)\/\/.*$/gm, '$1');
+        const near = at => source.slice(at, at + 60).replace(/\s+/g, ' ');
         assert.doesNotMatch(source, /waitForTimeout|\bsleep\(|setTimeout\(/, `${file.pathname}: a fixed sleep`);
-        assert.doesNotMatch(source, /\.then\([^()]*(\([^()]*\)[^()]*)*,\s*(\([^)]*\)|\w+)\s*=>/, `${file.pathname}: a .then with a rejection handler`);
+        // A .then with a second argument: a rejection handler.
+        for (const match of source.matchAll(/\.then\(/g)) {
+            assert.ok(!call(source, match.index + 5).comma, `${file.pathname}: a .then with a rejection handler (${near(match.index)})`);
+        }
         // A .catch that doesn't throw again, or a catch block left empty.
-        for (const [at] of source.matchAll(/\.catch\(/g).map(m => [m.index])) {
-            assert.match(source.slice(at, at + 200), /throw\b/, `${file.pathname}: a .catch that swallows (${source.slice(at, at + 60).replace(/\s+/g, ' ')})`);
+        for (const match of source.matchAll(/\.catch\(/g)) {
+            assert.match(call(source, match.index + 6).text, /throw\b/, `${file.pathname}: a .catch that swallows (${near(match.index)})`);
         }
         assert.doesNotMatch(source, /catch\s*(\([^)]*\))?\s*\{\s*\}/, `${file.pathname}: an empty catch`);
         // A wait or check in a try whose catch doesn't throw again.
-        assert.doesNotMatch(source, /try\s*\{[^}]*\b(waitFor\w*|expect|poll)\b[^}]*\}\s*catch\s*(\([^)]*\))?\s*\{(?![^}]*\bthrow\b)[^}]*\}/, `${file.pathname}: a wait whose failure is caught`);
+        for (const match of source.matchAll(/\btry\s*\{/g)) {
+            const block = call(source, match.index + match[0].length - 1).text;
+            if (!/\b(waitFor\w*|expect|poll)\b/.test(block)) continue;
+            const after = source.slice(match.index + match[0].length - 1 + block.length);
+            const handler = /^\s*catch\s*(\([^)]*\))?\s*\{/.exec(after);
+            if (handler) assert.match(call(after, handler[0].length - 1).text, /\bthrow\b/, `${file.pathname}: a wait whose failure is caught (${near(match.index)})`);
+        }
     }
 });
