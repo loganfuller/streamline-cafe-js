@@ -83,7 +83,10 @@ function tablet({ rows, loaded = null, batchId = HILL_NEW.id } = {}) {
             const rid = w.recipeId();
             return rid ? { kind: 'recipe', id: rid, modified: false } : null;
         },
-        readWorkflow: async () => copy(w.workflow),
+        readWorkflow: async () => {
+            if (w.failWorkflowRead) throw new Error('500');
+            return copy(w.workflow);
+        },
         readRecords: async () => (w.failRecords(Infinity) ? null : copy(w.rows)),
         saveRecord: (id, fields, options) => writer.setFields(id, fields, options),
         async writeWorkflow(patch) {
@@ -419,6 +422,11 @@ test('after the record is written again, a Workflow on another batch, another re
         ['another recipe loaded', world => { world.workflow.context.beanBatchId = HILL_NEW.id; world.workflow.context.extras.dye.recipeId = 'r2'; }, 'rewritten'],
         ['the pick still', () => {}, 'rewritten'],
         ['an old batch, and its write fails', world => { world.workflow.context.beanBatchId = HILL_NEW.id; world.failWorkflowWrite = true; }, 'workflow'],
+        ['a Workflow that can\'t be read', world => { world.failWorkflowRead = true; }, 'workflow'],
+        ['an old batch, and a shot begun once the record is written again', world => {
+            world.workflow.context.beanBatchId = HILL_NEW.id;
+            world.onRecordWrite = () => { world.settled = () => false; };
+        }, 'workflow'],
     ];
     for (const [label, after, want] of cases) {
         const original = recipe('r1', 'House espresso');
@@ -429,6 +437,21 @@ test('after the record is written again, a Workflow on another batch, another re
         assert.ok(holdsBean(w.get('r1'), VALLEY, VALLEY_1), label);
         assert.equal(w.workflowWrites.length, 1, `${label}: no second Workflow write`);
     }
+});
+
+test('a recipe that named no batch, set back and applied: the Workflow left with no batch takes the bean again', async () => {
+    const original = recipe('r1', 'Plain', { beanId: undefined, beanName: undefined, beanRoaster: undefined, beanBatchId: undefined });
+    delete original.workflow.context.beanBatchId;
+    const w = tablet({ rows: [original], loaded: 'r1' });
+    w.onWait = world => {
+        world.rows = [copy(original)];
+        delete world.workflow.context.beanBatchId;
+        world.onWait = () => {};
+    };
+    const answer = await w.change({ bean: VALLEY, batch: VALLEY_1, recipeId: 'r1' });
+    assert.equal(await answer.checked, 'rewritten');
+    assert.equal(w.workflow.context.beanBatchId, VALLEY_1.id);
+    assert.equal(w.workflowWrites.length, 2);
 });
 
 test('a record write that threw but landed is not refused when the page already shows its bean', async () => {
