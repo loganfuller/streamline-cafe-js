@@ -25,7 +25,7 @@
 // chosen: it is opened as src/cafe/graph.js opens it, with made-up names in it.
 
 import { test, expect } from './support/test.mjs';
-import { tapAt } from './support/page-reads.mjs';
+import { tapAt, load } from './support/page-reads.mjs';
 import { dialogDrawn } from '../cafe-smoke/page-helpers.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 
@@ -67,13 +67,10 @@ function rateNewestShot(fake) {
     expect(status).toBe(200);
 }
 
+/** The page, with a recipe loaded unless `recipe` is null. */
 async function openPage(cafe, { recipe = house } = {}) {
     const page = await cafe.open();
-    if (recipe) {
-        await page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
-        await expect(page.locator('#cafe-title')).toHaveText(recipe.name);
-        await cafe.advance(2000);
-    }
+    if (recipe) await load(cafe, recipe);
     return page;
 }
 

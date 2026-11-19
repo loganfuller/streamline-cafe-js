@@ -16,8 +16,8 @@
 // `GET /grinders/<id>` answers the grinder whole is recordings/grinders.json.
 
 import { test, expect } from './support/test.mjs';
-import { recording } from './support/adapter.mjs';
 import { writes } from './support/page-reads.mjs';
+import { profileOverride } from './support/fake-reads.mjs';
 import { GRINDER, PRESET_GRINDER, QUARTER_GRINDER } from '../cafe-smoke/sample-data.mjs';
 
 const VALUE = '#grind-value';
@@ -53,15 +53,7 @@ const fit = page => page.evaluate(() => {
     return { left: text.left - minus.right, right: plus.left - text.right, size: parseFloat(getComputedStyle(value).fontSize) };
 });
 
-// Streamline's own profile overrides (src/modules/profile-overrides.js) keep the
-// grind setting a Workflow write leaves, under the id Decaid's profile library
-// gives the Workflow's profile (as in grinder-dialog.spec.mjs).
-const PROFILES = recording('boot').requests['GET /api/v1/profiles?includeHidden=true'].body;
-function profileOverride(fake, grinderSetting) {
-    const matches = PROFILES.filter(entry => entry.profile.title === fake.workflow().profile.title);
-    expect(matches, 'one profile in Decaid\'s library has the Workflow\'s title').toHaveLength(1);
-    return { write: `POST /api/v1/store/streamlineProfileOverrides/${encodeURIComponent(matches[0].id)}`, body: { grinderSetting } };
-}
+// A step of the setting: its Workflow write and the profile override that keeps it.
 const grindWrite = (fake, grinderSetting) => [
     { write: 'PUT /api/v1/workflow', body: { context: { grinderSetting } } },
     profileOverride(fake, grinderSetting),

@@ -33,7 +33,7 @@ Each spec file is one feature and carries its tag: `@grinder`, `@shot`, `@touch`
 
 ## How a page test works
 
-`test/page/support/test.mjs` gives every test a fresh fake Decaid (`fake`) and a fresh browser context, and a `cafe` helper on the page. Tests run in parallel and leave nothing behind.
+`test/page/support/test.mjs` gives every test a fresh fake Decaid (`fake`) and a fresh browser context, and a `cafe` helper on the page. Tests run in parallel and leave nothing behind. What the specs read and do on the page is shared in `support/page-reads.mjs`, and what they read of the fake's state (DYE2's records, the recipe loaded, Streamline's profile override) in `support/fake-reads.mjs`.
 
 - **Two origins, no server.** The page is served from `http://127.0.0.1:24800`, its files read from the repository through a Playwright route, and it calls Decaid at `http://127.0.0.1:8080` as on a tablet. Every request and socket to Decaid goes to the model through `test/page/support/adapter.mjs`. Chromium is started with its Local Network Access check off, since a page answered by a route has no address it could tell is local.
 - **Nothing unanswered.** A request or socket the model has no answer for is answered with a 599 and kept, and the test fails at its end naming it. So does any error on the page, and any request to a third origin.

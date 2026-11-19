@@ -20,8 +20,8 @@
 // back (fake-decaid/dye2.js).
 
 import { test, expect } from './support/test.mjs';
-import { recording } from './support/adapter.mjs';
-import { pickDialog, pickClosed, tapAt } from './support/page-reads.mjs';
+import { pickDialog, pickClosed, tapAt, card } from './support/page-reads.mjs';
+import { records, recordOf, loadedId, isRecordWrite, matchMachine, PROFILES } from './support/fake-reads.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';
 
@@ -30,8 +30,6 @@ const DYE2 = '/api/v1/plugins/dye2.reaplugin';
 const RECORDS = '/api/v1/store/dye2.reaplugin/recipes';
 const WORKFLOW_URL = 'http://127.0.0.1:8080/api/v1/workflow';
 
-// Decaid's profiles, as the page reads them.
-const PROFILES = recording('boot').requests['GET /api/v1/profiles?includeHidden=true'].body;
 const byTitle = title => PROFILES.find(entry => entry.profile?.title === title);
 // Three of Decaid's profiles, each with a temperature of its own and none the Default's 90 °C.
 const light = byTitle('Best practice (light roast)');
@@ -40,30 +38,7 @@ const bloom = byTitle('Easy blooming - active pressure decline');
 const adaptive = byTitle('Adaptive v3');
 const own = record => record.profile.steps[0].temperature;
 
-const records = fake => fake.store.get('dye2.reaplugin', 'recipes') || [];
-const recordNamed = (fake, name) => records(fake).find(row => row && row.name === name);
-const loadedId = fake => { const selection = fake.selection(); return selection?.kind === 'recipe' ? selection.id : null; };
-const card = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1);
-const isRecordWrite = entry => entry.method === 'POST' && entry.path === RECORDS;
 const isWorkflowWrite = entry => entry.method === 'PUT' && entry.path === '/api/v1/workflow';
-
-// The simulated machine's Workflow reports a flush at 90 °C, and the sample
-// recipes hold 25 °C, so DYE2 calls a recipe changed the moment it loads. The
-// recipe's record is given the steam, hot water and flush the Workflow holds
-// (the smoke run's `matchMachine`), so that "not called changed" after a
-// profile change says something.
-const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
-function matchMachine(fake, name) {
-    const machine = fake.workflow();
-    fake.store.set('dye2.reaplugin', 'recipes', records(fake).map(row => {
-        if (!row || row.name !== name) return row;
-        const dashboardVariables = { ...row.dashboardVariables };
-        for (const [key, [group, field]] of Object.entries(MACHINE_FIELDS)) {
-            if (dashboardVariables[key] != null && machine[group]?.[field] != null) dashboardVariables[key] = machine[group][field];
-        }
-        return { ...row, dashboardVariables };
-    }));
-}
 
 /**
  * The function the profile dialog calls, called from the page itself: its
@@ -85,6 +60,10 @@ async function checkedAfter(cafe) {
     return cafe.page.evaluate(() => window.__cafeOutcome);
 }
 
+/**
+ * A tap on a recipe's card, and the load settled with the card shown pressed:
+ * these tests are about the recipe staying loaded, which the strip shows.
+ */
 async function load(cafe, recipe) {
     const { page } = cafe;
     await card(page, recipe.slot).click();
@@ -98,7 +77,7 @@ async function openLoaded(cafe) {
     matchMachine(cafe.fake, house.name);
     await cafe.open();
     await load(cafe, house);
-    const before = recordNamed(cafe.fake, house.name);
+    const before = recordOf(cafe.fake, house.name);
     expect(cafe.fake.selection(), 'the recipe is loaded before the change, and not as changed').toEqual({ kind: 'recipe', id: before.id, modified: false });
     return before;
 }
@@ -141,7 +120,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(answer, 'ok, on the loaded recipe, and keeping its name').toEqual({ ok: true, recipeId: String(before.id), name: null, checked: 'pending' });
         expect(fake.selection(), 'at once DYE2 still names the recipe, and not as changed').toEqual({ kind: 'recipe', id: before.id, modified: false });
 
-        const after = recordNamed(fake, house.name);
+        const after = recordOf(fake, house.name);
         const stored = { ...light.profile, target_weight: house.yield };
         expect(after.profileId, 'the record names the profile by its id').toBe(light.id);
         expect(after.profileTitle, 'and its title').toBe(light.profile.title);
@@ -175,7 +154,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
 
         expect(await checkedAfter(cafe), 'after DYE2\'s window the check finds the record holding the profile').toBe('held');
         expect(loadedId(fake), 'and the recipe still loaded').toBe(before.id);
-        expect(recordNamed(fake, house.name).profileId).toBe(light.id);
+        expect(recordOf(fake, house.name).profileId).toBe(light.id);
     });
     test('a tap on the Brew row\'s name opens the profile dialog on the profile just chosen, in use', async ({ cafe }) => {
         await openLoaded(cafe);
@@ -256,7 +235,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(workflow.context.targetDoseWeight, 'with the step on the machine').toBeGreaterThan(dose);
         // With no DYE2 save in the window, no write is lost.
         expect(await checkedAfter(cafe)).toBe('held');
-        expect(recordNamed(fake, house.name).profileId, 'the record holds the profile').toBe(gentle.id);
+        expect(recordOf(fake, house.name).profileId, 'the record holds the profile').toBe(gentle.id);
         expect(loadedId(fake), 'and the recipe is loaded').toBe(before.id);
     });
 
@@ -293,7 +272,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         await cafe.settle();
         expect(loadedId(fake), 'the recipe still loaded').toBe(before.id);
         expect(await checkedAfter(cafe)).toBe('held');
-        expect(recordNamed(fake, house.name).profileId, 'the record holds the profile').toBe(bloom.id);
+        expect(recordOf(fake, house.name).profileId, 'the record holds the profile').toBe(bloom.id);
         expect(loadedId(fake), 'and the recipe is loaded').toBe(before.id);
     });
 
@@ -322,7 +301,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(cafe.since(mark, isRecordWrite), 'the record write made again').toHaveLength(2);
         expect(loadedId(fake)).toBe(before.id);
         expect(await checkedAfter(cafe)).toBe('held');
-        expect(recordNamed(fake, house.name).profileId).toBe(bloom.id);
+        expect(recordOf(fake, house.name).profileId).toBe(bloom.id);
     });
 
     test('a record written back over the change in DYE2\'s window is written again by the check', async ({ cafe, fake }) => {
@@ -330,9 +309,9 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         const writeBack = fake.dye2RecordReads();
         await changeProfile(cafe.page, light.id);
         writeBack();
-        expect(recordNamed(fake, house.name).profileId, 'the change lost').not.toBe(light.id);
+        expect(recordOf(fake, house.name).profileId, 'the change lost').not.toBe(light.id);
         expect(await checkedAfter(cafe)).toBe('rewritten');
-        expect(recordNamed(fake, house.name).profileId).toBe(light.id);
+        expect(recordOf(fake, house.name).profileId).toBe(light.id);
         expect(loadedId(fake)).toBe(before.id);
     });
 
@@ -357,7 +336,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         await expect(page.locator('#cafe-title')).toHaveText('No recipe selected');
         const mark = fake.log.length;
         expect(await checkedAfter(cafe)).toBe('reloaded');
-        expect(recordNamed(fake, house.name).profileId).toBe(gentle.id);
+        expect(recordOf(fake, house.name).profileId).toBe(gentle.id);
         expect(loadedId(fake)).toBe(before.id);
         expect(fake.workflow().profile.title).toBe(gentle.profile.title);
         expect(cafe.since(mark, entry => entry.method === 'POST' && entry.path === `${DYE2}/selection`), 'loaded once').toHaveLength(1);
@@ -376,7 +355,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         await expect(page.locator('#cafe-title')).toHaveText('No recipe selected');
         expect(await checkedAfter(cafe)).toBe('tapped');
         expect(loadedId(fake)).toBeNull();
-        expect(recordNamed(fake, house.name).profileId).toBe(bloom.id);
+        expect(recordOf(fake, house.name).profileId).toBe(bloom.id);
     });
 
     /** A recipe DYE2 made from a Workflow on Adaptive v3, in slot 4, which DYE2 marks as loaded. */
@@ -407,7 +386,7 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         await cafe.screenshot('profile-renamed-1920x1200-light');
         expect(await checkedAfter(cafe), 'the renamed recipe stays loaded through DYE2\'s window').toBe('held');
         expect(loadedId(fake)).toBe(made.id);
-        expect(recordNamed(fake, house.name)?.name, 'the recipe named by hand kept its own').toBe(house.name);
+        expect(recordOf(fake, house.name)?.name, 'the recipe named by hand kept its own').toBe(house.name);
     });
 
     test('the list of recipes to choose from names the recipe\'s new profile', async ({ cafe }) => {

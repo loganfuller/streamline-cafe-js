@@ -1,7 +1,25 @@
 // What the page tests read off the page and do on it, beyond the smoke run's
 // own readers in test/cafe-smoke/page-helpers.mjs, which they share.
 
-export { legend, chartLines, row, keys, sides, stageNames, paint, REFERENCE_LINES } from '../../cafe-smoke/page-helpers.mjs';
+import { expect } from './test.mjs';
+
+export { legend, chartLines, row, keys, sides, stageNames, paint, noteDialog, REFERENCE_LINES } from '../../cafe-smoke/page-helpers.mjs';
+
+/** The page, with a tablet's numbers opening the numpad, as Streamline decides at start. */
+export async function openPage(cafe) {
+    await cafe.open({ before: () => { window._forceNumpadMobile = true; } });
+    return cafe.page;
+}
+
+/** A recipe's card on the strip, by its slot. */
+export const card = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1);
+
+/** A tap on a recipe's card, and the load through Streamline's apply settled. */
+export async function load(cafe, recipe) {
+    await card(cafe.page, recipe.slot).click();
+    await expect(cafe.page.locator('#cafe-title')).toHaveText(recipe.name);
+    await cafe.advance(2000);
+}
 
 export const pickDialog = page => page.locator('#cafe-pick-dialog[open]');
 export const pickClosed = page => page.locator('#cafe-pick-dialog:not([open])');
@@ -11,6 +29,17 @@ export const pickRows = page => page.locator('#cafe-pick-list .cafe-pick-row').e
     inUse: !!row.querySelector('.cafe-pick-in-use') && (row.parentElement.classList.contains('cafe-pick-confirming') || row.getAttribute('aria-pressed') === 'true'),
 })));
 export const pickRow = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+
+/**
+ * The pick dialog closed, and its close event handled, which empties its list
+ * and lets it open again: a tap before that opens nothing
+ * (src/cafe/pick-dialog.js, `active`).
+ */
+export async function untilPickClosed(cafe) {
+    await expect(pickClosed(cafe.page)).toBeAttached();
+    await expect(cafe.page.locator('#cafe-pick-list .cafe-pick-row')).toHaveCount(0);
+    await cafe.settle();
+}
 
 /**
  * A tap where a finger lands: on a row's name, or the name under it. The two

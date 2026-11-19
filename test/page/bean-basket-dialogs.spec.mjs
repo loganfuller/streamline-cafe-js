@@ -20,12 +20,12 @@
 // save-recipe is recordings/dye2-save-recipe.json.
 
 import { test, expect } from './support/test.mjs';
-import { pickDialog, pickClosed, pickRows, pickRow, tapAt, isWrite, writes, paint } from './support/page-reads.mjs';
+import { pickDialog, pickRows, pickRow, tapAt, isWrite, writes, paint, openPage, card, load, untilPickClosed } from './support/page-reads.mjs';
+import { records, recordOf, loadedId, isRecordWrite, matchMachine, PROFILES } from './support/fake-reads.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';
-import { recording } from './support/adapter.mjs';
 
 const [house, , decafRecipe] = RECIPES;
 const DYE2 = 'dye2.reaplugin';
@@ -34,42 +34,19 @@ const DOSE = '#dose-section .cafe-row-name';
 const YIELD = '#drink-section .cafe-row-name';
 const CLOSE = '#cafe-pick-dialog form[method="dialog"] .cafe-btn';
 const FINISHED_LANGUAGES = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
-const PROFILES = recording('boot').requests['GET /api/v1/profiles?includeHidden=true'].body;
 
 // ── The sample data, as the fake holds it.
-const records = fake => fake.store.get(DYE2, 'recipes') || [];
-const recordOf = (fake, name) => records(fake).find(row => row && row.name === name);
 const beanNamed = (fake, name) => fake.library.state.beans.find(bean => bean.name === name);
 const batchOf = (fake, name, day) => fake.library.state.batches.find(batch => batch.beanId === beanNamed(fake, name).id && batch.roastDate.startsWith(day) && !batch.archived);
 const blendNew = fake => batchOf(fake, 'Sample Blend', '2026-11-02');
 const blendOld = fake => batchOf(fake, 'Sample Blend', '2026-10-15');
 const decafBatch = fake => batchOf(fake, 'Example Decaf', '2026-10-20');
 const singleBatch = fake => batchOf(fake, 'Sample Single Origin', '2026-10-28');
-const loadedId = fake => { const selection = fake.selection(); return selection?.kind === 'recipe' ? selection.id : null; };
-const isRecordWrite = entry => entry.method === 'POST' && entry.path === RECIPE_STORE;
 const isRecordRead = entry => entry.method === 'GET' && entry.path === RECIPE_STORE;
 // The page's read of the records once DYE2's save window after a write has
 // passed (bean-change.js, `checkLater`). The log's time is the fake's, which
 // trails the page's by up to one 500 ms step of `cafe.advance`.
 const checkRead = writtenAt => entry => isRecordRead(entry) && entry.at >= writtenAt + AFTER_CHECK_MS - 500;
-
-// The Workflow's steam, hot water and flush, which the simulated machine
-// reports whatever its settings hold (a flush at 90 °C, where the sample
-// recipes hold 25 °C), written into a recipe's record, so that DYE2 does not
-// call it changed the moment it loads and "not called changed" says something.
-// The fixture's write, as the smoke run's `matchMachine`.
-const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
-function matchMachine(fake, name) {
-    const machineNow = fake.workflow();
-    fake.store.set(DYE2, 'recipes', records(fake).map(row => {
-        if (!row || row.name !== name) return row;
-        const dashboardVariables = { ...row.dashboardVariables };
-        for (const [key, [group, field]] of Object.entries(MACHINE_FIELDS)) {
-            if (dashboardVariables[key] != null && machineNow[group]?.[field] != null) dashboardVariables[key] = machineNow[group][field];
-        }
-        return { ...row, dashboardVariables };
-    }));
-}
 
 // ── The page.
 const sideRows = page => page.locator('#cafe-pick-side .cafe-pick-row').evaluateAll(rows => rows.map(row => ({
@@ -83,7 +60,6 @@ const batchRow = (page, n) => page.locator('#cafe-pick-list .cafe-pick-row').nth
 const under = page => page.locator('#cafe-pick-under');
 const dose = page => page.locator('#cafe-dose-desc');
 const basket = page => page.locator('#cafe-yield-desc');
-const card = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1);
 // The button under the batches (#70): its words, whether it can be tapped, the
 // note beside it, "In use" in its place, and the batches highlighted.
 const batchConfirm = page => page.evaluate(() => {
@@ -99,20 +75,6 @@ const batchConfirm = page => page.evaluate(() => {
     };
 });
 
-/** The page, with a tablet's numbers opening the numpad, as Streamline decides at start. */
-async function openPage(cafe) {
-    await cafe.open({ before: () => { window._forceNumpadMobile = true; } });
-    return cafe.page;
-}
-
-/** A tap on a recipe's card, and the load through Streamline's apply settled. */
-async function load(cafe, recipe) {
-    const { page } = cafe;
-    await card(page, recipe.slot).click();
-    await expect(page.locator('#cafe-title')).toHaveText(recipe.name);
-    await cafe.advance(2000);
-}
-
 /** The house recipe, its record matching the machine, loaded and not called changed. */
 async function houseLoaded(cafe, fake) {
     matchMachine(fake, house.name);
@@ -120,16 +82,6 @@ async function houseLoaded(cafe, fake) {
     await load(cafe, house);
     expect(fake.selection(), 'loaded, and not called changed').toEqual({ kind: 'recipe', id: recordOf(fake, house.name).id, modified: false });
     return page;
-}
-
-/**
- * Closed, and its close event handled, which empties its list and lets it open
- * again: a tap before that opens nothing (src/cafe/pick-dialog.js, `active`).
- */
-async function closed(cafe) {
-    await expect(pickClosed(cafe.page)).toBeAttached();
-    await expect(cafe.page.locator('#cafe-pick-list .cafe-pick-row')).toHaveCount(0);
-    await cafe.settle();
 }
 
 async function openDialog(cafe, on) {
@@ -148,7 +100,7 @@ async function useBatch(cafe, bean, n) {
     await batchRow(page, n).click();
     await expect(page.locator('#cafe-pick-confirm-use')).toBeEnabled();
     await page.locator('#cafe-pick-confirm-use').click();
-    await closed(cafe);
+    await untilPickClosed(cafe);
 }
 
 test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' }, () => {
@@ -209,7 +161,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         // Close closes it; the bean's name under Dose opens it too.
         await page.locator(CLOSE).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await openDialog(cafe, '#cafe-dose-desc');
         await expect(page.locator('#cafe-pick-title')).toHaveText('Bean and batch');
         await cafe.advance(1000);
@@ -238,13 +190,13 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await batchRow(page, 1).click();
         await expect(page.locator('#cafe-pick-confirm-use')).toBeEnabled();
         await page.locator(CLOSE).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
 
         await openDialog(cafe, DOSE);
         await batchRow(page, 1).click();
         await expect(page.locator('#cafe-pick-confirm-use')).toBeEnabled();
         await page.mouse.click(30, 30);
-        await closed(cafe);
+        await untilPickClosed(cafe);
 
         await cafe.advance(3000);
         expect(cafe.since(mark, isWrite), 'nothing written, no record either').toEqual([]);
@@ -333,10 +285,10 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         // The basket's name under Yield opens it too.
         await page.locator(CLOSE).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await openDialog(cafe, '#cafe-yield-desc');
         await pickRow(page, '20 g sample basket').click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await expect(basket(page)).toHaveText('20 g sample basket');
         await cafe.advance(2000);
         expect(writes(cafe.since(mark)), 'one write of its id and its name').toEqual([
@@ -357,7 +309,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await cafe.advance(1500);
         await openDialog(cafe, YIELD);
         await pickRow(page, '20 g sample basket').click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await expect(basket(page)).toHaveText('20 g sample basket');
         await cafe.advance(1500);
         expect(cafe.since(mark, entry => entry.method === 'POST' && /dye2\.reaplugin\/(record|save-recipe)$/.test(entry.path)), 'DYE2 asked to save nothing').toEqual([]);
@@ -448,7 +400,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await expect(page.locator('#cafe-pick-confirm-use')).toBeEnabled();
 
         await cafe.pour(fake.machine.pourMoment((frame, socket) => socket === 'machine/snapshot' && frame.state?.state === 'espresso'));
-        await closed(cafe);
+        await untilPickClosed(cafe);
         for (const open of [DOSE, YIELD]) await tapAt(page, open);
         await cafe.pour(3000);
         await expect(pickDialog(page), 'neither opens during a shot').toHaveCount(0);
@@ -478,7 +430,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await expect(under(page)).toHaveText('No recipe loaded · changes this machine only');
         await cafe.screenshot('basket-dialog-no-recipe-light');
         await pickRow(page, '20 g sample basket').click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await expect(basket(page)).toHaveText('20 g sample basket');
         await cafe.advance(2000);
         expect(writes(cafe.since(mark)), 'the Workflow alone, once for each').toEqual([
@@ -496,7 +448,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await openDialog(cafe, DOSE);
         await cafe.screenshot('bean-dialog-dark');
         await page.locator(CLOSE).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await openDialog(cafe, YIELD);
         await cafe.screenshot('basket-dialog-dark');
     });
@@ -542,7 +494,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                 if (code === 'en') await cafe.screenshot('bean-dialog-highlighted-1340x800-light');
                 if (code === 'de') await cafe.screenshot('bean-dialog-highlighted-1340x800-de-light');
                 await page.locator(CLOSE).click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
             }
             expect(unfit, `every one of ${1 + FINISHED_LANGUAGES.length} languages fits`).toEqual([]);
         });

@@ -17,7 +17,7 @@
 // (fake-decaid/recordings/sample-data.json).
 
 import { test, expect } from './support/test.mjs';
-import { noteDialog } from '../cafe-smoke/page-helpers.mjs';
+import { noteDialog } from './support/page-reads.mjs';
 import { KEYBOARD_GAP, SHRINK_ADOPT_MS } from '../../src/modules/keyboard-fit.js';
 
 const WIDTH = 1340;

@@ -11,52 +11,17 @@
 
 import { test, expect } from './support/test.mjs';
 import { PAGE_ORIGIN } from './support/page-files.mjs';
-import { recording } from './support/adapter.mjs';
-import { pickDialog, pickClosed, pickRows, pickRow, tapAt, isWrite, writes, paint } from './support/page-reads.mjs';
+import { pickDialog, pickRows, pickRow, tapAt, isWrite, writes, paint, openPage, load, untilPickClosed } from './support/page-reads.mjs';
+import { recordOf, profileOverride } from './support/fake-reads.mjs';
 import { GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES } from '../cafe-smoke/sample-data.mjs';
 
 const [house, , decaf] = RECIPES;
 const NAME = '#grind-section .cafe-row-name';
 const grinderNamed = (fake, model) => fake.library.state.grinders.find(g => g.model === model);
-const recordOf = (fake, name) => (fake.store.get('dye2.reaplugin', 'recipes') || []).find(row => row.name === name);
-
-/** The page, with a tablet's numbers opening the numpad, as Streamline decides at start. */
-async function openPage(cafe) {
-    await cafe.open({ before: () => { window._forceNumpadMobile = true; } });
-    return cafe.page;
-}
-
-/** A tap on a recipe's card, and the load through Streamline's apply settled. */
-async function load(cafe, recipe) {
-    const { page } = cafe;
-    await page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
-    await expect(page.locator('#cafe-title')).toHaveText(recipe.name);
-    await cafe.advance(2000);
-}
-
-/**
- * Closed, and its close event handled, which empties its list and lets it open
- * again: a tap before that opens nothing (src/cafe/pick-dialog.js, `active`).
- */
-async function closed(cafe) {
-    await expect(pickClosed(cafe.page)).toBeAttached();
-    await expect(cafe.page.locator('#cafe-pick-list .cafe-pick-row')).toHaveCount(0);
-    await cafe.settle();
-}
 
 async function openGrinders(cafe, on = NAME) {
     await tapAt(cafe.page, on);
     await expect(pickDialog(cafe.page)).toBeVisible();
-}
-
-// Streamline's own profile overrides (src/modules/profile-overrides.js) keep the
-// grind setting a Workflow write leaves, under the id Decaid's profile library
-// gives the Workflow's profile.
-const PROFILES = recording('boot').requests['GET /api/v1/profiles?includeHidden=true'].body;
-function profileOverride(fake, grinderSetting) {
-    const matches = PROFILES.filter(entry => entry.profile.title === fake.workflow().profile.title);
-    expect(matches, 'one profile in Decaid\'s library has the Workflow\'s title').toHaveLength(1);
-    return { write: `POST /api/v1/store/streamlineProfileOverrides/${encodeURIComponent(matches[0].id)}`, body: { grinderSetting } };
 }
 
 test.describe('the grinder dialog', { tag: '@grinder' }, () => {
@@ -93,15 +58,15 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
 
         // A tap outside closes it; the grinder's name under Grind opens it too; Close closes it.
         await page.mouse.click(40, 40);
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await openGrinders(cafe, '#cafe-grind-desc');
         await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
 
         // The grinder in use: a tap closes the dialog and writes nothing.
         await openGrinders(cafe);
         await pickRow(page, GRINDER.model).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await cafe.advance(3000);
         expect(cafe.since(mark, isWrite), 'nothing written').toEqual([]);
     });
@@ -115,7 +80,7 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
 
         await openGrinders(cafe);
         await pickRow(page, SECOND_GRINDER.model).click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await expect(page.locator('#cafe-grind-desc')).toHaveText(SECOND_GRINDER.model);
         await cafe.advance(3000);
         expect(writes(cafe.since(mark)), 'one write of the Workflow, and Streamline\'s own note of the setting for the profile').toEqual([
@@ -182,7 +147,7 @@ test.describe('the grinder dialog', { tag: '@grinder' }, () => {
         await openGrinders(cafe);
         // To the machine's first frame in espresso.
         await cafe.pour(fake.machine.pourMoment((frame, socket) => socket === 'machine/snapshot' && frame.state?.state === 'espresso'));
-        await closed(cafe);
+        await untilPickClosed(cafe);
         await tapAt(page, NAME);
         await cafe.pour(3000);
         await expect(pickDialog(page)).toHaveCount(0);

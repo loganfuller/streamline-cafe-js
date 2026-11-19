@@ -16,7 +16,8 @@
 // (fake-decaid/machine.js, `setState`), as `PUT /machine/state/<state>` sets it.
 
 import { test, expect, START } from './support/test.mjs';
-import { pickDialog, pickClosed, pickRows, writes, paint } from './support/page-reads.mjs';
+import { pickDialog, pickRows, writes, paint, load, untilPickClosed } from './support/page-reads.mjs';
+import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { SHOT_STORE_MS } from '../../src/cafe/barista-model.js';
 import { RECIPES, BARISTAS, RECIPE_BARISTA, TYPED_BARISTA, LONG_BARISTA } from '../cafe-smoke/sample-data.mjs';
@@ -66,7 +67,6 @@ function recordNamesBarista(fake, recipe, name) {
 }
 
 const named = fake => fake.workflow().context?.baristaName ?? null;
-const recordOf = (fake, name) => (fake.store.get('dye2.reaplugin', 'recipes') || []).find(row => row.name === name);
 
 // ── On the page ──────────────────────────────────────────────────────────────
 
@@ -108,23 +108,6 @@ const baristaRow = (page, name) => page.locator('#cafe-pick-list .cafe-pick-row'
 async function openBaristas(cafe) {
     await cafe.page.locator('#cafe-barista').click();
     await expect(pickDialog(cafe.page)).toBeVisible();
-}
-
-/**
- * Closed, and its close event handled, which empties its list and lets it open
- * again: a tap before that opens nothing (src/cafe/pick-dialog.js, `active`).
- */
-async function closed(cafe) {
-    await expect(pickClosed(cafe.page)).toBeAttached();
-    await expect(cafe.page.locator('#cafe-pick-list .cafe-pick-row')).toHaveCount(0);
-    await cafe.settle();
-}
-
-/** A tap on a recipe's card, and the load through Streamline's apply settled. */
-async function load(cafe, recipe) {
-    await cafe.page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
-    await expect(cafe.page.locator('#cafe-title')).toHaveText(recipe.name);
-    await cafe.advance(2000);
 }
 
 /** The machine goes to sleep or wakes, as Decaid's state socket says. */
@@ -178,7 +161,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
 
                 const mark = fake.log.length;
                 await baristaRow(page, 'No barista').click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await cafe.advance(1500);
                 expect(baristaWrites(cafe.since(mark)), 'a tap on the row in use writes nothing').toEqual([]);
             });
@@ -192,7 +175,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await openBaristas(cafe);
                 const mark = fake.log.length;
                 await baristaRow(page, SAMPLE).click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await expect(shown(page)).toHaveText(SAMPLE);
                 await expect.poll(() => named(fake)).toBe(SAMPLE);
                 await cafe.advance(1500);
@@ -299,7 +282,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
 
                 const mark = fake.log.length;
                 await page.locator('#cafe-pick-entry-use').click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await expect(shown(page)).toHaveText(TYPED_BARISTA);
                 await expect.poll(() => named(fake)).toBe(TYPED_BARISTA);
                 await cafe.advance(1500);
@@ -320,7 +303,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await page.locator('#cafe-pick-add').click();
                 await page.locator('#cafe-pick-entry-text').fill(` ${SAMPLE.toUpperCase()}`);
                 await page.locator('#cafe-pick-entry-text').press('Enter');
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await expect.poll(() => named(fake)).toBe(SAMPLE);
                 await expect(shown(page)).toHaveText(SAMPLE);
                 await cafe.advance(1500);
@@ -339,12 +322,12 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 const rows = await pickRows(page);
                 expect(rows[0], 'the long name whole, in use').toMatchObject({ name: LONG_BARISTA, inUse: true });
                 await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
 
                 const mark = fake.log.length;
                 await openBaristas(cafe);
                 await baristaRow(page, 'No barista').click();
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await expect.poll(() => named(fake)).toBeNull();
                 await expect(shown(page)).toHaveText('Barista');
                 await cafe.advance(1500);
@@ -361,7 +344,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await page.locator('#cafe-pick-entry-text').fill('Sample Half Typed');
                 // To the machine's first frame in espresso.
                 await cafe.pour(fake.machine.pourMoment((frame, socket) => socket === 'machine/snapshot' && frame.state?.state === 'espresso'));
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await page.locator('#cafe-barista').click();
                 await cafe.pour(3000);
                 await expect(pickDialog(page), 'opens nothing').toHaveCount(0);
@@ -383,7 +366,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await openBaristas(cafe);
                 const mark = fake.log.length;
                 await machineTo(cafe, 'sleeping');
-                await closed(cafe);
+                await untilPickClosed(cafe);
                 await expect.poll(() => named(fake)).toBeNull();
                 await cafe.advance(1000);
                 expect(baristaWrites(cafe.since(mark)), 'one write that clears it').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
@@ -439,7 +422,7 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
         await page.locator('#cafe-pick-entry-text').fill(TYPED_BARISTA);
         await cafe.screenshot('barista-name-field-1920x1200-dark');
         await page.locator('#cafe-pick-dialog .cafe-pick-head .cafe-btn').click();
-        await closed(cafe);
+        await untilPickClosed(cafe);
         nameElsewhere(fake, SAMPLE);
         await refresh(cafe);
         await expect(shown(page)).toHaveText(SAMPLE);
