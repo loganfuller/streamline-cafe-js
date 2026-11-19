@@ -9,7 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createFakeDecaid, OWNED } from '../fake-decaid/index.js';
 import { updateWorkflow, deepMerge } from '../fake-decaid/workflow.js';
 import { createStore } from '../fake-decaid/store.js';
-import { deriveSelection, recipeModified, profileFingerprint } from '../fake-decaid/dye2.js';
+import { deriveSelection, recipeModified, profileFingerprint, proposeRecipeName } from '../fake-decaid/dye2.js';
 import { createShots } from '../fake-decaid/shots.js';
 import { createLibrary } from '../fake-decaid/library.js';
 import { createBoot } from '../fake-decaid/boot.js';
@@ -173,6 +173,86 @@ test('grinders: the archived only when asked for, the most recently changed firs
     assert.equal(library.answer('GET', '/grinders/g1', new URLSearchParams()).body.model, 'Old');
     assert.equal(library.answer('GET', '/grinders/none', new URLSearchParams()).status, 404);
     assert.equal(library.answer('GET', '/bean-batches/b1', new URLSearchParams()).body.roastDate, 'r');
+});
+
+test('beans: the archived only when asked for, the most recently changed first; a bean\'s batches the same, none for a bean not there', () => {
+    const library = createLibrary({
+        beans: [{ id: 'n1', name: 'Old', updatedAt: '2026-01-01' }, { id: 'n2', name: 'New', updatedAt: '2026-02-01' }, { id: 'n3', name: 'Gone', archived: true, updatedAt: '2026-03-01' }],
+        batches: { n1: [{ id: 'b1', beanId: 'n1', updatedAt: '2026-01-01' }, { id: 'b2', beanId: 'n1', updatedAt: '2026-02-01' }, { id: 'b3', beanId: 'n1', archived: true, updatedAt: '2026-03-01' }], n2: [{ id: 'b4', beanId: 'n2', updatedAt: '2026-01-01' }] },
+    });
+    const ask = (path, search = '') => library.answer('GET', path, new URLSearchParams(search)).body.map(row => row.id);
+    assert.deepEqual(ask('/beans'), ['n2', 'n1']);
+    assert.deepEqual(ask('/beans', 'includeArchived=true'), ['n3', 'n2', 'n1']);
+    assert.deepEqual(ask('/beans/n1/batches'), ['b2', 'b1']);
+    assert.deepEqual(ask('/beans/n1/batches', 'includeArchived=true'), ['b3', 'b2', 'b1']);
+    assert.deepEqual(ask('/beans/none/batches', 'includeArchived=true'), []);
+    assert.equal(library.answer('POST', '/beans', new URLSearchParams()), null, 'a write has no answer');
+});
+
+test('DYE2: save-recipe names a recipe from its profile\'s first word and its bean, puts it in the slot asked for, and loads it', () => {
+    assert.equal(proposeRecipeName({ profile: { title: 'Adaptive v3' }, context: { coffeeName: 'Sample Blend' } }), 'Adaptive Sample Blend');
+    assert.equal(proposeRecipeName({ profile: { title: 'Default' }, context: { coffeeName: 'Bean' } }, ['bean']), 'Bean 2', 'a word that says nothing is left out, a name taken counts');
+    assert.equal(proposeRecipeName({ profile: { title: 'Custom' }, context: {} }, [], '', START), 'Recipe 18 Nov', 'no bean: the day');
+    const fake = fresh();
+    const pushes = [];
+    fake.connect('/ws/v1/plugins/dye2.reaplugin/changed', text => pushes.push(JSON.parse(text)));
+    fake.flush();
+    const adaptive = fake.store.get('dye2.reaplugin', 'recipes').find(row => row.name === 'Single origin').workflow.profile;
+    send(fake, 'PUT', '/api/v1/workflow', { profile: adaptive, context: { coffeeName: 'Sample Blend' } });
+    const holder = fake.store.get('dye2.reaplugin', 'recipes').find(row => row.stripSlot === 3);
+    fake.flush();
+    pushes.length = 0;
+    const made = send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/save-recipe', { slot: 3 });
+    fake.flush();
+    assert.equal(made.status, 200);
+    assert.equal(made.body.name, 'Adaptive Sample Blend');
+    assert.match(made.body.id, /^recipe-[0-9a-z]+$/);
+    const rows = fake.store.get('dye2.reaplugin', 'recipes');
+    const row = rows.find(r => r.id === made.body.id);
+    assert.equal(row.stripSlot, 3);
+    assert.equal(row.title, 'Adaptive Sample Blend');
+    assert.equal(row.profileTitle, adaptive.title);
+    assert.equal(rows.find(r => r.id === holder.id).stripSlot, null, 'the slot\'s holder keeps its row and loses the slot');
+    assert.equal(fake.selection().id, made.body.id, 'loaded');
+    assert.equal(fake.workflow().context.extras.dye.recipeId, made.body.id);
+    assert.ok(pushes.length > 0, 'a push');
+    const named = send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/save-recipe', { name: ' Typed ', slot: 9 });
+    assert.equal(named.body.name, 'Typed');
+    assert.equal(fake.store.get('dye2.reaplugin', 'recipes').find(r => r.id === named.body.id).stripSlot, null, 'no slot past 5');
+});
+
+test('DYE2: a list its record read, written back, loses a record written since; started again, it keeps the recipe loaded', () => {
+    const fake = fresh();
+    const house = houseRecord(fake);
+    send(fake, 'PUT', '/api/v1/workflow', applied(house));
+    send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/selection', { kind: 'recipe', id: house.id });
+    const adaptive = fake.store.get('dye2.reaplugin', 'recipes').find(row => row.name === 'Single origin').workflow.profile;
+    const writeBack = fake.dye2RecordReads();
+    const moved = fake.store.get('dye2.reaplugin', 'recipes').map(row => (row.id === house.id ? { ...row, profileTitle: adaptive.title, profileSnapshot: adaptive, workflow: { ...row.workflow, profile: adaptive } } : row));
+    send(fake, 'POST', '/api/v1/store/dye2.reaplugin/recipes', moved);
+    send(fake, 'PUT', '/api/v1/workflow', { profile: adaptive });
+    assert.equal(fake.selection().id, house.id, 'the record first, then the Workflow: still loaded');
+    fake.restartDye2();
+    assert.equal(fake.selection().id, house.id, 'started again, still loaded');
+    writeBack();
+    assert.equal(houseRecord(fake).profileTitle, house.profileTitle, 'the list as it was read');
+    fake.restartDye2();
+    assert.equal(fake.selection().id, house.id, 'started again with the record on another profile: still loaded, as on the pinned stack');
+    // Started again, DYE2 noted no profile: the next change of profile is the one it notes, and keeps the recipe.
+    // The model's reading, not recorded (dye2.js, `restart()`).
+    send(fake, 'PUT', '/api/v1/workflow', { profile: { ...adaptive, title: 'A third profile' } });
+    assert.equal(fake.selection().id, house.id, 'a first change of profile after a restart keeps the recipe loaded');
+});
+
+test('machine: its calibration as the simulated machine reports it; an unknown target or source refused', () => {
+    const fake = fresh();
+    assert.deepEqual(get(fake, '/api/v1/machine/calibration/temperature?source=current').body, { target: 'temperature', source: 'current', de1ReportedValue: 0, measuredValue: 93 });
+    assert.deepEqual(get(fake, '/api/v1/machine/calibration/pressure').body, { target: 'pressure', source: 'current', de1ReportedValue: 1, measuredValue: 9 });
+    assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=factory').body.measuredValue, 1);
+    assert.equal(get(fake, '/api/v1/machine/calibration/weight').status, 400);
+    assert.equal(get(fake, '/api/v1/machine/calibration/constructor').status, 400, 'an object\'s own keys only');
+    assert.equal(get(fake, '/api/v1/machine/calibration/flow?source=other').status, 400);
+    assert.equal(fake.request({ method: 'PUT', url: '/api/v1/machine/calibration/flow', body: {} }), null, 'a write has no answer');
 });
 
 test('machine: the recorded pour is replayed at the page\'s time, and Decaid stores its Shot with the Workflow as it is then', () => {

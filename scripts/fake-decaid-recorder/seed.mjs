@@ -3,7 +3,7 @@
 // writes. The recorder then reads the state back as the page tests' starting
 // point (fake-decaid/recordings/sample-data.json).
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES, MORE_BATCHES, BASKETS } from '../../test/cafe-smoke/sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, PRESET_GRINDER, QUARTER_GRINDER, GRINDER_USE, RECIPES, MORE_BATCHES, BASKETS } from '../../test/cafe-smoke/sample-data.mjs';
 
 const DYE2 = 'dye2.reaplugin';
 
@@ -29,6 +29,12 @@ export async function seed(decaid, machine) {
     const second = await decaid('POST', '/grinders', SECOND_GRINDER);
     const retired = await decaid('POST', '/grinders', ARCHIVED_GRINDER);
     await decaid('PUT', `/grinders/${retired.id}`, { ...retired, archived: true });
+    // The Grind row's two (#42), archived, as the smoke run left them: a page
+    // test that needs one takes it out of the archive in the fake.
+    for (const spec of [PRESET_GRINDER, QUARTER_GRINDER]) {
+        const made = await decaid('POST', '/grinders', spec);
+        await decaid('PUT', `/grinders/${made.id}`, { ...made, archived: true });
+    }
 
     const ids = {};
     const basketNamed = name => BASKETS.find(basket => basket.name === name);

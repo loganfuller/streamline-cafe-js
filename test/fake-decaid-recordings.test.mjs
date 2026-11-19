@@ -22,12 +22,13 @@ const recordedMs = text => Date.parse(`${text.slice(0, 23)}Z`);
 const newest = Math.max(...sampleData.shots.map(shot => recordedMs(shot.timestamp)));
 const fresh = () => createFakeDecaid({ sampleData, boot, pour, now: newest + 3_600_000 });
 
-// When Decaid last changed a Shot is its own clock's; the rest is compared whole.
-const IGNORED = new Set(['updatedAt']);
-const normal = value => {
-    if (Array.isArray(value)) return value.map(normal);
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !IGNORED.has(key)).map(([key, inner]) => [key, normal(inner)]));
-    return value;
+// When Decaid last changed a Shot, and when DYE2 made a recipe, are their own
+// clocks'; the rest is compared whole.
+const IGNORED = new Set(['updatedAt', 'capturedAt']);
+const normal = (value, ids = new Map()) => {
+    if (Array.isArray(value)) return value.map(inner => normal(inner, ids));
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !IGNORED.has(key)).map(([key, inner]) => [key, normal(inner, ids)]));
+    return typeof value === 'string' && ids.has(value) ? ids.get(value) : value;
 };
 
 const scenarios = readdirSync(DIR).filter(file => file.endsWith('.json')).map(file => file.slice(0, -5))
@@ -58,8 +59,15 @@ for (const { name, recording } of scenarios) {
         const pushes = [];
         if (recording.socket) fake.connect(recording.socket, text => pushes.push(JSON.parse(text)));
         fake.flush();
+        // DYE2 makes a recipe's id at random: the recorded one stands for the model's.
+        const made = new Map();
         recording.steps.forEach((step, index) => {
             pushes.length = 0;
+            if (step.event === 'restart-dye2') {
+                fake.restartDye2();
+                fake.flush();
+                return;
+            }
             const { method, path, body } = step.request;
             const where = `step ${index + 1}, ${method} ${path}`;
             const got = fake.request({ method, url: `/api/v1${path}`, body });
@@ -67,7 +75,8 @@ for (const { name, recording } of scenarios) {
             assert.ok(got, `${where}: the fake has no answer`);
             assert.equal(got.status, step.answer.status, `${where}: status`);
             // A refusal is compared by its status: the page reads no error's text.
-            if (step.answer.status < 400) assert.deepEqual(normal(got.body), normal(step.answer.body), `${where}: answer`);
+            if (path.endsWith('/save-recipe') && step.answer.status === 200) made.set(step.answer.body.id, got.body.id);
+            if (step.answer.status < 400) assert.deepEqual(normal(got.body), normal(step.answer.body, made), `${where}: answer`);
             if (recording.socket) assert.deepEqual(pushes, step.pushes, `${where}: what DYE2 pushed`);
         });
     });

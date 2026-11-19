@@ -12,7 +12,7 @@
 
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
-import { legend, row, keys, sides, stageNames, chartLines } from './support/page-reads.mjs';
+import { legend, row, keys, sides, stageNames, chartLines, load } from './support/page-reads.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
@@ -23,12 +23,6 @@ const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const POUR = recording('pour');
 // The last of the pour's frames before the machine went back to idle.
 const POUR_LENGTH_MS = POUR.idleAtMs - 1;
-
-async function load(cafe, recipe) {
-    await cafe.page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
-    await expect(cafe.page.locator('#cafe-title')).toHaveText(recipe.name);
-    await cafe.advance(2000);
-}
 
 test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
     test('during a shot: the weight against its target, the status, the six live cards and the stage names', async ({ cafe }) => {
