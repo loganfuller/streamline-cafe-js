@@ -153,6 +153,7 @@ test.describe('rating and notes', { tag: '@remarks' }, () => {
         await expect(toast(page), 'with no toast').toBeHidden();
         await cafe.advance(1000);
         await expect(toast(page)).toBeHidden();
+        expect(await stars(page), 'and the stars stay as made once it has been read again').toEqual([100, 100, 100, 100, 100]);
         restore();
         expect(annotations(fake).enjoyment).toBe(10);
         expect(edits(cafe, mark), 'one edit, made by Decaid').toEqual([{ annotations: { enjoyment: 10 } }]);

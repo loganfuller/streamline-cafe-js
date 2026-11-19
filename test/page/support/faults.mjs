@@ -18,8 +18,8 @@ export function dropAnswer(cafe, { method, path, times = Infinity }) {
     let left = times;
     const stop = cafe.routes.intercept(request => left > 0 && matcher({ method, path })(request), ({ forward }) => {
         left -= 1;
-        forward();
-        return { abort: true };
+        // One the fake has no answer for stays unanswered, and fails the test.
+        return forward() ? { abort: true } : null;
     });
     return stop;
 }

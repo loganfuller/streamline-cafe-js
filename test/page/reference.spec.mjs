@@ -332,7 +332,6 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
         expect(now.label, 'when the shot ends it becomes the latest, once Decaid has it').toBe('Latest');
         expect(now.when).toBe(await creditOf(page, latest));
         expect(now.reference, 'the reference keeps its row, with when it was pulled').toBe(await creditOf(page, reference));
-        expect([now.when, now.reference], 'both pulled today').toEqual([expect.stringMatching(/^Today \d/), expect.stringMatching(/^Today \d/)]);
         expect(now.make, 'and Make reference is back').toBe('Make reference');
         expect(now.badge).toBeNull();
         expect(now.flag).toBeNull();

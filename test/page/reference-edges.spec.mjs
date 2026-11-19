@@ -10,7 +10,7 @@
 //
 // A pour can't be stopped early in the fake, so the Unfinished Shot is added
 // with `fake.shots.add`: the stored pour cut to its Preheat and its first two
-// seconds of preinfusion, with nothing on the scale (`unfinishedFrom`), which
+// seconds of preinfusion, with nothing on the scale (`unfinishedParts`), which
 // `isUnfinished` (src/cafe/shot-model.js) calls Unfinished. That Decaid lists
 // Shots newest first and answers one it no longer has with a 404 is the fake's
 // Shots (fake-decaid/shots.js, recordings/shots.json).
@@ -25,7 +25,7 @@
 
 import { test, expect } from './support/test.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, paint, load, card, REFERENCE_LINES } from './support/page-reads.mjs';
-import { recordOf } from './support/fake-reads.mjs';
+import { recordOf, unfinishedParts } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
@@ -91,19 +91,13 @@ function shotWithRecipe(fake, start, recipeId, minutesAgo, id) {
  * the scale, the machine never pouring. Newer than the pour, with its recipe.
  */
 function unfinishedFrom(fake, stored, at) {
-    const startedAt = stored.measurements.find(m => m.machine.state.substate !== 'preparingForShot').machine.timestamp;
-    const cut = Date.parse(startedAt) + 2000;
-    const measurements = stored.measurements
-        .filter(m => m.machine.state.substate === 'preparingForShot' || (m.machine.state.substate === 'preinfusion' && Date.parse(m.machine.timestamp) <= cut))
-        .map(m => ({ ...m, scale: m.scale ? { ...m.scale, weight: 0, weightFlow: 0 } : m.scale }));
     const shot = {
         ...stored,
         id: '00000000-0000-4000-8000-0000000e0001',
         timestamp: localTime(at, fake.timeZone),
         createdAt: new Date(at).toISOString(),
         updatedAt: new Date(at).toISOString(),
-        measurements,
-        annotations: { actualDoseWeight: stored.annotations.actualDoseWeight },
+        ...unfinishedParts(stored),
     };
     fake.shots.add(shot);
     return shot;

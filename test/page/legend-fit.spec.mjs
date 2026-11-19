@@ -21,6 +21,10 @@
 // the legend is painted again on its `streamline:languagechange`
 // (src/cafe/graph.js). The language it writes to Decaid's store is this test's
 // fake's alone.
+//
+// The zone is pinned to UTC, where both Shots were pulled today: in a zone
+// where the start is just past midnight they are yesterday's, and the legend
+// shows a date, which is wider.
 
 import { test, expect } from './support/test.mjs';
 import { legend, remarks, legendFits, load } from './support/page-reads.mjs';
@@ -115,6 +119,8 @@ async function inEveryLanguage(cafe, name) {
 // ── The tests ────────────────────────────────────────────────────────────────
 
 test.describe('the legend at its fullest, in every language', { tag: '@legend' }, () => {
+    // What fits turns on the text: "Today", not a date, before the time.
+    test.use({ timezoneId: 'UTC' });
     test('stars, a note, a barista and Make reference, and a reference with a rating, a barista and a note: it fits in every finished language, only a name cut short', async ({ cafe, fake }) => {
         const page = await openFull(cafe, fake);
         const full = await legend(page);

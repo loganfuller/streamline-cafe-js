@@ -18,8 +18,8 @@
 // model's starting state, copies of a sample Shot made as the smoke run made
 // its copies: recipe cycling none, the loaded recipe and another, barista
 // cycling, every 25 minutes back from the evening before, rated and noted by
-// index. The smoke run imported them through Decaid; here they are added to
-// the fake before the page opens.
+// index, one of them Unfinished. The smoke run imported them through Decaid;
+// here they are added to the fake before the page opens.
 //
 // "Today", "Yesterday", the date and the twelve-hour clock are the page's own
 // (src/cafe/shot-list.js `dayOf`/`dayTitle`, the row's `toLocaleTimeString`
@@ -28,9 +28,9 @@
 
 import { test, expect } from './support/test.mjs';
 import { legend, chartLines, shotsHeader, remarks, load, writes, watchDraws, drawCounts } from './support/page-reads.mjs';
-import { recordOf } from './support/fake-reads.mjs';
+import { recordOf, unfinishedParts } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
-import { shotCurves } from '../../src/cafe/shot-model.js';
+import { shotCurves, isUnfinished } from '../../src/cafe/shot-model.js';
 import { RECIPES, BARISTAS } from '../cafe-smoke/sample-data.mjs';
 
 // A zone behind UTC with daylight saving, out of it in November.
@@ -46,6 +46,8 @@ const NOTE = 'A note from the sample data.';
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const LIST_SHOT = n => `00000000-0000-4000-8000-0000000c${String(n).padStart(4, '0')}`;
+/** The copy made Unfinished: the thirteenth, unrated, of no recipe. */
+const UNFINISHED = LIST_SHOT(12);
 /** The loaded recipe's own latest Shot, pulled today: the Shot in the graph. */
 const LATEST = '00000000-0000-4000-8000-0000000d0000';
 
@@ -79,14 +81,21 @@ function sixtyShots(fake, evening) {
     const targetId = String(recordOf(fake, target.name).id);
     const anotherId = String(recordOf(fake, another.name).id);
     for (let i = 0; i < 60; i += 1) {
-        fake.shots.add(copyOf(fake, {
+        const shot = copyOf(fake, {
             id: LIST_SHOT(i),
             at: evening - i * 25 * 60_000,
             recipeId: [null, targetId, anotherId][i % 3],
             barista: BARISTAS[i % 2],
             enjoyment: i % 4 === 0 ? 0 : (i % 5) * 2 + 2,
             note: i % 6 === 0 ? NOTE : '',
-        }));
+        });
+        // One of them, unrated and of no recipe, Unfinished: the tablet's list
+        // reads no measurements, so it can't tell and marks no row.
+        if (shot.id === UNFINISHED) {
+            const parts = unfinishedParts(shot);
+            Object.assign(shot, { measurements: parts.measurements, annotations: { ...parts.annotations, enjoyment: 0, espressoNotes: shot.annotations.espressoNotes } });
+        }
+        fake.shots.add(shot);
     }
     return { targetId, anotherId };
 }
@@ -192,6 +201,8 @@ test.describe('the Shots list', { tag: '@shots' }, () => {
 
         expect(await shotsHeader(page), 'with no Decent Sync the list is headed "Shots" and no more: no line, no Machine column and no Time column')
             .toEqual({ title: 'Shots', under: null, line: null, columns: COLUMNS.split('|') });
+        expect(isUnfinished(fake.shots.get(UNFINISHED)), 'one of the Shots listed is Unfinished by the page\'s own rule').toBe(true);
+        expect(shown.find(row => row.id === UNFINISHED), 'and is listed as "Not rated", as any unrated Shot').toMatchObject({ unrated: true, stars: [] });
         await expect(page.locator('#cafe-shots-list .cafe-shots-unfinished'), 'no row is marked Unfinished').toHaveCount(0);
         expect(await page.locator('#cafe-shots-list .cafe-shots-machine').evaluateAll(cells => cells.every(cell => getComputedStyle(cell).display === 'none')), 'or names a Machine').toBe(true);
         expect(await page.locator('#cafe-shots-list .cafe-shots-duration').evaluateAll(cells => cells.every(cell => getComputedStyle(cell).display === 'none')), 'or shows how long it ran').toBe(true);

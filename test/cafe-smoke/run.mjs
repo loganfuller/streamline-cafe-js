@@ -1262,7 +1262,6 @@ try {
     await page.waitForTimeout(2500);
     const cards = page.locator('#cafe-strip .cafe-card');
     const target = RECIPES[1];
-    const recordOf = async recipe => (await decaid('GET', `/store/${DYE2_PLUGIN_ID}/recipes`)).find(row => row.name === recipe.name);
     await cards.nth(target.slot - 1).click();
     await page.locator('#cafe-title').filter({ hasText: target.name }).waitFor({ timeout: 20_000 });
     await page.waitForTimeout(3000);

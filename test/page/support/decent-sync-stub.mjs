@@ -16,7 +16,9 @@ export const PLUGIN_ID = 'decent-sync.reaplugin';
 const PREFIX = `/api/v1/plugins/${PLUGIN_ID}/`;
 
 const SERVED = { connected: true, served: true, machine: { id: 'sample-machine', name: 'Sample Machine' }, location: { id: 'sample-location', name: 'Sample Cafe' } };
-const refused = code => ({ status: code === 'unreachable' ? 503 : 409, body: { connected: code !== 'unreachable', served: false, machine: null, location: null, code, message: 'Sample refusal.' } });
+// A refusal names the Machine wherever the server answered for it (a
+// Capture-only Machine is at no Location), and nothing while it wasn't asked.
+const refused = code => ({ status: code === 'unreachable' ? 503 : 409, body: { connected: code !== 'unreachable', served: false, machine: code === 'captureOnly' ? SERVED.machine : null, location: null, code, message: 'Sample refusal.' } });
 
 /**
  * Lists the plugin in Decaid's plugin list as loaded, and answers its routes
@@ -35,10 +37,13 @@ export function decentSync(cafe, state) {
         log.push(`${method} ${parsed.pathname}${parsed.search}`);
         if (route === 'status' && method === 'GET') return served() ? { status: 200, body: SERVED } : refused(state === 'coldStart' ? 'unreachable' : state);
         // No Reference Shot for any recipe, and no copy of one while it can't
-        // reach its server.
+        // reach its server. The Recipe asked about is named by DYE2's record.
         if (route === 'reference' && method === 'GET') {
             if (!served()) return { status: 503, body: { code: 'unreachable', message: 'Sample refusal.' } };
-            return { status: 200, body: { recipe: null, reference: null, source: 'server' } };
+            const recordId = parsed.searchParams.get('recipe');
+            const record = (cafe.fake.store.get('dye2.reaplugin', 'recipes') || []).find(row => row && String(row.id) === recordId);
+            if (!record) return { status: 409, body: { code: 'noSuchRecipe', message: 'Sample refusal.' } };
+            return { status: 200, body: { recipe: { id: `sample-recipe-${recordId}`, name: record.name, recordId }, reference: null, source: 'server' } };
         }
         return null; // anything else is unanswered, and fails the test naming it
     });
