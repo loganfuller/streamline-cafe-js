@@ -265,6 +265,8 @@ test.describe('the Shots list', { tag: '@shots' }, () => {
         await expect(page.locator('#cafe-reference-dialog'), 'that recipe has a reference, so Replace is asked').toHaveAttribute('open', '');
         await expect(page.locator('#cafe-reference-dialog-recipe'), 'naming that recipe').toHaveText(another.name);
         await page.locator('#cafe-reference-dialog-replace').click();
+        // The badge's text is always in the page, hidden: it is shown once the choice is kept.
+        await expect(page.locator('#cafe-reference-badge')).toBeVisible();
         await expect(page.locator('#cafe-reference-badge')).toHaveText('This shot is the reference');
         await cafe.settle();
         expect(fake.store.get(...REFERENCES), 'Make reference sets that recipe\'s reference and leaves the loaded recipe\'s').toEqual({ [targetId]: LIST_SHOT(7), [anotherId]: LIST_SHOT(5) });
