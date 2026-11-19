@@ -593,9 +593,10 @@ async function tapAt(page, selector) {
     await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + box.height / 2);
 }
 
-// 20. The dialogs at a tablet's size, 21. the Grind row's number, 22. the bean
-//     and batch dialog and the basket dialog, 23. the barista at the machine and
-//     25. the profile changed from the page are page tests now (test/page/:
+// 19. A short touchscreen and the soft keyboard, 20. the dialogs at a tablet's
+//     size, 21. the Grind row's number, 22. the bean and batch dialog and the
+//     basket dialog, 23. the barista at the machine and 25. the profile changed
+//     from the page are page tests now (test/page/: touch-keyboard,
 //     dialog-sizes, grind-row, bean-basket-dialogs, barista and profile-change).
 
 const grinderNamed = (grinders, model) => grinders.find(g => g && g.model === model) || null;
@@ -2899,10 +2900,6 @@ try {
     }
 
     await grinderFixtures();
-
-    // 19. A touchscreen whose screen rests short of its window is a page test now
-    //     (test/page/touch-keyboard.spec.mjs).
-
 
     await unloadByTap();
     await preheatLive();

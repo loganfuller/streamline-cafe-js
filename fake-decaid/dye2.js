@@ -36,8 +36,10 @@
 // - `recordReads()`: DYE2's `record` (Decent Sync's plugin asks for it after
 //   each dial-in change) has read the recipes list; the function it answers
 //   writes that list back whole, as `recordWorkflow` does once it has worked out
-//   its patch. A record written in between is lost. The patch itself is left
-//   out: what a page test needs is the list as it was read.
+//   its patch, then pushes on `changed` and mirrors the selection from the
+//   Workflow it read, as `handleRecord` does. A record written in between is
+//   lost. The patch itself is left out: what a page test needs is the list as
+//   it was read.
 // - `restart()`: DYE2 starts again (Decaid's plugin disable and enable, which
 //   unload it and load it afresh: plugin_loader_service.dart): it forgets what
 //   it noted at the last load. Its `onLoad` asks for a look at the Workflow
@@ -384,13 +386,23 @@ export function createDye2({ decaid, announce }) {
         /** DYE2's `record` has read the recipes list: the answer writes that list back. */
         recordReads() {
             const read = copy(kv('recipes'));
-            return () => decaid.store.set(NS, 'recipes', copy(read));
+            const wf = copy(decaid.workflow());
+            return () => {
+                decaid.store.set(NS, 'recipes', copy(read));
+                // `handleRecord` once it has written: a push, then the selection
+                // mirrored from the Workflow it read.
+                announce({ what: 'workflow' });
+                mirror(wf);
+            };
         },
         /**
          * DYE2 starts again: what it noted is forgotten, and its selection is
-         * mirrored and pushed afresh. The load-time look notes no profile (it
-         * cleared nothing on the pinned stack), so the next Workflow change is
-         * the one DYE2 notes the profile from.
+         * mirrored and pushed afresh. The load-time look notes no profile, so
+         * the next Workflow change is the one DYE2 notes the profile from. That
+         * is a guess: Decaid's source says `onLoad`'s look should run, and
+         * neither reading explains why it cleared nothing on the pinned stack.
+         * A step to a third profile after a restart, at the next re-record,
+         * would settle it; no page test changes the profile after a restart.
          */
         restart() {
             baseline = null;

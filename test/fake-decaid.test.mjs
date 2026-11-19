@@ -239,6 +239,7 @@ test('DYE2: a list its record read, written back, loses a record written since; 
     fake.restartDye2();
     assert.equal(fake.selection().id, house.id, 'started again with the record on another profile: still loaded, as on the pinned stack');
     // Started again, DYE2 noted no profile: the next change of profile is the one it notes, and keeps the recipe.
+    // The model's reading, not recorded (dye2.js, `restart()`).
     send(fake, 'PUT', '/api/v1/workflow', { profile: { ...adaptive, title: 'A third profile' } });
     assert.equal(fake.selection().id, house.id, 'a first change of profile after a restart keeps the recipe loaded');
 });
