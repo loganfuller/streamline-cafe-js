@@ -1469,8 +1469,9 @@ async function beanAndBasketDialogs() {
 
         //    A shot that starts closes the dialog, and neither opens during one.
         const openBefore = await openBeans(page);
-        // A batch highlighted, of another bean, which the shot must not choose (#70).
-        await sideRow(page, 'Sample Blend').click();
+        // A batch highlighted, of another bean, which the shot must not choose
+        // (#70). The recipe is back on its own bean, Sample Blend, by now.
+        await sideRow(page, 'Example Decaf').click();
         await page.waitForTimeout(400);
         await batchRow(page, 0).click();
         await page.waitForTimeout(300);
@@ -1488,7 +1489,7 @@ async function beanAndBasketDialogs() {
         await page.waitForTimeout(4000);
         check('bean: the batch highlighted when the shot started was not chosen: no bean written, no record written',
             heldBefore && !writes.slice(writesBeforeShot).some(write => write?.context && 'beanBatchId' in write.context) && recordWrites(0).length === recordsBeforeShot
-            && /^Example Decaf/.test(await dose()), `${heldBefore}, ${JSON.stringify(writes.slice(writesBeforeShot))}, ${await dose()}`);
+            && /^Sample Blend/.test(await dose()), `${heldBefore}, ${JSON.stringify(writes.slice(writesBeforeShot))}, ${await dose()}`);
         const during = await decaid('GET', '/shots?limit=1');
         if (during.items?.[0]) pulled.push(during.items[0].id);
 
