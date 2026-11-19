@@ -160,8 +160,9 @@ test.describe('the Grind row', { tag: '@grind' }, () => {
         await expect(page.locator(VALUE), 'still 11.50 after the next Workflow read').toHaveText('11.50');
 
         mark = fake.log.length;
-        await page.locator('#grind-minus').click();
-        await page.locator('#grind-minus').click();
+        // Two taps in one action: the page's clock runs on between actions,
+        // and a slow worker could let the 300 ms debounce end between two.
+        await page.locator('#grind-minus').click({ clickCount: 2 });
         // A whole number shows whole (grindText), as Streamline did.
         await expect(page.locator(VALUE), '− twice steps to 11 on its grid').toHaveText('11');
         await cafe.advance(2000);

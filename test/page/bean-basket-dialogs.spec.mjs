@@ -482,6 +482,9 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                     const at = rect(button);
                     return {
                         label: button.textContent,
+                        // The whole label shows: the button is as wide as its
+                        // text today, and this catches a style that clips it.
+                        whole: button.scrollWidth <= button.clientWidth + 1,
                         inside: at.left >= row.left - 1 && at.right <= row.right + 1 && at.bottom <= box.bottom && box.right <= innerWidth && box.bottom <= innerHeight,
                         // Beside the button, on one line, and not squeezed to a sliver.
                         noteBeside: !note.hidden && rect(note).right <= at.left + 1 && rect(note).height < at.height && rect(note).width >= 60,
@@ -490,7 +493,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                 // In this language's own words, so a label left in the last
                 // language, or in English, isn't measured in its place.
                 const translated = fit.label === (code === 'en' ? 'Use this batch' : CAFE_TRANSLATIONS['Use this batch'][code]);
-                if (!fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
+                if (!fit.whole || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
                 if (code === 'en') await cafe.screenshot('bean-dialog-highlighted-1340x800-light');
                 if (code === 'de') await cafe.screenshot('bean-dialog-highlighted-1340x800-de-light');
                 await page.locator(CLOSE).click();

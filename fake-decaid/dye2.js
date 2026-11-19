@@ -45,7 +45,11 @@
 //   pinned stack that look cleared no recipe, whether the record held the
 //   Workflow's profile or another: the recipe stayed loaded both times. Why
 //   was not found; the model follows the recording, and DYE2's next look at
-//   the Workflow notes the profile afresh. Recorded: recordings/dye2-restart.json.
+//   the Workflow notes the profile afresh. Recorded: recordings/dye2-restart.json,
+//   which shows only that the recipe stays loaded: a fake that did nothing on
+//   a restart would replay it too. What is forgotten (the noted profile and the
+//   last mirrored selection) shows in no answer the stack gives; it is read
+//   from DYE2's code, where a plugin loaded afresh starts with neither.
 //
 // Not kept: DYE2's recent favourites are read from the store and never worked
 // out again from new Shots; `record` has no answer.
