@@ -641,7 +641,7 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
         //     A basket: saved onto the Recipe by DYE2, at the plugin's ask.
         mark = seen.requests.length;
         await tapName(page, '#drink-section .cafe-row-name');
-        check('basket: on a served Machine the line says the choice is saved to the recipe', (await under(page)) === `${house.name} · saved to the recipe`, await under(page));
+        check('basket: on a served Machine the line says the choice is saved to the recipe', (await under(page)) === `${renamed} · saved to the recipe`, await under(page));
         await shot(page, 'sync-basket-dialog-light');
         await listRowNamed(page, '20 g sample basket').click();
         await pickClosed(page);
@@ -657,8 +657,11 @@ async function beanAndBasketWithDecentSync({ page, seen, house, location }) {
     } finally {
         await tablet2.close();
         //     The Recipe's own batch and basket put back, as the run found them.
-        await sync('PATCH', `/recipes/${house.id}`, { content: { beanId: original.beanId, beanBatchId: original.beanBatchId, basketId: original.basketId, name: house.name } })
-            .catch(error => note(`could not put the Recipe's bean, batch, basket and name back: ${error.message}`));
+        // The batch carries its Bean back with it.
+        await sync('PATCH', `/recipes/${house.id}`, { content: { beanBatchId: original.beanBatchId, basketId: original.basketId, name: house.name } })
+            .catch(error => note(`could not put the Recipe's batch, basket and name back: ${error.message}`));
+        await until(async () => ((await record(decaid))?.name === house.name && (await record(decaid2))?.name === house.name) || null, { timeout: 90_000, every: 1000 });
+        await page.locator('#cafe-strip .cafe-card').nth(house.slot - 1).filter({ hasText: house.name }).waitFor({ timeout: 60_000 }).catch(() => {});
         await load(page, house).catch(() => {});
     }
 }
