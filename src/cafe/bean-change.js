@@ -144,7 +144,9 @@ export function beanAfterCheck({ rows, recipeId, bean, batch, befores }) {
  * change or another recipe was loaded first; as the record was written, this
  * answer carries `checked` too). The check's outcomes are
  * `beanAfterCheck`'s, and `superseded` (a later change to the same recipe has
- * its own check), `lost`, `moved` and `skipped`.
+ * its own check), `lost`, `moved`, `skipped`, and `workflow` (the record was
+ * written again, and the Workflow, found on an old batch of this recipe, could
+ * not be read or written).
  */
 export function createBeanChange({
     settled = () => true, queue, readSelection, readWorkflow, readRecords,
@@ -272,10 +274,36 @@ export function createBeanChange({
             else {
                 entry.rewrote = true;
                 entry.rewroteAt = now();
+                if (!(await followRecord(change, entry))) outcome = 'workflow';
             }
         }
         if (!entry.rewrote) entry.done = true;
         return outcome;
+    }
+
+    // The record set back may have reached the machine before it was written
+    // again (its card tapped, or DYE2 loading it again for a profile change):
+    // a Workflow with this recipe loaded on one of the old batches takes the
+    // bean again, still in the check's turn. One on any other batch is left
+    // alone. False where that write was needed and could not be made.
+    async function followRecord({ recipeId, bean, batch }, entry) {
+        let workflow;
+        try {
+            workflow = await readWorkflow();
+        } catch (error) {
+            return false;
+        }
+        const context = workflow?.context;
+        if (String(context?.extras?.dye?.recipeId ?? '') !== recipeId) return true;
+        const batchNow = idOf(context?.beanBatchId);
+        if (sameId(batchNow, batch.id) || !entry.befores.some(b => b.batchId === batchNow)) return true;
+        if (!settled()) return false;
+        try {
+            await writeWorkflow({ context: currentBeanContext(bean, batch) });
+        } catch (error) {
+            return false;
+        }
+        return true;
     }
 
     async function untilSettled() {

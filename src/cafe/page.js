@@ -99,9 +99,10 @@ const clearAsleep = () => clearOnSleep({ write: writePick, written: seeBarista }
 
 // ── Whether the dial-in is saved ─────────────────────────────────────────────
 
-// The skin saves nothing onto a recipe itself. Decent Sync's plugin does, after
-// every change on a Machine it serves, so the column says "saved to the recipe"
-// only there. Its Status request says which (decent-sync.js), and is asked at
+// Decent Sync's plugin saves the dial-in onto the recipe, after every change on
+// a Machine it serves, so the column says "saved to the recipe" only there. The
+// skin itself saves only the profile and a batch of another bean (DESIGN.md,
+// "Who saves it"). Its Status request says which (decent-sync.js), and is asked at
 // start-up, when the page comes back into view and after each recipe load.
 function showStatus(answer) {
     const next = decentSyncSaves(saved, answer);

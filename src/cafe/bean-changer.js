@@ -50,7 +50,7 @@ export function initBeanChanger({ settled, queue, shotRunning }) {
             if (['held', 'rewritten', 'superseded'].includes(outcome)) logger.info(line);
             else logger.warn(line);
             // The cards and the names follow the record written again.
-            if (outcome === 'rewritten') document.dispatchEvent(new CustomEvent('streamline:workflow-refresh'));
+            if (outcome === 'rewritten' || outcome === 'workflow') document.dispatchEvent(new CustomEvent('streamline:workflow-refresh'));
         },
     }).change;
 }
