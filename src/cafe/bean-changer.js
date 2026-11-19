@@ -47,10 +47,10 @@ export function initBeanChanger({ settled, queue, shotRunning }) {
         wait: sleep,
         onChecked(outcome, recipeId) {
             const line = `Cafe: the check after a bean change on recipe ${recipeId}: ${outcome}`;
-            if (['held', 'rewritten', 'superseded'].includes(outcome)) logger.info(line);
+            if (['held', 'rewritten', 'followed', 'superseded'].includes(outcome)) logger.info(line);
             else logger.warn(line);
-            // The cards and the names follow the record written again.
-            if (outcome === 'rewritten' || outcome === 'workflow') document.dispatchEvent(new CustomEvent('streamline:workflow-refresh'));
+            // The cards and the names follow the record written again, and the Workflow.
+            if (['rewritten', 'followed', 'workflow'].includes(outcome)) document.dispatchEvent(new CustomEvent('streamline:workflow-refresh'));
         },
     }).change;
 }

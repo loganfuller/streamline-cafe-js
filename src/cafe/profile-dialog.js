@@ -86,6 +86,9 @@ export async function openProfileDialog({ mayOpen, epoch, recipe }) {
         if (!result.ok) {
             logger.warn(`Cafe: could not change the profile to ${row.id}: ${result.reason}`);
             showToast(cafeText('Could not change the profile'), 4000, 'error');
+            // A record that took the profile all the same: the card and names
+            // follow it now, and the machine at the check (`checked`).
+            if (result.checked) document.dispatchEvent(new Event('streamline:workflow-refresh'));
         }
     } finally {
         opening = false;

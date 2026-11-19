@@ -99,8 +99,10 @@ export function initProfileChanger({ mayChange, settled, queue, epoch, shotRunni
         wait: sleep,
         onChecked(outcome, recipeId) {
             const line = `Cafe: the check after a profile change on recipe ${recipeId}: ${outcome}`;
-            if (['held', 'rewritten', 'reloaded', 'tapped', 'superseded'].includes(outcome)) logger.info(line);
+            if (['held', 'rewritten', 'followed', 'reloaded', 'tapped', 'superseded'].includes(outcome)) logger.info(line);
             else logger.warn(line);
+            // The cards and the names follow the record written again.
+            if (outcome === 'rewritten') document.dispatchEvent(new CustomEvent('streamline:workflow-refresh'));
         },
     }).change;
 }
