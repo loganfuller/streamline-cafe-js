@@ -8,7 +8,9 @@
     "build:echarts": "esbuild scripts/echarts-streamline-entry.js --bundle --format=esm --minify --outfile=src/modules/echarts-streamline.min.js",
     "build": "npm run build:css && npm run build:echarts",
     "watch:css": "tailwindcss -i ./src/input.css -o ./src/css/app.css --watch",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:page": "playwright test",
+    "record:fake-decaid": "node scripts/fake-decaid-recorder/record.mjs"
   },
   "repository": {
     "type": "git",

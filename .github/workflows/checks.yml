@@ -28,3 +28,35 @@ jobs:
         run: |
           npm run build:css
           git diff --exit-code -- src/css/app.css
+
+  # The page tests: the real page in Chromium against the fake Decaid
+  # (docs/cafe/TESTING.md). One Node version, Chromium's headless shell cached.
+  page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Cache Chromium
+        id: chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      # The runner's image carries Chrome's system libraries; a fresh download
+      # installs them too, in case the image ever stops.
+      - name: Install Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Page tests
+        run: npx playwright test
+      - name: Keep the traces and screenshots of a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-tests
+          path: test/page/out/
+          retention-days: 14
