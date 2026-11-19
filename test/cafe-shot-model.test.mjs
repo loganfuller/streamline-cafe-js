@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
     shotRecipeId, shotsWithRecipe, isUnfinished, shotCurves, shotCredit,
-    differentProfile, whenText, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot, sameReference,
+    differentProfile, whenText, untilNextDay, viewFrom, graphModel, chosenShotId, withChosenShot, drawnShot, sameReference,
     UNCHANGEABLE_NOTICE, UNREAD_NOTICE, isDrawnShot,
 } from '../src/cafe/shot-model.js';
 import { createTabletShots } from '../src/cafe/tablet-shots.js';
@@ -127,6 +127,28 @@ test('a time reads "Today" for today and the day otherwise, in the page\'s langu
     assert.equal(whenText(new Date(2025, 10, 12, 14, 32), now, 'en-GB', 'Today'), '12 Nov 14:32', 'the same day a year before is not today');
     assert.equal(whenText(null, now, 'en-GB', 'Today'), '');
     assert.equal(whenText(new Date(2026, 10, 12, 14, 32), now, 'not a locale!', 'Today').startsWith('Today '), true);
+});
+
+test('the next local day starts at midnight, through a month\'s end and a zone\'s clock changes', () => {
+    assert.equal(untilNextDay(new Date(2026, 10, 18, 22, 59)), 61 * 60_000);
+    assert.equal(untilNextDay(new Date(2026, 10, 18, 23, 59, 59, 999)), 1);
+    const before = process.env.TZ;
+    try {
+        // Vancouver changes its clock at 2 AM; Santiago at midnight, which it
+        // skips in September, so its day starts at 1 AM.
+        for (const zone of ['Asia/Tokyo', 'America/Vancouver', 'America/Santiago']) {
+            process.env.TZ = zone;
+            for (let day = 0; day < 366; day++) {
+                const now = new Date(2026, 0, 1 + day, 12, 30);
+                const next = new Date(now.getTime() + untilNextDay(now));
+                assert.notEqual(next.getDate(), now.getDate(), `${zone}, ${now}: the next day`);
+                assert.equal(new Date(next.getTime() - 1).getDate(), now.getDate(), `${zone}, ${now}: its first moment`);
+            }
+        }
+    } finally {
+        if (before === undefined) delete process.env.TZ;
+        else process.env.TZ = before;
+    }
 });
 
 test('the stored view is Reference unless it says Targets', () => {

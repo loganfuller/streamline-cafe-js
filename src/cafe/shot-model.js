@@ -154,6 +154,15 @@ export function differentProfile(recipe, shot) {
     return !!recipes && !!shots && recipes !== shots;
 }
 
+/**
+ * Milliseconds from `now` to the start of the next local day, when a time
+ * that read "Today" may read with its date. A midnight a clock change skips
+ * is the first moment of that day.
+ */
+export function untilNextDay(now) {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+}
+
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 /**
