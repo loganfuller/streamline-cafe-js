@@ -59,6 +59,19 @@ class Cafe {
     }
 
     /**
+     * Opens the page on the "DYE2 is needed" screen and waits until it is drawn
+     * and nothing is being answered. A gated page draws no cards and opens no
+     * machine socket (src/modules/app.js returns before it connects).
+     */
+    async openGated({ before } = {}) {
+        if (before) await this.page.addInitScript(before);
+        await this.page.goto(`${PAGE_ORIGIN}/index.html`);
+        await this.page.locator('#main-page.cafe-gated').waitFor();
+        await this.settle();
+        return this.page;
+    }
+
+    /**
      * Until no request is being answered, and the page has had a turn to read
      * what came. Fails, naming them, if requests are still being answered after
      * 5 s of real time.

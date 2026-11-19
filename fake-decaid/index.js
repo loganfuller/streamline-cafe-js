@@ -9,6 +9,10 @@
 //
 // Each rule names the source it was read from, in the file that keeps it, and
 // is backed by a recording in recordings/ that `npm test` replays against it.
+//
+// Kept here: Decaid's plugin list, and a plugin that is not loaded answering
+// 404 on its routes (Decaid v0.9.2, `plugins_handler.dart`); DYE2 disabled and
+// enabled through it. Recorded: recordings/dye2-plugin.json.
 
 import { copy, updateWorkflow } from './workflow.js';
 import { createStore } from './store.js';
@@ -236,6 +240,22 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         dye2RecordReads: () => dye2.recordReads(),
         /** DYE2 starts again, as Decaid's plugin disable and enable leave it (dye2.js). */
         restartDye2() {
+            dye2.restart();
+        },
+        /**
+         * DYE2 disabled in Decaid's plugins: listed as not loaded and not
+         * loaded at start (`autoLoad`), its routes
+         * answered 404 "plugin with … not loaded" and its socket refused (recordings/dye2-plugin.json).
+         */
+        disableDye2() {
+            const plugin = plugins.find(p => p.id === DYE2_ID);
+            if (plugin) Object.assign(plugin, { loaded: false, autoLoad: false });
+        },
+        /** DYE2 enabled again: listed as loaded and loaded at start, and started afresh as `restartDye2()` leaves it. */
+        enableDye2() {
+            const plugin = plugins.find(p => p.id === DYE2_ID);
+            if (!plugin) throw new Error('DYE2 is not installed in the fake');
+            Object.assign(plugin, { loaded: true, autoLoad: true });
             dye2.restart();
         },
         /** A recorded answer of the boot, changed: `patch(body)` answers the new body. */
