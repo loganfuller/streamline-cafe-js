@@ -339,3 +339,140 @@ test('a request or socket the model keeps no answer for has none (a machine stat
     assert.equal(get(fake, '/api/v1/grinders').status, 200);
     assert.equal(fake.log.at(-1).path, '/api/v1/grinders');
 });
+
+// ── Decent Sync's plugin (fake-decaid/decent-sync.js) ─────────────────────────
+
+const decentSync = load('decent-sync');
+const served = () => createFakeDecaid({ ...recordings, decentSync, now: START });
+const PLUGIN = '/api/v1/plugins/decent-sync.reaplugin';
+const { A, B, C, D } = decentSync.labels;
+const pushesOf = fake => {
+    const pushes = [];
+    fake.connect('/ws/v1/plugins/decent-sync.reaplugin/changes', text => pushes.push(JSON.parse(text)));
+    fake.flush();
+    return pushes;
+};
+
+test('Decent Sync: absent unless the fake is made with it, and listed and loaded when it is', () => {
+    const plain = fresh();
+    assert.equal(plain.decentSync, null);
+    assert.equal(get(plain, '/api/v1/plugins').body.some(p => p.id === 'decent-sync.reaplugin'), false);
+    assert.equal(get(plain, `${PLUGIN}/status`).status, 404, 'a plugin not installed answers 404, as Decaid does');
+    const fake = served();
+    assert.equal(get(fake, '/api/v1/plugins').body.find(p => p.id === 'decent-sync.reaplugin')?.loaded, true);
+    assert.deepEqual(get(fake, `${PLUGIN}/skin`).body, decentSync.skin);
+    assert.ok(OWNED('GET', `${PLUGIN}/status`) && OWNED('WS', '/ws/v1/plugins/decent-sync.reaplugin/changes'));
+});
+
+test('Decent Sync: status served, then each state it may be in, with its refusal\'s status and fields', () => {
+    const fake = served();
+    assert.deepEqual(get(fake, `${PLUGIN}/status`), { status: 200, body: decentSync.status });
+    const states = {
+        captureOnly: [409, true, true, false],
+        hardwareMismatch: [409, true, false, false],
+        serverTooOld: [503, true, false, false],
+        unreachable: [503, false, false, false],
+    };
+    for (const [state, [status, connected, hasMachine, hasLocation]] of Object.entries(states)) {
+        fake.decentSync.setState(state);
+        const answer = get(fake, `${PLUGIN}/status`);
+        assert.equal(answer.status, status, state);
+        assert.equal(answer.body.code, state);
+        assert.equal(answer.body.connected, connected, `${state}: connected`);
+        assert.equal(answer.body.served, false);
+        assert.equal(answer.body.machine !== null, hasMachine, `${state}: its Machine`);
+        assert.equal(answer.body.location !== null, hasLocation, `${state}: its Location`);
+    }
+    fake.decentSync.setState('served');
+    fake.decentSync.setSharing(false);
+    assert.equal(get(fake, `${PLUGIN}/status`).body.code, 'captureOnly', 'sharing off is a Capture-only Machine');
+    assert.equal(get(fake, `${PLUGIN}/shots`).status, 409, 'and every endpoint that asks the server is refused so');
+});
+
+test('Decent Sync: the Location\'s Shots, newest first, paged by a cursor; the tablet\'s and another Machine\'s', () => {
+    const fake = served();
+    const all = get(fake, `${PLUGIN}/shots?limit=50`).body;
+    assert.deepEqual(all.shots.map(row => row.id).sort(), [A, B, C, D].sort(), 'the sample data\'s Shots, pulled before the Machine joined, are not listed');
+    assert.equal(all.nextCursor, null);
+    const times = all.shots.map(row => row.pulledAt);
+    assert.deepEqual(times, [...times].sort().reverse(), 'newest first');
+    assert.deepEqual(all.shots.map(row => row.onThisTablet), all.shots.map(row => row.id === A || row.id === B));
+    assert.equal(all.shots.find(row => row.id === D).unfinished, true);
+    const first = get(fake, `${PLUGIN}/shots?limit=3`).body;
+    const next = get(fake, `${PLUGIN}/shots?limit=3&cursor=${encodeURIComponent(first.nextCursor)}`).body;
+    assert.deepEqual([...first.shots, ...next.shots].map(row => row.id), all.shots.map(row => row.id));
+    assert.equal(next.nextCursor, null);
+    for (const query of ['limit=0', 'limit=51', 'limit=x', 'cursor=nope']) assert.equal(get(fake, `${PLUGIN}/shots?${query}`).status, 400, query);
+    assert.equal(get(fake, `${PLUGIN}/shot?id=${C}`).body.shot.id, C, 'another Machine\'s Shot whole');
+    assert.equal(get(fake, `${PLUGIN}/shot?id=${recordings.sampleData.shots[0].id}`).status, 404, 'one the list doesn\'t list is noSuchShot');
+});
+
+test('Decent Sync: a Reference Shot chosen by DYE2 record id, pushed for a slotted Recipe, and answered from the copy while out of reach', () => {
+    const fake = served();
+    const pushes = pushesOf(fake);
+    const house = houseRecord(fake).id;
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=${house}`).body.reference, null);
+    const chosen = send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, { shotId: A });
+    assert.equal(chosen.status, 200);
+    assert.equal(chosen.body.reference.shot.id, A);
+    assert.equal(chosen.body.source, 'server');
+    assert.equal(chosen.body.reference.profileDiffers, false);
+    fake.flush();
+    assert.deepEqual(pushes.map(p => p.what), ['reference']);
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, { shotId: B }).body.reference.profileDiffers, true, 'B was pulled on another Profile');
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, { shotId: recordings.sampleData.shots[0].id }).status, 404);
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, {}).status, 400, 'a tablet can\'t clear one');
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=no-such-record`).status, 404);
+    fake.decentSync.stopServer();
+    const copy = get(fake, `${PLUGIN}/reference?recipe=${house}`);
+    assert.equal(copy.body.source, 'tablet');
+    assert.equal(copy.body.reference.shot.id, B);
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, { shotId: A }).status, 503, 'no choice is kept for later');
+    fake.flush();
+    assert.deepEqual(pushes.at(-1), { what: 'connection', connected: false });
+});
+
+test('Decent Sync: an edit of the tablet\'s own Shot goes through Decaid whatever the server; another Machine\'s through the server, now or not at all', () => {
+    const fake = served();
+    fake.decentSync.stopServer();
+    const own = send(fake, 'PUT', `${PLUGIN}/shot?id=${A}`, { rating: 8, note: 'Sample note' });
+    assert.deepEqual(own, { status: 200, body: { rating: 8, note: 'Sample note' } });
+    assert.equal(fake.shots.get(A).annotations.enjoyment, 8, 'written into Decaid\'s Shot');
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=${C}`, { rating: 6 }).status, 503);
+    fake.decentSync.startServer();
+    assert.deepEqual(send(fake, 'PUT', `${PLUGIN}/shot?id=${C}`, { rating: 6 }).body, { rating: 6, note: null });
+    for (const body of [{}, { rating: 11 }, { rating: 4, extra: 1 }, { note: null }]) assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=${A}`, body).status, 400, JSON.stringify(body));
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=no-such-shot`, { rating: 2 }).status, 404);
+});
+
+test('Decent Sync: what the server does reaches the page as pushes; a plugin never connected holds no copy', () => {
+    const fake = served();
+    const pushes = pushesOf(fake);
+    const house = houseRecord(fake).id;
+    fake.decentSync.chooseReference(house, A);
+    fake.decentSync.renameRecipe(house, 'House espresso renamed');
+    fake.decentSync.editShot(A, { rating: 7, note: 'Server note' });
+    fake.flush();
+    assert.deepEqual(pushes.map(p => p.recipe.name), ['House espresso', 'House espresso renamed', 'House espresso renamed']);
+    assert.equal(fake.shots.get(A).annotations.espressoNotes, 'Server note', 'the tablet\'s own Shot is written as the plugin writes it');
+
+    const cold = served();
+    const coldPushes = pushesOf(cold);
+    cold.decentSync.firstStart();
+    assert.equal(get(cold, `${PLUGIN}/reference?recipe=${houseRecord(cold).id}`).status, 503, 'no copy to answer from');
+    cold.decentSync.startServer();
+    cold.flush();
+    assert.deepEqual(coldPushes[0], { what: 'connection', connected: true });
+    assert.equal(coldPushes.filter(p => p.what === 'reference').length, decentSync.server.recipes.filter(r => r.slot).length, 'each copy comes, and is pushed');
+});
+
+test('Decent Sync: a Shot stored on the tablet joins the Location\'s Shots, with its duration past the Preheat', () => {
+    const fake = served();
+    fake.startPour();
+    fake.finishPour();
+    const id = fake.storeShot();
+    const row = get(fake, `${PLUGIN}/shots?limit=1`).body.shots[0];
+    assert.equal(row.id, id);
+    assert.equal(row.onThisTablet, true);
+    assert.ok(row.duration > 10 && row.duration < 40, `a duration in seconds: ${row.duration}`);
+});

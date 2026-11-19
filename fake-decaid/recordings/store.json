@@ -8,7 +8,7 @@
  "about": "Decaid's store: a key never written answers null, a write answers {} and is read back as written, a namespace lists its keys or, with full=1, its values, and a delete answers {}.",
  "given": {
   "workflow": {
-   "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+   "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+    "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+    "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",

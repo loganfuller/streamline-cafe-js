@@ -1,8 +1,10 @@
 // The fake Decaid against the pinned real stack: each scenario recorded in
 // fake-decaid/recordings/ is sent to the model, which must answer as the real
 // stack did, and push on DYE2's socket what DYE2 pushed. The recorded pour is
-// replayed and its Shot compared with the one Decaid stored. How to record them
-// again is in docs/cafe/TESTING.md.
+// replayed and its Shot compared with the one Decaid stored. Decent Sync's
+// scenarios start from a fake made with recordings/decent-sync.json, and their
+// events on the server are the fake plugin's. How to record them again is in
+// docs/cafe/TESTING.md.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,12 +17,15 @@ const load = name => JSON.parse(readFileSync(new URL(`${name}.json`, DIR), 'utf8
 const sampleData = load('sample-data');
 const boot = load('boot');
 const pour = load('pour');
+const decentSync = load('decent-sync');
 const recordedMs = text => Date.parse(`${text.slice(0, 23)}Z`);
 
 // The sample data's Shots keep the times they were recorded at when the page's
 // clock is an hour past the newest (fake-decaid/index.js moves them otherwise).
 const newest = Math.max(...sampleData.shots.map(shot => recordedMs(shot.timestamp)));
-const fresh = () => createFakeDecaid({ sampleData, boot, pour, now: newest + 3_600_000 });
+const fresh = (served = false) => createFakeDecaid({ sampleData, boot, pour, ...(served ? { decentSync } : {}), now: newest + 3_600_000 });
+// A push the plugin may repeat is compared once.
+const once = pushes => pushes.filter((push, index) => index === 0 || JSON.stringify(push) !== JSON.stringify(pushes[index - 1]));
 
 // When Decaid last changed a Shot, and when DYE2 made a recipe, are their own
 // clocks'; the rest is compared whole.
@@ -40,6 +45,7 @@ test('every recording was made with the pinned versions', () => {
         const { recordedWith } = load(file.slice(0, -5));
         assert.equal(recordedWith?.decaid, pins.decaid.version, `${file}: recorded with Decaid ${recordedWith?.decaid}, pinned ${pins.decaid.version}; record again`);
         assert.equal(recordedWith?.dye2, pins.dye2.version, `${file}: recorded with DYE2 ${recordedWith?.dye2}, pinned ${pins.dye2.version}; record again`);
+        if (file.startsWith('decent-sync')) assert.equal(recordedWith?.decentSync, pins.decentSync.version, `${file}: recorded with Decent Sync ${recordedWith?.decentSync}, pinned ${pins.decentSync.version}; record again`);
     }
     // Only the boot holds what Streamline's own modules ask for.
     assert.equal(boot.recordedWith.streamline, pins.streamline.version, `boot.json: recorded with Streamline ${boot.recordedWith.streamline}, pinned ${pins.streamline.version}; record the boot again`);
@@ -47,14 +53,17 @@ test('every recording was made with the pinned versions', () => {
 
 test('every rule file has a recorded scenario', () => {
     const rules = new Set(scenarios.map(({ recording }) => recording.rule));
-    for (const rule of ['fake-decaid/index.js', 'fake-decaid/workflow.js', 'fake-decaid/store.js', 'fake-decaid/dye2.js', 'fake-decaid/shots.js', 'fake-decaid/library.js']) {
+    for (const rule of ['fake-decaid/index.js', 'fake-decaid/workflow.js', 'fake-decaid/store.js', 'fake-decaid/dye2.js', 'fake-decaid/shots.js', 'fake-decaid/library.js', 'fake-decaid/decent-sync.js']) {
         assert.ok(rules.has(rule), `no recorded scenario for ${rule}`);
     }
 });
 
 for (const { name, recording } of scenarios) {
-    test(`${name}: the fake answers as Decaid ${recording.recordedWith.decaid} and DYE2 ${recording.recordedWith.dye2} did (${recording.rule})`, () => {
-        const fake = fresh();
+    const versions = `Decaid ${recording.recordedWith.decaid}, DYE2 ${recording.recordedWith.dye2}${recording.decentSync ? ` and Decent Sync ${recording.recordedWith.decentSync}` : ''}`;
+    test(`${name}: the fake answers as ${versions} did (${recording.rule})`, () => {
+        const fake = fresh(!!recording.decentSync);
+        // DYE2's pushes are compared as pushed; Decent Sync's plugin may repeat one.
+        const pushed = recording.decentSync ? once : list => list;
         if (recording.given) fake.given(recording.given);
         const pushes = [];
         if (recording.socket) fake.connect(recording.socket, text => pushes.push(JSON.parse(text)));
@@ -64,10 +73,23 @@ for (const { name, recording } of scenarios) {
         recording.steps.forEach((step, index) => {
             pushes.length = 0;
             if (step.event) {
-                const events = { 'restart-dye2': () => fake.restartDye2(), 'disable-dye2': () => fake.disableDye2(), 'enable-dye2': () => fake.enableDye2() };
+                const sync = fake.decentSync;
+                const events = {
+                    'restart-dye2': () => fake.restartDye2(),
+                    'disable-dye2': () => fake.disableDye2(),
+                    'enable-dye2': () => fake.enableDye2(),
+                    'sync-sharing': () => sync.setSharing(step.on),
+                    'sync-stop-server': () => sync.stopServer(),
+                    'sync-start-server': () => sync.startServer(),
+                    'sync-choose-reference': () => sync.chooseReference(step.recipe, step.shot),
+                    'sync-rename': () => sync.renameRecipe(step.recipe, step.name),
+                    'sync-edit-shot': () => sync.editShot(step.shot, { rating: step.rating, note: step.note }),
+                };
                 assert.ok(events[step.event], `step ${index + 1}: no such event in the model: ${step.event}`);
                 events[step.event]();
                 fake.flush();
+                // What DYE2 pushes as it loads is not kept; what Decent Sync's plugin pushes after an event is.
+                if (step.pushes) assert.deepEqual(pushed(pushes), pushed(step.pushes), `step ${index + 1}, ${step.event}: what the plugin pushed`);
                 return;
             }
             const { method, path, body } = step.request;
@@ -79,7 +101,7 @@ for (const { name, recording } of scenarios) {
             // A refusal is compared by its status: the page reads no error's text.
             if (path.endsWith('/save-recipe') && step.answer.status === 200) made.set(step.answer.body.id, got.body.id);
             if (step.answer.status < 400) assert.deepEqual(normal(got.body), normal(step.answer.body, made), `${where}: answer`);
-            if (recording.socket) assert.deepEqual(pushes, step.pushes, `${where}: what DYE2 pushed`);
+            if (recording.socket) assert.deepEqual(pushed(pushes), pushed(step.pushes), `${where}: what was pushed`);
         });
     });
 }

@@ -8,10 +8,11 @@
 // the latest Shot alone and the line saying why, until the plugin's connection
 // comes and the page asks again; and the page with no recipe loaded, dark.
 //
-// Decent Sync's plugin is the stand-in of support/decent-sync-stub.mjs, which
-// answers its Status and `reference` requests and pushes on its `changes`
-// socket only when the test says (`plugin.connect()`), not after a wait. Its
-// fake with recordings is #61's.
+// Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
+// Machine at its Location from recordings/decent-sync.json, with its sharing
+// turned off for "not saved", and never connected yet for the cold start: its
+// connection comes, and it pushes on its `changes` socket, only when the test
+// says (`fake.decentSync.startServer()`), not after a wait.
 //
 // The page asks the Status again on a timer while no answer has said either
 // way (src/cafe/decent-sync.js, `statusRetryMs`): 30 s at the first pace. The
@@ -24,7 +25,6 @@
 // screenshots with a recipe loaded.
 
 import { test, expect } from './support/test.mjs';
-import { decentSync } from './support/decent-sync-stub.mjs';
 import { legend, row, keys, sides, paint, load } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
@@ -63,6 +63,9 @@ function shotOf(fake, start, recipe) {
     });
 }
 
+/** The plugin's endpoints the page asked, as "GET /api/v1/…?…", matching `pattern`. */
+const asked = (fake, pattern) => fake.log.map(entry => `${entry.method} ${entry.path}${entry.search}`).filter(line => pattern.test(line));
+
 /** Reads of the choice of references kept on the tablet, in Decaid's store. */
 const referencesRead = fake => fake.log.filter(entry => entry.path.startsWith(REFERENCES)).map(entry => `${entry.method} ${entry.path}`);
 
@@ -98,50 +101,53 @@ test.describe('the dial-in label and Decent Sync', { tag: '@sync' }, () => {
         await cafe.screenshot('page-recipe-own-buttons-dark');
     });
 
-    for (const [state, label] of [['served', SAVED], ['captureOnly', NOT_SAVED]]) {
-        test(`Decent Sync answering "${state}": the column reads "${label}"`, async ({ cafe, fake, start }) => {
-            shotOf(fake, start, house);
-            const plugin = decentSync(cafe, state);
+    test.describe('with Decent Sync\'s plugin', () => {
+        test.use({ decentSync: true });
+
+        for (const [state, label] of [['served', SAVED], ['captureOnly', NOT_SAVED]]) {
+            test(`Decent Sync answering "${state}": the column reads "${label}"`, async ({ cafe, fake }) => {
+                // A Capture-only Machine: its sharing turned off on the server.
+                if (state === 'captureOnly') fake.decentSync.setSharing(false);
+                const page = await cafe.open();
+                await load(cafe, house);
+                await expect(page.locator('#cafe-dial-label')).toHaveText(label);
+                expect(asked(fake, STATUS).length, 'its Status was asked').toBeGreaterThan(0);
+                if (state === 'served') await cafe.screenshot('page-recipe-decent-sync-light');
+            });
+        }
+
+        test('Decent Sync not connected yet: "not saved", the latest Shot alone and a line saying why, until its connection comes', async ({ cafe, fake, start }) => {
+            fake.decentSync.firstStart();
             const page = await cafe.open();
             await load(cafe, house);
-            await expect(page.locator('#cafe-dial-label')).toHaveText(label);
-            expect(plugin.asked(STATUS).length, 'its Status was asked').toBeGreaterThan(0);
-            if (state === 'served') await cafe.screenshot('page-recipe-decent-sync-light');
-        });
-    }
 
-    test('Decent Sync not connected yet: "not saved", the latest Shot alone and a line saying why, until its connection comes', async ({ cafe, fake, start }) => {
-        shotOf(fake, start, house);
-        const plugin = decentSync(cafe, 'coldStart');
-        const page = await cafe.open();
-        await load(cafe, house);
+            await expect(page.locator('#cafe-dial-label')).toHaveText(NOT_SAVED);
+            expect(await legend(page), 'the latest Shot alone, with no reference, no badge and no Make reference').toMatchObject({
+                label: 'Latest', reference: null, badge: null, make: null, notice: UNREACHABLE,
+            });
+            expect(referencesRead(fake), 'the choice kept on the tablet is not read').toEqual([]);
+            expect(cafe.routes.sockets.has('/ws/v1/plugins/decent-sync.reaplugin/changes'), 'the page listens on the plugin\'s socket').toBe(true);
 
-        await expect(page.locator('#cafe-dial-label')).toHaveText(NOT_SAVED);
-        expect(await legend(page), 'the latest Shot alone, with no reference, no badge and no Make reference').toMatchObject({
-            label: 'Latest', reference: null, badge: null, make: null, notice: UNREACHABLE,
-        });
-        expect(referencesRead(fake), 'the choice kept on the tablet is not read').toEqual([]);
-        expect(plugin.listening(), 'the page listens on the plugin\'s socket').toBe(true);
+            // Every ask so far was answered "unreachable", and the page's timer to
+            // ask again has not fired: the clock has not reached its first pace.
+            const asks = asked(fake, STATUS).length;
+            const references = asked(fake, REFERENCE).length;
+            expect(asks).toBeGreaterThan(0);
+            expect(await page.evaluate(() => Date.now()) - start, 'short of the first retry').toBeLessThan(statusRetryMs(1));
 
-        // Every ask so far was answered "unreachable", and the page's timer to
-        // ask again has not fired: the clock has not reached its first pace.
-        const asks = plugin.asked(STATUS).length;
-        const references = plugin.asked(REFERENCE).length;
-        expect(asks).toBeGreaterThan(0);
-        expect(await page.evaluate(() => Date.now()) - start, 'short of the first retry').toBeLessThan(statusRetryMs(1));
+            fake.decentSync.startServer();
+            cafe.fake.flush();
+            await cafe.settle();
+            await expect(page.locator('#cafe-dial-label')).toHaveText(SAVED);
+            expect(asked(fake, STATUS).length, 'one ask more, the one the connection\'s push made').toBe(asks + 1);
+            expect(await page.evaluate(() => Date.now()) - start, 'and no retry fired').toBeLessThan(statusRetryMs(1));
 
-        plugin.connect();
-        cafe.fake.flush();
-        await cafe.settle();
-        await expect(page.locator('#cafe-dial-label')).toHaveText(SAVED);
-        expect(plugin.asked(STATUS).length, 'one ask more, the one the connection\'s push made').toBe(asks + 1);
-        expect(await page.evaluate(() => Date.now()) - start, 'and no retry fired').toBeLessThan(statusRetryMs(1));
-
-        await expect.poll(() => legend(page), 'Make reference once the Machine is known to be served, and the line gone').toMatchObject({
-            label: 'Latest', make: 'Make reference', muted: false, notice: null,
-        });
-        expect(plugin.asked(REFERENCE).length, 'the plugin asked for the reference again').toBeGreaterThan(references);
-        expect(referencesRead(fake), 'and the choice kept on the tablet never read').toEqual([]);
+            await expect.poll(() => legend(page), 'Make reference once the Machine is known to be served, and the line gone').toMatchObject({
+                label: 'Latest', make: 'Make reference', muted: false, notice: null,
+            });
+            expect(asked(fake, REFERENCE).length, 'the plugin asked for the reference again').toBeGreaterThan(references);
+            expect(referencesRead(fake), 'and the choice kept on the tablet never read').toEqual([]);
+    });
     });
 
     test('page-no-recipe-dark: "No recipe selected", the last Shot, and no reference', async ({ cafe, fake }) => {

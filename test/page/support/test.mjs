@@ -183,8 +183,19 @@ export const test = base.extend({
      * tablet.
      */
     start: [START, { option: true }],
-    fake: async ({ start, timezoneId }, use) => {
-        const fake = createFakeDecaid({ sampleData: recording('sample-data'), boot: recording('boot'), pour: recording('pour'), now: start, timeZone: timezoneId ?? 'UTC' });
+    /**
+     * Whether Decent Sync's plugin is installed, serving the Machine at its
+     * Location (fake-decaid/decent-sync.js, recordings/decent-sync.json). A
+     * spec turns it on with `test.use({ decentSync: true })`, and drives it
+     * through `fake.decentSync`.
+     */
+    decentSync: [false, { option: true }],
+    fake: async ({ start, timezoneId, decentSync }, use) => {
+        const fake = createFakeDecaid({
+            sampleData: recording('sample-data'), boot: recording('boot'), pour: recording('pour'),
+            ...(decentSync ? { decentSync: recording('decent-sync') } : {}),
+            now: start, timeZone: timezoneId ?? 'UTC',
+        });
         await use(fake);
     },
     cafe: async ({ page, context, fake, start }, use) => {

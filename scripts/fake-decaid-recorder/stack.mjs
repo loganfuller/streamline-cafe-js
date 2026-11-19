@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(HERE, '..', '..');
 export const PINS = JSON.parse(await readFile(join(ROOT, 'fake-decaid', 'pins.json'), 'utf8'));
-const LABEL = 'streamline-cafe-js.fake-decaid';
+export const LABEL = 'streamline-cafe-js.fake-decaid';
 export const CACHE = process.env.FAKE_DECAID_CACHE || join(homedir(), '.cache', 'streamline-cafe-fake-decaid');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -25,7 +25,7 @@ async function sha256(path) {
 }
 
 // A release asset, downloaded once into the cache and checked against its pinned sum.
-async function asset(repo, tag, { name, sha256: want }) {
+export async function asset(repo, tag, { name, sha256: want }) {
     await mkdir(CACHE, { recursive: true });
     const path = join(CACHE, name);
     if (!existsSync(path) || (await sha256(path)) !== want) {
@@ -75,9 +75,13 @@ export function opened(socket) {
  * kept with --keep, never remove each other's. A start that fails removes the
  * container it made.
  *
- * @param {{ port?: number, timezone?: string }} [options]
+ * `devices` is what Decaid simulates: a DE1 and a scale unless told otherwise
+ * (Decent Sync's second Machine is a Bengle, since two simulated DE1s share a
+ * serial, which its server refuses).
+ *
+ * @param {{ port?: number, timezone?: string, devices?: string[] }} [options]
  */
-export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
+export async function standUp({ port = 18157, timezone = 'UTC', devices = ['machine', 'scale'] } = {}) {
     const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
     const decaidTag = `v${PINS.decaid.version}`;
     const decaidArchive = await asset(PINS.decaid.repo, decaidTag, PINS.decaid.assets[arch]);
@@ -102,7 +106,7 @@ export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
         // DYE2 placed before Decaid's first start stays at its version: Decaid
         // installs its bundled copy only where none is.
         exec('mkdir -p ~/.local/share/decaid/plugins && unzip -q -o /tmp/dye2.zip -d ~/.local/share/decaid/plugins');
-        exec(`echo '{"simulateDevices":["machine","scale"],"onboardingCompleted":true,"accountStepSeen":true}' > ~/.local/share/decaid/shared_preferences.json`);
+        exec(`echo '${JSON.stringify({ simulateDevices: devices, onboardingCompleted: true, accountStepSeen: true })}' > ~/.local/share/decaid/shared_preferences.json`);
         exec('mkdir -p /run/dbus && (dbus-daemon --system --fork || true) && (avahi-daemon -D || true)');
         // The token goes through the environment, never the command line, so
         // no process list or failed command's message shows it.

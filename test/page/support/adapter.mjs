@@ -17,15 +17,18 @@ export function recording(name) {
 
 /**
  * Routes `context` to `fake`. Answers `{ unanswered, inflight, sockets,
- * intercept, interceptSocket }`: what had no answer, the requests being
- * answered now ("METHOD url"), the paths of the sockets open, and two ways for
- * a test to stand between the page and the fake (support/faults.mjs and
- * support/decent-sync-stub.mjs use them).
+ * opened, drop, intercept, interceptSocket }`: what had no answer, the
+ * requests being answered now ("METHOD url"), the paths of the sockets open,
+ * the path of every socket opened in order (a reopened one again), a way to
+ * close the sockets open to a path from Decaid's side, and two ways for a test
+ * to stand between the page and the fake (support/faults.mjs uses them).
  */
 export async function attach(context, fake) {
     const unanswered = [];
     const inflight = new Set();
     const sockets = new Set();
+    const opened = [];
+    const live = new Map();
     const interceptors = [];
     const socketInterceptors = [];
 
@@ -100,13 +103,28 @@ export async function attach(context, fake) {
             return;
         }
         sockets.add(path);
+        opened.push(path);
+        if (!live.has(path)) live.set(path, new Set());
+        live.get(path).add(socket);
         socket.onMessage(() => {});
         socket.onClose(() => {
             handle.close();
-            sockets.delete(path);
+            live.get(path)?.delete(socket);
+            if (!live.get(path)?.size) sockets.delete(path);
         });
         fake.flush();
     });
 
-    return { unanswered, inflight, sockets, intercept, interceptSocket };
+    /**
+     * Closes every socket open to `path` from Decaid's side, as a Decaid
+     * restarting or a network drop leaves the page: the fake stops sending to
+     * them, and the page sees them close. Answers how many it closed.
+     */
+    const drop = async path => {
+        const open = [...(live.get(path) || [])];
+        for (const socket of open) await socket.close({ code: 1001, reason: 'dropped by the test' });
+        return open.length;
+    };
+
+    return { unanswered, inflight, sockets, opened, drop, intercept, interceptSocket };
 }
