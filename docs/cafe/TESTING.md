@@ -102,4 +102,4 @@ The page tests write the screenshots the smoke steps took to `test/page/out/scre
 
 ## Measured in the pilot (#57)
 
-On an Apple-silicon Mac, Chromium 158: each test takes 0.5 to 1.9 s on one worker, a median of 1.0 s, its page's boot (about 170 files and 55 requests, 0.4 s to the strip) included. All nine take about 10 s on one worker and 5 s on five. Twenty repeats of both specs on five workers: 180 runs, no failure. The two smoke steps they replace held at least 81 s of fixed waits, real-time pours and fade waits between them, before any page's boot or Decaid's store.
+On an Apple-silicon Mac, Chromium 158: each test takes 0.5 to 1.9 s on one worker, a median of 1.0 s, its page's boot (about 170 files and 55 requests, 0.4 s to the strip) included. All nine take about 10 s on one worker and 4 s on five. Twenty repeats of both specs on five workers: 180 runs, no failure. The two smoke steps they replace held at least 81 s of fixed waits, real-time pours and fade waits between them, before any page's boot or Decaid's store.
