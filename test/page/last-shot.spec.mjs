@@ -244,17 +244,20 @@ test.describe('"Last shot" across midnight', { tag: '@lastshot' }, () => {
     // Woken past midnight with the timer not yet fired: the page writes the
     // date as it comes into view, before any read of the Shots, which on a
     // tablet that wakes offline may fail and, with no recipe loaded, paint
-    // nothing.
+    // nothing. Anything else may paint the legend after the clock moves, as a
+    // read still on its way does on a slow runner, so the row is blanked and
+    // read again in the turn the page shows: only the page showing writes it.
     test('a page that comes back into view past midnight writes the date at once, before reading anything', async ({ cafe, start }) => {
         const page = await cafe.open();
         expect((await legend(page)).when).toBe('Today 10:59 PM');
         await page.clock.setSystemTime(start + 2 * 60_000);
         const written = await page.evaluate(() => {
-            const before = document.getElementById('cafe-shot-when').textContent;
+            const when = document.getElementById('cafe-shot-when');
+            when.textContent = '';
             document.dispatchEvent(new Event('visibilitychange'));
-            return [before, document.getElementById('cafe-shot-when').textContent];
+            return when.textContent;
         });
-        expect(written, 'past midnight, no timer fired, then in the same turn as the page shows').toEqual(['Today 10:59 PM', 'Nov 18 10:59 PM']);
+        expect(written, 'past midnight, no timer fired, written in the turn the page shows').toBe('Nov 18 10:59 PM');
     });
 
     test('with a recipe loaded, its latest Shot and its reference both read with their dates once the day turns, the page left at rest', async ({ cafe, fake, start }) => {
