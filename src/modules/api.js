@@ -1482,7 +1482,9 @@ export async function getDye2KvArray(key) {
 // in place, never a stale cached copy.
 // Streamline Cafe: sent without keepalive. A recipes list passes keepalive's
 // 64 KiB at about a dozen recipes, and the browser then refuses the write
-// before it leaves the page. Every caller awaits the write (fork issue #74).
+// before it leaves the page. The recipe writer and the strip's hide await it;
+// the older-DYE2 auto-save fires it from a timer (docs/cafe/UPSTREAM_EDITS.md;
+// fork issue #74).
 export async function setDye2KvArray(key, items) {
     await setKVValue(DYE2_KV_NAMESPACE, key, items, { keepalive: false });
 }

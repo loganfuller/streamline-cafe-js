@@ -109,7 +109,7 @@ One module in the fork is the only writer, `src/cafe/recipe-writer.js`, and a te
 - changes only the named fields of one row, and keeps every field and every row it doesn't know;
 - gives a slot one holder: a recipe placed in a slot takes it from any other row that names it, as DYE2's own save does;
 - writes, reads again to confirm, and retries once;
-- sends the whole list without `keepalive`, which a browser refuses once the body passes 64 KiB, about a dozen recipes (#74).
+- sends the whole list without `keepalive`, which a browser refuses once the body, with the keepalive bodies still in flight, passes 64 KiB: about a dozen recipes, or two writes of a shorter list back to back (#74).
 
 Decaid's store has no conditional write, and DYE2 reads, waits and writes the whole list, sometimes over several seconds. A write that lands inside that window is lost, which is why each one is confirmed. The confirming read follows the write at once, so it catches a write the store refused and a change already written over. A copy DYE2 writes back later than that is not caught.
 
