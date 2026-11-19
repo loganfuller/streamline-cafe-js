@@ -3024,16 +3024,23 @@ async function liveLabels() {
             check(`live labels (${tag}): the page left the shot when it stopped`, leftLive);
             await page.waitForTimeout(300);
             const ended = await lineLabels(page);
-            const moved = lastLive && ended ? Math.max(...ended.labels.map((l, i) => Math.hypot(l.x - lastLive.labels[i].x, l.y - lastLive.labels[i].y))) : null;
+            // Compared label by label only where both frames name the same lines;
+            // otherwise the check below fails and says so.
+            const sameLines = (a, b) => !!a && !!b && a.labels.map(l => l.name).join() === b.labels.map(l => l.name).join();
+            const moved = sameLines(lastLive, ended) && ended.labels.length ? Math.max(...ended.labels.map((l, i) => Math.hypot(l.x - lastLive.labels[i].x, l.y - lastLive.labels[i].y))) : null;
             check(`live labels (${tag}): when the shot ends the labels stay where they were (within a frame's travel)`,
                 ended && ended.labels.map(l => l.name).join() === OWN_LABELLED && moved !== null && moved <= 12,
                 JSON.stringify({ moved, end: [lastLive?.end, ended?.end] }));
             // Once saved, the Shot as Decaid stored it is drawn: say how far each label went.
             const id = await saved(before);
             check(`live labels (${tag}): the shot was saved`, !!id);
-            await page.waitForTimeout(4000);
+            // The stars show once the page has the saved Shot's record, and not
+            // while it still draws the shot's own last frame.
+            const drawn = await page.locator('#cafe-stars').waitFor({ state: 'visible', timeout: 20_000 }).then(() => true, () => false);
+            check(`live labels (${tag}): the saved Shot is drawn in the shot's place`, drawn);
+            await page.waitForTimeout(1000);
             const finished = await lineLabels(page);
-            const travel = ended && finished && finished.labels.length === ended.labels.length
+            const travel = sameLines(ended, finished)
                 ? finished.labels.map((l, i) => Math.round(Math.hypot(l.x - ended.labels[i].x, l.y - ended.labels[i].y))) : null;
             note(`(${tag}) once the saved Shot is drawn each label moved ${JSON.stringify(travel)} px, the axis ${ended?.end?.toFixed(2)} → ${finished?.end?.toFixed(2)} s`);
             check(`live labels (${tag}): the saved Shot's labels name the same four lines, none reaching past the chart`,
