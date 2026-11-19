@@ -242,6 +242,6 @@ try {
     if (ONLY.includes('boot')) await boot();
     if (ONLY.includes('pour')) await pour();
 } finally {
-    if (KEEP) console.log(`kept: ${stack.api} (token ${stack.token})`);
+    if (KEEP) console.log(`kept: ${stack.api} (token ${stack.token}${stack.id ? `, container ${stack.id.slice(0, 12)}` : ''})`);
     else stack.stop();
 }

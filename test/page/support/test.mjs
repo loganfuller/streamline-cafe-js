@@ -57,14 +57,20 @@ class Cafe {
         return this.page;
     }
 
-    /** Until no request is being answered, and the page has had a turn to read what came. */
+    /**
+     * Until no request is being answered, and the page has had a turn to read
+     * what came. Fails, naming them, if requests are still being answered after
+     * 5 s of real time.
+     */
     async settle(page = this.page) {
-        for (let round = 0; round < 50; round += 1) {
-            if (this.routes.inflight.count === 0) {
+        const deadline = Date.now() + 5000;
+        for (;;) {
+            if (this.routes.inflight.size === 0) {
                 this.fake.flush();
                 await page.evaluate(() => 0);
-                if (this.routes.inflight.count === 0) return;
+                if (this.routes.inflight.size === 0) return;
             }
+            if (Date.now() > deadline) throw new Error(`requests still being answered after 5 s: ${[...this.routes.inflight].join(', ')}`);
             await new Promise(resolve => setImmediate(resolve));
         }
     }

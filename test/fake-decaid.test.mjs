@@ -213,10 +213,12 @@ test('boot: the recorded answers, matched by method, path and query; anything el
     assert.equal(boot.socket('/ws/v1/other'), null);
 });
 
-test('a request or socket the model keeps no answer for has none, and a refusal is answered as the test asked', () => {
+test('a request or socket the model keeps no answer for has none (a machine state no recording asks for among them), and a refusal is answered as the test asked', () => {
     const fake = fresh();
     assert.equal(get(fake, '/api/v1/never/heard/of'), null);
     assert.equal(fake.connect('/ws/v1/never', () => {}), null);
+    assert.equal(fake.request({ method: 'PUT', url: '/api/v1/machine/state/expresso' }), null, 'a machine state nothing recorded');
+    assert.equal(fake.request({ method: 'PUT', url: '/api/v1/machine/state/sleeping' }).status, 200);
     assert.equal(OWNED('GET', '/api/v1/workflow'), true);
     assert.equal(OWNED('GET', '/api/v1/settings'), false);
     const allow = fake.refuse({ method: 'GET', path: /^\/api\/v1\/grinders/, abort: true });

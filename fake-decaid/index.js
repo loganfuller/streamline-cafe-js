@@ -146,7 +146,9 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         if (/^\/api\/v1\/(grinders|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
         if (/^\/api\/v1\/shots(\/|$)/.test(path)) return shots.answer(method, path.slice(`${API}/shots`.length), query, body);
         if (path === `${API}/machine/state` && method === 'GET') return { status: 200, body: machine.snapshot() };
-        const state = /^\/api\/v1\/machine\/state\/([a-zA-Z]+)$/.exec(path);
+        // Only the states a recording or the page's tests ask for; any other
+        // is left unanswered, so a test asking for it fails naming it.
+        const state = /^\/api\/v1\/machine\/state\/(espresso|idle|sleeping)$/.exec(path);
         if (state && method === 'PUT') {
             machine.setState(state[1]);
             return { status: 200, body: {} };

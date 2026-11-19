@@ -17,24 +17,25 @@ export function recording(name) {
 
 /**
  * Routes `context` to `fake`. Answers `{ unanswered, inflight, sockets }`:
- * what had no answer, how many requests are being answered now, and the paths
- * of the sockets open.
+ * what had no answer, the requests being answered now ("METHOD url"), and the
+ * paths of the sockets open.
  */
 export async function attach(context, fake) {
     const unanswered = [];
-    const inflight = { count: 0 };
+    const inflight = new Set();
     const sockets = new Set();
 
     // Anything else the page asks for, a file elsewhere included, has no answer.
-    await context.route(url => !url.href.startsWith(PAGE_ORIGIN) && !url.href.startsWith(DECAID_ORIGIN), route => {
+    await context.route(url => url.origin !== PAGE_ORIGIN && url.origin !== DECAID_ORIGIN, route => {
         unanswered.push(`${route.request().method()} ${route.request().url()}`);
         return route.abort('blockedbyclient');
     });
 
     await context.route(`${DECAID_ORIGIN}/**`, async route => {
-        inflight.count += 1;
+        const request = route.request();
+        const asking = { toString: () => `${request.method()} ${request.url()}` };
+        inflight.add(asking);
         try {
-            const request = route.request();
             const text = request.postData();
             let body;
             if (text) {
@@ -54,7 +55,7 @@ export async function attach(context, fake) {
             // A page closing while it is answered.
             if (!/closed|disposed/i.test(String(error))) throw error;
         } finally {
-            inflight.count -= 1;
+            inflight.delete(asking);
             fake.flush();
         }
     });
@@ -62,7 +63,7 @@ export async function attach(context, fake) {
     await context.routeWebSocket(() => true, socket => {
         const url = new URL(socket.url());
         const path = url.pathname;
-        const handle = url.href.startsWith(DECAID_SOCKETS) ? fake.connect(path, text => socket.send(text)) : null;
+        const handle = url.origin === DECAID_SOCKETS ? fake.connect(path, text => socket.send(text)) : null;
         if (!handle) {
             unanswered.push(`WS ${socket.url()}`);
             socket.close({ code: 1011, reason: 'the fake Decaid has no such socket' });

@@ -115,7 +115,7 @@ export function createMachine({ pour, timeZone, now, emit, nextId, workflow, sto
         /** The machine's state set through Decaid's API: espresso starts the pour, the rest is a state of its own. */
         setState(name) {
             if (name === 'espresso') return this.startPour();
-            state.snapshot = { ...stamped(state.snapshot), state: { state: name, substate: name === 'sleeping' ? 'idle' : 'idle' } };
+            state.snapshot = { ...stamped(state.snapshot), state: { state: name, substate: 'idle' } };
             emit('/ws/v1/machine/snapshot', copy(state.snapshot));
             return null;
         },

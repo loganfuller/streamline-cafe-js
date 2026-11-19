@@ -49,52 +49,63 @@ function baseImage() {
 }
 
 /**
- * Starts the pinned Decaid. Returns its API's address, its extensions token, and
- * `stop()`, which removes the container.
+ * Starts the pinned Decaid. Returns its API's address, its extensions token, the
+ * container's id, and `stop()`, which removes the container.
  *
- * @param {{ name?: string, port?: number, timezone?: string }} [options]
+ * Each run gets a container of its own, named afresh, so two recorders, or one
+ * kept with --keep, never remove each other's. A start that fails removes the
+ * container it made.
+ *
+ * @param {{ port?: number, timezone?: string }} [options]
  */
-export async function standUp({ name = 'cafe-fake-decaid-recorder', port = 18157, timezone = 'UTC' } = {}) {
+export async function standUp({ port = 18157, timezone = 'UTC' } = {}) {
     const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
     const decaidTag = `v${PINS.decaid.version}`;
     const decaidArchive = await asset(PINS.decaid.repo, decaidTag, PINS.decaid.assets[arch]);
     const dye2Archive = await asset(PINS.dye2.repo, `v${PINS.dye2.version}`, PINS.dye2.asset);
     const image = baseImage();
-    try { docker('rm', '-f', name); } catch { /* none yet */ }
-    docker('run', '-d', '--name', name, '--label', `${LABEL}=recorder`, '-e', `TZ=${timezone}`,
+    const name = `cafe-fake-decaid-recorder-${randomBytes(4).toString('hex')}`;
+    const id = docker('run', '-d', '--name', name, '--label', `${LABEL}=recorder`, '-e', `TZ=${timezone}`,
         '-p', `127.0.0.1:${port}:8080`, image, 'sleep', 'infinity');
-    const exec = command => docker('exec', name, 'bash', '-c', command);
+    const stop = () => { try { docker('rm', '-f', id); } catch { /* gone */ } };
+    const exec = command => docker('exec', id, 'bash', '-c', command);
     const token = randomBytes(32).toString('hex');
-    docker('cp', decaidArchive, `${name}:/tmp/decaid.tar.gz`);
-    docker('cp', dye2Archive, `${name}:/tmp/dye2.zip`);
-    exec('mkdir -p /opt/decaid && tar -xzf /tmp/decaid.tar.gz -C /opt/decaid');
-    // DYE2 placed before Decaid's first start stays at its version: Decaid
-    // installs its bundled copy only where none is.
-    exec('mkdir -p ~/.local/share/decaid/plugins && unzip -q -o /tmp/dye2.zip -d ~/.local/share/decaid/plugins');
-    exec(`echo '{"simulateDevices":["machine","scale"],"onboardingCompleted":true,"accountStepSeen":true}' > ~/.local/share/decaid/shared_preferences.json`);
-    exec('mkdir -p /run/dbus && (dbus-daemon --system --fork || true) && (avahi-daemon -D || true)');
-    docker('exec', '-d', '-e', `DECAID_EXTENSIONS_TOKEN=${token}`, name, 'bash', '-c',
-        'xvfb-run -a dbus-run-session -- /opt/decaid/bundle/decaid --serial --bypass-onboarding --no-account > /tmp/decaid.log 2>&1');
     const api = `http://127.0.0.1:${port}/api/v1`;
-    const deadline = Date.now() + 120_000;
-    for (;;) {
-        try {
-            const plugins = await (await fetch(`${api}/plugins`)).json();
-            const dye2 = plugins.find(plugin => plugin.id === 'dye2.reaplugin');
-            if (dye2?.loaded) {
-                if (dye2.version !== PINS.dye2.version) throw new Error(`DYE2 ${dye2.version} loaded, pinned ${PINS.dye2.version}`);
-                break;
+    try {
+        docker('cp', decaidArchive, `${id}:/tmp/decaid.tar.gz`);
+        docker('cp', dye2Archive, `${id}:/tmp/dye2.zip`);
+        exec('mkdir -p /opt/decaid && tar -xzf /tmp/decaid.tar.gz -C /opt/decaid');
+        // DYE2 placed before Decaid's first start stays at its version: Decaid
+        // installs its bundled copy only where none is.
+        exec('mkdir -p ~/.local/share/decaid/plugins && unzip -q -o /tmp/dye2.zip -d ~/.local/share/decaid/plugins');
+        exec(`echo '{"simulateDevices":["machine","scale"],"onboardingCompleted":true,"accountStepSeen":true}' > ~/.local/share/decaid/shared_preferences.json`);
+        exec('mkdir -p /run/dbus && (dbus-daemon --system --fork || true) && (avahi-daemon -D || true)');
+        docker('exec', '-d', '-e', `DECAID_EXTENSIONS_TOKEN=${token}`, id, 'bash', '-c',
+            'xvfb-run -a dbus-run-session -- /opt/decaid/bundle/decaid --serial --bypass-onboarding --no-account > /tmp/decaid.log 2>&1');
+        const deadline = Date.now() + 120_000;
+        for (;;) {
+            try {
+                const plugins = await (await fetch(`${api}/plugins`)).json();
+                const dye2 = plugins.find(plugin => plugin.id === 'dye2.reaplugin');
+                if (dye2?.loaded) {
+                    if (dye2.version !== PINS.dye2.version) throw new Error(`DYE2 ${dye2.version} loaded, pinned ${PINS.dye2.version}`);
+                    break;
+                }
+            } catch (error) {
+                if (/pinned/.test(error.message)) throw error;
             }
-        } catch (error) {
-            if (/pinned/.test(error.message)) throw error;
+            if (Date.now() > deadline) throw new Error(`Decaid did not answer with DYE2 loaded in 120 s:\n${exec('tail -n 40 /tmp/decaid.log')}`);
+            await sleep(1000);
         }
-        if (Date.now() > deadline) throw new Error(`Decaid did not answer with DYE2 loaded in 120 s:\n${exec('tail -n 40 /tmp/decaid.log')}`);
-        await sleep(1000);
+    } catch (error) {
+        stop();
+        throw error;
     }
     return {
         api,
         token,
+        id,
         exec,
-        stop: () => { try { docker('rm', '-f', name); } catch { /* gone */ } },
+        stop,
     };
 }

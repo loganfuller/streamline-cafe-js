@@ -23,6 +23,8 @@ const REST_REFERENCE = 'time firstDrip yield ratio peak';
 const POUR = recording('pour');
 // Decaid stored the recorded Shot this long after the machine went back to idle.
 const STORE_AFTER_MS = POUR.storedAtMs - POUR.idleAtMs;
+// The last of the pour's frames before the machine went back to idle.
+const POUR_LENGTH_MS = POUR.idleAtMs - 1;
 
 async function load(cafe, recipe) {
     await cafe.page.locator('#cafe-strip .cafe-card').nth(recipe.slot - 1).click();
@@ -58,13 +60,21 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
     test('once Decaid has stored it: the Shot in the graph, its time, and the five cards with its own numbers', async ({ cafe, fake }) => {
         const page = await cafe.open();
         await load(cafe, house);
+        await cafe.pour(POUR_LENGTH_MS);
+        const poured = await chartLines(page);
+        const measured = poured.names.map((name, index) => [name, poured.points[index]]).filter(([name]) => !/^(Target|Reference) /.test(name));
+        expect(measured.map(([name]) => name), 'the shot\'s measured lines').toEqual(['Pressure', 'Flow', '°C', 'Weight']);
+        measured.forEach(([name, points]) => expect(points, `${name} is drawn`).toBeGreaterThan(0));
         await cafe.pour();
         await expect(page.locator('#machine-status')).toHaveText('Ready');
         await expect(page.locator('#cafe-live')).toBeHidden();
 
         // Until Decaid has stored it the graph keeps the shot's live lines, the
         // six cards stay, and the row names no time.
+        // The pour's last frame may be drawn after the read above, so a line may
+        // have a point more; none has fewer.
         const ended = await chartLines(page);
+        ended.points.forEach((points, index) => expect(points, `${ended.names[index]} is kept when the pump stops`).toBeGreaterThanOrEqual(poured.points[index]));
         await cafe.advance(STORE_AFTER_MS);
         expect((await legend(page)).when, 'no time yet').toBeNull();
         expect(keys(await row(page)), 'the six live cards stay').toBe(LIVE);
@@ -74,7 +84,7 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
 
         const now = await legend(page);
         expect(now.label).toBe('Latest');
-        expect(now.when).toMatch(/^Today \d{1,2}:\d{2}/);
+        expect(now.when).toMatch(/^Today \d{2}:\d{2}/);
         const rest = await row(page);
         expect(rest.mode).toBe('rest');
         expect(keys(rest), 'the five cards return').toBe(REST_REFERENCE);
