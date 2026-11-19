@@ -51,7 +51,6 @@ const HEADED = args.includes('--headed');
 const TIMEZONE = flag('timezone', 'UTC');
 // One step alone, by name, on a Decaid a whole run has already set up.
 const ONLY = flag('only', '');
-// A shell command that starts Decaid again, for step 25's check across a restart.
 const API = `${DECAID}/api/v1`;
 const SETTING = `${API}/store/streamlineSettings/streamline.dye2Enabled`;
 const STRIP_MODE = '/store/streamlineSettings/streamline.dyeStripMode';
@@ -84,7 +83,7 @@ async function seed() {
     if (RECIPES.every(r => recipesNow.some(row => row && row.name === r.name))) {
         note('the sample recipes are already there');
         // A Decaid seeded before the bean and basket dialogs has no second
-        // batch and no baskets with ids, and step 20 measures those dialogs.
+        // batch and no baskets with ids, which the second run chooses.
         await beanAndBasketFixtures();
         return;
     }
@@ -127,7 +126,7 @@ async function seed() {
 
 // The bean and batch dialog's batches, and DYE2's baskets with ids, where they
 // are missing: the seed makes them, on a fresh Decaid and on one seeded before
-// they were added, and step 22 makes sure of them again. DYE2's basket list is the fixture's write, as DYE2's
+// they were added. DYE2's basket list is the fixture's write, as DYE2's
 // own basket page would make it; the skin writes no basket.
 async function beanAndBasketFixtures() {
     const beans = await decaid('GET', '/beans?includeArchived=true');
@@ -602,8 +601,7 @@ async function tapAt(page, selector) {
 const grinderNamed = (grinders, model) => grinders.find(g => g && g.model === model) || null;
 
 // 18. The grinder dialog is a page test now (test/page/grinder-dialog.spec.mjs).
-//     Its grinders stay: the second run chooses the second one, and the dialogs'
-//     sizes (step 20) are measured with more than one listed.
+//     Its grinders stay: the second run chooses the second one.
 async function grinderFixtures() {
     const listed = await decaid('GET', '/grinders?includeArchived=true');
     const grinders = Array.isArray(listed) ? listed : listed.items || [];

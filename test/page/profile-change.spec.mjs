@@ -281,8 +281,10 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
     // (src/cafe/recipe-write.js). The second POST fails in Chromium ("Failed
     // to fetch"): setKVValue sends with `keepalive`, whose bodies in flight
     // may not pass 64 KiB, and the sample list is 33 KB, so the change answers
-    // `unconfirmed`.
-    test.fixme('a save written back before the record write is confirmed: the writer writes it again', async ({ cafe, fake }) => {
+    // `unconfirmed`. Left as fixme until #74 is fixed.
+    test.fixme('a save written back before the record write is confirmed: the writer writes it again', {
+        annotation: { type: 'issue', description: 'https://github.com/loganfuller/streamline-cafe-js/issues/74: store writes sent with keepalive fail past 64 KiB' },
+    }, async ({ cafe, fake }) => {
         const before = await openLoaded(cafe);
         const page = cafe.page;
         const writeBack = fake.dye2RecordReads();

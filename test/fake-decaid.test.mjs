@@ -238,6 +238,9 @@ test('DYE2: a list its record read, written back, loses a record written since; 
     assert.equal(houseRecord(fake).profileTitle, house.profileTitle, 'the list as it was read');
     fake.restartDye2();
     assert.equal(fake.selection().id, house.id, 'started again with the record on another profile: still loaded, as on the pinned stack');
+    // Started again, DYE2 noted no profile: the next change of profile is the one it notes, and keeps the recipe.
+    send(fake, 'PUT', '/api/v1/workflow', { profile: { ...adaptive, title: 'A third profile' } });
+    assert.equal(fake.selection().id, house.id, 'a first change of profile after a restart keeps the recipe loaded');
 });
 
 test('machine: its calibration as the simulated machine reports it; an unknown target or source refused', () => {

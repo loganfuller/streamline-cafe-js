@@ -228,7 +228,7 @@ export function recipeIdOf(wf) {
 const GENERIC_PROFILE = /^(default|advanced|custom|profile|new|untitled)$/i;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** DYE2's `proposeRecipeName`; `now` is the page's time, read in UTC, Decaid's zone. */
+/** DYE2's `proposeRecipeName`; `now` is the page's time, read in UTC, Decaid's zone. Not recorded: the save-recipe scenario's names all have a bean, so the day is held by the unit test alone. */
 export function proposeRecipeName(wf, existingNames = [], beverage = '', now = 0) {
     const word = String((wf && wf.profile && wf.profile.title) || '').trim().split(/\s+/)[0] || '';
     const ctx = (wf && wf.context) || {};
@@ -386,11 +386,16 @@ export function createDye2({ decaid, announce }) {
             const read = copy(kv('recipes'));
             return () => decaid.store.set(NS, 'recipes', copy(read));
         },
-        /** DYE2 starts again: what it noted is forgotten, and it reads the Workflow as it loads. */
+        /**
+         * DYE2 starts again: what it noted is forgotten, and its selection is
+         * mirrored and pushed afresh. The load-time look notes no profile (it
+         * cleared nothing on the pinned stack), so the next Workflow change is
+         * the one DYE2 notes the profile from.
+         */
         restart() {
             baseline = null;
             mirrored = null;
-            return workflowChanged(decaid.workflow());
+            mirror(decaid.workflow());
         },
         /** Once a Shot is stored DYE2 works out its recents again, and pushes. */
         shotStored: () => announce({ what: 'workflow' }),
