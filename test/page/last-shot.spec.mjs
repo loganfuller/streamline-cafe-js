@@ -215,26 +215,30 @@ test.describe('"Last shot" across midnight', { tag: '@lastshot' }, () => {
     });
 
     // Chromium's timers on Android need not count the time a tablet sleeps, so
-    // one set for midnight before a sleep can fire long after it. Here the
-    // clock is moved on 50 s with no timer counting them, as a sleep would, and
-    // the page comes back into view at 23:59:50: the timer set at 23:59 would
-    // fire near 00:01, and the one set again as the page shows fires at
-    // midnight.
-    test('the midnight timer is set again as the page comes back into view, so a sleep before midnight leaves it on time', async ({ cafe, start }) => {
-        const page = await cafe.open();
-        expect((await legend(page)).when).toBe('Today 10:59 PM');
-        await page.clock.setSystemTime(start + 50_000);
-        // Read in the turn the page shows: the clock runs on by itself, so a
-        // later read could fall past midnight.
-        const shown = await page.evaluate(() => {
-            document.dispatchEvent(new Event('visibilitychange'));
-            return document.getElementById('cafe-shot-when').textContent;
+    // one set for midnight before a sleep can fire long after it. Here the page
+    // opens at 23:00, and the clock is moved on to 23:59:50 with no timer
+    // counting the time, as a sleep would: the timer set at 23:00 would fire
+    // near 01:00, and the one set again as the page shows fires at midnight.
+    test.describe('opened at 23:00', () => {
+        test.use({ start: START - 59 * 60_000 });
+
+        test('the midnight timer is set again as the page comes back into view, so a sleep before midnight leaves it on time', async ({ cafe }) => {
+            const page = await cafe.open();
+            expect((await legend(page)).when).toBe('Today 10:00 PM');
+            await page.clock.setSystemTime(START + 50_000);
+            // Read in the turn the page shows: the clock runs on by itself, so
+            // a later read could fall past midnight.
+            const shown = await page.evaluate(() => {
+                document.dispatchEvent(new Event('visibilitychange'));
+                return document.getElementById('cafe-shot-when').textContent;
+            });
+            expect(shown, 'back in view before midnight: "Today"').toBe('Today 10:00 PM');
+            await cafe.advance(15_000, { step: 1000 });
+            expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
+            expect(await page.evaluate(() => new Date().getMinutes()), 'within the first minute').toBe(0);
+            // The timer fired within the advance, and writes as it fires.
+            expect((await legend(page)).when, 'written as the day turns, not an hour late').toBe('Nov 18 10:00 PM');
         });
-        expect(shown, 'back in view before midnight: "Today"').toBe('Today 10:59 PM');
-        await cafe.advance(15_000, { step: 1000 });
-        expect(await page.evaluate(() => new Date().getDate()), 'past midnight').toBe(19);
-        expect(await page.evaluate(() => new Date().getMinutes()), 'within the first minute').toBe(0);
-        await expect.poll(async () => (await legend(page)).when, 'written as the day turns, not a minute late').toBe('Nov 18 10:59 PM');
     });
 
     // Woken past midnight with the timer not yet fired: the page writes the
