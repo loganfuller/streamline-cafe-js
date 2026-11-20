@@ -13,7 +13,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(HERE, '..', '..');
-export const PINS = JSON.parse(await readFile(join(ROOT, 'fake-decaid', 'pins.json'), 'utf8'));
+// FAKE_DECAID_PINS names another pins file: the weekly run's, written by
+// latest-pins.mjs from the newest stable releases.
+export const PINS_FILE = process.env.FAKE_DECAID_PINS || join(ROOT, 'fake-decaid', 'pins.json');
+export const PINS = JSON.parse(await readFile(PINS_FILE, 'utf8'));
 export const LABEL = 'streamline-cafe-js.fake-decaid';
 export const CACHE = process.env.FAKE_DECAID_CACHE || join(homedir(), '.cache', 'streamline-cafe-fake-decaid');
 

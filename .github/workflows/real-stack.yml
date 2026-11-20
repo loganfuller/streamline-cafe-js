@@ -1,0 +1,37 @@
+name: Real stack
+
+# SPIKE (#62): does headless Decaid run on GitHub's arm64 runner? Temporary
+# push trigger; the real triggers come once it does.
+on:
+  push:
+    branches: [62-real-stack-journeys]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps --only-shell chromium
+      - run: docker version && nproc && free -m
+      - name: Record from the pinned stack
+        run: node scripts/fake-decaid-recorder/record.mjs --out="$RUNNER_TEMP/recordings"
+      - name: Replay the fresh recordings against the fake
+        env:
+          FAKE_DECAID_RECORDINGS: ${{ runner.temp }}/recordings
+        run: node --test test/fake-decaid-recordings.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recordings
+          path: ${{ runner.temp }}/recordings
+          retention-days: 14

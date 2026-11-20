@@ -12,8 +12,8 @@
 // and removes them at the end, unless --keep.
 
 import { chromium } from 'playwright';
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import { standUp, opened, CACHE, PINS, ROOT } from './stack.mjs';
 import { seed } from './seed.mjs';
@@ -28,7 +28,10 @@ const SCENARIO = flag('scenario', '') ? flag('scenario', '').split(',') : null;
 const ONLY = flag('only', SCENARIO ? 'scenarios' : 'sample-data,scenarios,boot,pour,decent-sync').split(',');
 const KEEP = args.includes('--keep');
 const PORT = Number(flag('port', '18157'));
-const OUT = join(ROOT, 'fake-decaid', 'recordings');
+// --out= writes the recordings somewhere else, for the real-stack workflow to
+// compare with the committed ones (compare.mjs) without touching them.
+const OUT = flag('out', '') ? resolve(flag('out', '')) : join(ROOT, 'fake-decaid', 'recordings');
+await mkdir(OUT, { recursive: true });
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const recordedWith = { decaid: PINS.decaid.version, dye2: PINS.dye2.version, streamline: PINS.streamline.version };
 const write = (name, data) => writeFile(join(OUT, `${name}.json`), `${JSON.stringify({ recordedWith, ...data }, null, 1)}\n`);

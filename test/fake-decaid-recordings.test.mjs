@@ -9,10 +9,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 import { createFakeDecaid } from '../fake-decaid/index.js';
 
-const DIR = new URL('../fake-decaid/recordings/', import.meta.url);
+// FAKE_DECAID_RECORDINGS replays a fresh recording instead of the committed one,
+// and FAKE_DECAID_PINS names the pins it was made with (the real-stack workflow).
+const DIR = process.env.FAKE_DECAID_RECORDINGS ? pathToFileURL(`${process.env.FAKE_DECAID_RECORDINGS.replace(/\/$/, '')}/`) : new URL('../fake-decaid/recordings/', import.meta.url);
+const PINS = process.env.FAKE_DECAID_PINS ? pathToFileURL(process.env.FAKE_DECAID_PINS) : new URL('../fake-decaid/pins.json', import.meta.url);
 const load = name => JSON.parse(readFileSync(new URL(`${name}.json`, DIR), 'utf8'));
 const sampleData = load('sample-data');
 const boot = load('boot');
@@ -40,7 +44,7 @@ const scenarios = readdirSync(DIR).filter(file => file.endsWith('.json')).map(fi
     .map(name => ({ name, recording: load(name) })).filter(({ recording }) => Array.isArray(recording.steps));
 
 test('every recording was made with the pinned versions', () => {
-    const pins = JSON.parse(readFileSync(new URL('../fake-decaid/pins.json', import.meta.url), 'utf8'));
+    const pins = JSON.parse(readFileSync(PINS, 'utf8'));
     for (const file of readdirSync(DIR).filter(name => name.endsWith('.json'))) {
         const { recordedWith } = load(file.slice(0, -5));
         assert.equal(recordedWith?.decaid, pins.decaid.version, `${file}: recorded with Decaid ${recordedWith?.decaid}, pinned ${pins.decaid.version}; record again`);
