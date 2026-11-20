@@ -8,14 +8,15 @@
 // shot-state sockets and DYE2's push, with their times; the Shot's
 // measurements, yield, dose and stop reason; the Workflow's profile (one of
 // Decaid's own), dose and yield; and the machine's model, firmware and flow
-// calibration. What it
-// puts in place of the rest: the Workflow is the simulated pour's
-// (recordings/pour.json, the sample data's House espresso) but for that
-// profile, dose and yield; the serial is a made-up one; the Shot's id is
-// made up. The extras a shot-upload plugin wrote into the Shot after Decaid
-// stored it are left out: the list row read at the store has none, and the
-// fake is Decaid alone. It fails if any text of the capture's own Workflow,
-// machine or Shot ids is left in what it writes.
+// calibration. What it puts in place of the rest: the Workflow is the
+// simulated pour's (recordings/pour.json, the sample data's House espresso)
+// but for that profile, dose and yield; the serial is a made-up one; the
+// Shot's id is made up. Of the Shot's annotations only the numbers are kept:
+// the extras a shot-upload plugin wrote into the Shot after Decaid stored it
+// are left out (the list row read at the store has none, and the fake is
+// Decaid alone), and so is any text, such as a note. It fails if any text of
+// the capture's own Workflow, machine, Shot ids or annotations is left in
+// what it writes.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -38,8 +39,11 @@ workflow.context.targetYield = raw.workflowBefore.context.targetYield;
 const { model, firmwareVersion, flowCalibration, provenanceStatus } = raw.shot.workflow.machine;
 const machine = { provenanceStatus, flowCalibration, serialNumber: SERIAL, model, firmwareVersion };
 
-/** Decaid's own annotations: the shot-upload plugin's extras left out. */
-const decaidAnnotations = ({ extras, ...own }) => own;
+/**
+ * The Shot's weighed numbers only (its dose, yield and any other number):
+ * the shot-upload plugin's extras and any text, such as notes, left out.
+ */
+const decaidAnnotations = annotations => Object.fromEntries(Object.entries(annotations ?? {}).filter(([, value]) => typeof value === 'number'));
 /** A Shot of the capture with the Workflow above, the made-up id, and none of the plugin's extras. */
 function scrubShot(shot, { measurements = true } = {}) {
     const { metadata, ...rest } = shot;
@@ -89,14 +93,22 @@ const { profile: _profile, ...rawWorkflowRest } = raw.workflowBefore;
 collect(rawWorkflowRest);
 collect(raw.shot.workflow.machine.serialNumber);
 collect(raw.shot.id);
-collect(raw.shot.annotations?.extras);
+collect(raw.shot.annotations);
+collect(raw.listRow.annotations);
 // What the made-up recording holds too is no one's: a default such as the
 // beverage type "espresso".
 const madeUp = JSON.stringify(simulated);
 for (const value of own) if (madeUp.includes(JSON.stringify(value))) own.delete(value);
 for (const keep of [model, provenanceStatus, firmwareVersion]) own.delete(keep);
-const text = JSON.stringify(recording);
-const left = [...own].filter(value => text.includes(value));
+// Searched in the recording's strings as they are, not as JSON writes them,
+// so a value with a quote, backslash or line break in it is found too.
+const written = [];
+const strings = value => {
+    if (typeof value === 'string') written.push(value);
+    else if (value && typeof value === 'object') Object.entries(value).forEach(([key, inner]) => { written.push(key); strings(inner); });
+};
+strings(recording);
+const left = [...own].filter(value => written.some(text => text.includes(value)));
 if (left.length) throw new Error(`${left.length} value(s) of the capture are still in the recording; nothing written`);
 
 const out = join(ROOT, 'fake-decaid', 'recordings', 'real', 'de1pro-pour.json');

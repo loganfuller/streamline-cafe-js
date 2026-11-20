@@ -90,7 +90,7 @@ node scripts/fake-decaid-recorder/capture-real-pour.mjs --api=http://<tablet>:80
 node scripts/fake-decaid-recorder/scrub-real-pour.mjs <raw file>
 ```
 
-The capture listens to the sockets the recorder listens to and waits for a shot started on the machine, then reads the Shot Decaid stored. The raw file holds the machine's serial and the cafe's Workflow, so keep it out of the repository. The scrub writes the recording: the Workflow is the simulated pour's (the sample data's House espresso) but for the profile, dose and yield; the serial (`10001`) and the Shot's id are made up; the extras a shot-upload plugin writes into a Shot after its store are left out. It refuses to write if any text of the capture's own Workflow, serial or ids is left. Grep the result for the machine's real serial and Bluetooth address before committing it.
+The capture listens to the sockets the recorder listens to and waits for a shot started on the machine, then reads the Shot Decaid stored. The raw file holds the machine's serial and the cafe's Workflow, so keep it out of the repository. The scrub writes the recording: the Workflow is the simulated pour's (the sample data's House espresso) but for the profile, dose and yield; the serial (`10001`) and the Shot's id are made up; of the Shot's annotations only the numbers are kept, so the extras a shot-upload plugin writes into a Shot after its store, and any note, are left out. It refuses to write if any text of the capture's own Workflow, serial or ids is left. Grep the result for the machine's real serial and Bluetooth address before committing it.
 
 ## The real stack
 

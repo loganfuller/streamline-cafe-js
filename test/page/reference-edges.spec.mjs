@@ -321,4 +321,3 @@ test.describe('the row with every number in it, on the real pour', { tag: '@refe
         await cafe.screenshot('row-targets-weighed-light');
     });
 });
-
