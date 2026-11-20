@@ -43,6 +43,14 @@ const applied = record => ({
     profile: record.workflow.profile,
 });
 
+// A profile with every step's temperature moved by `by`, as the page's brew
+// temperature stepper writes it.
+const warmer = (profile, by) => ({ ...profile, steps: profile.steps.map(step => ({ ...step, temperature: step.temperature + by })) });
+// The sample records with one of them holding none of `keys` in its dashboard.
+const withoutFields = (sample, name, keys) => sample.recipes.map(row => (row.name === name
+    ? { ...row, dashboardVariables: Object.fromEntries(Object.entries(row.dashboardVariables).filter(([key]) => !keys.includes(key))) }
+    : row));
+
 export const SCENARIOS = [
     {
         name: 'workflow-merge',
@@ -118,6 +126,58 @@ export const SCENARIOS = [
             // Its own skin answer, and a recipe id no record has.
             { method: 'GET', path: `${DYE2}/skin` },
             { method: 'POST', path: `${DYE2}/selection`, body: { kind: 'recipe', id: 'recipe-none' } },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+        ],
+    },
+    {
+        name: 'dye2-record',
+        rule: 'fake-decaid/dye2.js',
+        dye2: true,
+        about: 'DYE2\'s record, as Decent Sync\'s plugin asks for it: nothing saved with no recipe loaded or nothing moved; a moved dose, yield and grind setting written into the loaded recipe\'s record and its stored Workflow; a brew temperature moved, its stored profile moved with it; a basket chosen, id and name together; a hot water value the record holds; steam turned off, its temperature and time held back; a value the record does not hold, written once moved since the apply and not otherwise; and a recipe whose record is gone. Each write pushes on changed, and only that row changes.',
+        socket: '/ws/v1/plugins/dye2.reaplugin/changed',
+        steps: [
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
+            { method: 'POST', path: `${DYE2}/selection`, body: {} },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            // House espresso loaded as the page loads it, then saved with nothing moved.
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => applied(recipeNamed(sample, 'House espresso')) },
+            { method: 'POST', path: `${DYE2}/selection`, body: ({ sample }) => ({ kind: 'recipe', id: recipeNamed(sample, 'House espresso').id }) },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            // The dial-in moved.
+            { method: 'PUT', path: '/workflow', body: { context: { targetDoseWeight: 18.5, targetYield: 38, grinderSetting: '2.6' } } },
+            { method: 'GET', path: `${DYE2}/selection` },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            { method: 'GET', path: `${DYE2}/selection` },
+            // The brew temperature two degrees up.
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => ({ profile: warmer(recipeNamed(sample, 'House espresso').workflow.profile, 2) }) },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            // A basket chosen, as the basket dialog writes it.
+            { method: 'PUT', path: '/workflow', body: { context: { extras: { basketId: 'bskt-sample-20', basketName: '20 g sample basket' } } } },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            // A hot water value the record holds.
+            { method: 'PUT', path: '/workflow', body: { hotWaterData: { volume: 60 } } },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            // Steam turned off as Streamline turns it off, and the dose moved back.
+            { method: 'PUT', path: '/workflow', body: { steamSettings: { targetTemperature: 0, duration: 0 }, context: { targetDoseWeight: 18 } } },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            { method: 'PUT', path: '/workflow', body: { steamSettings: { targetTemperature: 150, duration: 50 }, hotWaterData: { volume: 50 } } },
+            // Decaf's record holding no hot water time and no steam flow: the
+            // time moved after the apply is written, the flow left alone is not.
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => withoutFields(sample, 'Decaf', ['hotWaterTimeS', 'steamFlowMls']) },
+            { method: 'PUT', path: '/workflow', body: ({ sample }) => applied(recipeNamed(sample, 'Decaf')) },
+            { method: 'POST', path: `${DYE2}/selection`, body: ({ sample }) => ({ kind: 'recipe', id: recipeNamed(sample, 'Decaf').id }) },
+            { method: 'PUT', path: '/workflow', body: { hotWaterData: { duration: 35 } } },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            { method: 'GET', path: '/store/dye2.reaplugin/recipes' },
+            // Decaf's record gone while it is loaded.
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => sample.recipes.filter(row => row.name !== 'Decaf') },
+            { method: 'POST', path: `${DYE2}/record`, body: {} },
+            // Everything put back.
+            { method: 'POST', path: '/store/dye2.reaplugin/recipes', body: ({ sample }) => sample.recipes },
             { method: 'POST', path: `${DYE2}/selection`, body: {} },
             { method: 'PUT', path: '/workflow', body: ({ sample }) => sample.workflow },
         ],

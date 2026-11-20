@@ -4,7 +4,7 @@
 // `mirror`, `announce`, `handleSelection`, `handleRecord`, the `skin` answer,
 // `refreshRecents` on `shotStored`) and dye2-plugin/src/utils/workflow-record.ts (`recipeFields`,
 // `recipeModified`, `deriveSelection`, `favouriteMatches`, `profileFingerprint`,
-// `resolveRecipeFromHistory`); guided by decent-sync's
+// `resolveRecipeFromHistory`, `itemPatch`, `recordWorkflow`, `profileAtBrewC`); guided by decent-sync's
 // server/test/support/simulated-dye2.ts, which follows DYE2 v0.1.40.
 // Recorded: recordings/dye2-selection.json; the push once a Shot is stored, in
 // recordings/pour.json (DYE2's `changed` socket through the store).
@@ -32,9 +32,34 @@
 //   base 36, made from the page's time and a count rather than at random.
 //   Recorded: recordings/dye2-save-recipe.json.
 //
+// - `record` (any method, as DYE2 checks none; Decent Sync's plugin sends
+//   `POST` with `{}`) saves into the loaded recipe's record what the Workflow
+//   now holds otherwise, as `handleRecord` and `recordWorkflow` do. With no
+//   recipe loaded it answers `{ saved: false, reason: 'no recipe is selected' }`;
+//   else `{ saved, kind: 'recipe', id }`, `saved` false where the record is
+//   gone (a recipe known only from a Shot) or nothing differs. What it writes
+//   (`itemPatch`): dose, drink, grind, rpm, feed rate, the basket, the brew
+//   temperature and the steam, hot water and flush values, each only where
+//   the record holds it or, for a machine value or the basket, the barista
+//   moved it off what was live when the recipe was applied; the brew
+//   temperature only once it moved off the one armed, which each `record`
+//   then rebases; only values that differ, numbers as numbers and two strings
+//   exactly; a basket's id and name together; with steam off (a target below
+//   135) never the steam temperature or time; never a mode field. The flush
+//   temperature and flow are the machine's (`GET /machine/settings`, laid over
+//   the Workflow) where the record holds either or a recipe is armed. The
+//   record's stored Workflow follows: its context (dose, yield, grind setting
+//   as text, rpm, feed rate, basket), its steam, hot water and flush values,
+//   and every step of its profile moved by the brew temperature's change (not
+//   its `profileSnapshot`). It changes that row alone, re-reading the list
+//   just before. Only where it wrote does it push on `changed`, then mirror
+//   the selection (a second push where `modified` moved).
+//   Recorded: recordings/dye2-record.json; asked by Decent Sync's plugin in
+//   recordings/decent-sync-saves.json.
+//
 // What the test makes happen, which no request shows:
-// - `recordReads()`: DYE2's `record` (Decent Sync's plugin asks for it after
-//   each dial-in change) has read the recipes list; the function it answers
+// - `recordReads()`: the lost-update window of `record` (above), which no
+//   request can open: DYE2 has read the recipes list; the function it answers
 //   writes that list back whole, as `recordWorkflow` does once it has worked out
 //   its patch, then pushes on `changed` and mirrors the selection from the
 //   Workflow it read, as `handleRecord` does. A record written in between is
@@ -54,7 +79,9 @@
 //   from DYE2's code, where a plugin loaded afresh starts with neither.
 //
 // Not kept: DYE2's recent favourites are read from the store and never worked
-// out again from new Shots; `record` has no answer.
+// out again from new Shots; `record` into a favourite (DYE2 saves into recipes
+// only); the 60 s memo of the machine's settings (the fake's never change);
+// `record` failing to read or write (502).
 
 import { copy, isObject } from './workflow.js';
 
@@ -170,6 +197,69 @@ function heldFields(fields, stored) {
 function movedSinceArming(k, live, armed) {
     if (!armed || (!(k in MACHINE_MAP) && k !== 'basketId')) return false;
     return armed[k] !== undefined && !sameValue(armed[k], live);
+}
+
+/** `itemPatch` for a recipe: what to write onto `record` for the Workflow `wf`. */
+export function itemPatch(record, wf, armedBrewC = null, armedMachine = null) {
+    const stored = record.dashboardVariables || {};
+    const all = recipeFields(wf);
+    const off = steamOff(wf);
+    const known = {};
+    for (const k of Object.keys(all)) {
+        if (off && STEAM_OFF_KEYS.includes(k)) continue;
+        if (stored[k] == null && !movedSinceArming(k, all[k], armedMachine)) continue;
+        if (k === 'brewC' && (armedBrewC == null || all.brewC === armedBrewC)) continue;
+        known[k] = all[k];
+    }
+    const patch = changedFields(known, stored);
+    if ('basketId' in patch || 'basketName' in patch) {
+        for (const k of ['basketId', 'basketName']) if (all[k] !== undefined) patch[k] = all[k];
+    }
+    return patch;
+}
+
+/** `profileAtBrewC`: the profile with its first step at `brewC` and every other moved as far, or null. */
+export function profileAtBrewC(profile, brewC) {
+    if (brewC == null || brewC === '') return null;
+    const target = Number(brewC);
+    if (!profile || !Array.isArray(profile.steps) || !Number.isFinite(target)) return null;
+    const origin = profile.steps[0] && profile.steps[0].temperature;
+    const shift = typeof origin === 'number' && Number.isFinite(origin) ? target - origin : null;
+    return {
+        ...profile,
+        steps: profile.steps.map(step => ({
+            ...step,
+            temperature: shift != null && typeof step.temperature === 'number' && Number.isFinite(step.temperature)
+                ? Math.round((step.temperature + shift) * 100) / 100
+                : target,
+        })),
+    };
+}
+
+/** `recordWorkflow`'s new row: the patch merged into the record and its stored Workflow. */
+function recordedRow(item, patch) {
+    const next = { ...item, dashboardVariables: { ...(item.dashboardVariables || {}), ...patch } };
+    if (item.workflow && item.workflow.context) {
+        const c = { ...item.workflow.context };
+        if ('dose' in patch) c.targetDoseWeight = patch.dose;
+        if ('drink' in patch) c.targetYield = patch.drink;
+        if (patch.grind !== undefined) c.grinderSetting = String(patch.grind);
+        for (const k of ['rpm', 'feedRate', 'basketId', 'basketName']) {
+            if (k in patch) c.extras = { ...(c.extras || {}), [k]: patch[k] };
+        }
+        next.workflow = { ...item.workflow, context: c };
+    }
+    if (next.workflow) {
+        for (const [k, [group, field]] of Object.entries(MACHINE_MAP)) {
+            if (!(k in patch)) continue;
+            next.workflow = { ...next.workflow, [group]: { ...(next.workflow[group] || {}), [field]: patch[k] } };
+        }
+    }
+    if ('brewC' in patch && next.workflow) {
+        const shifted = profileAtBrewC(next.workflow.profile, patch.brewC);
+        if (shifted) next.workflow = { ...next.workflow, profile: shifted };
+    }
+    return next;
 }
 
 function profileOf(recipe) {
@@ -335,6 +425,45 @@ export function createDye2({ decaid, announce }) {
         return null;
     }
 
+    // `recordWorkflow`: true where it wrote. `armed` is the baseline DYE2
+    // noted at the apply, or an empty one for the recipe, whose `armedBrewC`
+    // it rebases.
+    function recordWorkflow(wf, armed) {
+        const list = kv('recipes');
+        const idx = list.findIndex(row => row && String(row.id) === armed.id);
+        if (idx === -1) return false;
+        const item = list[idx];
+        const stored = item.dashboardVariables || {};
+        const wantsDe1 = Object.keys(DE1_ONLY).some(k => stored[k] != null || (armed.armedMachine && armed.armedMachine[k] !== undefined));
+        const full = wantsDe1 ? withMachineSettings(wf, decaid.machineSettings()) : wf;
+        const patch = itemPatch(item, full, armed.armedBrewC, armed.armedMachine);
+        const live = recipeFields(wf).brewC;
+        armed.armedBrewC = live === undefined ? null : live;
+        if (Object.keys(patch).length === 0) return false;
+        const out = list.slice();
+        out[idx] = recordedRow(item, patch);
+        // As JSON carries it: a field left undefined is not written.
+        decaid.store.set(NS, 'recipes', JSON.parse(JSON.stringify(out)));
+        return true;
+    }
+
+    // `handleRecord`.
+    function record() {
+        const wf = decaid.workflow();
+        const sel = derive(wf);
+        if (!sel || sel.kind !== 'recipe') return { status: 200, body: { saved: false, reason: 'no recipe is selected' } };
+        const armed = baseline && baseline.id === sel.id ? baseline : {
+            kind: 'recipe', id: sel.id, profileFingerprint: null, armedBrewC: null,
+            armedBeanBatchId: null, armedGrinderId: null, armedMachine: null,
+        };
+        const wrote = recordWorkflow(wf, armed);
+        if (wrote) {
+            announce({ what: 'workflow' });
+            mirror(wf);
+        }
+        return { status: 200, body: { saved: wrote, kind: sel.kind, id: sel.id } };
+    }
+
     let made = 0;
     // `handleSaveRecipe`.
     function saveRecipe(body) {
@@ -431,6 +560,7 @@ export function createDye2({ decaid, announce }) {
                 return { status: 200, body: copy(derive(decaid.workflow())) };
             }
             if (endpoint === 'save-recipe' && method === 'POST') return saveRecipe(body);
+            if (endpoint === 'record') return record();
             return null;
         },
     };

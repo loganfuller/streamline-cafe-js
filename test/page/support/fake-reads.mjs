@@ -21,7 +21,12 @@ export const isRecordWrite = entry => entry.method === 'POST' && entry.path === 
 // reports whatever its settings hold (a flush at 90 °C, where the sample
 // recipes hold 25 °C), written into a recipe's record, so that DYE2 does not
 // call it changed the moment it loads and "not called changed" says something.
-// The fixture's write.
+// The machine's settings are given the Workflow's flush temperature and flow
+// too: DYE2's `record` reads those two from `GET /machine/settings` over the
+// Workflow's, and the recorded machine says 25 °C there whatever the Workflow
+// holds (recordings/dye2-record.json), so the first save into the record,
+// Decent Sync's plugin's after a load, would otherwise write 25 °C back and
+// have DYE2 call the recipe changed again. The fixture's writes.
 const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
 export function matchMachine(fake, name) {
     const machineNow = fake.workflow();
@@ -33,6 +38,8 @@ export function matchMachine(fake, name) {
         }
         return { ...row, dashboardVariables };
     }));
+    const { targetTemperature, flow } = machineNow.rinseData || {};
+    fake.patchBoot('GET /api/v1/machine/settings', settings => ({ ...settings, ...(targetTemperature != null && { flushTemp: targetTemperature }), ...(flow != null && { flushFlow: flow }) }));
 }
 
 /**

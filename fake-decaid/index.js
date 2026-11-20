@@ -17,7 +17,10 @@
 // Decent Sync's plugin (decent-sync.js) is there only when the fake is made
 // with `decentSync` (recordings/decent-sync.json): listed and loaded, DYE2's
 // records and baskets as its Library's sync left them, and the tablet's Shots
-// pulled at the Location after the sample data's added to Decaid's.
+// pulled at the Location after the sample data's added to Decaid's. It hears
+// every Workflow set, as DYE2 does, and a save into the Loaded Recipe it
+// decides on is made at the next `flush`, before what the sockets have waiting
+// is sent.
 
 import { copy, updateWorkflow } from './workflow.js';
 import { createStore } from './store.js';
@@ -120,11 +123,16 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
     const dye2Loaded = () => plugins.some(p => p.id === DYE2_ID && p.loaded);
     const loaded = id => plugins.some(p => p.id === id && p.loaded);
 
-    // Every Workflow set reaches DYE2's `workflowUpdated`, a set of its own included.
+    // Set below, once DYE2 is there: the plugin hears every Workflow set from then.
+    let decentSyncPlugin = null;
+    // Every Workflow set reaches DYE2's `workflowUpdated`, a set of its own
+    // included, and Decent Sync's plugin's.
     function setWorkflow(body) {
         const { answer, workflow: next } = updateWorkflow(workflow, body);
         if (next) {
+            const previous = workflow;
             workflow = next;
+            if (decentSyncPlugin && loaded(DECENT_SYNC_ID)) decentSyncPlugin.workflowChanged(copy(previous), copy(workflow));
             if (dye2Loaded()) {
                 const own = dye2.workflowChanged(copy(workflow));
                 if (own) setWorkflow(own);
@@ -158,9 +166,15 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
         if (answer?.status === 200) decentSyncPlugin?.ownShotChanged();
         return answer;
     };
-    const decentSyncPlugin = decentSync && createDecentSync({
+    decentSyncPlugin = decentSync && createDecentSync({
         recording: decentSync,
-        decaid: { store, shots, timeZone, putShot },
+        decaid: {
+            store, shots, timeZone, putShot,
+            workflow: () => copy(workflow),
+            dye2Loaded,
+            // DYE2's `record`, as the plugin asks it: not in the request log.
+            record: () => answer('POST', `${API}/plugins/${DYE2_ID}/record`, new URLSearchParams(), {}),
+        },
         announce: frame => { if (loaded(DECENT_SYNC_ID)) emit(`/ws/v1/plugins/${DECENT_SYNC_ID}/changes`, frame); },
         moved: movedOther,
     });
@@ -242,8 +256,9 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
             for (const frame of opening) outbox.push([send, JSON.stringify(frame)]);
             return { close: () => sockets.get(path).delete(send) };
         },
-        /** Sends every frame waiting, in order. */
+        /** Makes the save Decent Sync's plugin has waiting, then sends every frame waiting, in order. */
         flush() {
+            decentSyncPlugin?.settle();
             for (const [send, text] of outbox.splice(0)) send(text);
         },
         /**
@@ -257,6 +272,7 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
             for (const shot of added) if (!shots.get(shot.id)) shots.add(copy(shot));
             workflow = copy(next);
             if (dye2Loaded()) dye2Loads();
+            decentSyncPlugin?.decided();
             outbox.length = 0;
         },
         /** The page's time, which the test moves. */

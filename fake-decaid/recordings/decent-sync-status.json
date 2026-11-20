@@ -11,7 +11,7 @@
  "socket": "/ws/v1/plugins/decent-sync.reaplugin/changes",
  "given": {
   "workflow": {
-   "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
+   "id": "aee57311-fcda-4386-af7e-7b8d0b37b7db",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -158,11 +158,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 40,
-    "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
+    "grinderId": "401ece3f-5a9c-49c4-873b-9e134d7eee89",
     "grinderModel": "Sample Grinder 64",
     "grinderSetting": "2.1",
     "grinderRpm": 900,
-    "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
+    "beanBatchId": "4ae2de2f-b961-406c-ba5b-ce1f538f03c1",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -170,7 +170,7 @@
      "dye": {
       "selection": null,
       "v": 1,
-      "recipeId": "recipe-mwo2rv8tv4sf"
+      "recipeId": "recipe-mwpjfsxgbduj"
      },
      "basketId": "bskt-sample-18",
      "basketName": "18 g sample basket",
@@ -212,11 +212,11 @@
      "connected": true,
      "served": true,
      "machine": {
-      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "id": "01a1fb0b-381c-75de-b583-32b408d62bea",
       "name": "Sample Machine"
      },
      "location": {
-      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "id": "01a1fb0b-37e3-76b9-b913-2e596ba79f6f",
       "name": "Sample Cafe"
      }
     }
@@ -267,11 +267,11 @@
      "connected": true,
      "served": false,
      "machine": {
-      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "id": "01a1fb0b-381c-75de-b583-32b408d62bea",
       "name": "Sample Machine"
      },
      "location": {
-      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "id": "01a1fb0b-37e3-76b9-b913-2e596ba79f6f",
       "name": "Sample Cafe"
      },
      "code": "captureOnly",
@@ -297,7 +297,7 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4"
+    "path": "/plugins/decent-sync.reaplugin/shot?id=6daee5a1-c8a2-422e-86c2-da6cf4cbd884"
    },
    "answer": {
     "status": 409,
@@ -311,7 +311,7 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1"
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfswnu9rs"
    },
    "answer": {
     "status": 409,
@@ -325,9 +325,9 @@
   {
    "request": {
     "method": "PUT",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1",
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfswnu9rs",
     "body": {
-     "shotId": "7115a371-38af-4b22-a0f9-21555ea3b7c2"
+     "shotId": "e2be798b-57d2-4c6d-8ba6-f1432bf6771a"
     }
    },
    "answer": {
@@ -342,7 +342,7 @@
   {
    "request": {
     "method": "PUT",
-    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4",
+    "path": "/plugins/decent-sync.reaplugin/shot?id=6daee5a1-c8a2-422e-86c2-da6cf4cbd884",
     "body": {
      "rating": 4
     }
@@ -363,49 +363,49 @@
     {
      "what": "reference",
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      }
     },
     {
      "what": "reference",
      "recipe": {
-      "id": "51fe8686-6cd1-4d27-b993-ae853f2b8100",
+      "id": "f9d6a550-38a3-406b-94f8-b35df27028da",
       "name": "Single origin",
-      "recordId": "recipe-mwo2rv8tv4sf"
+      "recordId": "recipe-mwpjfsxgbduj"
      }
     },
     {
      "what": "reference",
      "recipe": {
-      "id": "26ffbf49-025a-4780-9b52-d2906927543f",
+      "id": "b29ba590-08a5-4823-92b8-098e4d948be3",
       "name": "Decaf",
-      "recordId": "recipe-mwo2rv9fw10l"
+      "recordId": "recipe-mwpjfsxzao7u"
      }
     },
     {
      "what": "reference",
      "recipe": {
-      "id": "c9cd550e-68fc-44c9-a252-74f53b3c9f17",
+      "id": "4c7f13e1-abaf-456d-b59e-975133aa36da",
       "name": "Long black",
-      "recordId": "recipe-mwo2rva1m4ml"
+      "recordId": "recipe-mwpjfsyicp5m"
      }
     },
     {
      "what": "reference",
      "recipe": {
-      "id": "b2cda694-3289-4d06-9498-672e3e933dcf",
+      "id": "4697971a-28dc-43a7-b0f0-f2aebc32308f",
       "name": "Guest roast with a long name",
-      "recordId": "recipe-mwo2rvahilzl"
+      "recordId": "recipe-mwpjfsyyem20"
      }
     },
     {
      "what": "reference",
      "recipe": {
-      "id": "b11f2ce2-8408-45f1-809b-5628eb1d8375",
+      "id": "68ea9b8c-4619-401e-98d8-2a1dff6a0718",
       "name": "Filter",
-      "recordId": "recipe-mwo2rvb0wvb9"
+      "recordId": "recipe-mwpjfszg0vro"
      }
     }
    ]
@@ -421,11 +421,11 @@
      "connected": true,
      "served": true,
      "machine": {
-      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "id": "01a1fb0b-381c-75de-b583-32b408d62bea",
       "name": "Sample Machine"
      },
      "location": {
-      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "id": "01a1fb0b-37e3-76b9-b913-2e596ba79f6f",
       "name": "Sample Cafe"
      }
     }

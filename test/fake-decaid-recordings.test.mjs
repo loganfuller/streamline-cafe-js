@@ -68,7 +68,7 @@ for (const { name, recording } of scenarios) {
     test(`${name}: the fake answers as ${versions} did (${recording.rule})`, () => {
         const fake = fresh(!!recording.decentSync);
         // DYE2's pushes are compared as pushed; Decent Sync's plugin may repeat one.
-        const pushed = recording.decentSync ? once : list => list;
+        const pushed = recording.decentSync && recording.socket?.includes('decent-sync') ? once : list => list;
         if (recording.given) fake.given(recording.given);
         const pushes = [];
         if (recording.socket) fake.connect(recording.socket, text => pushes.push(JSON.parse(text)));
@@ -89,6 +89,9 @@ for (const { name, recording } of scenarios) {
                     'sync-choose-reference': () => sync.chooseReference(step.recipe, step.shot),
                     'sync-rename': () => sync.renameRecipe(step.recipe, step.name),
                     'sync-edit-shot': () => sync.editShot(step.shot, { rating: step.rating, note: step.note }),
+                    // The plugin's save waited for, or a wait for one that doesn't come: the flush below makes it.
+                    'sync-saved': () => {},
+                    'sync-quiet': () => {},
                 };
                 assert.ok(events[step.event], `step ${index + 1}: no such event in the model: ${step.event}`);
                 events[step.event]();

@@ -19,8 +19,14 @@
 //   { event: 'sync-choose-reference', recipe, shot } a Reference Shot chosen (shot null clears it)
 //   { event: 'sync-rename', recipe, name }          a Recipe renamed
 //   { event: 'sync-edit-shot', shot, rating, note } a Shot rated and noted
+//   { event: 'sync-saved', recipe, dose }            no event of the server's: the recorder waits for
+//                                                   the plugin's save, the recipe's record holding the
+//                                                   dose; the replay flushes, which makes the fake's save
+//   { event: 'sync-quiet' }                          the recorder waits past the plugin's poll for a save
+//                                                   that does not come; the replay flushes
 // What the plugin pushes on `changes` after an event is kept and compared, each
-// push once: the plugin may repeat one.
+// push once: the plugin may repeat one. A scenario on DYE2's `changed` socket
+// has DYE2's pushes compared as pushed.
 //
 // Each scenario starts from the stage's state (no Reference Shots, the Shots as
 // pulled) and puts back what it changed of it, or leaves only what no later
@@ -29,6 +35,17 @@
 const P = '/plugins/decent-sync.reaplugin';
 const CHANGES = '/ws/v1/plugins/decent-sync.reaplugin/changes';
 const HOUSE = 'House espresso';
+const RECORDS = '/store/dye2.reaplugin/recipes';
+const recordNamed = (seen, name) => seen.records.find(row => row.name === name);
+// Streamline's apply of a record, as scenarios.mjs `applied` writes it.
+const applied = record => ({
+    context: {
+        ...record.workflow.context,
+        extras: { ...record.workflow.context.extras, dye: { v: 1, recipeId: record.id }, rpm: null, feedRate: null },
+        drinkerName: null,
+    },
+    profile: record.workflow.profile,
+});
 const DECAF = 'Decaf';
 
 export const DECENT_SYNC_SCENARIOS = [
@@ -150,6 +167,31 @@ export const DECENT_SYNC_SCENARIOS = [
             { event: 'sync-choose-reference', recipe: HOUSE, shot: null },
         ],
     },
+    {
+        name: 'decent-sync-saves',
+        rule: 'fake-decaid/decent-sync.js',
+        about: 'The plugin saves a dial-in change into the Loaded Recipe: House espresso loaded as the page loads it, its dose stepped, and the plugin has DYE2 write it into the record, which DYE2 pushes on changed. Unloaded as the page unloads it, then sharing turned off: on the Capture-only Machine, House espresso loaded again and its dose stepped is saved into nothing. (Sharing turned off with a Recipe loaded, the server unloads it, which the model leaves out: so the unload comes first.)',
+        socket: '/ws/v1/plugins/dye2.reaplugin/changed',
+        steps: [
+            { method: 'GET', path: RECORDS, as: 'records' },
+            { method: 'PUT', path: '/workflow', body: ({ seen }) => applied(recordNamed(seen, HOUSE)) },
+            { method: 'POST', path: '/plugins/dye2.reaplugin/selection', body: ({ seen }) => ({ kind: 'recipe', id: recordNamed(seen, HOUSE).id }) },
+            { method: 'PUT', path: '/workflow', body: { context: { targetDoseWeight: 18.5 } } },
+            { event: 'sync-saved', recipe: HOUSE, dose: 18.5 },
+            { method: 'GET', path: RECORDS },
+            { method: 'GET', path: '/plugins/dye2.reaplugin/selection' },
+            // Unloaded, then Capture-only.
+            { method: 'POST', path: '/plugins/dye2.reaplugin/selection', body: {} },
+            { event: 'sync-sharing', on: false },
+            { method: 'PUT', path: '/workflow', body: ({ seen }) => applied(recordNamed(seen, HOUSE)) },
+            { method: 'POST', path: '/plugins/dye2.reaplugin/selection', body: ({ seen }) => ({ kind: 'recipe', id: recordNamed(seen, HOUSE).id }) },
+            { method: 'PUT', path: '/workflow', body: { context: { targetDoseWeight: 19 } } },
+            { event: 'sync-quiet' },
+            { method: 'GET', path: RECORDS },
+            { method: 'POST', path: '/plugins/dye2.reaplugin/selection', body: {} },
+            { event: 'sync-sharing', on: true },
+        ],
+    },
 ];
 
 /**
@@ -196,7 +238,22 @@ export async function recordDecentSyncScenarios({ raw, ws, write, sleep, opened,
             await stage.server('PATCH', `/shots/${shotId(shot)}`, { rating, note });
             return { shot: shotId(shot), rating, note };
         },
+        'sync-saved': async ({ recipe, dose }) => {
+            for (let waited = 0; ; waited += 250) {
+                const records = (await raw('GET', RECORDS)).body;
+                if (Array.isArray(records) && records.find(row => row.name === recipe)?.dashboardVariables?.dose === dose) break;
+                if (waited > 30_000) throw new Error(`the plugin did not save the dose ${dose} into ${recipe} within 30 s`);
+                await sleep(250);
+            }
+            return { recipe: sync.records[recipe] };
+        },
+        // Past the plugin's poll (five seconds as the stage sets it), in the sleep after every event.
+        'sync-quiet': async () => ({}),
     };
+    // What the recorder waits after each event: the plugin hears the server's
+    // change on its connection, and keeps a copy before it pushes; a save waited
+    // for has been made, and DYE2 pushes within a moment of it.
+    const settleMs = { 'sync-saved': 1000 };
     for (const scenario of DECENT_SYNC_SCENARIOS) {
         if (only && !only.includes(scenario.name)) continue;
         const pushes = [];
@@ -216,7 +273,7 @@ export async function recordDecentSyncScenarios({ raw, ws, write, sleep, opened,
                 const { event, ...args } = step;
                 const recorded = await events[event](args);
                 // The plugin hears the server's change on its connection, and keeps a copy before it pushes.
-                await sleep(6000);
+                await sleep(settleMs[event] ?? 6000);
                 steps.push({ event, ...recorded, ...(socket ? { pushes: [...pushes] } : {}) });
                 continue;
             }
