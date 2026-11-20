@@ -406,12 +406,17 @@ test.describe('the pretend machine', { tag: '@preview-cafe' }, () => {
         await expect(pullButton(preview)).toBeEnabled();
     });
 
-    test('a tap on a recipe card, on Sleep, or on the mode switch during a pour leaves the preview in a state it can go on from', async ({ preview }) => {
+    test('a dialog open closes as a pour starts; a tap on a recipe card, on Sleep, or on the mode switch during a pour leaves the preview in a state it can go on from', async ({ preview }) => {
         test.slow();
         const frame = await preview.open();
+        // A dialog open when the pour starts closes, as on a tablet.
+        await frame.locator('#cafe-shots-btn').click();
+        await expect(frame.locator('#cafe-shots-dialog')).toHaveAttribute('open', '');
         // A card tapped mid-pour loads nothing, as on a tablet (src/cafe/strip.js);
         // the Shot is stored under the recipe loaded, and a tap then loads.
         let startedAt = await pull(preview);
+        await until(preview, startedAt, ESPRESSO_FRAMES[0] + 500);
+        await expect(frame.locator('#cafe-shots-dialog'), 'the open dialog closed as the pour began').not.toHaveAttribute('open');
         await until(preview, startedAt, 20_000);
         await card(frame, SINGLE.stripSlot).click();
         await preview.advance(1000);
