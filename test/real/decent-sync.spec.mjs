@@ -68,9 +68,15 @@ async function recordAs(side, wanted) {
 async function putBack(sync, id, wanted) {
     const off = differing((await recipeOn(sync, id))?.content, wanted);
     if (off.length) await sync.server('PATCH', `/recipes/${id}`, { content: Object.fromEntries(off.map(field => [field, wanted[field] ?? null])) });
-    const expected = [await recordAs(sync, wanted), await recordAs(sync.second, wanted)];
-    await expect.poll(async () => [recordHolds(await recordFor(sync, id)), recordHolds(await recordFor(sync.second, id))], { message: 'both tablets\' records hold the Recipe as put back', timeout: 90_000 })
-        .toEqual(expected);
+    // Each side's ids are read again at every poll, and one not there yet
+    // (empty) never matches: a Library item can reach a tablet after its
+    // plugin first serves, on a fresh stack. A poll that runs out shows both.
+    const side = async decaid => ({ held: recordHolds(await recordFor(decaid, id)), wanted: await maybe(() => recordAs(decaid, wanted)) });
+    const holds = ({ held, wanted: there }) => Boolean(there?.grinder && there.batch && there.basket) && JSON.stringify(held) === JSON.stringify(there);
+    await expect.poll(async () => {
+        const sides = [await side(sync), await side(sync.second)];
+        return sides.every(holds) || sides;
+    }, { message: 'both tablets\' records hold the Recipe as put back', timeout: 90_000 }).toBe(true);
 }
 
 /**
