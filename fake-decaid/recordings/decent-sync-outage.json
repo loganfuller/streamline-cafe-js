@@ -11,7 +11,7 @@
  "socket": "/ws/v1/plugins/decent-sync.reaplugin/changes",
  "given": {
   "workflow": {
-   "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
+   "id": "aee57311-fcda-4386-af7e-7b8d0b37b7db",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -158,11 +158,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 40,
-    "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
+    "grinderId": "401ece3f-5a9c-49c4-873b-9e134d7eee89",
     "grinderModel": "Sample Grinder 64",
     "grinderSetting": "2.1",
     "grinderRpm": 900,
-    "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
+    "beanBatchId": "4ae2de2f-b961-406c-ba5b-ce1f538f03c1",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -203,15 +203,15 @@
  "steps": [
   {
    "event": "sync-choose-reference",
-   "recipe": "recipe-mwo2rv87c8n1",
-   "shot": "ec6e89b6-eba3-41f9-b85e-a87700257253",
+   "recipe": "recipe-mwpjfswnu9rs",
+   "shot": "e3ea4435-4e7f-493d-8ce0-bade2b9b62cd",
    "pushes": [
     {
      "what": "reference",
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      }
     }
    ]
@@ -246,27 +246,27 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1"
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfswnu9rs"
    },
    "answer": {
     "status": 200,
     "body": {
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      },
      "reference": {
       "shot": {
-       "id": "ec6e89b6-eba3-41f9-b85e-a87700257253",
+       "id": "e3ea4435-4e7f-493d-8ce0-bade2b9b62cd",
        "workflow": {
-        "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
+        "id": "aee57311-fcda-4386-af7e-7b8d0b37b7db",
         "name": "Workflow",
         "context": {
          "extras": {
           "dye": {
            "v": 1,
-           "recipeId": "recipe-mwo2rv8tv4sf",
+           "recipeId": "recipe-mwpjfsxgbduj",
            "selection": null
           },
           "rpm": null,
@@ -277,11 +277,11 @@
           "feedRate": null,
           "basketName": "18 g sample basket"
          },
-         "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
+         "grinderId": "401ece3f-5a9c-49c4-873b-9e134d7eee89",
          "coffeeName": "Sample Single Origin",
          "grinderRpm": 900,
          "baristaName": "Sample Barista",
-         "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
+         "beanBatchId": "4ae2de2f-b961-406c-ba5b-ce1f538f03c1",
          "targetYield": 40,
          "grinderModel": "Sample Grinder 64",
          "coffeeRoaster": "Sample Roasters",
@@ -455,9 +455,9 @@
          "targetTemperature": 150
         }
        },
-       "createdAt": "2026-11-19T21:45:17.975750Z",
-       "timestamp": "2026-11-19T21:45:11.974630",
-       "updatedAt": "2026-11-19T21:45:17.975750Z",
+       "createdAt": "2026-11-20T22:20:15.855494Z",
+       "timestamp": "2026-11-20T22:20:09.955052",
+       "updatedAt": "2026-11-20T22:20:15.855494Z",
        "stopReason": "apiStop",
        "annotations": {
         "actualDoseWeight": 18
@@ -467,8 +467,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:11.780518",
-          "timerValue": 18107,
+          "timestamp": "2026-11-20T22:20:09.753712",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -479,7 +479,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.2491186328365433,
-          "timestamp": "2026-11-19T21:45:11.974368",
+          "timestamp": "2026-11-20T22:20:09.954541",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -494,8 +494,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:11.974361",
-          "timerValue": 18107,
+          "timestamp": "2026-11-20T22:20:09.954531",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -506,7 +506,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.38651637932906047,
-          "timestamp": "2026-11-19T21:45:12.076564",
+          "timestamp": "2026-11-20T22:20:10.049465",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -521,8 +521,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
-          "timerValue": null,
+          "timestamp": "2026-11-20T22:20:09.954531",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -533,7 +533,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.505808173142,
-          "timestamp": "2026-11-19T21:45:12.173944",
+          "timestamp": "2026-11-20T22:20:10.152144",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -548,7 +548,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
+          "timestamp": "2026-11-20T22:20:10.152132",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -560,7 +560,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.603104755016371,
-          "timestamp": "2026-11-19T21:45:12.283247",
+          "timestamp": "2026-11-20T22:20:10.248388",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -575,7 +575,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
+          "timestamp": "2026-11-20T22:20:10.152132",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -587,7 +587,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.6795680936113293,
-          "timestamp": "2026-11-19T21:45:12.380593",
+          "timestamp": "2026-11-20T22:20:10.354644",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 76.52454239228791,
@@ -602,7 +602,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.380582",
+          "timestamp": "2026-11-20T22:20:10.354632",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -614,7 +614,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.7383654315483063,
-          "timestamp": "2026-11-19T21:45:12.483614",
+          "timestamp": "2026-11-20T22:20:10.449344",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.03188823949412,
@@ -629,7 +629,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.380582",
+          "timestamp": "2026-11-20T22:20:10.354632",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -641,7 +641,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.783137060532783,
-          "timestamp": "2026-11-19T21:45:12.580581",
+          "timestamp": "2026-11-20T22:20:10.554683",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.52260131142465,
@@ -656,7 +656,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.580568",
+          "timestamp": "2026-11-20T22:20:10.554668",
           "timerValue": 199,
           "weightFlow": 0
          },
@@ -668,7 +668,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8172914896652638,
-          "timestamp": "2026-11-19T21:45:12.683580",
+          "timestamp": "2026-11-20T22:20:10.654217",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.99722689531283,
@@ -683,8 +683,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.580568",
-          "timerValue": 199,
+          "timestamp": "2026-11-20T22:20:10.746748",
+          "timerValue": 391,
           "weightFlow": 0
          },
          "volume": 0,
@@ -695,7 +695,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8437364816861622,
-          "timestamp": "2026-11-19T21:45:12.773897",
+          "timestamp": "2026-11-20T22:20:10.748631",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 78.45629240175018,
@@ -710,8 +710,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.773887",
-          "timerValue": 392,
+          "timestamp": "2026-11-20T22:20:10.746748",
+          "timerValue": 391,
           "weightFlow": 0
          },
          "volume": 0,
@@ -722,7 +722,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8648270857823744,
-          "timestamp": "2026-11-19T21:45:12.883695",
+          "timestamp": "2026-11-20T22:20:10.848220",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 78.90030795075229,
@@ -737,8 +737,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.773887",
-          "timerValue": 392,
+          "timestamp": "2026-11-20T22:20:10.944513",
+          "timerValue": 588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -749,7 +749,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8824116114519285,
-          "timestamp": "2026-11-19T21:45:12.980594",
+          "timestamp": "2026-11-20T22:20:10.948581",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 79.3297669386115,
@@ -764,8 +764,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.980582",
-          "timerValue": 599,
+          "timestamp": "2026-11-20T22:20:10.944513",
+          "timerValue": 588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -776,7 +776,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8979132649361311,
-          "timestamp": "2026-11-19T21:45:13.083557",
+          "timestamp": "2026-11-20T22:20:11.048765",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 79.74514658616562,
@@ -791,8 +791,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.980582",
-          "timerValue": 599,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -803,7 +803,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9124167907374098,
-          "timestamp": "2026-11-19T21:45:13.179969",
+          "timestamp": "2026-11-20T22:20:11.147967",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.14690846909251,
@@ -818,8 +818,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.179956",
-          "timerValue": 798,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -830,7 +830,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9267465730840303,
-          "timestamp": "2026-11-19T21:45:13.283654",
+          "timestamp": "2026-11-20T22:20:11.254866",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.53549903081937,
@@ -845,8 +845,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.179956",
-          "timerValue": 798,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -857,7 +857,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9415315365137102,
-          "timestamp": "2026-11-19T21:45:13.380597",
+          "timestamp": "2026-11-20T22:20:11.349912",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.91135007861693,
@@ -872,8 +872,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.380586",
-          "timerValue": 999,
+          "timestamp": "2026-11-20T22:20:11.349901",
+          "timerValue": 994,
           "weightFlow": 0
          },
          "volume": 0,
@@ -884,7 +884,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9572565045878922,
-          "timestamp": "2026-11-19T21:45:13.478324",
+          "timestamp": "2026-11-20T22:20:11.448759",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.27487926342977,
@@ -899,8 +899,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.380586",
-          "timerValue": 999,
+          "timestamp": "2026-11-20T22:20:11.349901",
+          "timerValue": 994,
           "weightFlow": 0
          },
          "volume": 0,
@@ -911,7 +911,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9743015388313097,
-          "timestamp": "2026-11-19T21:45:13.580609",
+          "timestamp": "2026-11-20T22:20:11.546937",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.62649054397585,
@@ -926,8 +926,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.580593",
-          "timerValue": 1199,
+          "timestamp": "2026-11-20T22:20:11.546910",
+          "timerValue": 1191,
           "weightFlow": 0
          },
          "volume": 0,
@@ -938,7 +938,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9929713778816791,
-          "timestamp": "2026-11-19T21:45:13.683555",
+          "timestamp": "2026-11-20T22:20:11.650679",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.9665746356311,
@@ -953,8 +953,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.546910",
+          "timerValue": 1191,
           "weightFlow": 0
          },
          "volume": 0,
@@ -965,7 +965,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0135170878163202,
-          "timestamp": "2026-11-19T21:45:13.774444",
+          "timestamp": "2026-11-20T22:20:11.748949",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.29550944459787,
@@ -980,8 +980,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.748937",
+          "timerValue": 1393,
           "weightFlow": 0
          },
          "volume": 0,
@@ -992,7 +992,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0361517709654253,
-          "timestamp": "2026-11-19T21:45:13.882345",
+          "timestamp": "2026-11-20T22:20:11.848601",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.6136604878395,
@@ -1007,8 +1007,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1019,7 +1019,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0610618420606255,
-          "timestamp": "2026-11-19T21:45:13.972471",
+          "timestamp": "2026-11-20T22:20:11.948032",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.92138129924794,
@@ -1034,8 +1034,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.972464",
-          "timerValue": 1591,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1046,7 +1046,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0884150522904463,
-          "timestamp": "2026-11-19T21:45:14.083601",
+          "timestamp": "2026-11-20T22:20:12.055146",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.21901382249558,
@@ -1061,8 +1061,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.972464",
-          "timerValue": 1591,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1073,7 +1073,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.118366158285152,
-          "timestamp": "2026-11-19T21:45:14.176430",
+          "timestamp": "2026-11-20T22:20:12.154668",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.50688879100778,
@@ -1088,8 +1088,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.176421",
-          "timerValue": 1795,
+          "timestamp": "2026-11-20T22:20:12.154647",
+          "timerValue": 1799,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1100,7 +1100,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.1510609032665413,
-          "timestamp": "2026-11-19T21:45:14.275145",
+          "timestamp": "2026-11-20T22:20:12.249218",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.78532609547852,
@@ -1115,8 +1115,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.176421",
-          "timerValue": 1795,
+          "timestamp": "2026-11-20T22:20:12.154647",
+          "timerValue": 1799,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1127,7 +1127,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.186638798750016,
-          "timestamp": "2026-11-19T21:45:14.372859",
+          "timestamp": "2026-11-20T22:20:12.354588",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.05463513933745,
@@ -1142,8 +1142,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.372843",
-          "timerValue": 1991,
+          "timestamp": "2026-11-20T22:20:12.354581",
+          "timerValue": 1998,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1154,7 +1154,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.2252350598087474,
-          "timestamp": "2026-11-19T21:45:14.483709",
+          "timestamp": "2026-11-20T22:20:12.449135",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.3151151825632,
@@ -1169,8 +1169,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.372843",
-          "timerValue": 1991,
+          "timestamp": "2026-11-20T22:20:12.354581",
+          "timerValue": 1998,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1181,7 +1181,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.2669819465010999,
-          "timestamp": "2026-11-19T21:45:14.578342",
+          "timestamp": "2026-11-20T22:20:12.553088",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.56705567422541,
@@ -1196,7 +1196,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.578329",
+          "timestamp": "2026-11-20T22:20:12.553073",
           "timerValue": 2197,
           "weightFlow": 0
          },
@@ -1208,7 +1208,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.312009690734367,
-          "timestamp": "2026-11-19T21:45:14.678368",
+          "timestamp": "2026-11-20T22:20:12.652370",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.81073657412445,
@@ -1223,8 +1223,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.770904",
-          "timerValue": 2389,
+          "timestamp": "2026-11-20T22:20:12.553073",
+          "timerValue": 2197,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1235,7 +1235,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.360447134933301,
-          "timestamp": "2026-11-19T21:45:14.773900",
+          "timestamp": "2026-11-20T22:20:12.747970",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.04642866388674,
@@ -1250,8 +1250,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.770904",
-          "timerValue": 2389,
+          "timestamp": "2026-11-20T22:20:12.747957",
+          "timerValue": 2392,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1262,7 +1262,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.4124221710831693,
-          "timestamp": "2026-11-19T21:45:14.873726",
+          "timestamp": "2026-11-20T22:20:12.849227",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.27439384786109,
@@ -1277,8 +1277,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.970959",
-          "timerValue": 2589,
+          "timestamp": "2026-11-20T22:20:12.747957",
+          "timerValue": 2392,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1289,7 +1289,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.4680620419256618,
-          "timestamp": "2026-11-19T21:45:14.972885",
+          "timestamp": "2026-11-20T22:20:12.947562",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.49488544415041,
@@ -1304,8 +1304,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.970959",
-          "timerValue": 2589,
+          "timestamp": "2026-11-20T22:20:12.947551",
+          "timerValue": 2591,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1316,7 +1316,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.5274935472218483,
-          "timestamp": "2026-11-19T21:45:15.083714",
+          "timestamp": "2026-11-20T22:20:13.058659",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.70814846610243,
@@ -1331,8 +1331,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:12.947551",
+          "timerValue": 2591,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1343,7 +1343,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.5908431847875895,
-          "timestamp": "2026-11-19T21:45:15.173585",
+          "timestamp": "2026-11-20T22:20:13.154383",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.91441989457186,
@@ -1358,8 +1358,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:13.154372",
+          "timerValue": 2798,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1370,7 +1370,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.6582372468013418,
-          "timestamp": "2026-11-19T21:45:15.280080",
+          "timestamp": "2026-11-20T22:20:13.254538",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.11392894125692,
@@ -1385,8 +1385,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:13.154372",
+          "timerValue": 2798,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1397,7 +1397,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.7298018854945607,
-          "timestamp": "2026-11-19T21:45:15.379273",
+          "timestamp": "2026-11-20T22:20:13.354640",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.30689730340254,
@@ -1412,8 +1412,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.379259",
-          "timerValue": 2998,
+          "timestamp": "2026-11-20T22:20:13.354629",
+          "timerValue": 2999,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1424,7 +1424,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.8056631579148725,
-          "timestamp": "2026-11-19T21:45:15.476654",
+          "timestamp": "2026-11-20T22:20:13.455622",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.4935394101534,
@@ -1439,8 +1439,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.570879",
-          "timerValue": 3189,
+          "timestamp": "2026-11-20T22:20:13.354629",
+          "timerValue": 2999,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1451,7 +1451,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.8859470564037255,
-          "timestamp": "2026-11-19T21:45:15.573071",
+          "timestamp": "2026-11-20T22:20:13.554640",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.67406266083073,
@@ -1466,8 +1466,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.570879",
-          "timerValue": 3189,
+          "timestamp": "2026-11-20T22:20:13.554630",
+          "timerValue": 3199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1478,7 +1478,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.9707795293331078,
-          "timestamp": "2026-11-19T21:45:15.678432",
+          "timestamp": "2026-11-20T22:20:13.658647",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.84866765539718,
@@ -1493,8 +1493,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.770007",
-          "timerValue": 3388,
+          "timestamp": "2026-11-20T22:20:13.554630",
+          "timerValue": 3199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1505,7 +1505,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.0602864952064253,
-          "timestamp": "2026-11-19T21:45:15.773158",
+          "timestamp": "2026-11-20T22:20:13.752965",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.01754841736644,
@@ -1520,8 +1520,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.770007",
-          "timerValue": 3388,
+          "timestamp": "2026-11-20T22:20:13.752951",
+          "timerValue": 3397,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1532,7 +1532,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.154593852242449,
-          "timestamp": "2026-11-19T21:45:15.875320",
+          "timestamp": "2026-11-20T22:20:13.848584",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.18089260940476,
@@ -1547,8 +1547,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.752951",
+          "timerValue": 3397,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1559,7 +1559,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.253827484886705,
-          "timestamp": "2026-11-19T21:45:15.973804",
+          "timestamp": "2026-11-20T22:20:13.954706",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.33888174186447,
@@ -1574,8 +1574,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.954692",
+          "timerValue": 3599,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1586,7 +1586,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.3581132682339865,
-          "timestamp": "2026-11-19T21:45:16.074616",
+          "timestamp": "2026-11-20T22:20:14.050027",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.49169137448067,
@@ -1601,8 +1601,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.954692",
+          "timerValue": 3599,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1613,7 +1613,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.4675770710313922,
-          "timestamp": "2026-11-19T21:45:16.173797",
+          "timestamp": "2026-11-20T22:20:14.148473",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.6394913114558,
@@ -1628,7 +1628,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.173789",
+          "timestamp": "2026-11-20T22:20:14.148463",
           "timerValue": 3792,
           "weightFlow": 0
          },
@@ -1640,7 +1640,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.5823447577171335,
-          "timestamp": "2026-11-19T21:45:16.282197",
+          "timestamp": "2026-11-20T22:20:14.248507",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.78244579014837,
@@ -1655,8 +1655,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.173789",
-          "timerValue": 3792,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1667,7 +1667,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.7025421898045394,
-          "timestamp": "2026-11-19T21:45:16.380624",
+          "timestamp": "2026-11-20T22:20:14.348975",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.92071366357584,
@@ -1682,8 +1682,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.380610",
-          "timerValue": 3999,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1694,7 +1694,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.828295226821496,
-          "timestamp": "2026-11-19T21:45:16.483600",
+          "timestamp": "2026-11-20T22:20:14.452657",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.05444857693429,
@@ -1709,8 +1709,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.380610",
-          "timerValue": 3999,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1721,7 +1721,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.9597297269480918,
-          "timestamp": "2026-11-19T21:45:16.580527",
+          "timestamp": "2026-11-20T22:20:14.554455",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.18379913833117,
@@ -1736,8 +1736,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.580519",
-          "timerValue": 4199,
+          "timestamp": "2026-11-20T22:20:14.554430",
+          "timerValue": 4198,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1748,7 +1748,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.0969715474494257,
-          "timestamp": "2026-11-19T21:45:16.675729",
+          "timestamp": "2026-11-20T22:20:14.652196",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.3089090839206,
@@ -1763,8 +1763,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.580519",
-          "timerValue": 4199,
+          "timestamp": "2026-11-20T22:20:14.554430",
+          "timerValue": 4198,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1775,7 +1775,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.2401465449693836,
-          "timestamp": "2026-11-19T21:45:16.779916",
+          "timestamp": "2026-11-20T22:20:14.754442",
           "targetFlow": 8,
           "profileFrame": 1,
           "mixTemperature": 88.42991743762512,
@@ -1790,7 +1790,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.779901",
+          "timestamp": "2026-11-20T22:20:14.754421",
           "timerValue": 4398,
           "weightFlow": 0
          },
@@ -1802,7 +1802,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.389380575730058,
-          "timestamp": "2026-11-19T21:45:16.877254",
+          "timestamp": "2026-11-20T22:20:14.848068",
           "targetFlow": 8,
           "profileFrame": 2,
           "mixTemperature": 88.54695866562096,
@@ -1817,7 +1817,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.779901",
+          "timestamp": "2026-11-20T22:20:14.754421",
           "timerValue": 4398,
           "weightFlow": 0
          },
@@ -1829,7 +1829,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:16.973512",
+          "timestamp": "2026-11-20T22:20:14.954251",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.66016282575873,
@@ -1844,8 +1844,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.973482",
-          "timerValue": 4592,
+          "timestamp": "2026-11-20T22:20:14.954240",
+          "timerValue": 4598,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1856,7 +1856,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.083655",
+          "timestamp": "2026-11-20T22:20:15.050558",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.76965571208551,
@@ -1871,8 +1871,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.973482",
-          "timerValue": 4592,
+          "timestamp": "2026-11-20T22:20:14.954240",
+          "timerValue": 4598,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1883,7 +1883,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.177441",
+          "timestamp": "2026-11-20T22:20:15.152237",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.87555899462903,
@@ -1898,7 +1898,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.177431",
+          "timestamp": "2026-11-20T22:20:15.152224",
           "timerValue": 4796,
           "weightFlow": 0
          },
@@ -1910,7 +1910,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.283364",
+          "timestamp": "2026-11-20T22:20:15.258642",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.97799035459902,
@@ -1925,7 +1925,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.177431",
+          "timestamp": "2026-11-20T22:20:15.152224",
           "timerValue": 4796,
           "weightFlow": 0
          },
@@ -1937,7 +1937,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.380225",
+          "timestamp": "2026-11-20T22:20:15.352180",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.07706361515625,
@@ -1952,8 +1952,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.380215",
-          "timerValue": 4998,
+          "timestamp": "2026-11-20T22:20:15.352171",
+          "timerValue": 4996,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1964,7 +1964,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.483612",
+          "timestamp": "2026-11-20T22:20:15.458712",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.17288886789446,
@@ -1979,8 +1979,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.380215",
-          "timerValue": 4998,
+          "timestamp": "2026-11-20T22:20:15.352171",
+          "timerValue": 4996,
           "weightFlow": 0
          },
          "volume": 0,
@@ -1991,7 +1991,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.574086",
+          "timestamp": "2026-11-20T22:20:15.554638",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.2655725951756,
@@ -2006,8 +2006,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.574075",
-          "timerValue": 5192,
+          "timestamp": "2026-11-20T22:20:15.554625",
+          "timerValue": 5199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2018,7 +2018,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.673709",
+          "timestamp": "2026-11-20T22:20:15.658639",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.35521778845461,
@@ -2033,8 +2033,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.574075",
-          "timerValue": 5192,
+          "timestamp": "2026-11-20T22:20:15.554625",
+          "timerValue": 5199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2045,7 +2045,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.777753",
+          "timestamp": "2026-11-20T22:20:15.754680",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.4419240627249,
@@ -2055,46 +2055,19 @@
           "targetMixTemperature": 88,
           "targetGroupTemperature": 88
          }
-        },
-        {
-         "scale": {
-          "weight": 0,
-          "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.777738",
-          "timerValue": 5396,
-          "weightFlow": 0
-         },
-         "volume": 0,
-         "machine": {
-          "flow": 4.251410697169479,
-          "state": {
-           "state": "espresso",
-           "substate": "preinfusion"
-          },
-          "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.876742",
-          "targetFlow": 0,
-          "profileFrame": 2,
-          "mixTemperature": 84.52578776721192,
-          "targetPressure": 3,
-          "groupTemperature": 85.52578776721192,
-          "steamTemperature": 150,
-          "targetMixTemperature": 88,
-          "targetGroupTemperature": 88
-         }
         }
        ]
       },
       "recipe": {
-       "id": "51fe8686-6cd1-4d27-b993-ae853f2b8100",
+       "id": "f9d6a550-38a3-406b-94f8-b35df27028da",
        "name": "Single origin",
-       "recordId": "recipe-mwo2rv8tv4sf"
+       "recordId": "recipe-mwpjfsxgbduj"
       },
       "referenceOf": [
        {
-        "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+        "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
         "name": "House espresso",
-        "recordId": "recipe-mwo2rv87c8n1"
+        "recordId": "recipe-mwpjfswnu9rs"
        }
       ],
       "rating": null,
@@ -2109,15 +2082,15 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv9fw10l"
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfsxzao7u"
    },
    "answer": {
     "status": 200,
     "body": {
      "recipe": {
-      "id": "26ffbf49-025a-4780-9b52-d2906927543f",
+      "id": "b29ba590-08a5-4823-92b8-098e4d948be3",
       "name": "Decaf",
-      "recordId": "recipe-mwo2rv9fw10l"
+      "recordId": "recipe-mwpjfsxzao7u"
      },
      "reference": null,
      "source": "tablet"
@@ -2156,7 +2129,7 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4"
+    "path": "/plugins/decent-sync.reaplugin/shot?id=6daee5a1-c8a2-422e-86c2-da6cf4cbd884"
    },
    "answer": {
     "status": 503,
@@ -2170,9 +2143,9 @@
   {
    "request": {
     "method": "PUT",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1",
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfswnu9rs",
     "body": {
-     "shotId": "7115a371-38af-4b22-a0f9-21555ea3b7c2"
+     "shotId": "e2be798b-57d2-4c6d-8ba6-f1432bf6771a"
     }
    },
    "answer": {
@@ -2187,7 +2160,7 @@
   {
    "request": {
     "method": "PUT",
-    "path": "/plugins/decent-sync.reaplugin/shot?id=ec6e89b6-eba3-41f9-b85e-a87700257253",
+    "path": "/plugins/decent-sync.reaplugin/shot?id=e3ea4435-4e7f-493d-8ce0-bade2b9b62cd",
     "body": {
      "rating": 6
     }
@@ -2204,7 +2177,7 @@
   {
    "request": {
     "method": "PUT",
-    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4",
+    "path": "/plugins/decent-sync.reaplugin/shot?id=6daee5a1-c8a2-422e-86c2-da6cf4cbd884",
     "body": {
      "rating": 5
     }
@@ -2228,9 +2201,9 @@
     {
      "what": "reference",
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      }
     }
    ]
@@ -2246,11 +2219,11 @@
      "connected": true,
      "served": true,
      "machine": {
-      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "id": "01a1fb0b-381c-75de-b583-32b408d62bea",
       "name": "Sample Machine"
      },
      "location": {
-      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "id": "01a1fb0b-37e3-76b9-b913-2e596ba79f6f",
       "name": "Sample Cafe"
      }
     }
@@ -2260,27 +2233,27 @@
   {
    "request": {
     "method": "GET",
-    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1"
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwpjfswnu9rs"
    },
    "answer": {
     "status": 200,
     "body": {
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      },
      "reference": {
       "shot": {
-       "id": "ec6e89b6-eba3-41f9-b85e-a87700257253",
+       "id": "e3ea4435-4e7f-493d-8ce0-bade2b9b62cd",
        "workflow": {
-        "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
+        "id": "aee57311-fcda-4386-af7e-7b8d0b37b7db",
         "name": "Workflow",
         "context": {
          "extras": {
           "dye": {
            "v": 1,
-           "recipeId": "recipe-mwo2rv8tv4sf",
+           "recipeId": "recipe-mwpjfsxgbduj",
            "selection": null
           },
           "rpm": null,
@@ -2291,11 +2264,11 @@
           "feedRate": null,
           "basketName": "18 g sample basket"
          },
-         "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
+         "grinderId": "401ece3f-5a9c-49c4-873b-9e134d7eee89",
          "coffeeName": "Sample Single Origin",
          "grinderRpm": 900,
          "baristaName": "Sample Barista",
-         "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
+         "beanBatchId": "4ae2de2f-b961-406c-ba5b-ce1f538f03c1",
          "targetYield": 40,
          "grinderModel": "Sample Grinder 64",
          "coffeeRoaster": "Sample Roasters",
@@ -2469,9 +2442,9 @@
          "targetTemperature": 150
         }
        },
-       "createdAt": "2026-11-19T21:45:17.975750Z",
-       "timestamp": "2026-11-19T21:45:11.974630",
-       "updatedAt": "2026-11-19T21:47:54.471294Z",
+       "createdAt": "2026-11-20T22:20:15.855494Z",
+       "timestamp": "2026-11-20T22:20:09.955052",
+       "updatedAt": "2026-11-20T22:22:52.228680Z",
        "stopReason": "apiStop",
        "annotations": {
         "enjoyment": 6,
@@ -2482,8 +2455,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:11.780518",
-          "timerValue": 18107,
+          "timestamp": "2026-11-20T22:20:09.753712",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2494,7 +2467,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.2491186328365433,
-          "timestamp": "2026-11-19T21:45:11.974368",
+          "timestamp": "2026-11-20T22:20:09.954541",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -2509,8 +2482,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:11.974361",
-          "timerValue": 18107,
+          "timestamp": "2026-11-20T22:20:09.954531",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2521,7 +2494,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.38651637932906047,
-          "timestamp": "2026-11-19T21:45:12.076564",
+          "timestamp": "2026-11-20T22:20:10.049465",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -2536,8 +2509,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
-          "timerValue": null,
+          "timestamp": "2026-11-20T22:20:09.954531",
+          "timerValue": 18000,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2548,7 +2521,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.505808173142,
-          "timestamp": "2026-11-19T21:45:12.173944",
+          "timestamp": "2026-11-20T22:20:10.152144",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -2563,7 +2536,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
+          "timestamp": "2026-11-20T22:20:10.152132",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -2575,7 +2548,7 @@
            "substate": "preparingForShot"
           },
           "pressure": 0.603104755016371,
-          "timestamp": "2026-11-19T21:45:12.283247",
+          "timestamp": "2026-11-20T22:20:10.248388",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 92,
@@ -2590,7 +2563,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.170768",
+          "timestamp": "2026-11-20T22:20:10.152132",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -2602,7 +2575,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.6795680936113293,
-          "timestamp": "2026-11-19T21:45:12.380593",
+          "timestamp": "2026-11-20T22:20:10.354644",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 76.52454239228791,
@@ -2617,7 +2590,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.380582",
+          "timestamp": "2026-11-20T22:20:10.354632",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -2629,7 +2602,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.7383654315483063,
-          "timestamp": "2026-11-19T21:45:12.483614",
+          "timestamp": "2026-11-20T22:20:10.449344",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.03188823949412,
@@ -2644,7 +2617,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.380582",
+          "timestamp": "2026-11-20T22:20:10.354632",
           "timerValue": null,
           "weightFlow": 0
          },
@@ -2656,7 +2629,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.783137060532783,
-          "timestamp": "2026-11-19T21:45:12.580581",
+          "timestamp": "2026-11-20T22:20:10.554683",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.52260131142465,
@@ -2671,7 +2644,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.580568",
+          "timestamp": "2026-11-20T22:20:10.554668",
           "timerValue": 199,
           "weightFlow": 0
          },
@@ -2683,7 +2656,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8172914896652638,
-          "timestamp": "2026-11-19T21:45:12.683580",
+          "timestamp": "2026-11-20T22:20:10.654217",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 77.99722689531283,
@@ -2698,8 +2671,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.580568",
-          "timerValue": 199,
+          "timestamp": "2026-11-20T22:20:10.746748",
+          "timerValue": 391,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2710,7 +2683,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8437364816861622,
-          "timestamp": "2026-11-19T21:45:12.773897",
+          "timestamp": "2026-11-20T22:20:10.748631",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 78.45629240175018,
@@ -2725,8 +2698,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.773887",
-          "timerValue": 392,
+          "timestamp": "2026-11-20T22:20:10.746748",
+          "timerValue": 391,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2737,7 +2710,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8648270857823744,
-          "timestamp": "2026-11-19T21:45:12.883695",
+          "timestamp": "2026-11-20T22:20:10.848220",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 78.90030795075229,
@@ -2752,8 +2725,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.773887",
-          "timerValue": 392,
+          "timestamp": "2026-11-20T22:20:10.944513",
+          "timerValue": 588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2764,7 +2737,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8824116114519285,
-          "timestamp": "2026-11-19T21:45:12.980594",
+          "timestamp": "2026-11-20T22:20:10.948581",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 79.3297669386115,
@@ -2779,8 +2752,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.980582",
-          "timerValue": 599,
+          "timestamp": "2026-11-20T22:20:10.944513",
+          "timerValue": 588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2791,7 +2764,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.8979132649361311,
-          "timestamp": "2026-11-19T21:45:13.083557",
+          "timestamp": "2026-11-20T22:20:11.048765",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 79.74514658616562,
@@ -2806,8 +2779,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:12.980582",
-          "timerValue": 599,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2818,7 +2791,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9124167907374098,
-          "timestamp": "2026-11-19T21:45:13.179969",
+          "timestamp": "2026-11-20T22:20:11.147967",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.14690846909251,
@@ -2833,8 +2806,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.179956",
-          "timerValue": 798,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2845,7 +2818,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9267465730840303,
-          "timestamp": "2026-11-19T21:45:13.283654",
+          "timestamp": "2026-11-20T22:20:11.254866",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.53549903081937,
@@ -2860,8 +2833,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.179956",
-          "timerValue": 798,
+          "timestamp": "2026-11-20T22:20:11.145928",
+          "timerValue": 790,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2872,7 +2845,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9415315365137102,
-          "timestamp": "2026-11-19T21:45:13.380597",
+          "timestamp": "2026-11-20T22:20:11.349912",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 80.91135007861693,
@@ -2887,8 +2860,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.380586",
-          "timerValue": 999,
+          "timestamp": "2026-11-20T22:20:11.349901",
+          "timerValue": 994,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2899,7 +2872,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9572565045878922,
-          "timestamp": "2026-11-19T21:45:13.478324",
+          "timestamp": "2026-11-20T22:20:11.448759",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.27487926342977,
@@ -2914,8 +2887,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.380586",
-          "timerValue": 999,
+          "timestamp": "2026-11-20T22:20:11.349901",
+          "timerValue": 994,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2926,7 +2899,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9743015388313097,
-          "timestamp": "2026-11-19T21:45:13.580609",
+          "timestamp": "2026-11-20T22:20:11.546937",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.62649054397585,
@@ -2941,8 +2914,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.580593",
-          "timerValue": 1199,
+          "timestamp": "2026-11-20T22:20:11.546910",
+          "timerValue": 1191,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2953,7 +2926,7 @@
            "substate": "preinfusion"
           },
           "pressure": 0.9929713778816791,
-          "timestamp": "2026-11-19T21:45:13.683555",
+          "timestamp": "2026-11-20T22:20:11.650679",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 81.9665746356311,
@@ -2968,8 +2941,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.546910",
+          "timerValue": 1191,
           "weightFlow": 0
          },
          "volume": 0,
@@ -2980,7 +2953,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0135170878163202,
-          "timestamp": "2026-11-19T21:45:13.774444",
+          "timestamp": "2026-11-20T22:20:11.748949",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.29550944459787,
@@ -2995,8 +2968,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.748937",
+          "timerValue": 1393,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3007,7 +2980,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0361517709654253,
-          "timestamp": "2026-11-19T21:45:13.882345",
+          "timestamp": "2026-11-20T22:20:11.848601",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.6136604878395,
@@ -3022,8 +2995,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.770358",
-          "timerValue": 1389,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3034,7 +3007,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0610618420606255,
-          "timestamp": "2026-11-19T21:45:13.972471",
+          "timestamp": "2026-11-20T22:20:11.948032",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 82.92138129924794,
@@ -3049,8 +3022,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.972464",
-          "timerValue": 1591,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3061,7 +3034,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.0884150522904463,
-          "timestamp": "2026-11-19T21:45:14.083601",
+          "timestamp": "2026-11-20T22:20:12.055146",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.21901382249558,
@@ -3076,8 +3049,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:13.972464",
-          "timerValue": 1591,
+          "timestamp": "2026-11-20T22:20:11.944289",
+          "timerValue": 1588,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3088,7 +3061,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.118366158285152,
-          "timestamp": "2026-11-19T21:45:14.176430",
+          "timestamp": "2026-11-20T22:20:12.154668",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.50688879100778,
@@ -3103,8 +3076,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.176421",
-          "timerValue": 1795,
+          "timestamp": "2026-11-20T22:20:12.154647",
+          "timerValue": 1799,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3115,7 +3088,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.1510609032665413,
-          "timestamp": "2026-11-19T21:45:14.275145",
+          "timestamp": "2026-11-20T22:20:12.249218",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 83.78532609547852,
@@ -3130,8 +3103,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.176421",
-          "timerValue": 1795,
+          "timestamp": "2026-11-20T22:20:12.154647",
+          "timerValue": 1799,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3142,7 +3115,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.186638798750016,
-          "timestamp": "2026-11-19T21:45:14.372859",
+          "timestamp": "2026-11-20T22:20:12.354588",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.05463513933745,
@@ -3157,8 +3130,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.372843",
-          "timerValue": 1991,
+          "timestamp": "2026-11-20T22:20:12.354581",
+          "timerValue": 1998,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3169,7 +3142,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.2252350598087474,
-          "timestamp": "2026-11-19T21:45:14.483709",
+          "timestamp": "2026-11-20T22:20:12.449135",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.3151151825632,
@@ -3184,8 +3157,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.372843",
-          "timerValue": 1991,
+          "timestamp": "2026-11-20T22:20:12.354581",
+          "timerValue": 1998,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3196,7 +3169,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.2669819465010999,
-          "timestamp": "2026-11-19T21:45:14.578342",
+          "timestamp": "2026-11-20T22:20:12.553088",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.56705567422541,
@@ -3211,7 +3184,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.578329",
+          "timestamp": "2026-11-20T22:20:12.553073",
           "timerValue": 2197,
           "weightFlow": 0
          },
@@ -3223,7 +3196,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.312009690734367,
-          "timestamp": "2026-11-19T21:45:14.678368",
+          "timestamp": "2026-11-20T22:20:12.652370",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 84.81073657412445,
@@ -3238,8 +3211,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.770904",
-          "timerValue": 2389,
+          "timestamp": "2026-11-20T22:20:12.553073",
+          "timerValue": 2197,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3250,7 +3223,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.360447134933301,
-          "timestamp": "2026-11-19T21:45:14.773900",
+          "timestamp": "2026-11-20T22:20:12.747970",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.04642866388674,
@@ -3265,8 +3238,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.770904",
-          "timerValue": 2389,
+          "timestamp": "2026-11-20T22:20:12.747957",
+          "timerValue": 2392,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3277,7 +3250,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.4124221710831693,
-          "timestamp": "2026-11-19T21:45:14.873726",
+          "timestamp": "2026-11-20T22:20:12.849227",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.27439384786109,
@@ -3292,8 +3265,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.970959",
-          "timerValue": 2589,
+          "timestamp": "2026-11-20T22:20:12.747957",
+          "timerValue": 2392,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3304,7 +3277,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.4680620419256618,
-          "timestamp": "2026-11-19T21:45:14.972885",
+          "timestamp": "2026-11-20T22:20:12.947562",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.49488544415041,
@@ -3319,8 +3292,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:14.970959",
-          "timerValue": 2589,
+          "timestamp": "2026-11-20T22:20:12.947551",
+          "timerValue": 2591,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3331,7 +3304,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.5274935472218483,
-          "timestamp": "2026-11-19T21:45:15.083714",
+          "timestamp": "2026-11-20T22:20:13.058659",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.70814846610243,
@@ -3346,8 +3319,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:12.947551",
+          "timerValue": 2591,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3358,7 +3331,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.5908431847875895,
-          "timestamp": "2026-11-19T21:45:15.173585",
+          "timestamp": "2026-11-20T22:20:13.154383",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 85.91441989457186,
@@ -3373,8 +3346,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:13.154372",
+          "timerValue": 2798,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3385,7 +3358,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.6582372468013418,
-          "timestamp": "2026-11-19T21:45:15.280080",
+          "timestamp": "2026-11-20T22:20:13.254538",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.11392894125692,
@@ -3400,8 +3373,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.171514",
-          "timerValue": 2790,
+          "timestamp": "2026-11-20T22:20:13.154372",
+          "timerValue": 2798,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3412,7 +3385,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.7298018854945607,
-          "timestamp": "2026-11-19T21:45:15.379273",
+          "timestamp": "2026-11-20T22:20:13.354640",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.30689730340254,
@@ -3427,8 +3400,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.379259",
-          "timerValue": 2998,
+          "timestamp": "2026-11-20T22:20:13.354629",
+          "timerValue": 2999,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3439,7 +3412,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.8056631579148725,
-          "timestamp": "2026-11-19T21:45:15.476654",
+          "timestamp": "2026-11-20T22:20:13.455622",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.4935394101534,
@@ -3454,8 +3427,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.570879",
-          "timerValue": 3189,
+          "timestamp": "2026-11-20T22:20:13.354629",
+          "timerValue": 2999,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3466,7 +3439,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.8859470564037255,
-          "timestamp": "2026-11-19T21:45:15.573071",
+          "timestamp": "2026-11-20T22:20:13.554640",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.67406266083073,
@@ -3481,8 +3454,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.570879",
-          "timerValue": 3189,
+          "timestamp": "2026-11-20T22:20:13.554630",
+          "timerValue": 3199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3493,7 +3466,7 @@
            "substate": "preinfusion"
           },
           "pressure": 1.9707795293331078,
-          "timestamp": "2026-11-19T21:45:15.678432",
+          "timestamp": "2026-11-20T22:20:13.658647",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 86.84866765539718,
@@ -3508,8 +3481,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.770007",
-          "timerValue": 3388,
+          "timestamp": "2026-11-20T22:20:13.554630",
+          "timerValue": 3199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3520,7 +3493,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.0602864952064253,
-          "timestamp": "2026-11-19T21:45:15.773158",
+          "timestamp": "2026-11-20T22:20:13.752965",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.01754841736644,
@@ -3535,8 +3508,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.770007",
-          "timerValue": 3388,
+          "timestamp": "2026-11-20T22:20:13.752951",
+          "timerValue": 3397,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3547,7 +3520,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.154593852242449,
-          "timestamp": "2026-11-19T21:45:15.875320",
+          "timestamp": "2026-11-20T22:20:13.848584",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.18089260940476,
@@ -3562,8 +3535,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.752951",
+          "timerValue": 3397,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3574,7 +3547,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.253827484886705,
-          "timestamp": "2026-11-19T21:45:15.973804",
+          "timestamp": "2026-11-20T22:20:13.954706",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.33888174186447,
@@ -3589,8 +3562,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.954692",
+          "timerValue": 3599,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3601,7 +3574,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.3581132682339865,
-          "timestamp": "2026-11-19T21:45:16.074616",
+          "timestamp": "2026-11-20T22:20:14.050027",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.49169137448067,
@@ -3616,8 +3589,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:15.971181",
-          "timerValue": 3589,
+          "timestamp": "2026-11-20T22:20:13.954692",
+          "timerValue": 3599,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3628,7 +3601,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.4675770710313922,
-          "timestamp": "2026-11-19T21:45:16.173797",
+          "timestamp": "2026-11-20T22:20:14.148473",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.6394913114558,
@@ -3643,7 +3616,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.173789",
+          "timestamp": "2026-11-20T22:20:14.148463",
           "timerValue": 3792,
           "weightFlow": 0
          },
@@ -3655,7 +3628,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.5823447577171335,
-          "timestamp": "2026-11-19T21:45:16.282197",
+          "timestamp": "2026-11-20T22:20:14.248507",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.78244579014837,
@@ -3670,8 +3643,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.173789",
-          "timerValue": 3792,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3682,7 +3655,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.7025421898045394,
-          "timestamp": "2026-11-19T21:45:16.380624",
+          "timestamp": "2026-11-20T22:20:14.348975",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 87.92071366357584,
@@ -3697,8 +3670,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.380610",
-          "timerValue": 3999,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3709,7 +3682,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.828295226821496,
-          "timestamp": "2026-11-19T21:45:16.483600",
+          "timestamp": "2026-11-20T22:20:14.452657",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.05444857693429,
@@ -3724,8 +3697,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.380610",
-          "timerValue": 3999,
+          "timestamp": "2026-11-20T22:20:14.345901",
+          "timerValue": 3990,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3736,7 +3709,7 @@
            "substate": "preinfusion"
           },
           "pressure": 2.9597297269480918,
-          "timestamp": "2026-11-19T21:45:16.580527",
+          "timestamp": "2026-11-20T22:20:14.554455",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.18379913833117,
@@ -3751,8 +3724,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.580519",
-          "timerValue": 4199,
+          "timestamp": "2026-11-20T22:20:14.554430",
+          "timerValue": 4198,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3763,7 +3736,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.0969715474494257,
-          "timestamp": "2026-11-19T21:45:16.675729",
+          "timestamp": "2026-11-20T22:20:14.652196",
           "targetFlow": 8,
           "profileFrame": 0,
           "mixTemperature": 88.3089090839206,
@@ -3778,8 +3751,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.580519",
-          "timerValue": 4199,
+          "timestamp": "2026-11-20T22:20:14.554430",
+          "timerValue": 4198,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3790,7 +3763,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.2401465449693836,
-          "timestamp": "2026-11-19T21:45:16.779916",
+          "timestamp": "2026-11-20T22:20:14.754442",
           "targetFlow": 8,
           "profileFrame": 1,
           "mixTemperature": 88.42991743762512,
@@ -3805,7 +3778,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.779901",
+          "timestamp": "2026-11-20T22:20:14.754421",
           "timerValue": 4398,
           "weightFlow": 0
          },
@@ -3817,7 +3790,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3.389380575730058,
-          "timestamp": "2026-11-19T21:45:16.877254",
+          "timestamp": "2026-11-20T22:20:14.848068",
           "targetFlow": 8,
           "profileFrame": 2,
           "mixTemperature": 88.54695866562096,
@@ -3832,7 +3805,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.779901",
+          "timestamp": "2026-11-20T22:20:14.754421",
           "timerValue": 4398,
           "weightFlow": 0
          },
@@ -3844,7 +3817,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:16.973512",
+          "timestamp": "2026-11-20T22:20:14.954251",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.66016282575873,
@@ -3859,8 +3832,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.973482",
-          "timerValue": 4592,
+          "timestamp": "2026-11-20T22:20:14.954240",
+          "timerValue": 4598,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3871,7 +3844,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.083655",
+          "timestamp": "2026-11-20T22:20:15.050558",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.76965571208551,
@@ -3886,8 +3859,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:16.973482",
-          "timerValue": 4592,
+          "timestamp": "2026-11-20T22:20:14.954240",
+          "timerValue": 4598,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3898,7 +3871,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.177441",
+          "timestamp": "2026-11-20T22:20:15.152237",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.87555899462903,
@@ -3913,7 +3886,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.177431",
+          "timestamp": "2026-11-20T22:20:15.152224",
           "timerValue": 4796,
           "weightFlow": 0
          },
@@ -3925,7 +3898,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.283364",
+          "timestamp": "2026-11-20T22:20:15.258642",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 83.97799035459902,
@@ -3940,7 +3913,7 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.177431",
+          "timestamp": "2026-11-20T22:20:15.152224",
           "timerValue": 4796,
           "weightFlow": 0
          },
@@ -3952,7 +3925,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.380225",
+          "timestamp": "2026-11-20T22:20:15.352180",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.07706361515625,
@@ -3967,8 +3940,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.380215",
-          "timerValue": 4998,
+          "timestamp": "2026-11-20T22:20:15.352171",
+          "timerValue": 4996,
           "weightFlow": 0
          },
          "volume": 0,
@@ -3979,7 +3952,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.483612",
+          "timestamp": "2026-11-20T22:20:15.458712",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.17288886789446,
@@ -3994,8 +3967,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.380215",
-          "timerValue": 4998,
+          "timestamp": "2026-11-20T22:20:15.352171",
+          "timerValue": 4996,
           "weightFlow": 0
          },
          "volume": 0,
@@ -4006,7 +3979,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.574086",
+          "timestamp": "2026-11-20T22:20:15.554638",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.2655725951756,
@@ -4021,8 +3994,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.574075",
-          "timerValue": 5192,
+          "timestamp": "2026-11-20T22:20:15.554625",
+          "timerValue": 5199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -4033,7 +4006,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.673709",
+          "timestamp": "2026-11-20T22:20:15.658639",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.35521778845461,
@@ -4048,8 +4021,8 @@
          "scale": {
           "weight": 0,
           "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.574075",
-          "timerValue": 5192,
+          "timestamp": "2026-11-20T22:20:15.554625",
+          "timerValue": 5199,
           "weightFlow": 0
          },
          "volume": 0,
@@ -4060,7 +4033,7 @@
            "substate": "preinfusion"
           },
           "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.777753",
+          "timestamp": "2026-11-20T22:20:15.754680",
           "targetFlow": 0,
           "profileFrame": 2,
           "mixTemperature": 84.4419240627249,
@@ -4070,46 +4043,19 @@
           "targetMixTemperature": 88,
           "targetGroupTemperature": 88
          }
-        },
-        {
-         "scale": {
-          "weight": 0,
-          "battery": 100,
-          "timestamp": "2026-11-19T21:45:17.777738",
-          "timerValue": 5396,
-          "weightFlow": 0
-         },
-         "volume": 0,
-         "machine": {
-          "flow": 4.251410697169479,
-          "state": {
-           "state": "espresso",
-           "substate": "preinfusion"
-          },
-          "pressure": 3,
-          "timestamp": "2026-11-19T21:45:17.876742",
-          "targetFlow": 0,
-          "profileFrame": 2,
-          "mixTemperature": 84.52578776721192,
-          "targetPressure": 3,
-          "groupTemperature": 85.52578776721192,
-          "steamTemperature": 150,
-          "targetMixTemperature": 88,
-          "targetGroupTemperature": 88
-         }
         }
        ]
       },
       "recipe": {
-       "id": "51fe8686-6cd1-4d27-b993-ae853f2b8100",
+       "id": "f9d6a550-38a3-406b-94f8-b35df27028da",
        "name": "Single origin",
-       "recordId": "recipe-mwo2rv8tv4sf"
+       "recordId": "recipe-mwpjfsxgbduj"
       },
       "referenceOf": [
        {
-        "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+        "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
         "name": "House espresso",
-        "recordId": "recipe-mwo2rv87c8n1"
+        "recordId": "recipe-mwpjfswnu9rs"
        }
       ],
       "rating": 6,
@@ -4123,15 +4069,15 @@
   },
   {
    "event": "sync-choose-reference",
-   "recipe": "recipe-mwo2rv87c8n1",
+   "recipe": "recipe-mwpjfswnu9rs",
    "shot": null,
    "pushes": [
     {
      "what": "reference",
      "recipe": {
-      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "id": "de4ffe61-6410-468e-99eb-34a8d8d665b7",
       "name": "House espresso",
-      "recordId": "recipe-mwo2rv87c8n1"
+      "recordId": "recipe-mwpjfswnu9rs"
      }
     }
    ]

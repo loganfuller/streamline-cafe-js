@@ -15,8 +15,13 @@
 // (`referenceProfileDiffers`), server/src/shots/extraction.ts (a Shot's
 // duration past its Preheat, its target yield), protocol/src/index.ts
 // (`shotRatingAndNote`, `isShotRating`, `isShotNote`); and docs/PLUGIN.md,
-// "For a Skin's author". Recorded: recordings/decent-sync.json (the state a
-// served Machine starts from) and recordings/decent-sync-*.json.
+// "For a Skin's author"; plugin/src/loaded-recipes.ts (`observe`, `decide`,
+// `sharing`, `saveSoon`), plugin/src/loaded-recipe-rules.ts (`loadable`),
+// plugin/src/dye2.ts (`recordIntoRecipe`) and protocol/src/index.ts
+// (`dye2GlobalIdOf`, `dye2Fingerprint`) for the save into the Loaded Recipe.
+// Recorded: recordings/decent-sync.json (the state a served Machine starts
+// from) and recordings/decent-sync-*.json; the save, in
+// recordings/decent-sync-saves.json.
 //
 // - **status:** 200 `{ connected, served: true, machine, location }` when
 //   served; any other state answers its refusal's HTTP status with `code` and
@@ -51,6 +56,20 @@
 //   meanwhile, and for every copy when sharing is turned on again (sharing off
 //   empties them with no push). The plugin may push one twice; the model
 //   pushes it once.
+// - **The save into the Loaded Recipe (ADR-0022):** the plugin hears every
+//   Workflow change Decaid announces, the plugin's own load aside. One naming
+//   another Recipe than the one loaded (by its DYE2 record's `decentSyncId`, a
+//   global id) is a load, saving nothing; the plugin starts having decided on
+//   the Workflow it finds. Any other change while a Recipe is loaded is saved
+//   into it, but not one changing the profile (as DYE2 fingerprints one), on
+//   a Capture-only Machine (sharing off, or the server's word: the plugin
+//   keeps the last it heard while it can't be asked, so it saves on through
+//   an outage), or while DYE2 is not loaded. One save waits for the next
+//   flush, covering the changes after it of the same Recipe, load and
+//   profile; then, if the Workflow still names that Recipe on that profile
+//   and no load came meanwhile, the plugin asks DYE2's `record` (`POST`, `{}`),
+//   which writes the record and pushes on DYE2's `changed`. Its ask is not in
+//   the fake's request log, as no request of the page's is.
 //
 // What the test makes happen (`events`): the connection lost and found
 // (`stopServer`, `startServer`), sharing off and on (`setSharing`), any other
@@ -68,10 +87,21 @@
 // later); the Library's sync (the records it leaves are recorded); a slot
 // changed; Shots of another Location chosen as a Reference Shot; what the
 // server does with a Shot stored while it refuses the Machine (the model
-// lists it nowhere).
+// lists it nowhere). Of the save into the Loaded Recipe: the saved dial-in
+// reaching the server and its Recipes (the page reads the dial-in from DYE2's
+// records); the plugin's own writes into the Workflow, a load's included;
+// the rule for steam turned back on, which writes the Recipe's steam settings
+// first (the model's machine has no steam); the Workflow's changes held back
+// from the server while a save is under way; DYE2 seen as away only after two
+// polls not loaded (the model: at once); the seconds DYE2 may take to read the
+// machine's settings before it writes (the model saves at the next flush).
+// Nor, seen in the recording and not modelled yet: the server unloading the
+// Machine's Loaded Recipe as its sharing is turned off, which the plugin makes
+// by clearing the Workflow's recipe (a DYE2 push follows).
 
 import { copy, isObject } from './workflow.js';
 import { localTime } from './machine.js';
+import { profileFingerprint, recipeIdOf } from './dye2.js';
 
 export const DECENT_SYNC_ID = 'decent-sync.reaplugin';
 const DYE2_NAMESPACE = 'dye2.reaplugin';
@@ -100,6 +130,7 @@ const refusal = (code, body = {}, message = REFUSALS[code].message) => ({ status
 const invalid = message => refusal('invalidRequest', {}, message);
 const json = body => ({ status: 200, body });
 const methodNotAllowed = (...allowed) => ({ status: 405, body: { error: `Only ${allowed.join(' and ')} ${allowed.length === 1 ? 'is' : 'are'} answered` } });
+const GLOBAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const askable = value => typeof value === 'string' && value.length <= MAX_ASKED_LENGTH;
 const recordedText = value => (typeof value === 'number' && Number.isFinite(value) ? String(value) : typeof value === 'string' && value.trim() !== '' ? value : null);
 const numberOf = value => (typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)) ? Number(value) : null);
@@ -198,6 +229,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     const timeZone = decaid.timeZone;
     let state = 'served';
     let sharing = true;
+    /** Whether the server last told the plugin its Machine is Capture-only: kept while it can't be asked (`setCaptureOnly`). */
+    let captureOnly = false;
     const machine = copy(server.machine);
     const location = copy(server.location);
     const recipes = new Map(server.recipes.map(recipe => [recipe.id, copy(recipe)]));
@@ -217,6 +250,25 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     };
     const recordIdOf = recipeId => (records() || []).find(row => row?.decentSyncId === recipeId)?.id ?? null;
     const skinRecipe = recipe => ({ id: recipe.id, name: recipe.name, recordId: recordIdOf(recipe.id) });
+
+    // ── The save into the Loaded Recipe (`LoadedRecipes`).
+    /** The Recipe the Workflow names, by the global id its DYE2 record carries (`loadable`, `dye2GlobalIdOf`), or null. */
+    const loadedIn = workflow => {
+        const recordId = recipeIdOf(workflow);
+        const globalId = recordId && (records() || []).find(row => row && row.id === recordId)?.decentSyncId;
+        return typeof globalId === 'string' && GLOBAL_ID.test(globalId) ? globalId.toLowerCase() : null;
+    };
+    /** `sharing()`: the plugin writes into the Workflow and saves into its recipes. */
+    const saving = () => !captureOnly && decaid.dye2Loaded();
+    let loadedRecipe = null;
+    let loads = 0;
+    let queuedSave = null;
+    /** The plugin has decided on the Workflow as it stands: its Recipe loaded, nothing waiting. */
+    const decided = () => {
+        loadedRecipe = loadedIn(decaid.workflow());
+        queuedSave = null;
+    };
+    decided();
     const servedNow = () => state === 'served' && sharing;
     const connected = () => state !== 'unreachable';
     const notServed = () => (state === 'served' ? (sharing ? null : 'captureOnly') : state);
@@ -415,6 +467,32 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     };
 
     return {
+        /** Decaid announced a Workflow change, from `previous` to `workflow` (`observe`, `decide`). */
+        workflowChanged(previous, workflow) {
+            const globalId = loadedIn(workflow);
+            if (globalId !== loadedRecipe) {
+                loadedRecipe = globalId;
+                loads++;
+                return;
+            }
+            if (globalId === null || !saving()) return;
+            const fingerprint = profileFingerprint(workflow.profile);
+            if (profileFingerprint(previous && previous.profile) !== fingerprint) return;
+            const save = { globalId, load: loads, fingerprint };
+            if (queuedSave && queuedSave.globalId === save.globalId && queuedSave.load === save.load && queuedSave.fingerprint === save.fingerprint) return;
+            queuedSave = save;
+        },
+        /** The save waiting, made at the flush (`saveSoon`): DYE2's `record`, where the Workflow still names its Recipe on its profile. */
+        settle() {
+            const save = queuedSave;
+            queuedSave = null;
+            if (!save || loadedRecipe !== save.globalId || loads !== save.load || !saving()) return;
+            const workflow = decaid.workflow();
+            if (loadedIn(workflow) !== save.globalId || profileFingerprint(workflow.profile) !== save.fingerprint) return;
+            // `recordIntoRecipe`: what DYE2 answers is reported to the server, which the model leaves out.
+            decaid.record();
+        },
+        decided,
         /** Answers a request to one of the plugin's endpoints, or null for none it has. */
         answer(method, endpoint, query, body) {
             switch (endpoint) {
@@ -453,6 +531,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
             startServer() {
                 if (state !== 'unreachable') return;
                 state = 'served';
+                captureOnly = !sharing;
                 // Reported now, to a server that lists them only if the Machine shares.
                 if (sharing) for (const id of unreported) if (!own.has(id)) own.set(id, { unfinished: false });
                 unreported.clear();
@@ -466,6 +545,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
              */
             setSharing(on) {
                 sharing = !!on;
+                // The server tells a connected plugin; one out of reach hears it once connected.
+                if (state !== 'unreachable') captureOnly = !sharing;
                 if (!sharing) copies.clear();
                 if (servedNow()) refreshCopies();
             },
@@ -478,6 +559,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
             setState(next) {
                 if (next !== 'served' && !Object.hasOwn(NOT_SERVED, next)) throw new Error(`no such state: ${next}`);
                 state = next;
+                if (state === 'captureOnly') captureOnly = true;
+                else if (state === 'served') captureOnly = !sharing;
                 // A Capture-only Machine has no slots, so no copies, as sharing off leaves it.
                 if (state === 'captureOnly') copies.clear();
                 if (servedNow()) refreshCopies();
@@ -490,6 +573,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
              */
             firstStart() {
                 state = 'unreachable';
+                captureOnly = false;
                 copies.clear();
             },
             /** A Recipe's Reference Shot chosen on the server, or cleared with null, by its DYE2 record's id. */

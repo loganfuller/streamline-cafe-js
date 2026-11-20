@@ -9,7 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createFakeDecaid, OWNED } from '../fake-decaid/index.js';
 import { updateWorkflow, deepMerge } from '../fake-decaid/workflow.js';
 import { createStore } from '../fake-decaid/store.js';
-import { deriveSelection, recipeModified, profileFingerprint, proposeRecipeName } from '../fake-decaid/dye2.js';
+import { deriveSelection, recipeModified, profileFingerprint, proposeRecipeName, itemPatch, profileAtBrewC } from '../fake-decaid/dye2.js';
 import { createShots } from '../fake-decaid/shots.js';
 import { createLibrary } from '../fake-decaid/library.js';
 import { createBoot } from '../fake-decaid/boot.js';
@@ -236,6 +236,144 @@ test('DYE2: save-recipe names a recipe from its profile\'s first word and its be
     const named = send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/save-recipe', { name: ' Typed ', slot: 9 });
     assert.equal(named.body.name, 'Typed');
     assert.equal(fake.store.get('dye2.reaplugin', 'recipes').find(r => r.id === named.body.id).stripSlot, null, 'no slot past 5');
+});
+
+// ── DYE2's record ────────────────────────────────────────────────────────────
+
+const RECORD = '/api/v1/plugins/dye2.reaplugin/record';
+const recordsOf = fake => fake.store.get('dye2.reaplugin', 'recipes');
+/** A fake with House espresso loaded as the page loads it, and DYE2's pushes from then. */
+function houseLoaded(make = fresh) {
+    const fake = make();
+    const house = houseRecord(fake);
+    send(fake, 'PUT', '/api/v1/workflow', applied(house));
+    send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/selection', { kind: 'recipe', id: house.id });
+    const pushes = [];
+    fake.connect('/ws/v1/plugins/dye2.reaplugin/changed', text => pushes.push(JSON.parse(text)));
+    fake.flush();
+    return { fake, house, pushes };
+}
+/** Every row but `id`'s as it was, and `id`'s fields outside `dashboardVariables` and `workflow` too. */
+function onlyRowChanged(before, after, id) {
+    assert.equal(after.length, before.length);
+    for (const [index, row] of before.entries()) {
+        if (row.id !== id) { assert.deepEqual(after[index], row, `${row.name} as it was`); continue; }
+        const { dashboardVariables: _d, workflow: _w, ...rest } = after[index];
+        const { dashboardVariables: _bd, workflow: _bw, ...was } = row;
+        assert.deepEqual(rest, was, `${row.name}'s other fields as they were`);
+    }
+}
+
+test('DYE2 record: with no recipe loaded it saves nothing and says so', () => {
+    const fake = fresh();
+    const pushes = [];
+    fake.connect('/ws/v1/plugins/dye2.reaplugin/changed', text => pushes.push(JSON.parse(text)));
+    fake.flush();
+    const before = recordsOf(fake);
+    assert.deepEqual(send(fake, 'POST', RECORD, {}), { status: 200, body: { saved: false, reason: 'no recipe is selected' } });
+    fake.flush();
+    assert.deepEqual(pushes, []);
+    assert.deepEqual(recordsOf(fake), before);
+});
+
+test('DYE2 record: nothing moved saves nothing; the machine\'s flush is read over the Workflow\'s', () => {
+    const { fake, house, pushes } = houseLoaded();
+    assert.equal(fake.workflow().rinseData.targetTemperature, 90, 'the Workflow\'s flush');
+    assert.equal(house.dashboardVariables.flushTempC, 25, 'the record\'s, which the machine\'s settings hold too');
+    assert.deepEqual(send(fake, 'POST', RECORD, {}).body, { saved: false, kind: 'recipe', id: house.id });
+    fake.flush();
+    assert.deepEqual(pushes, [], 'no push where it wrote nothing');
+});
+
+test('DYE2 record: a dose, a yield and a grind setting moved are written into the row and its stored Workflow alone, and pushed', () => {
+    const { fake, house, pushes } = houseLoaded();
+    const before = recordsOf(fake);
+    send(fake, 'PUT', '/api/v1/workflow', { context: { targetDoseWeight: 18.5, targetYield: 38, grinderSetting: '2.6' } });
+    fake.flush();
+    pushes.length = 0;
+    assert.deepEqual(send(fake, 'POST', RECORD, {}).body, { saved: true, kind: 'recipe', id: house.id });
+    fake.flush();
+    assert.deepEqual(pushes, [{ what: 'workflow' }], 'pushed once: still the recipe, still called changed for its flush');
+    const row = houseRecord(fake);
+    assert.deepEqual(row.dashboardVariables, { ...house.dashboardVariables, dose: 18.5, drink: 38, grind: 2.6 });
+    assert.deepEqual(row.workflow.context, { ...house.workflow.context, targetDoseWeight: 18.5, targetYield: 38, grinderSetting: '2.6' });
+    assert.deepEqual({ ...row.workflow, context: null }, { ...house.workflow, context: null }, 'the rest of its stored Workflow as it was');
+    onlyRowChanged(before, recordsOf(fake), house.id);
+    assert.deepEqual(send(fake, 'POST', RECORD, {}).body.saved, false, 'saved, nothing differs');
+});
+
+test('DYE2 record: the brew temperature moved moves every step of the stored profile, not its snapshot, and is armed afresh', () => {
+    const { fake, house } = houseLoaded();
+    const profile = house.workflow.profile;
+    const warmer = { ...profile, steps: profile.steps.map(step => ({ ...step, temperature: step.temperature + 2 })) };
+    send(fake, 'PUT', '/api/v1/workflow', { profile: warmer });
+    assert.equal(fake.selection().id, house.id, 'a temperature is not another profile');
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, true);
+    const row = houseRecord(fake);
+    assert.equal(row.dashboardVariables.brewC, profile.steps[0].temperature + 2);
+    assert.deepEqual(row.workflow.profile.steps.map(step => step.temperature), profile.steps.map(step => step.temperature + 2));
+    assert.deepEqual(row.profileSnapshot, house.profileSnapshot);
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, false, 'the armed temperature is the saved one now');
+    assert.deepEqual(profileAtBrewC({ steps: [{ temperature: 94 }, { temperature: 90 }, { temperature: 'x' }] }, 92).steps.map(s => s.temperature), [92, 88, 92]);
+    assert.equal(profileAtBrewC({ steps: [] }, null), null);
+});
+
+test('DYE2 record: a basket\'s id and name are written together; a held hot water value is written into the stored Workflow', () => {
+    const { fake, house } = houseLoaded();
+    send(fake, 'PUT', '/api/v1/workflow', { context: { extras: { basketId: 'bskt-sample-20', basketName: '20 g sample basket' } }, hotWaterData: { volume: 60 } });
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, true);
+    const row = houseRecord(fake);
+    assert.equal(row.dashboardVariables.basketId, 'bskt-sample-20');
+    assert.equal(row.dashboardVariables.basketName, '20 g sample basket');
+    assert.equal(row.workflow.context.extras.basketId, 'bskt-sample-20');
+    assert.equal(row.workflow.context.extras.basketName, '20 g sample basket');
+    assert.equal(row.dashboardVariables.hotWaterMl, 60);
+    assert.equal(row.workflow.hotWaterData.volume, 60);
+    // Only the id moved: the name is written with it all the same.
+    const stored = { dashboardVariables: { basketId: 'a', basketName: 'Same' } };
+    assert.deepEqual(itemPatch(stored, { context: { extras: { basketId: 'b', basketName: 'Same' } } }), { basketId: 'b', basketName: 'Same' });
+});
+
+test('DYE2 record: with steam off its temperature and time are held back, the rest written', () => {
+    const { fake, house } = houseLoaded();
+    send(fake, 'PUT', '/api/v1/workflow', { steamSettings: { targetTemperature: 0, duration: 0, flow: 1.2 }, context: { targetDoseWeight: 19 } });
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, true);
+    const row = houseRecord(fake).dashboardVariables;
+    assert.equal(row.steamTempC, house.dashboardVariables.steamTempC);
+    assert.equal(row.steamTimeS, house.dashboardVariables.steamTimeS);
+    assert.equal(row.steamFlowMls, 1.2, 'the flow is no part of the off state');
+    assert.equal(row.dose, 19);
+});
+
+test('DYE2 record: a value the record does not hold is written once moved since the apply, and not otherwise; numbers compare as numbers', () => {
+    const fake = fresh();
+    const rows = recordsOf(fake).map(row => (row.name === 'Decaf'
+        ? { ...row, dashboardVariables: Object.fromEntries(Object.entries(row.dashboardVariables).filter(([key]) => !['hotWaterTimeS', 'steamFlowMls'].includes(key))) }
+        : row));
+    send(fake, 'POST', '/api/v1/store/dye2.reaplugin/recipes', rows);
+    const decaf = rows.find(row => row.name === 'Decaf');
+    send(fake, 'PUT', '/api/v1/workflow', applied(decaf));
+    send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/selection', { kind: 'recipe', id: decaf.id });
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, false, 'neither moved: neither adopted');
+    send(fake, 'PUT', '/api/v1/workflow', { hotWaterData: { duration: 35 } });
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, true);
+    const row = recordsOf(fake).find(r => r.name === 'Decaf').dashboardVariables;
+    assert.equal(row.hotWaterTimeS, 35, 'moved since the apply: adopted');
+    assert.equal(row.steamFlowMls, undefined, 'not moved: not adopted');
+    assert.deepEqual(itemPatch({ dashboardVariables: { dose: '18.0', basketName: '0' } }, { context: { targetDoseWeight: 18, extras: { basketName: '' } } }), { basketName: '' }, 'a number as text is the same number; two strings compare exactly');
+    assert.deepEqual(itemPatch({ dashboardVariables: { rpm: 700 } }, { context: { extras: { rpm: null } } }), {}, 'nothing to write for a value the Workflow lacks');
+});
+
+test('DYE2 record: a recipe whose record is gone saves nothing', () => {
+    const { fake, house } = houseLoaded();
+    send(fake, 'POST', '/api/v1/store/dye2.reaplugin/recipes', recordsOf(fake).filter(row => row.id !== house.id));
+    assert.deepEqual(send(fake, 'POST', RECORD, {}).body, { saved: false, reason: 'no recipe is selected' }, 'no Shot names it: no recipe at all');
+    // Where a Shot names it, DYE2 still knows the recipe, and has no row to write.
+    const sync = served();
+    const shotRecipe = sync.shots.get(A).workflow.context.extras.dye.recipeId;
+    send(sync, 'PUT', '/api/v1/workflow', { context: { extras: { dye: { recipeId: shotRecipe } } } });
+    send(sync, 'POST', '/api/v1/store/dye2.reaplugin/recipes', recordsOf(sync).filter(row => row.id !== shotRecipe));
+    assert.deepEqual(send(sync, 'POST', RECORD, {}).body, { saved: false, kind: 'recipe', id: shotRecipe });
 });
 
 test('DYE2: a list its record read, written back, loses a record written since; started again, it keeps the recipe loaded', () => {
@@ -519,4 +657,97 @@ test('Decent Sync: a Shot stored on the tablet joins the Location\'s Shots, with
     assert.equal(row.id, id);
     assert.equal(row.onThisTablet, true);
     assert.ok(row.duration > 10 && row.duration < 40, `a duration in seconds: ${row.duration}`);
+});
+
+// ── Decent Sync's plugin: the save into the Loaded Recipe ────────────────────
+
+/** A served fake with House espresso loaded as the page loads it; DYE2's pushes from then. */
+const servedHouse = () => houseLoaded(served);
+const stepDose = (fake, dose) => send(fake, 'PUT', '/api/v1/workflow', { context: { targetDoseWeight: dose } });
+
+test('Decent Sync save: a Workflow change with a Recipe loaded is saved into it at the next flush, and DYE2 pushes', () => {
+    const { fake, house, pushes } = servedHouse();
+    const mark = fake.log.length;
+    stepDose(fake, 18.5);
+    assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, 'nothing before the flush');
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, 'saved into the record');
+    assert.equal(houseRecord(fake).workflow.context.targetDoseWeight, 18.5);
+    assert.deepEqual(pushes, [{ what: 'workflow' }], 'DYE2 pushed on changed');
+    assert.deepEqual(fake.log.slice(mark).map(entry => `${entry.method} ${entry.path}`), ['PUT /api/v1/workflow'], 'the plugin\'s ask is not in the log');
+    // Two changes before a flush: one save covers both.
+    pushes.length = 0;
+    stepDose(fake, 19);
+    send(fake, 'PUT', '/api/v1/workflow', { context: { targetYield: 40 } });
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 19);
+    assert.equal(houseRecord(fake).dashboardVariables.drink, 40);
+    assert.deepEqual(pushes, [{ what: 'workflow' }], 'one save');
+});
+
+test('Decent Sync save: none for the change that loads a recipe, none after a change of profile, none with no recipe loaded', () => {
+    const fake = served();
+    const before = JSON.stringify(recordsOf(fake));
+    const house = houseRecord(fake);
+    // The apply moves the dose off the record's, and loads it: a load saves nothing.
+    send(fake, 'PUT', '/api/v1/workflow', { ...applied(house), context: { ...applied(house).context, targetDoseWeight: 21 } });
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before, 'a load');
+    // A change of profile, with the dose moved in the same write: DYE2 clears the recipe, the plugin saves nothing.
+    const other = recordsOf(fake).find(row => row.name === 'Single origin').workflow.profile;
+    send(fake, 'PUT', '/api/v1/workflow', { profile: other, context: { targetDoseWeight: 22 } });
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before, 'a change of profile');
+    assert.equal(fake.selection()?.kind === 'recipe' ? fake.selection().id : null, null, 'DYE2 cleared the recipe');
+    stepDose(fake, 23);
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before, 'no recipe loaded');
+});
+
+test('Decent Sync save: none for a recipe whose record carries no Recipe of the Location', () => {
+    const fake = served();
+    const house = houseRecord(fake);
+    const { decentSyncId: _dropped, ...local } = house;
+    send(fake, 'POST', '/api/v1/store/dye2.reaplugin/recipes', recordsOf(fake).map(row => (row.id === house.id ? local : row)));
+    send(fake, 'PUT', '/api/v1/workflow', applied(local));
+    fake.flush();
+    const before = JSON.stringify(recordsOf(fake));
+    stepDose(fake, 18.5);
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before);
+});
+
+test('Decent Sync save: none on a Capture-only Machine or with DYE2 disabled; saved on through an outage', () => {
+    for (const [what, make] of [
+        ['sharing off', fake => fake.decentSync.setSharing(false)],
+        ['Capture-only', fake => fake.decentSync.setState('captureOnly')],
+        ['DYE2 disabled', fake => fake.disableDye2()],
+    ]) {
+        const { fake, house } = servedHouse();
+        make(fake);
+        stepDose(fake, 18.5);
+        fake.flush();
+        assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, what);
+    }
+    const { fake } = servedHouse();
+    fake.decentSync.stopServer();
+    stepDose(fake, 18.5);
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, 'the server out of reach: the plugin keeps saving on the tablet');
+    // Sharing turned off while out of reach reaches the plugin only once it is connected.
+    fake.decentSync.setSharing(false);
+    stepDose(fake, 19);
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 19, 'it has not heard yet');
+    fake.decentSync.startServer();
+    stepDose(fake, 20);
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 19, 'heard on connecting: Capture-only');
+});
+
+test('Decent Sync save: a fake made without the plugin saves nothing on a Workflow change', () => {
+    const { fake, house } = houseLoaded();
+    stepDose(fake, 18.5);
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose);
 });

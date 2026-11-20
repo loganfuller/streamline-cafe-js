@@ -3,8 +3,9 @@
 // profile" and "Recipes and the strip"): the grinder, bean and basket dialogs
 // say a choice is saved to the recipe, and a bean other than the recipe's that
 // it changes the recipe's bean; a grinder, a batch of the recipe's own bean and
-// a basket are each one write of the Workflow and no DYE2 record, the plugin
-// being the one that saves them; a tap on the loaded card unloads it, at 1920
+// a basket are each one write of the Workflow and no DYE2 record of the page's,
+// the plugin being the one that saves them (DYE2 writes the grind setting and
+// the basket into the record; a batch is no field of DYE2's record); a tap on the loaded card unloads it, at 1920
 // by 1200 and at 1340 by 800, the column going from "saved to the recipe" to
 // "not saved to a recipe", and a step then reaches the Workflow alone; and the
 // profile dialog says "saved to the recipe" and lists the profiles sorted, the
@@ -51,6 +52,12 @@ const byTitle = title => PROFILES.find(entry => entry.profile?.title === title);
 
 /** Any write of DYE2's: its records and baskets in the store, its save and its record. */
 const isDye2Write = entry => entry.method !== 'GET' && (/^\/api\/v1\/store\/dye2\.reaplugin\//.test(entry.path) || /^\/api\/v1\/plugins\/dye2\.reaplugin\/(record|save-recipe)$/.test(entry.path));
+/** `record` as DYE2 leaves it once the plugin has had it save `fields`, with its stored Workflow's `context` and `extras` following. */
+const savedInto = (record, fields, context = {}, extras = {}) => ({
+    ...record,
+    dashboardVariables: { ...record.dashboardVariables, ...fields },
+    workflow: { ...record.workflow, context: { ...record.workflow.context, ...context, extras: { ...record.workflow.context.extras, ...extras } } },
+});
 const workflowWrites = entries => writes(entries).filter(({ write }) => write === 'PUT /api/v1/workflow');
 
 const under = page => page.locator('#cafe-pick-under');
@@ -91,7 +98,7 @@ async function openDialog(cafe, on) {
 test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () => {
     test.use({ decentSync: true });
 
-    test('the grinder dialog says the choice is saved to the recipe, and a choice is one Workflow write and no record', async ({ cafe, fake }) => {
+    test('the grinder dialog says the choice is saved to the recipe, and a choice is one Workflow write, which the plugin saves into the record', async ({ cafe, fake }) => {
         const record = await houseLoaded(cafe);
         const page = cafe.page;
         const second = fake.library.state.grinders.find(g => g.model === SECOND_GRINDER.model);
@@ -111,8 +118,9 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
             { write: 'PUT /api/v1/workflow', body: { context: { grinderId: second.id, grinderModel: SECOND_GRINDER.model, grinderSetting: GRINDER_USE.second.setting, extras: { rpm: GRINDER_USE.second.rpm } } } },
             profileOverride(fake, GRINDER_USE.second.setting),
         ]);
-        expect(cafe.since(mark, isDye2Write), 'no DYE2 record written: the plugin saves the choice').toEqual([]);
-        expect(recordOf(fake, house.name), 'the recipe\'s DYE2 record').toEqual(record);
+        expect(cafe.since(mark, isDye2Write), 'no DYE2 record written by the page: the plugin saves the choice').toEqual([]);
+        const grind = Number(GRINDER_USE.second.setting);
+        expect(recordOf(fake, house.name), 'the plugin had DYE2 save the grind setting into the record (DYE2 holds no grinder and no rpm the record lacks)').toEqual(savedInto(record, { grind }, { grinderSetting: String(grind) }));
         expect(loadedId(fake), 'the recipe stays loaded').toBe(record.id);
         await expect(page.locator('#cafe-dial-label')).toHaveText(SAVED_LABEL);
     });
@@ -162,11 +170,11 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
             { write: 'PUT /api/v1/workflow', body: { context: { beanBatchId: older.id, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } },
         ]);
         expect(cafe.since(chose, isDye2Write), 'and no DYE2 record: the plugin saves it').toEqual([]);
-        expect(recordOf(fake, house.name), 'the recipe\'s DYE2 record').toEqual(record);
+        expect(recordOf(fake, house.name), 'the recipe\'s DYE2 record: a batch is no field DYE2 saves').toEqual(record);
         expect(loadedId(fake), 'the recipe stays loaded').toBe(record.id);
     });
 
-    test('the basket dialog says the choice is saved to the recipe, and a choice is one Workflow write and no record', async ({ cafe, fake }) => {
+    test('the basket dialog says the choice is saved to the recipe, and a choice is one Workflow write, which the plugin saves into the record', async ({ cafe, fake }) => {
         const record = await houseLoaded(cafe);
         const page = cafe.page;
         const twenty = fake.store.get('dye2.reaplugin', 'baskets').find(b => b.name === '20 g sample basket');
@@ -184,8 +192,9 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
         expect(workflowWrites(cafe.since(mark)), 'one write of the basket\'s id and name').toEqual([
             { write: 'PUT /api/v1/workflow', body: { context: { extras: { basketId: twenty.id, basketName: '20 g sample basket' } } } },
         ]);
-        expect(cafe.since(mark, isDye2Write), 'and no DYE2 record').toEqual([]);
-        expect(recordOf(fake, house.name), 'the recipe\'s DYE2 record').toEqual(record);
+        expect(cafe.since(mark, isDye2Write), 'and no DYE2 record of the page\'s').toEqual([]);
+        const basket = { basketId: twenty.id, basketName: '20 g sample basket' };
+        expect(recordOf(fake, house.name), 'the plugin had DYE2 save the basket, id and name together').toEqual(savedInto(record, basket, {}, basket));
         expect(loadedId(fake), 'the recipe stays loaded').toBe(record.id);
     });
 
