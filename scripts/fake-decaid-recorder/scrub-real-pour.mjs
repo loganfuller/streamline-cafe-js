@@ -31,9 +31,15 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const SHOT_ID = '00000000-0000-4000-8000-0000000de1a1';
 const SERIAL = '10001';
 
-// The profile is kept whole, so it must be one of Decaid's own, whose title
-// and notes are Decent's, not the cafe's.
-if (raw.workflowBefore.profile?.author !== 'Decent') throw new Error(`the profile "${raw.workflowBefore.profile?.title}" is not one of Decaid's own; nothing written`);
+// The profile is kept whole, so it must be one Decaid ships, its title,
+// notes and author as Decaid's profile list has them (recordings/boot.json),
+// not the cafe's.
+const boot = JSON.parse(await readFile(join(ROOT, 'fake-decaid', 'recordings', 'boot.json'), 'utf8'));
+const bundled = boot.requests['GET /api/v1/profiles?includeHidden=true'].body.filter(entry => entry.metadata?.source === 'bundled').map(entry => entry.profile);
+const pulled = raw.workflowBefore.profile ?? {};
+if (!bundled.some(profile => ['title', 'notes', 'author'].every(key => profile[key] === pulled[key]))) {
+    throw new Error(`the profile "${pulled.title}" is not one Decaid ships, as its title, notes and author are; nothing written`);
+}
 
 const workflow = copy(simulated.workflowBefore);
 workflow.profile = copy(raw.workflowBefore.profile);

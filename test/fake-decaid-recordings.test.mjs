@@ -231,5 +231,6 @@ test('the real pour holds nothing of the machine it was taken on', () => {
     const { profile: _profile, ...sampleRest } = unnamed(committed('pour').workflowBefore);
     const asSet = workflow => ({ ...workflow, context: { ...workflow.context, targetDoseWeight: 0, targetYield: 0 } });
     assert.deepEqual(asSet(rest), asSet(sampleRest));
-    assert.equal(profile.author, 'Decent', 'one of Decaid\'s own profiles');
+    const bundled = committed('boot').requests['GET /api/v1/profiles?includeHidden=true'].body.filter(entry => entry.metadata?.source === 'bundled').map(entry => entry.profile);
+    assert.ok(bundled.some(shipped => ['title', 'notes', 'author'].every(key => shipped[key] === profile[key])), 'a profile Decaid ships, its title, notes and author as Decaid has them');
 });
