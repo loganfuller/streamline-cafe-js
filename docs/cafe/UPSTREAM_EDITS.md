@@ -67,7 +67,7 @@ Streamline's modules are otherwise unedited: the hook in `app.js`, the two in `d
 | `.github/workflows/release.yml` | A `main` build gets the id `streamline-cafe.js-dist`. Only the two cafe ids pass validation. The release zip is named `streamline-cafe.js-<tag>.zip`. |
 | `.github/workflows/release.yml` | A `main` build's version is stamped `<version>.dev.<run>.<sha>`, where Streamline stamps `<version>-dev.<sha>.<run>`. The skin's version compare reads nothing past a second `-`, and the fork's version already has one, so Streamline's stamp would make every `main` build compare equal. |
 | `.github/workflows/release.yml` | A `main` build's `SKIN_ID` is rewritten to the dist id. The running page looks itself up by `SKIN_ID` to see whether a newer build is on disk, so it has to carry the id it is installed under. |
-| `.github/workflows/static.yml` | GitHub Pages gets the built skin only (`index.html`, `skin-manifest.json`, `src`), where Streamline publishes the whole repository. |
+| `.github/workflows/static.yml` | GitHub Pages gets the public preview, staged by `node preview/stage.mjs _site`: the preview's own page at the root, the skin's page made from `index.html` with the stand-in added (`skin.html`), `src`, `preview/stand-in.js`, and `fake-decaid/` with the recordings the stand-in starts from (DESIGN.md, "The public preview"). Streamline publishes the whole repository. |
 
 ## Streamline's tests
 

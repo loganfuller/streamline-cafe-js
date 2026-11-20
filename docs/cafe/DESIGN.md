@@ -547,6 +547,19 @@ The screen's new text covers the languages Streamline supports.
 - A label a language makes too long for its place is shrunk to fit by Streamline's own text fitting, as its header buttons are.
 - A date is written in the page's language too.
 
+## The public preview
+
+The Pages site's root opens the skin's real main page in a desktop browser, with no Decaid anywhere, on made-up sample data (slice 8; #87 builds what it stands on, #88 the sample cafe). It needs a recent browser: the fake Decaid it runs leans on `Object.hasOwn`, `Array.prototype.at` and `String.prototype.isWellFormed`.
+
+- **What a visitor sees.** A bar, "Preview on sample data. No machine is connected.", with a link to the repository and "Start over", above the skin's page shown unchanged in a frame at a tablet's 16:10 shape, the largest the window holds. The bar and the frame are the preview's own page (`preview/index.html`); nothing is added to the skin's page, and the bar's English text is in no translation table.
+- **How the page reaches the model.** The frame's page, `skin.html`, is `index.html` with one line added: `preview/stand-in.js`, a classic script placed first, so it runs before any of the page's own scripts. `preview/stage.mjs` makes it from `index.html` each time the site is staged, so the two can't drift; the skin's files are served as they are. The stand-in replaces the browser's `fetch` and `WebSocket` for Decaid's address, port 8080 on the host `api.js` finds, and answers from one fake Decaid (`fake-decaid/`) made in the page from the recordings it starts from. Every other request, the page's own files among them, goes to the browser untouched. A service worker can't do this: the browser blocks a `http://` request from an https page before a worker sees it, and a worker never sees a socket.
+- **Why it is not a second connection stack.** The rule is that the skin's code reaches Decaid only through `api.js` and its socket helpers, and it still does: the stand-in stands beneath them, where the network would be, on the preview's page only. No module of the skin knows it is there, and no file of Streamline's has a hook for it. A transport switch inside `api.js` was turned down: it needed hooks in three to five of Streamline's files, and would ship to tablets.
+- **The clock.** The fake keeps no timers, so the stand-in keeps them for it, as the page tests' adapter does: it gives the fake the page's time before each request, the visitor's own clock and zone; has the machine send its frames at rest every half second; and sends what the sockets have waiting only after the page has read the answer that caused it (or 50 ms on, for an answer the page never reads). The fake's request log is kept to its last 200 entries.
+- **The sample machine.** It says it has its own buttons, as a DE1Pro does, so the page draws no Coffee, Water, Steam, Flush or Stop buttons and puts Settings, Shots and Sleep under the dial-in column. The sample Shots are dated from the visitor's clock, the newest an hour before the page opened.
+- **What the model can't answer is quiet.** A request gets "not found" (404) and a socket is refused, as a Decaid without it would; each is named once on the console, and nothing is shown on the page or sent to the network.
+- **Each visit starts fresh.** `github.io` storage is shared by every Pages site of the account, so the preview never clears the whole origin's. As the page writes, the stand-in notes each `localStorage` and `sessionStorage` key and each IndexedDB database the skin uses, under keys of its own; at the next start it clears those, and the skin's history database, before the page reads anything, then sets what the page needs (DYE2 turned on). "Start over" is a reload.
+- **Nothing of it ships.** The stand-in and its page live in `preview/`, beside `fake-decaid/`, outside `src/`, and only the Pages workflow copies either. `test/cafe-builds.test.mjs` holds the release's and the `dist` build's file list to `index.html`, `skin-manifest.json` and `src`, and fails if anything in them names either folder.
+
 ## Tests
 
 Three layers, all of them run by every pull request but the real stack's journeys and its fresh recording ([`TESTING.md`](TESTING.md) says how each works and how to run it):
@@ -561,7 +574,7 @@ What no layer can show stays a check on a real tablet: its WebView, a real soft 
 
 - **Release.** A zip per tag. Installing one release's zip by URL pins a tablet to it.
 - **`dist`.** A build of every push to `main`, under the id `streamline-cafe.js-dist`. A tablet that installs the `dist` branch follows every push.
-- **GitHub Pages.** The built skin from `main`, and a public preview with sample data that needs no Decaid (slice 8).
+- **GitHub Pages.** The public preview, from every push to `main`: the preview's page at the site's root, the skin's page made from `index.html` with the stand-in added, `src/`, the stand-in, and the fake Decaid with the recordings it starts from ([The public preview](#the-public-preview)). The plain `index.html` has no address of its own, and Pages is no install source.
 
 At a Location on Decent Sync, the skin needs Decaid v0.9.2 or later, DYE2 v0.1.40 or later, and a Decent Sync release that follows the Streamline version the skin is built on.
 

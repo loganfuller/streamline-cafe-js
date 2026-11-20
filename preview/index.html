@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  The public preview's own page, the Pages site's root (docs/cafe/DESIGN.md,
+  "The public preview"). It holds the bar and, under it, the skin's page in a
+  frame at a tablet's 16:10 shape. The frame's page is index.html with the
+  stand-in added first (preview/stage.mjs); nothing here is part of the skin.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Streamline Cafe preview</title>
+    <link rel="icon" href="data:,">
+    <style>
+        :root {
+            --bar-bg: #1f2328;
+            --bar-text: #f0f2f4;
+            --bar-muted: #b8c0c8;
+            --bar-accent: #8ab4f8;
+            --around: #0d1013;
+            color-scheme: dark;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            display: flex;
+            flex-direction: column;
+            background: var(--around);
+            font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+        #preview-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 18px;
+            padding: 8px 16px;
+            background: var(--bar-bg);
+            color: var(--bar-text);
+        }
+        #preview-bar p { margin: 0; flex: 1 1 auto; }
+        #preview-bar a { color: var(--bar-accent); }
+        #preview-bar button {
+            font: inherit;
+            color: var(--bar-text);
+            background: transparent;
+            border: 1px solid var(--bar-muted);
+            border-radius: 6px;
+            padding: 3px 12px;
+            cursor: pointer;
+        }
+        #preview-bar button:hover { background: rgba(255, 255, 255, 0.08); }
+        #preview-stage {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: grid;
+            place-items: center;
+            container-type: size;
+        }
+        /* The largest 16:10 the space under the bar holds. */
+        #preview-skin {
+            display: block;
+            width: min(100cqw, 100cqh * 16 / 10);
+            aspect-ratio: 16 / 10;
+            border: 0;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <header id="preview-bar">
+        <p>Preview on sample data. No machine is connected.</p>
+        <a href="https://github.com/loganfuller/streamline-cafe-js" target="_blank" rel="noopener">Repository</a>
+        <button type="button" id="preview-start-over">Start over</button>
+    </header>
+    <main id="preview-stage">
+        <iframe id="preview-skin" src="skin.html" title="Streamline Cafe" allow="fullscreen"></iframe>
+    </main>
+    <script>
+        // Each visit starts fresh (preview/stand-in.js), so starting over is a reload.
+        document.getElementById('preview-start-over').addEventListener('click', () => location.reload());
+    </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ Layers, each answering a different question.
 |---|---|---|---|
 | Unit tests | Pure modules, under `node:test` | `test/*.test.mjs` | `npm test`, every pull request (Node 22, 24 and 26) |
 | Page tests | The real page in Chromium, against a fake Decaid | `test/page/*.spec.mjs` | `npm run test:page`, every pull request (Node 26) |
+| The preview's page test | The Pages site as the workflow stages it, the fake Decaid running in the page | `test/page/preview.spec.mjs` | With the page tests |
 | The real stack, pinned | The scenarios behind each rule the fake follows, recorded from the real Decaid, DYE2 and Decent Sync, replayed against the fake | `fake-decaid/recordings/`, replayed by `test/fake-decaid-recordings.test.mjs` | Replayed in `npm test`; recorded again on a version bump |
 | The real pour | One pour on a real DE1Pro with a real scale, for the weighted comparison row | `fake-decaid/recordings/real/`, replayed by `test/fake-decaid-recordings.test.mjs` | Replayed in `npm test`; captured by hand with the owner |
 | The real journeys | The real page against the real pinned stack, for what only it can show | `test/real/*.spec.mjs` | `npm run test:real`; in the real-stack workflow on a pull request that changes the pins, the recorder or the journeys, before a release tag, on demand, and weekly against the newest stable releases |
@@ -32,7 +33,7 @@ npx playwright test --repeat-each=20                  # look for a flaky one
 CAFE_TZ=Asia/Tokyo npx playwright test                # in a zone other than UTC
 ```
 
-Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`, `@shot`, `@fullscreen`, `@menu`, `@languages`, `@grinder`, `@touch`, `@dialogs`, `@grind`, `@bean`, `@barista`, `@unload`, `@profile`, `@reference`, `@remarks`, `@legend`, `@sync`, `@lastshot`, `@shots`, and with Decent Sync serving `@sync-reference`, `@sync-pushes`, `@sync-remarks`, `@sync-outage`, `@sync-capture`, `@sync-shots`, `@sync-shots-outage` and `@sync-picks`, and `@preheat`, `@profile-dialog` and `@live-labels`. A failure keeps its trace, screenshot and page snapshot in `test/page/out/results/` (`npx playwright show-trace <path>/trace.zip` opens a trace). The CI job uploads that folder when a test fails.
+Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`, `@shot`, `@fullscreen`, `@menu`, `@languages`, `@grinder`, `@touch`, `@dialogs`, `@grind`, `@bean`, `@barista`, `@unload`, `@profile`, `@reference`, `@remarks`, `@legend`, `@sync`, `@lastshot`, `@shots`, and with Decent Sync serving `@sync-reference`, `@sync-pushes`, `@sync-remarks`, `@sync-outage`, `@sync-capture`, `@sync-shots`, `@sync-shots-outage` and `@sync-picks`, and `@preheat`, `@profile-dialog`, `@live-labels` and `@preview`. A failure keeps its trace, screenshot and page snapshot in `test/page/out/results/` (`npx playwright show-trace <path>/trace.zip` opens a trace). The CI job uploads that folder when a test fails.
 
 ## How a page test works
 
@@ -51,9 +52,13 @@ Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`,
 - **Sockets.** `cafe.routes.opened` lists the path of every socket the page opened, in order, a reopened one again; `cafe.routes.sockets` holds those open now. `await cafe.routes.drop(path)` closes the sockets open to `path` from Decaid's side, and the page reopens them on its own timer, which `cafe.advance` moves.
 - **How the chart was drawn.** `watchDraws(page)`, then the frames played (`cafe.pour`), then `drawCounts(page)`: the frames appended to the chart's first line and the times it was given lines in full.
 
+## The preview's page test
+
+`test/page/preview.spec.mjs` runs with the page tests, but has no adapter and no route to a fake in Node: it checks the public preview as Pages serves it. It stages the site with `preview/stage.mjs`, the script the Pages workflow runs, into `test/page/out/preview-site-<worker>/`, serves it under a project path through a route (`support/preview-site.mjs`), at a Pages-like https address and at a local one, and opens its root. The fake Decaid runs in the page, through the stand-in (DESIGN.md, "The public preview"), and the test reads it through `window.cafePreview.ready`. Every request and socket that leaves the page is kept and refused, and the test fails naming it, as it does on an error on the page. It moves the page's clock as the page tests do, and the stand-in's own timers run on it.
+
 ## The fake Decaid
 
-`fake-decaid/` is a plain model of what Decaid, DYE2 and the simulated machine hold, which answers a request as the real ones would. It keeps no timers and uses no Node API (`test/fake-decaid.test.mjs` checks both), so the public preview (#9) can load it in a page. No build copies it to a tablet: a release takes `index.html`, `skin-manifest.json` and `src/` only.
+`fake-decaid/` is a plain model of what Decaid, DYE2 and the simulated machine hold, which answers a request as the real ones would. It keeps no timers and uses no Node API (`test/fake-decaid.test.mjs` checks both), so the public preview loads it in a page, through the stand-in that keeps its timers there (DESIGN.md, "The public preview"). No build copies it to a tablet: a release takes `index.html`, `skin-manifest.json` and `src/` only, which `test/cafe-builds.test.mjs` holds.
 
 | File | What it keeps | Read from |
 |---|---|---|

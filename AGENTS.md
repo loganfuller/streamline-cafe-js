@@ -70,6 +70,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 - Leave a part of the screen out until its slice builds it, so every control on the page does something.
 - For a change to the main page, run the page tests ([`docs/cafe/TESTING.md`](docs/cafe/TESTING.md)) and put the screenshots they write in the pull request's description from the moment it opens. A new slice writes its closing check as page tests against the fake Decaid. A change to what the page writes to Decaid, DYE2 or Decent Sync's plugin also runs the real journeys that cover it (`npm run test:real`, TESTING.md's "The real journeys"); a pull request that changes the pins, the recorder or the journeys gets the real-stack workflow on its own. A change to what the fake Decaid does adds or records again the scenario that backs it. Sample data is made up: no cafe's names, beans or recipes.
 - Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.
+- The public preview (`preview/`) answers the page from the fake Decaid through a stand-in that replaces `fetch` and `WebSocket` beneath `api.js`, on the preview's own page only. That is not a second connection stack, and it gets no hook in `src/`. Nothing a release or the `dist` build ships may name `preview/` or `fake-decaid/` (`test/cafe-builds.test.mjs`).
 - Do not open issues or pull requests on `decentespresso` repositories from work on this fork.
 
 ### Design sections by area
