@@ -132,6 +132,14 @@ async function serverStopped(cafe, fake) {
 }
 
 /** The server back: its connection pushed, and the page's asks after it answered. */
+/**
+ * The status the plugin answers now, asked of the fake and not by the page: in
+ * the catch-up race it already says served while `shots` and `shot` refuse.
+ * (A page open through the outage keeps "saved to the recipe" all along, so
+ * its label can't show it.)
+ */
+const pluginStatus = fake => fake.request({ method: 'GET', url: `${PLUGIN}/status` }).status;
+
 async function serverBack(cafe, fake) {
     fake.decentSync.startServer();
     fake.flush();
@@ -287,7 +295,7 @@ test.describe('the Location\'s Shots while Decent Sync can\'t be reached', { tag
         await cafe.settle();
         fake.refuse({ method: 'GET', path: /\/plugins\/decent-sync\.reaplugin\/shots/, status: 503, body: UNREACHABLE, times: 1 });
         await serverBack(cafe, fake);
-        expect(await page.locator('#cafe-dial-label').textContent(), 'the status says served').toBe('Dial-in · saved to the recipe');
+        expect(pluginStatus(fake), 'the plugin\'s status says served').toBe(200);
 
         let mark = fake.log.length;
         await openList(cafe);
@@ -323,7 +331,7 @@ test.describe('the Location\'s Shots while Decent Sync can\'t be reached', { tag
         fake.refuse({ method: 'GET', path: /\/plugins\/decent-sync\.reaplugin\/shot\?/, status: 503, body: UNREACHABLE, times: 2 });
         const mark = fake.log.length;
         await serverBack(cafe, fake);
-        await expect(page.locator('#cafe-dial-label')).toHaveText('Dial-in · saved to the recipe');
+        expect(pluginStatus(fake), 'the plugin\'s status says served').toBe(200);
         await expect.poll(() => cafe.since(mark, isWholeRead(C)).map(entry => entry.status), 'read again as the connection came back, and refused').toEqual([503]);
         await cafe.settle();
         expect(await legend(page), 'so still muted, with the line').toMatchObject({ label: 'Viewing', muted: true, notice: SHOT_CANT_CHANGE });

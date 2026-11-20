@@ -66,7 +66,9 @@
 // from its samples, recorded for the recorded Shots and false for one stored
 // during a test; a rename reaching DYE2's record (the plugin writes it a poll
 // later); the Library's sync (the records it leaves are recorded); a slot
-// changed; Shots of another Location chosen as a Reference Shot.
+// changed; Shots of another Location chosen as a Reference Shot; what the
+// server does with a Shot stored while it refuses the Machine (the model
+// lists it nowhere).
 
 import { copy, isObject } from './workflow.js';
 import { localTime } from './machine.js';
@@ -206,6 +208,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     const others = new Map((server.others || []).map(other => [other.shot.id, { ...copy(other), shot: moved(copy(other.shot)) }]));
     /** The tablet's copies, for each Recipe in a slot: the reference as last pushed, by Recipe id. */
     const copies = new Map();
+    /** The tablet's Shots stored while the server was out of reach, which the plugin reports once it is back. */
+    const unreported = new Set();
 
     const records = () => {
         const list = decaid.store.get(DYE2_NAMESPACE, 'recipes');
@@ -281,11 +285,13 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         };
     }
 
-    // The copies follow the server while connected: one that changed or came
-    // new is kept, and its Recipe pushed (`keep` in reference-copies.ts). The
-    // fake starts with them held, as a plugin connected before.
+    // The copies follow the server while it serves the Machine: one that
+    // changed or came new is kept, and its Recipe pushed (`keep` in
+    // reference-copies.ts). A Machine not served has no slots, so it gets
+    // none; what changed meanwhile comes once it is served again. The fake
+    // starts with them held, as a plugin connected before.
     function refreshCopies({ quiet = false } = {}) {
-        if (!connected() || state === 'serverTooOld') return;
+        if (!servedNow()) return;
         for (const recipe of recipes.values()) {
             if (!recipe.slot) { copies.delete(recipe.id); continue; }
             const now = JSON.stringify(referenceAnswer(recipe));
@@ -420,9 +426,17 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 default: return null;
             }
         },
-        /** A Shot the tablet stored: it joins the Location's Shots while the Machine is at it. */
+        /**
+         * A Shot the tablet stored: it joins the Location's Shots while the
+         * Machine is served at it; stored while the server is out of reach,
+         * once the plugin reports it, as the connection comes back. In any
+         * other state (a Machine at no Location, or one the server refuses)
+         * it joins no Location's.
+         */
         shotStored(id) {
-            if (state !== 'unreachable' && sharing && !own.has(id)) own.set(id, { unfinished: false });
+            if (!sharing || own.has(id)) return;
+            if (state === 'served') own.set(id, { unfinished: false });
+            else if (state === 'unreachable') unreported.add(id);
         },
         /** A Shot of the tablet's own changed in Decaid: the copies follow. */
         ownShotChanged() {
@@ -439,6 +453,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
             startServer() {
                 if (state !== 'unreachable') return;
                 state = 'served';
+                for (const id of unreported) if (!own.has(id)) own.set(id, { unfinished: false });
+                unreported.clear();
                 announce({ what: 'connection', connected: true });
                 refreshCopies();
             },

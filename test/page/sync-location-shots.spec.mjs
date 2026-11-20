@@ -8,15 +8,17 @@
 // list at 1340 by 800; another Machine's Shot opened, read whole through the
 // plugin, with its recipe's Reference Shot behind it and a legend naming who
 // and never where; rated and noted through the plugin; the kept list showing
-// the edits, and the list read afresh showing them; Make reference on it, and
-// a reference chosen on the server followed while it is still opened; and the
+// the edits, and the list read afresh showing them; its edits refused, with a
+// reason or as out of reach, while the page has the Machine served; Make
+// reference on it, and a reference chosen on the server followed while it is
+// still opened; and the
 // next page of the Location's list read by the plugin's cursor, past fifty
 // Shots counted at the Location with `fake.decentSync.atLocation`.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
 // Machine at "Sample Cafe" from recordings/decent-sync.json. Its four Shots at
 // the Location are labelled there: A and B this tablet's, C and D "Sample
-// Machine Two"'s, D Unfinished. No Recipe has a Reference Shot at the start,
+// Machine Two"'s, B and D Unfinished. No Recipe has a Reference Shot at the start,
 // so each test chooses A as House espresso's on the server before the page
 // opens: the chip has a row, and C, of House espresso too, opens with a
 // reference behind it.
@@ -36,6 +38,7 @@ import { recordOf } from './support/fake-reads.mjs';
 import { recording } from './support/adapter.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { localTime } from '../../fake-decaid/index.js';
+import { REFUSALS } from '../../fake-decaid/decent-sync.js';
 
 const [house] = RECIPES;
 const { A, B, C, D } = recording('decent-sync').labels;
@@ -121,6 +124,8 @@ const shotsDrawn = (page, parts) => page.evaluate(selectors => {
 const pluginListReads = (cafe, mark) => cafe.since(mark, entry => entry.method === 'GET' && entry.path === `${PLUGIN}/shots`).map(entry => entry.search);
 /** The page's reads of Decaid's own list of 50 since `mark`. */
 const decaidListReads = (cafe, mark) => cafe.since(mark, entry => entry.method === 'GET' && entry.path === '/api/v1/shots' && new URLSearchParams(entry.search).get('limit') === '50');
+/** A read of the Shot `id` whole, through the plugin. */
+const isWholeRead = id => entry => entry.method === 'GET' && entry.path === `${PLUGIN}/shot` && new URLSearchParams(entry.search).get('id') === id;
 /** Every edit of a Shot since `mark`, through the plugin or Decaid's own: "PUT path?query" and its body. */
 const shotEdits = (cafe, mark) => cafe.since(mark, entry => entry.method === 'PUT' && (entry.path === `${PLUGIN}/shot` || entry.path.startsWith('/api/v1/shots')))
     .map(({ method, path, search, body }) => ({ edit: `${method} ${path}${search}`, body }));
@@ -270,6 +275,42 @@ test.describe('the Location\'s Shots with Decent Sync serving', { tag: '@sync-sh
         expect(pluginListReads(cafe, mark), 'read afresh, once').toEqual(['?limit=50']);
         rowOf = (await listRows(page)).find(item => item.id === C);
         expect(rowOf, 'showing the edits').toMatchObject({ stars: 4, note: true, current: false });
+    });
+
+    test('another Machine\'s Shot whose rating the plugin refuses: a refusal with a reason shows it and puts the stars back; `unreachable` is read again through the plugin', async ({ cafe, fake }) => {
+        // The tablet's own Shot is written through Decaid whatever the server,
+        // so only another Machine's edit can come back `captureOnly` or
+        // `unreachable` while the page still has the Machine served.
+        const page = await openServed(cafe, fake);
+        await openList(cafe);
+        await openRow(cafe, C, 'Viewing');
+        const edit = /^\/api\/v1\/plugins\/decent-sync\.reaplugin\/shot\?id=/;
+        const refuse = code => fake.refuse({ method: 'PUT', path: edit, status: REFUSALS[code].status, body: { code, message: REFUSALS[code].message } });
+        const ratingOfC = () => fake.decentSync.others().find(other => other.shot.id === C).shot.annotations?.enjoyment;
+
+        let mark = fake.log.length;
+        let allow = refuse('captureOnly');
+        await page.locator('#cafe-stars .cafe-star').nth(3).click();
+        await expect(page.locator('#app-toast-message'), 'the plugin\'s own message').toHaveText(REFUSALS.captureOnly.message);
+        await expect.poll(() => remarks(page).then(shown => shown.stars), 'the stars go back').toEqual([0, 0, 0, 0, 0]);
+        allow();
+        await cafe.settle();
+        expect(cafe.since(mark, entry => entry.method === 'GET' && entry.path === `${PLUGIN}/status`).length, 'a refusal that says the Machine is not served has the status asked again').toBeGreaterThan(0);
+        expect(cafe.since(mark, isWholeRead(C)), 'and the Shot is not read again').toEqual([]);
+        expect(ratingOfC()).toBeUndefined();
+
+        await cafe.advance(5000);
+        await expect(page.locator('#app-toast')).toBeHidden();
+        mark = fake.log.length;
+        allow = refuse('unreachable');
+        await page.locator('#cafe-stars .cafe-star').nth(2).click();
+        await expect(page.locator('#app-toast-message'), 'nothing in the answer to show, so the page\'s own words').toHaveText('The rating could not be saved');
+        await expect.poll(() => remarks(page).then(shown => shown.stars), 'the read found it unrated, so the stars go back').toEqual([0, 0, 0, 0, 0]);
+        allow();
+        expect(cafe.since(mark, isWholeRead(C)).map(entry => entry.status), 'read again through the plugin, which holds it').toEqual([200]);
+        expect(shotEdits(cafe, mark), 'one edit, to the plugin').toEqual([{ edit: `PUT ${PLUGIN}/shot?id=${C}`, body: { rating: 6 } }]);
+        expect(ratingOfC()).toBeUndefined();
+        await expect(page.locator('#cafe-dial-label'), 'the Machine is still served').toHaveText('Dial-in · saved to the recipe');
     });
 
     test('Make reference on another Machine\'s Shot, then a reference chosen on the server followed while it is still opened', async ({ cafe, fake }) => {

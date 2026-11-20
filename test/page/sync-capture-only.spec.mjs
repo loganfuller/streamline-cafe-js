@@ -19,7 +19,9 @@
 // server's reference and the tablet's are told apart on the page. The tablet's
 // choice, in Decaid's store, is Shot B (this tablet's, Single origin, another
 // Profile than House espresso's, "Sample Barista"). House espresso's latest is
-// Shot A. Sharing changes push nothing: the page hears it only by asking.
+// Shot A. Sharing turned off pushes nothing, so the page hears it only by
+// asking; turned on again, every slotted Recipe's reference is pushed, which
+// may bring the server's Reference Shot before the next ask does.
 //
 // What stays in the real journey: that the server takes the Machine's sharing
 // off and on (`PUT /machines/<id>/sharing`) and the plugin's Status follows it,

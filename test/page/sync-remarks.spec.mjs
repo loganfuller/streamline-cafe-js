@@ -8,7 +8,11 @@
 // the chart not drawn again, and its note opens to read. And the plugin's
 // refusals of an edit: one with a reason shows the plugin's message and puts
 // the stars back; `shotUnwritten` and `unreachable` are read again first, and
-// one that was made after all is shown as made, with no toast.
+// one that was made after all is shown as made, with no toast. The plugin
+// writes the tablet's own Shot through Decaid whatever the server, so it never
+// refuses one `captureOnly` or `unreachable`: those are injected here to try
+// the page's handling, which is the same for every Shot. Another Machine's
+// Shot refused so, as can happen, is sync-location-shots.spec.mjs's.
 //
 // The plugin is the fake's (fake-decaid/decent-sync.js), serving the Machine
 // from recordings/decent-sync.json. House espresso's latest Shot on this

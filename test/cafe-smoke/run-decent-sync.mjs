@@ -66,6 +66,8 @@ const PLUGIN = 'decent-sync.reaplugin';
 const PLUGIN_REPO = 'loganfuller/decent-sync';
 const LOCATION = 'Sample Cafe';
 const MACHINE = 'Sample Machine';
+// The tablet's own choice of reference, which a served Machine never reads.
+const REFERENCES = '/store/streamlineCafe/references';
 const MACHINE_2 = 'Sample Machine Two';
 
 const docker = (...command) => promisify(execFile)('docker', command);
@@ -997,8 +999,11 @@ try {
     check('a Machine that turns Capture-only reads "Dial-in · not saved to the recipe" at the next recipe load', (await label(page)) === 'Dial-in · not saved to the recipe', await label(page));
     await page.locator('#cafe-make-reference').click();
     await page.locator('#cafe-reference-dialog-replace').click({ timeout: 5000 }).catch(() => {});
-    await waitLegend(page, l => l.badge !== null);
-    check('and Make reference there leaves the server\'s Reference Shot as it was', (await referenceOnServer(house)) === first.id, await referenceOnServer(house));
+    //    The tap made on the page (kept on the tablet, as sync-capture-only.spec
+    //    checks in full), so the server's Reference Shot unchanged is the plugin's doing.
+    const madeThere = await waitLegend(page, l => l.badge !== null);
+    check('there Make reference keeps the choice on the tablet', !!madeThere && (await decaid('GET', REFERENCES))?.[house.recordId] === second.id, JSON.stringify(await decaid('GET', REFERENCES)));
+    check('and leaves the server\'s Reference Shot as it was', (await referenceOnServer(house)) === first.id, await referenceOnServer(house));
 
     //    Served again.
     await sync('PUT', `/machines/${machine.id}/sharing`, { sharing: true });

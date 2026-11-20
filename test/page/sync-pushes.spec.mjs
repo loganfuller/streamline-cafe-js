@@ -12,8 +12,8 @@
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving
 // the Machine at "Sample Cafe" from recordings/decent-sync.json, where no
-// Recipe has a Reference Shot at the start. Shot A is this tablet's newest,
-// pulled with House espresso, so it is the graph's "Latest"; Shot B is this
+// Recipe has a Reference Shot at the start. Shot A is this tablet's latest
+// with House espresso, so it is the graph's "Latest" once that is loaded; Shot B is this
 // tablet's too, on another Profile, by "Sample Barista". What the server does
 // (`fake.decentSync.chooseReference`, `renameRecipe`) pushes on the plugin's
 // `changes` socket, delivered at the next flush.

@@ -471,6 +471,34 @@ test('Decent Sync: what the server does reaches the page as pushes; a plugin nev
     assert.equal(coldPushes.filter(p => p.what === 'reference').length, decentSync.server.recipes.filter(r => r.slot).length, 'each copy comes, and is pushed');
 });
 
+test('Decent Sync: a Machine not served holds no copy and hears no push of what the server does', () => {
+    const fake = served();
+    const pushes = pushesOf(fake);
+    const house = houseRecord(fake).id;
+    fake.decentSync.setSharing(false);
+    fake.decentSync.chooseReference(house, C);
+    fake.decentSync.renameRecipe(house, 'House espresso renamed');
+    fake.flush();
+    assert.deepEqual(pushes, [], 'sharing off, nothing is pushed');
+    fake.decentSync.stopServer();
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=${house}`).status, 503, 'and out of reach there is no copy to answer from');
+    fake.decentSync.startServer();
+    fake.decentSync.setSharing(true);
+    fake.flush();
+    assert.equal(pushes.filter(p => p.what === 'reference').length, decentSync.server.recipes.filter(r => r.slot).length, 'sharing on again, every copy comes');
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=${house}`).body.reference.shot.id, C, 'with what was chosen meanwhile');
+});
+
+test('Decent Sync: a Shot stored while the server is out of reach joins the Location\'s Shots once it is back', () => {
+    const fake = served();
+    fake.decentSync.stopServer();
+    fake.startPour();
+    fake.finishPour();
+    const id = fake.storeShot();
+    fake.decentSync.startServer();
+    assert.equal(get(fake, `${PLUGIN}/shots?limit=1`).body.shots[0].id, id);
+});
+
 test('Decent Sync: a Shot stored on the tablet joins the Location\'s Shots, with its duration past the Preheat', () => {
     const fake = served();
     fake.startPour();
