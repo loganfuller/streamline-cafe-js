@@ -175,14 +175,18 @@
     const opened = [];
     let fake = null;
     let flushing = null;
+    // Answers handed to the page and not yet read (nor given up on). Nothing
+    // is sent while any is waiting, since the fake's sockets send all they
+    // have at once, the push an unread answer caused among it.
+    let unread = 0;
 
     // Sends what the sockets have waiting, in a task of its own, after
     // whatever caused it has been delivered.
     function flushSoon() {
-        if (flushing !== null) return;
+        if (flushing !== null || unread > 0) return;
         flushing = setTimeout(() => {
             flushing = null;
-            fake.flush();
+            if (unread === 0) fake.flush();
         }, 0);
     }
 
@@ -255,17 +259,23 @@
             status,
             headers: { 'content-type': 'application/json' },
         });
-        const timer = setTimeout(flushSoon, UNREAD_ANSWER_MS);
+        unread += 1;
+        let waiting = true;
+        const settle = () => {
+            if (!waiting) return;
+            waiting = false;
+            unread -= 1;
+            clearTimeout(timer);
+            flushSoon();
+        };
+        const timer = setTimeout(settle, UNREAD_ANSWER_MS);
         for (const read of ['json', 'text', 'arrayBuffer', 'blob']) {
             const own = Response.prototype[read];
             Object.defineProperty(response, read, {
                 configurable: true,
                 writable: true,
                 value() {
-                    return own.call(this).finally(() => {
-                        clearTimeout(timer);
-                        flushSoon();
-                    });
+                    return own.call(this).finally(settle);
                 },
             });
         }

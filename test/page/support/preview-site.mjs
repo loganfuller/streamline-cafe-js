@@ -4,12 +4,12 @@
 // other request and socket is kept and refused, so a test can say none was
 // made: the preview has no adapter and no route to a fake in Node.
 
+import { mkdtempSync, rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
 import { stage } from '../../../preview/stage.mjs';
-
-const ROOT = join(import.meta.dirname, '..', '..', '..');
 
 /** Where the site is served: a Pages-like https address, and a local http one with Decaid's port beside it. */
 export const SITES = {
@@ -33,9 +33,17 @@ const TYPES = {
     '.mp3': 'audio/mpeg',
 };
 
-/** Stages the site into a folder of the worker's own, as the workflow does. */
-export function stageSite(worker) {
-    return stage(join(ROOT, 'test', 'page', 'out', `preview-site-${worker}`));
+/**
+ * Stages the site into a new temporary folder of the worker's own, as the
+ * workflow does, so two runs at once never stage over each other's. The
+ * caller removes it (`removeSite`).
+ */
+export function stageSite() {
+    return stage(mkdtempSync(join(tmpdir(), 'cafe-preview-site-')));
+}
+
+export function removeSite(root) {
+    rmSync(root, { recursive: true, force: true });
 }
 
 /**

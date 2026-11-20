@@ -54,7 +54,7 @@ Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`,
 
 ## The preview's page test
 
-`test/page/preview.spec.mjs` runs with the page tests, but has no adapter and no route to a fake in Node: it checks the public preview as Pages serves it. It stages the site with `preview/stage.mjs`, the script the Pages workflow runs, into `test/page/out/preview-site-<worker>/`, serves it under a project path through a route (`support/preview-site.mjs`), at a Pages-like https address and at a local one, and opens its root. The fake Decaid runs in the page, through the stand-in (DESIGN.md, "The public preview"), and the test reads it through `window.cafePreview.ready`. Every request and socket that leaves the page is kept and refused, and the test fails naming it, as it does on an error on the page. It moves the page's clock as the page tests do, and the stand-in's own timers run on it.
+`test/page/preview.spec.mjs` runs with the page tests, but has no adapter and no route to a fake in Node: it checks the public preview as Pages serves it. It stages the site with `preview/stage.mjs`, the script the Pages workflow runs, into a temporary folder of the worker's own, removed when the worker ends, serves it under a project path through a route (`support/preview-site.mjs`), at a Pages-like https address and at a local one, and opens its root. The fake Decaid runs in the page, through the stand-in (DESIGN.md, "The public preview"), and the test reads it through `window.cafePreview.ready`. Every request and socket that leaves the page is kept and refused, and the test fails naming it, as it does on an error on the page. It moves the page's clock as the page tests do, and the stand-in's own timers run on it.
 
 ## The fake Decaid
 

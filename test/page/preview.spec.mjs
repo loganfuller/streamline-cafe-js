@@ -13,7 +13,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test as base, expect } from 'playwright/test';
 
-import { SITES, FAVICON_ORIGIN, serveSite, stageSite } from './support/preview-site.mjs';
+import { SITES, FAVICON_ORIGIN, removeSite, serveSite, stageSite } from './support/preview-site.mjs';
 import { SCREENSHOTS } from './support/test.mjs';
 import { legend } from './support/page-reads.mjs';
 import { RECIPES } from './support/sample-data.mjs';
@@ -95,8 +95,10 @@ class Preview {
 }
 
 const test = base.extend({
-    site: [async ({}, use, workerInfo) => {
-        await use(stageSite(workerInfo.workerIndex));
+    site: [async ({}, use) => {
+        const root = stageSite();
+        await use(root);
+        removeSite(root);
     }, { scope: 'worker' }],
     /** Which address the site is served at (support/preview-site.mjs, SITES). */
     origin: ['local', { option: true }],
@@ -326,6 +328,35 @@ test.describe('the preview', { tag: '@preview' }, () => {
         await preview.advance(6000);
         expect(await count(), 'the page opened the socket again').toBeGreaterThan(before);
         await expect(frame.locator('#machine-status')).toHaveText('Ready');
+    });
+
+    test('a push waits for its own answer to be read, not only for another\'s', async ({ preview }) => {
+        const frame = await preview.open();
+        await frame.evaluate(async () => {
+            const order = window.__order = [];
+            const ws = new WebSocket(`ws://${location.hostname}:8080/ws/v1/machine/snapshot`);
+            await new Promise(resolve => { ws.onmessage = resolve; });
+            ws.onmessage = event => { if (JSON.parse(event.data).state?.state === 'sleeping' && !order.includes('push')) order.push('push'); };
+        });
+        // The clock held, so only the steps below run the stand-in's timers.
+        await preview.page.clock.pauseAt(await frame.evaluate(() => Date.now()) + 1000);
+        await frame.evaluate(async () => {
+            const host = `${location.hostname}:8080`;
+            window.__unread = await fetch(`http://${host}/api/v1/machine/state/sleeping`, { method: 'PUT' });
+            window.__order.push('answer');
+            await (await fetch(`http://${host}/api/v1/machine/info`)).json();
+            window.__order.push('other read');
+        });
+        // Short of the 50 ms an unread answer is waited for.
+        await preview.page.clock.runFor(20);
+        expect(await frame.evaluate(() => window.__order.join(' ')), 'no push while the answer that caused it is unread')
+            .toBe('answer other read');
+        await frame.evaluate(async () => {
+            await window.__unread.json();
+            window.__order.push('read');
+        });
+        await preview.page.clock.runFor(20);
+        await expect.poll(() => frame.evaluate(() => window.__order.join(' '))).toBe('answer other read read push');
     });
 
     test('a machine with buttons of its own: no machine buttons, and Settings, Shots and Sleep under the dial-in column', async ({ preview }) => {
