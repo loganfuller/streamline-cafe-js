@@ -553,7 +553,7 @@ Three layers, all of them run by every pull request but the real stack's journey
 
 - **Unit tests**, Streamline's convention: pure modules under `node:test`, in `npm test`.
 - **Page tests**: the real page in Chromium, through Playwright Test, against a fake Decaid (`fake-decaid/`), a plain model of Decaid, DYE2 and the simulated machine with no timers, which keeps what they hold and answers as they do. A second job in the checks workflow. A request the fake has no answer for, and an error on the page, fail the test. They write the screenshots for the pull request.
-- **The real stack, pinned** (`fake-decaid/pins.json`): every rule the fake follows is backed by a scenario recorded from the pinned Decaid, DYE2 and Decent Sync, committed, and replayed against the fake in `npm test`. The recorder stands the stack up in Docker. A few journeys only the real stack can show (`test/real/`) run against it in the real-stack workflow on a version bump, before a release tag, on demand, and weekly against the newest stable releases, where a difference opens an issue.
+- **The real stack, pinned** (`fake-decaid/pins.json`): every rule the fake follows is backed by a scenario recorded from the pinned Decaid, DYE2 and Decent Sync, committed, and replayed against the fake in `npm test`. The recorder stands the stack up in Docker. A few journeys only the real stack can show (`test/real/`) run against it in the real-stack workflow on a pull request that changes the pins, the recorder or the journeys, before a release tag, on demand, and weekly against the newest stable releases, where a difference opens an issue.
 
 What no layer can show stays a check on a real tablet: its WebView, a real soft keyboard, a finger on the stars (TESTING.md, "What no test covers").
 
