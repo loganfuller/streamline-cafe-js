@@ -9,7 +9,7 @@
  "socket": "/ws/v1/plugins/dye2.reaplugin/changed",
  "given": {
   "workflow": {
-   "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+   "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -114,11 +114,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+    "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+    "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -159,10 +159,10 @@
    "dye2.reaplugin": {
     "autoFavourites": [
      {
-      "id": "recent:ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+      "id": "recent:bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
       "auto": true,
       "recentRank": 1,
-      "sourceShotId": "ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+      "sourceShotId": "bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
       "title": "Sample Single Origin · Default · Sample Grinder 38",
       "subtitle": "Sample Roasters · Default · Sample Grinder 38",
       "beverage": "",
@@ -283,10 +283,10 @@
         "target_volume_count_start": 2,
         "tank_temperature": 0
        },
-       "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+       "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
        "coffeeName": "Sample Single Origin",
        "coffeeRoaster": "Sample Roasters",
-       "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+       "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
        "grinderModel": "Sample Grinder 38",
        "grindSetting": "11.5",
        "rpm": 800,
@@ -294,13 +294,13 @@
        "dose": 18,
        "drink": 36
       },
-      "capturedAt": "2026-11-19T16:12:54.159954",
+      "capturedAt": "2026-11-19T21:41:58.778473",
       "workflow": {
        "context": {
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
-        "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+        "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
         "grinderModel": "Sample Grinder 38",
         "grinderSetting": "11.5",
         "targetDoseWeight": 18,
@@ -411,10 +411,10 @@
       }
      },
      {
-      "id": "recent:07f9843d-a1e3-4aaa-bd74-3092cee3aded",
+      "id": "recent:43a13ea1-89b8-4ba5-83ab-5980cd04c1c0",
       "auto": true,
       "recentRank": 2,
-      "sourceShotId": "07f9843d-a1e3-4aaa-bd74-3092cee3aded",
+      "sourceShotId": "43a13ea1-89b8-4ba5-83ab-5980cd04c1c0",
       "title": "Sample Single Origin · Default · Sample Grinder 64",
       "subtitle": "Sample Roasters · Default · Sample Grinder 64",
       "beverage": "",
@@ -535,10 +535,10 @@
         "target_volume_count_start": 2,
         "tank_temperature": 0
        },
-       "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+       "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
        "coffeeName": "Sample Single Origin",
        "coffeeRoaster": "Sample Roasters",
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64",
        "grindSetting": "2.6",
        "rpm": null,
@@ -546,13 +546,13 @@
        "dose": 18,
        "drink": 36
       },
-      "capturedAt": "2026-11-19T16:12:28.158109",
+      "capturedAt": "2026-11-19T21:41:32.773661",
       "workflow": {
        "context": {
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.6",
         "targetDoseWeight": 18,
@@ -693,14 +693,14 @@
     "recipeBeansMigrated": true,
     "recipes": [
      {
-      "id": "recipe-mwnr0o3mcmwg",
+      "id": "recipe-mwo2rv87c8n1",
       "stripSlot": 1,
       "name": "House espresso",
       "title": "House espresso",
       "beverage": "",
       "beanName": "Sample Blend",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -819,17 +819,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18,
         "targetYield": 36,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.4",
-        "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+        "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
         "coffeeName": "Sample Blend",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -964,18 +964,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.784Z",
+      "capturedAt": "2026-11-19T21:41:32.507Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o4ke2fv",
+      "id": "recipe-mwo2rv8tv4sf",
       "stripSlot": 2,
       "name": "Single origin",
       "title": "Single origin",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -1136,17 +1136,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18,
         "targetYield": 40,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.1",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -1323,18 +1323,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.812Z",
+      "capturedAt": "2026-11-19T21:41:32.525Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o5jzlp2",
+      "id": "recipe-mwo2rv9fw10l",
       "stripSlot": 3,
       "name": "Decaf",
       "title": "Decaf",
       "beverage": "",
       "beanName": "Example Decaf",
       "beanRoaster": "Example Coffee Co",
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -1453,17 +1453,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 17,
         "targetYield": 34,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "1.9",
-        "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+        "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
         "coffeeName": "Example Decaf",
         "coffeeRoaster": "Example Coffee Co",
         "extras": {
@@ -1598,18 +1598,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.847Z",
+      "capturedAt": "2026-11-19T21:41:32.547Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o6kwn4i",
+      "id": "recipe-mwo2rva1m4ml",
       "stripSlot": 5,
       "name": "Long black",
       "title": "Long black",
       "beverage": "",
       "beanName": "Sample Blend",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -1728,17 +1728,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 20,
         "targetYield": 50,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.8",
-        "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+        "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
         "coffeeName": "Sample Blend",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -1873,18 +1873,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.884Z",
+      "capturedAt": "2026-11-19T21:41:32.569Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o7itt6g",
+      "id": "recipe-mwo2rvahilzl",
       "stripSlot": 7,
       "name": "Guest roast with a long name",
       "title": "Guest roast with a long name",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -2045,17 +2045,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18.5,
         "targetYield": 42,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.2",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -2232,18 +2232,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.918Z",
+      "capturedAt": "2026-11-19T21:41:32.586Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o8l4609",
+      "id": "recipe-mwo2rvb0wvb9",
       "stripSlot": 9,
       "name": "Filter",
       "title": "Filter",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -2402,17 +2402,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 15,
         "targetYield": 250,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "6.5",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -2589,31 +2589,31 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.957Z",
+      "capturedAt": "2026-11-19T21:41:32.604Z",
       "showOnStreamlineDashboard": true
      }
     ],
     "recipesMigrated": true,
     "selection": {
      "kind": "favourite",
-     "id": "recent:ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+     "id": "recent:bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
      "modified": false,
      "auto": true
     },
     "selectionMigrated": true,
     "shotIndex": {
      "v": 3,
-     "builtAt": 1795104797177,
-     "newestShotId": "ac2ebf25-b69a-49ea-a105-1955a4fe7194",
-     "newestTs": 1795104774159,
+     "builtAt": 1795124541797,
+     "newestShotId": "bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
+     "newestTs": 1795124518778,
      "total": 2,
-     "etag": "\"b07718e49a7b6ac8\"",
+     "etag": "\"4dab01f7fa7f468a\"",
      "reps": {
-      "name:sample roasters::sample single origin|profile:default|gid:8e43c706-8d5d-479c-9ac4-9d93026853de": {
-       "id": "07f9843d-a1e3-4aaa-bd74-3092cee3aded",
-       "timestamp": "2026-11-19T16:12:28.158109",
+      "name:sample roasters::sample single origin|profile:default|gid:c913db38-5362-4ab4-a65a-7f7f85e3010a": {
+       "id": "43a13ea1-89b8-4ba5-83ab-5980cd04c1c0",
+       "timestamp": "2026-11-19T21:41:32.773661",
        "workflow": {
-        "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+        "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
         "name": "Workflow",
         "description": "Description",
         "profile": {
@@ -2718,10 +2718,10 @@
         "context": {
          "targetDoseWeight": 18,
          "targetYield": 36,
-         "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+         "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
          "grinderModel": "Sample Grinder 64",
          "grinderSetting": "2.6",
-         "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+         "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
          "coffeeName": "Sample Single Origin",
          "coffeeRoaster": "Sample Roasters",
          "extras": {
@@ -2761,11 +2761,11 @@
         }
        }
       },
-      "name:sample roasters::sample single origin|profile:default|gid:cc0fe316-641b-4860-8042-2a081be2753c": {
-       "id": "ac2ebf25-b69a-49ea-a105-1955a4fe7194",
-       "timestamp": "2026-11-19T16:12:54.159954",
+      "name:sample roasters::sample single origin|profile:default|gid:ebe513c4-fcb1-44e1-9bc5-0d5639aae674": {
+       "id": "bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
+       "timestamp": "2026-11-19T21:41:58.778473",
        "workflow": {
-        "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+        "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
         "name": "Workflow",
         "description": "Description",
         "profile": {
@@ -2870,10 +2870,10 @@
         "context": {
          "targetDoseWeight": 18,
          "targetYield": 36,
-         "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+         "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
          "grinderModel": "Sample Grinder 38",
          "grinderSetting": "11.5",
-         "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+         "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
          "coffeeName": "Sample Single Origin",
          "coffeeRoaster": "Sample Roasters",
          "extras": {
@@ -2916,16 +2916,16 @@
      },
      "tail": [
       {
-       "id": "07f9843d-a1e3-4aaa-bd74-3092cee3aded",
-       "ts": 1795104748158,
-       "key": "name:sample roasters::sample single origin|profile:default|gid:8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "id": "43a13ea1-89b8-4ba5-83ab-5980cd04c1c0",
+       "ts": 1795124492773,
+       "key": "name:sample roasters::sample single origin|profile:default|gid:c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "rid": null,
        "rating": null
       },
       {
-       "id": "ac2ebf25-b69a-49ea-a105-1955a4fe7194",
-       "ts": 1795104774159,
-       "key": "name:sample roasters::sample single origin|profile:default|gid:cc0fe316-641b-4860-8042-2a081be2753c",
+       "id": "bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
+       "ts": 1795124518778,
+       "key": "name:sample roasters::sample single origin|profile:default|gid:ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
        "rid": null,
        "rating": null
       }
@@ -2941,7 +2941,7 @@
     "method": "PUT",
     "path": "/workflow",
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -3046,10 +3046,10 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "coffeeName": "Sample Single Origin",
       "coffeeRoaster": "Sample Roasters",
       "extras": {
@@ -3085,7 +3085,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -3190,11 +3190,11 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
       "grinderRpm": 900,
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "coffeeName": "Sample Single Origin",
       "coffeeRoaster": "Sample Roasters",
       "baristaName": "Sample Barista",
@@ -3244,7 +3244,7 @@
     "status": 200,
     "body": {
      "kind": "favourite",
-     "id": "recent:ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+     "id": "recent:bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
      "modified": false,
      "auto": true
     }
@@ -3260,7 +3260,7 @@
     "status": 200,
     "body": {
      "kind": "favourite",
-     "id": "recent:ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+     "id": "recent:bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
      "modified": false,
      "auto": true
     }
@@ -3276,7 +3276,7 @@
     "status": 200,
     "body": {
      "kind": "favourite",
-     "id": "recent:ac2ebf25-b69a-49ea-a105-1955a4fe7194",
+     "id": "recent:bb4f2c67-4c56-4240-99d6-aafad67f7d2c",
      "modified": false,
      "auto": true
     }
@@ -3291,10 +3291,10 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "2.4",
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "coffeeName": "Sample Blend",
       "coffeeRoaster": "Sample Roasters",
       "extras": {
@@ -3302,7 +3302,7 @@
        "basketName": "18 g sample basket",
        "dye": {
         "v": 1,
-        "recipeId": "recipe-mwnr0o3mcmwg"
+        "recipeId": "recipe-mwo2rv87c8n1"
        },
        "rpm": null,
        "feedRate": null
@@ -3413,7 +3413,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -3518,11 +3518,11 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "2.4",
       "grinderRpm": 900,
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "coffeeName": "Sample Blend",
       "coffeeRoaster": "Sample Roasters",
       "baristaName": "Sample Barista",
@@ -3530,7 +3530,7 @@
        "dye": {
         "selection": null,
         "v": 1,
-        "recipeId": "recipe-mwnr0o3mcmwg"
+        "recipeId": "recipe-mwo2rv87c8n1"
        },
        "basketId": "bskt-sample-18",
        "basketName": "18 g sample basket",
@@ -3572,14 +3572,14 @@
     "path": "/plugins/dye2.reaplugin/selection",
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o3mcmwg"
+     "id": "recipe-mwo2rv87c8n1"
     }
    },
    "answer": {
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o3mcmwg",
+     "id": "recipe-mwo2rv87c8n1",
      "modified": true
     }
    },
@@ -3594,7 +3594,7 @@
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o3mcmwg",
+     "id": "recipe-mwo2rv87c8n1",
      "modified": true
     }
    },
@@ -3609,7 +3609,7 @@
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o3mcmwg",
+     "id": "recipe-mwo2rv87c8n1",
      "modified": true
     }
    },
@@ -3621,7 +3621,7 @@
     "path": "/workflow",
     "body": {
      "context": {
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
       "extras": {
@@ -3633,7 +3633,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -3738,11 +3738,11 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
       "grinderRpm": 900,
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "coffeeName": "Sample Blend",
       "coffeeRoaster": "Sample Roasters",
       "baristaName": "Sample Barista",
@@ -3750,7 +3750,7 @@
        "dye": {
         "selection": null,
         "v": 1,
-        "recipeId": "recipe-mwnr0o3mcmwg"
+        "recipeId": "recipe-mwo2rv87c8n1"
        },
        "basketId": "bskt-sample-18",
        "basketName": "18 g sample basket",
@@ -3791,7 +3791,7 @@
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o3mcmwg",
+     "id": "recipe-mwo2rv87c8n1",
      "modified": true
     }
    },
@@ -3806,14 +3806,14 @@
     "status": 200,
     "body": [
      {
-      "id": "recipe-mwnr0o3mcmwg",
+      "id": "recipe-mwo2rv87c8n1",
       "stripSlot": 1,
       "name": "House espresso",
       "title": "House espresso",
       "beverage": "",
       "beanName": "Sample Blend",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -3932,17 +3932,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18,
         "targetYield": 36,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.4",
-        "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+        "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
         "coffeeName": "Sample Blend",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -4077,18 +4077,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.784Z",
+      "capturedAt": "2026-11-19T21:41:32.507Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o4ke2fv",
+      "id": "recipe-mwo2rv8tv4sf",
       "stripSlot": 2,
       "name": "Single origin",
       "title": "Single origin",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -4249,17 +4249,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18,
         "targetYield": 40,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.1",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -4436,18 +4436,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.812Z",
+      "capturedAt": "2026-11-19T21:41:32.525Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o5jzlp2",
+      "id": "recipe-mwo2rv9fw10l",
       "stripSlot": 3,
       "name": "Decaf",
       "title": "Decaf",
       "beverage": "",
       "beanName": "Example Decaf",
       "beanRoaster": "Example Coffee Co",
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -4566,17 +4566,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 17,
         "targetYield": 34,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "1.9",
-        "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+        "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
         "coffeeName": "Example Decaf",
         "coffeeRoaster": "Example Coffee Co",
         "extras": {
@@ -4711,18 +4711,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.847Z",
+      "capturedAt": "2026-11-19T21:41:32.547Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o6kwn4i",
+      "id": "recipe-mwo2rva1m4ml",
       "stripSlot": 5,
       "name": "Long black",
       "title": "Long black",
       "beverage": "",
       "beanName": "Sample Blend",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+      "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
       "profileTitle": "Default",
       "profileSnapshot": {
        "version": "2",
@@ -4841,17 +4841,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 20,
         "targetYield": 50,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.8",
-        "beanBatchId": "ff87d25a-c68b-4dbf-9790-89a9150e9db1",
+        "beanBatchId": "48fcf0c9-39ab-45c7-b17b-a0907599240f",
         "coffeeName": "Sample Blend",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -4986,18 +4986,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.884Z",
+      "capturedAt": "2026-11-19T21:41:32.569Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o7itt6g",
+      "id": "recipe-mwo2rvahilzl",
       "stripSlot": 7,
       "name": "Guest roast with a long name",
       "title": "Guest roast with a long name",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -5158,17 +5158,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 18.5,
         "targetYield": 42,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "2.2",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -5345,18 +5345,18 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.918Z",
+      "capturedAt": "2026-11-19T21:41:32.586Z",
       "showOnStreamlineDashboard": true
      },
      {
-      "id": "recipe-mwnr0o8l4609",
+      "id": "recipe-mwo2rvb0wvb9",
       "stripSlot": 9,
       "name": "Filter",
       "title": "Filter",
       "beverage": "",
       "beanName": "Sample Single Origin",
       "beanRoaster": "Sample Roasters",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "profileTitle": "Adaptive v3",
       "profileSnapshot": {
        "version": "2",
@@ -5515,17 +5515,17 @@
        "flushTempC": 25,
        "flushS": 10,
        "flushFlowMls": 6,
-       "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+       "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
        "grinderModel": "Sample Grinder 64"
       },
       "workflow": {
        "context": {
         "targetDoseWeight": 15,
         "targetYield": 250,
-        "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+        "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
         "grinderModel": "Sample Grinder 64",
         "grinderSetting": "6.5",
-        "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+        "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
         "coffeeName": "Sample Single Origin",
         "coffeeRoaster": "Sample Roasters",
         "extras": {
@@ -5702,7 +5702,7 @@
         "flow": 6
        }
       },
-      "capturedAt": "2026-11-19T16:12:27.957Z",
+      "capturedAt": "2026-11-19T21:41:32.604Z",
       "showOnStreamlineDashboard": true
      }
     ]
@@ -5717,10 +5717,10 @@
      "context": {
       "targetDoseWeight": 17,
       "targetYield": 34,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "1.9",
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "coffeeName": "Example Decaf",
       "coffeeRoaster": "Example Coffee Co",
       "extras": {
@@ -5728,7 +5728,7 @@
        "basketName": "18 g sample basket",
        "dye": {
         "v": 1,
-        "recipeId": "recipe-mwnr0o5jzlp2"
+        "recipeId": "recipe-mwo2rv9fw10l"
        },
        "rpm": null,
        "feedRate": null
@@ -5839,7 +5839,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -5944,11 +5944,11 @@
      "context": {
       "targetDoseWeight": 17,
       "targetYield": 34,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "1.9",
       "grinderRpm": 900,
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "coffeeName": "Example Decaf",
       "coffeeRoaster": "Example Coffee Co",
       "baristaName": "Sample Barista",
@@ -5956,7 +5956,7 @@
        "dye": {
         "selection": null,
         "v": 1,
-        "recipeId": "recipe-mwnr0o5jzlp2"
+        "recipeId": "recipe-mwo2rv9fw10l"
        },
        "basketId": "bskt-sample-18",
        "basketName": "18 g sample basket",
@@ -6001,7 +6001,7 @@
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o5jzlp2",
+     "id": "recipe-mwo2rv9fw10l",
      "modified": true
     }
    },
@@ -6020,7 +6020,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -6125,11 +6125,11 @@
      "context": {
       "targetDoseWeight": 17.5,
       "targetYield": 34,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "1.9",
       "grinderRpm": 900,
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "coffeeName": "Example Decaf",
       "coffeeRoaster": "Example Coffee Co",
       "baristaName": "Sample Barista",
@@ -6137,7 +6137,7 @@
        "dye": {
         "selection": null,
         "v": 1,
-        "recipeId": "recipe-mwnr0o5jzlp2"
+        "recipeId": "recipe-mwo2rv9fw10l"
        },
        "basketId": "bskt-sample-18",
        "basketName": "18 g sample basket",
@@ -6178,7 +6178,7 @@
     "status": 200,
     "body": {
      "kind": "recipe",
-     "id": "recipe-mwnr0o5jzlp2",
+     "id": "recipe-mwo2rv9fw10l",
      "modified": true
     }
    },
@@ -6335,7 +6335,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -6482,11 +6482,11 @@
      "context": {
       "targetDoseWeight": 17.5,
       "targetYield": 34,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "1.9",
       "grinderRpm": 900,
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "coffeeName": "Example Decaf",
       "coffeeRoaster": "Example Coffee Co",
       "baristaName": "Sample Barista",
@@ -6494,7 +6494,7 @@
        "dye": {
         "selection": null,
         "v": 1,
-        "recipeId": "recipe-mwnr0o5jzlp2"
+        "recipeId": "recipe-mwo2rv9fw10l"
        },
        "basketId": "bskt-sample-18",
        "basketName": "18 g sample basket",
@@ -6538,7 +6538,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -6685,11 +6685,11 @@
      "context": {
       "targetDoseWeight": 17.5,
       "targetYield": 34,
-      "grinderId": "8e43c706-8d5d-479c-9ac4-9d93026853de",
+      "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
       "grinderModel": "Sample Grinder 64",
       "grinderSetting": "1.9",
       "grinderRpm": 900,
-      "beanBatchId": "7db64f4c-4236-4570-bb33-ceadf63c93a9",
+      "beanBatchId": "8a802cbe-6eae-4f5e-8efb-6cfe3aabe1d9",
       "coffeeName": "Example Decaf",
       "coffeeRoaster": "Example Coffee Co",
       "baristaName": "Sample Barista",
@@ -6789,7 +6789,7 @@
     "method": "PUT",
     "path": "/workflow",
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -6894,10 +6894,10 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "coffeeName": "Sample Single Origin",
       "coffeeRoaster": "Sample Roasters",
       "extras": {
@@ -6933,7 +6933,7 @@
    "answer": {
     "status": 200,
     "body": {
-     "id": "359e1603-bbff-4aa1-a84e-6f61d399ec2a",
+     "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
      "name": "Workflow",
      "description": "Description",
      "profile": {
@@ -7038,11 +7038,11 @@
      "context": {
       "targetDoseWeight": 18,
       "targetYield": 36,
-      "grinderId": "cc0fe316-641b-4860-8042-2a081be2753c",
+      "grinderId": "ebe513c4-fcb1-44e1-9bc5-0d5639aae674",
       "grinderModel": "Sample Grinder 38",
       "grinderSetting": "11.5",
       "grinderRpm": 900,
-      "beanBatchId": "5c2f1607-2a92-44c9-b593-9163d2facbae",
+      "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
       "coffeeName": "Sample Single Origin",
       "coffeeRoaster": "Sample Roasters",
       "baristaName": "Sample Barista",

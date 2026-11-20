@@ -1,0 +1,436 @@
+{
+ "recordedWith": {
+  "decaid": "0.9.2",
+  "dye2": "0.1.42",
+  "streamline": "0.2.28",
+  "decentSync": "1.11.1"
+ },
+ "rule": "fake-decaid/decent-sync.js",
+ "about": "The plugin's status: served with its Machine and Location; a method it doesn't take; a Capture-only Machine (its sharing off) refused 409 captureOnly with its Machine and no Location, the same refusal from every endpoint that asks the server; served again once sharing is on.",
+ "decentSync": true,
+ "socket": "/ws/v1/plugins/decent-sync.reaplugin/changes",
+ "given": {
+  "workflow": {
+   "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",
+   "name": "Workflow",
+   "description": "Description",
+   "profile": {
+    "version": "2",
+    "title": "Adaptive v3",
+    "notes": "This profile aims to unite the best practices in espresso extraction that we have learned so far with the Decent. It unites Brakel's Londonium, Rao's Blooming and Gagné's Adaptive profiles. The flow rate during extraction will automatically adjust itself from the flow rate actually happening during the Pressurize step and then gently increase it from there.  A 15g dose is typical.  Aim for a flow rate around 1.5 ml/s at the Pressurize step. 15g in, 33g out, in 32 seconds is a typical recipe for a medium roast.  Grind fine enough to keep dripping during preinfusion to around 4g. If you have a bluetooth scale, you can keep track of how much dripping into the cup there is before the ramp stage.  4 grams of total dripping, within 1 gram, seems to give the best tasting results. Try adusting your grind and dose to get that amount of dripping, and see if you like how it tastes.",
+    "author": "Decent",
+    "beverage_type": "espresso",
+    "steps": [
+     {
+      "name": "Prefill",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": null,
+      "volume": 100,
+      "seconds": 5,
+      "weight": 0,
+      "temperature": 93,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": {
+       "value": 0,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Fill",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 3
+      },
+      "volume": 100,
+      "seconds": 12,
+      "weight": 0,
+      "temperature": 93,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": {
+       "value": 0,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Compressing",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": {
+       "type": "flow",
+       "condition": "under",
+       "value": 3
+      },
+      "volume": 100,
+      "seconds": 12,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 3,
+      "limiter": {
+       "value": 0,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Dripping",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 6,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 0.1,
+      "limiter": {
+       "value": 0,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Pressurize",
+      "pump": "pressure",
+      "transition": "smooth",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 7.7
+      },
+      "volume": 100,
+      "seconds": 6,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 11,
+      "limiter": {
+       "value": 3.5,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Extraction start",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 0
+      },
+      "volume": 0,
+      "seconds": 0,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 1.5,
+      "limiter": {
+       "value": 8.6,
+       "range": 0.6
+      }
+     },
+     {
+      "name": "Extraction",
+      "pump": "flow",
+      "transition": "smooth",
+      "exit": null,
+      "volume": 100,
+      "seconds": 60,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 3.5,
+      "limiter": {
+       "value": 8.6,
+       "range": 0.6
+      }
+     }
+    ],
+    "target_volume": 36,
+    "target_weight": 36,
+    "target_volume_count_start": 3,
+    "tank_temperature": 0
+   },
+   "context": {
+    "targetDoseWeight": 18,
+    "targetYield": 40,
+    "grinderId": "c913db38-5362-4ab4-a65a-7f7f85e3010a",
+    "grinderModel": "Sample Grinder 64",
+    "grinderSetting": "2.1",
+    "grinderRpm": 900,
+    "beanBatchId": "ae93d0bc-cb20-432f-8b33-8311dd8ff480",
+    "coffeeName": "Sample Single Origin",
+    "coffeeRoaster": "Sample Roasters",
+    "baristaName": "Sample Barista",
+    "extras": {
+     "dye": {
+      "selection": null,
+      "v": 1,
+      "recipeId": "recipe-mwo2rv8tv4sf"
+     },
+     "basketId": "bskt-sample-18",
+     "basketName": "18 g sample basket",
+     "rpm": null,
+     "feedRate": null,
+     "sample": {
+      "nested": true
+     }
+    }
+   },
+   "steamSettings": {
+    "targetTemperature": 150,
+    "duration": 50,
+    "flow": 0.8,
+    "stopAtTemperature": 0
+   },
+   "hotWaterData": {
+    "targetTemperature": 75,
+    "duration": 30,
+    "volume": 50,
+    "flow": 10
+   },
+   "rinseData": {
+    "targetTemperature": 25,
+    "duration": 10,
+    "flow": 6
+   }
+  }
+ },
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/status"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "connected": true,
+     "served": true,
+     "machine": {
+      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "name": "Sample Machine"
+     },
+     "location": {
+      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "name": "Sample Cafe"
+     }
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "/plugins/decent-sync.reaplugin/status",
+    "body": {}
+   },
+   "answer": {
+    "status": 405,
+    "body": {
+     "error": "Only GET is answered"
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/reference"
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "code": "invalidRequest",
+     "message": "Give the id of the Recipe's DYE2 record on this tablet as recipe."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "event": "sync-sharing",
+   "on": false,
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/status"
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "connected": true,
+     "served": false,
+     "machine": {
+      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "name": "Sample Machine"
+     },
+     "location": {
+      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "name": "Sample Cafe"
+     },
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/shots?limit=50"
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4"
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1"
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/plugins/decent-sync.reaplugin/reference?recipe=recipe-mwo2rv87c8n1",
+    "body": {
+     "shotId": "7115a371-38af-4b22-a0f9-21555ea3b7c2"
+    }
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/plugins/decent-sync.reaplugin/shot?id=d806f71e-cbbc-4601-8864-142a0be298c4",
+    "body": {
+     "rating": 4
+    }
+   },
+   "answer": {
+    "status": 409,
+    "body": {
+     "code": "captureOnly",
+     "message": "This Machine is a Capture-only Machine: it is at no Location, or its sharing is off, so it takes no part in the Library."
+    }
+   },
+   "pushes": []
+  },
+  {
+   "event": "sync-sharing",
+   "on": true,
+   "pushes": [
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "d1d085b1-1b97-49d5-9917-3d2e4b928ca8",
+      "name": "House espresso",
+      "recordId": "recipe-mwo2rv87c8n1"
+     }
+    },
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "51fe8686-6cd1-4d27-b993-ae853f2b8100",
+      "name": "Single origin",
+      "recordId": "recipe-mwo2rv8tv4sf"
+     }
+    },
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "26ffbf49-025a-4780-9b52-d2906927543f",
+      "name": "Decaf",
+      "recordId": "recipe-mwo2rv9fw10l"
+     }
+    },
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "c9cd550e-68fc-44c9-a252-74f53b3c9f17",
+      "name": "Long black",
+      "recordId": "recipe-mwo2rva1m4ml"
+     }
+    },
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "b2cda694-3289-4d06-9498-672e3e933dcf",
+      "name": "Guest roast with a long name",
+      "recordId": "recipe-mwo2rvahilzl"
+     }
+    },
+    {
+     "what": "reference",
+     "recipe": {
+      "id": "b11f2ce2-8408-45f1-809b-5628eb1d8375",
+      "name": "Filter",
+      "recordId": "recipe-mwo2rvb0wvb9"
+     }
+    }
+   ]
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/plugins/decent-sync.reaplugin/status"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "connected": true,
+     "served": true,
+     "machine": {
+      "id": "01a1f5c4-d829-7004-a64a-78a430970072",
+      "name": "Sample Machine"
+     },
+     "location": {
+      "id": "01a1f5c4-d7f4-721e-a5e0-e52063dee9ef",
+      "name": "Sample Cafe"
+     }
+    }
+   },
+   "pushes": []
+  }
+ ]
+}

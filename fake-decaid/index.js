@@ -13,6 +13,11 @@
 // Kept here: Decaid's plugin list, and a plugin that is not loaded answering
 // 404 on its routes (Decaid v0.9.2, `plugins_handler.dart`); DYE2 disabled and
 // enabled through it. Recorded: recordings/dye2-plugin.json.
+//
+// Decent Sync's plugin (decent-sync.js) is there only when the fake is made
+// with `decentSync` (recordings/decent-sync.json): listed and loaded, DYE2's
+// records and baskets as its Library's sync left them, and the tablet's Shots
+// pulled at the Location after the sample data's added to Decaid's.
 
 import { copy, updateWorkflow } from './workflow.js';
 import { createStore } from './store.js';
@@ -21,6 +26,7 @@ import { createShots } from './shots.js';
 import { createLibrary } from './library.js';
 import { createMachine, calibration, localTime, shiftTime } from './machine.js';
 import { createBoot } from './boot.js';
+import { createDecentSync, DECENT_SYNC_ID } from './decent-sync.js';
 
 export { localTime };
 
@@ -30,6 +36,7 @@ const OWNED_REST = [
     /^\/api\/v1\/store\//,
     /^\/api\/v1\/plugins$/,
     /^\/api\/v1\/plugins\/dye2\.reaplugin\//,
+    /^\/api\/v1\/plugins\/decent-sync\.reaplugin\//,
     /^\/api\/v1\/grinders(\/|$)/,
     /^\/api\/v1\/bean-batches\//,
     /^\/api\/v1\/beans(\/|$)/,
@@ -42,6 +49,8 @@ const OWNED_SOCKETS = [
     '/ws/v1/machine/shotState',
     '/ws/v1/scale/snapshot',
     '/ws/v1/plugins/dye2.reaplugin/changed',
+    '/ws/v1/plugins/decent-sync.reaplugin/changes',
+    '/ws/v1/plugins/decent-sync.reaplugin/changed',
 ];
 
 /** Whether the model answers this request or socket from its own state, rather than from the recorded boot. */
@@ -51,16 +60,17 @@ export function OWNED(method, path) {
 }
 
 /**
- * The sample data's Shots moved back in time, keeping their spacing, so the
- * newest was pulled an hour before `now`, whenever they were recorded. Their
- * times were written in UTC, the recorder's zone.
+ * Moves a recorded Shot back in time as the sample data's are moved, keeping
+ * their spacing, so the newest sample Shot was pulled an hour before `now`,
+ * whenever they were recorded. Their times were written in UTC, the
+ * recorder's zone; a Shot moved is written in `timeZone`.
  */
-function earlier(shots, now, timeZone) {
-    if (!shots.length) return [];
+function mover(shots, now, timeZone) {
+    if (!shots.length) return shot => shot;
     const ms = text => Date.parse(/[zZ]$/.test(text) ? text : `${text.slice(0, 23)}Z`);
     const shift = now - 3_600_000 - Math.max(...shots.map(shot => ms(shot.timestamp)));
     const moved = text => shiftTime(text, shift, timeZone);
-    return shots.map(shot => ({
+    return shot => ({
         ...shot,
         timestamp: moved(shot.timestamp),
         createdAt: moved(shot.createdAt),
@@ -70,14 +80,15 @@ function earlier(shots, now, timeZone) {
             machine: m.machine ? { ...m.machine, timestamp: moved(m.machine.timestamp) } : m.machine,
             scale: m.scale ? { ...m.scale, timestamp: moved(m.scale.timestamp) } : m.scale,
         })),
-    }));
+    });
 }
 
 /**
- * @param {{ sampleData: object, boot: object, pour: object, now?: number, timeZone?: string }} recordings
+ * @param {{ sampleData: object, boot: object, pour: object, decentSync?: object, now?: number, timeZone?: string }} recordings
  *   `now` is the page's time when the test starts, in epoch milliseconds; `timeZone` Decaid's.
+ *   `decentSync` (recordings/decent-sync.json) installs Decent Sync's plugin, serving the Machine.
  */
-export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('2026-11-18T14:00:00Z'), timeZone = 'UTC' }) {
+export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, now = Date.parse('2026-11-18T14:00:00Z'), timeZone = 'UTC' }) {
     let clock = now;
     let ids = 0;
     const nextId = () => `00000000-0000-4000-8000-${(++ids).toString(16).padStart(12, '0')}`;
@@ -96,10 +107,18 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
     let workflow = copy(sampleData.workflow);
     const plugins = copy(sampleData.plugins);
     const store = createStore(sampleData.store);
-    const shots = createShots(earlier(sampleData.shots, clock, timeZone), utcNow);
+    const moved = mover(sampleData.shots, clock, timeZone);
+    // The Location's Shots of another Machine were written in its zone, UTC on the recorded stack.
+    const movedOther = mover(sampleData.shots, clock, 'UTC');
+    const shots = createShots([...sampleData.shots, ...(decentSync?.shots || [])].map(moved), utcNow);
+    if (decentSync) {
+        plugins.push(copy(decentSync.plugin));
+        for (const [key, value] of Object.entries(decentSync.store[DYE2_ID] || {})) store.set(DYE2_ID, key, value);
+    }
     const library = createLibrary(sampleData);
     const cannedBoot = createBoot(boot);
     const dye2Loaded = () => plugins.some(p => p.id === DYE2_ID && p.loaded);
+    const loaded = id => plugins.some(p => p.id === id && p.loaded);
 
     // Every Workflow set reaches DYE2's `workflowUpdated`, a set of its own included.
     function setWorkflow(body) {
@@ -133,6 +152,19 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
     };
     if (dye2Loaded()) dye2Loads();
 
+    // Decaid's own Shot update, as the page and Decent Sync's plugin both make it.
+    const putShot = (id, body) => {
+        const answer = shots.answer('PUT', `/${encodeURIComponent(id)}`, new URLSearchParams(), body);
+        if (answer?.status === 200) decentSyncPlugin?.ownShotChanged();
+        return answer;
+    };
+    const decentSyncPlugin = decentSync && createDecentSync({
+        recording: decentSync,
+        decaid: { store, shots, timeZone, putShot },
+        announce: frame => { if (loaded(DECENT_SYNC_ID)) emit(`/ws/v1/plugins/${DECENT_SYNC_ID}/changes`, frame); },
+        moved: movedOther,
+    });
+
     const machine = createMachine({
         pour, timeZone, emit, nextId,
         now: () => clock,
@@ -140,6 +172,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
         store: shot => {
             shots.add(shot);
             if (dye2Loaded()) dye2.shotStored();
+            decentSyncPlugin?.shotStored(shot.id);
         },
     });
 
@@ -155,7 +188,12 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             if (!dye2Loaded()) return { status: 404, body: { error: `plugin with ${DYE2_ID} not loaded` } };
             return dye2.answer(method, path.slice(`${API}/plugins/${DYE2_ID}/`.length), body);
         }
+        if (path.startsWith(`${API}/plugins/${DECENT_SYNC_ID}/`)) {
+            if (!loaded(DECENT_SYNC_ID) || !decentSyncPlugin) return { status: 404, body: { error: `plugin with ${DECENT_SYNC_ID} not loaded` } };
+            return decentSyncPlugin.answer(method, path.slice(`${API}/plugins/${DECENT_SYNC_ID}/`.length), query, body);
+        }
         if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
+        if (/^\/api\/v1\/shots\/[^/]+$/.test(path) && method === 'PUT') return putShot(decodeURIComponent(path.slice(`${API}/shots/`.length)), body);
         if (/^\/api\/v1\/shots(\/|$)/.test(path)) return shots.answer(method, path.slice(`${API}/shots`.length), query, body);
         if (path === `${API}/machine/state` && method === 'GET') return { status: 200, body: machine.snapshot() };
         const calibrated = /^\/api\/v1\/machine\/calibration\/([^/]+)$/.exec(path);
@@ -193,6 +231,7 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             let opening;
             if (OWNED('WS', path)) {
                 if (path.startsWith(`/ws/v1/plugins/${DYE2_ID}/`)) opening = dye2Loaded() ? [] : null;
+                else if (path.startsWith(`/ws/v1/plugins/${DECENT_SYNC_ID}/`)) opening = decentSyncPlugin && loaded(DECENT_SYNC_ID) ? [] : null;
                 else opening = machine.opening(path);
             } else {
                 opening = cannedBoot.socket(path);
@@ -211,10 +250,11 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
          * Starts from a Workflow as a whole, and store keys, as Decaid held them
          * when a scenario was recorded; DYE2 reads them as it does when it loads.
          */
-        given({ workflow: next, store: keys = {} }) {
+        given({ workflow: next, store: keys = {}, shots: added = [] }) {
             for (const [namespace, values] of Object.entries(keys)) {
                 for (const [key, value] of Object.entries(values || {})) store.set(namespace, key, value);
             }
+            for (const shot of added) if (!shots.get(shot.id)) shots.add(copy(shot));
             workflow = copy(next);
             if (dye2Loaded()) dye2Loads();
             outbox.length = 0;
@@ -259,6 +299,20 @@ export function createFakeDecaid({ sampleData, boot, pour, now = Date.parse('202
             if (!plugin) throw new Error('DYE2 is not installed in the fake');
             Object.assign(plugin, { loaded: true, autoLoad: true });
             dye2.restart();
+        },
+        /**
+         * Decent Sync's plugin, where the fake was made with it: what the
+         * test makes happen on its server and connection (decent-sync.js
+         * `events`), and what it reads of them. Null without it.
+         */
+        decentSync: decentSyncPlugin && {
+            ...decentSyncPlugin.events,
+            recipe: decentSyncPlugin.recipe,
+            state: decentSyncPlugin.state,
+            others: decentSyncPlugin.others,
+            own: decentSyncPlugin.own,
+            machine: decentSyncPlugin.machine,
+            location: decentSyncPlugin.location,
         },
         /** A recorded answer of the boot, changed: `patch(body)` answers the new body. */
         patchBoot: (key, patch) => cannedBoot.patch(key, patch),

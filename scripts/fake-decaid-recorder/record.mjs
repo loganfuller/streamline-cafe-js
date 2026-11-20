@@ -1,13 +1,15 @@
 // Records the fake Decaid's evidence from the pinned real stack
 // (fake-decaid/pins.json): the sample data's state, the page's boot, each
-// scenario in scenarios.mjs beside this file, and one simulated pour. Writes them to
+// scenario in scenarios.mjs beside this file, one simulated pour, and last, on
+// the second setup (decent-sync.mjs), the state Decent Sync's plugin serves and
+// each scenario in decent-sync-scenarios.mjs. Writes them to
 // fake-decaid/recordings/. How and when to run it is in docs/cafe/TESTING.md.
 //
 //   node scripts/fake-decaid-recorder/record.mjs                 everything
 //   node scripts/fake-decaid-recorder/record.mjs --only=scenarios --keep
 //
-// It needs Docker and network access to GitHub. It starts a throwaway container
-// and removes it at the end, unless --keep.
+// It needs Docker and network access to GitHub. It starts throwaway containers
+// and removes them at the end, unless --keep.
 
 import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -23,19 +25,21 @@ const flag = (name, fallback) => args.find(a => a.startsWith(`--${name}=`))?.sli
 // --scenario=a,b records only those scenarios, and nothing else unless --only
 // names it: on a kept stack, the sample data written again would be a second copy.
 const SCENARIO = flag('scenario', '') ? flag('scenario', '').split(',') : null;
-const ONLY = flag('only', SCENARIO ? 'scenarios' : 'sample-data,scenarios,boot,pour').split(',');
+const ONLY = flag('only', SCENARIO ? 'scenarios' : 'sample-data,scenarios,boot,pour,decent-sync').split(',');
 const KEEP = args.includes('--keep');
 const PORT = Number(flag('port', '18157'));
 const OUT = join(ROOT, 'fake-decaid', 'recordings');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const recordedWith = { decaid: PINS.decaid.version, dye2: PINS.dye2.version, streamline: PINS.streamline.version };
 const write = (name, data) => writeFile(join(OUT, `${name}.json`), `${JSON.stringify({ recordedWith, ...data }, null, 1)}\n`);
+// Decent Sync's recordings name its version too.
+const writeSync = (name, data) => write(name, { recordedWith: { ...recordedWith, decentSync: PINS.decentSync.version }, ...data });
 
 // --api= and --token-file= (the file --keep names) point it at a Decaid already
 // running, the token read from the file so it is on no command line, for working on a
 // scenario; a recording to commit comes from a fresh stack.
 const stack = flag('api', '')
-    ? { api: flag('api', ''), token: flag('token-file', '') ? (await readFile(flag('token-file', ''), 'utf8')).trim() : '', stop: () => {} }
+    ? { api: flag('api', ''), id: flag('container', '') || null, token: flag('token-file', '') ? (await readFile(flag('token-file', ''), 'utf8')).trim() : '', stop: () => {} }
     : await standUp({ port: PORT });
 // Ctrl-C or a kill skips the `finally` below: the container goes with it.
 if (!KEEP) {
@@ -258,8 +262,78 @@ async function pour() {
     });
 }
 
+// Decent Sync's second setup, on this run's Decaid: the plugin connected as the
+// Location's first Machine, a second Decaid as its second, and four Shots
+// pulled at the Location (two on each). Its Library's sync rewrites DYE2's
+// records and baskets, so it comes after everything else is recorded. Writes
+// the state the fake plugin starts from (recordings/decent-sync.json), then
+// each scenario in decent-sync-scenarios.mjs.
+let stage = null;
+async function decentSyncStage() {
+    if (!stack.id) throw new Error('the decent-sync part needs the Decaid\'s container: a stack this run stood up, or --container= with --api=');
+    const { standUpSync, pull, appliedWith, until, PLUGIN } = await import('./decent-sync.mjs');
+    const P = `/plugins/${PLUGIN}`;
+    stage = await standUpSync({ first: { id: stack.id, api: stack.api, token: stack.token } });
+    const records = await decaid('GET', '/store/dye2.reaplugin/recipes');
+    const named = name => records.find(row => row.name === name);
+    if (!records.every(row => row.decentSyncId)) throw new Error('the Library\'s sync left a DYE2 record with no decentSyncId');
+    // A: the first Machine's own, stopped on weight; B: its own on another Profile;
+    // C: the second Machine's; D: the second Machine's, cut short.
+    const A = await pull(decaid, { workflow: appliedWith(named(RECIPES[0].name), 'Example Barista') });
+    const B = await pull(decaid, { workflow: appliedWith(named(RECIPES[1].name), 'Sample Barista'), seconds: 6 });
+    const secondRecords = await stage.second.decaid('GET', '/store/dye2.reaplugin/recipes');
+    const secondHouse = secondRecords.find(row => row.decentSyncId === named(RECIPES[0].name).decentSyncId);
+    if (!secondHouse) throw new Error('the Location\'s Recipes did not reach the second Decaid');
+    const C = await pull(stage.second.decaid, { workflow: appliedWith(secondHouse, 'Second Barista'), seconds: 9 });
+    const D = await pull(stage.second.decaid, { seconds: 2 });
+    const labels = { A: A.id, B: B.id, C: C.id, D: D.id };
+    const listing = await until(async () => {
+        const answer = await raw('GET', `${P}/shots?limit=50`);
+        const ids = (answer.body?.shots || []).map(row => row.id);
+        return Object.values(labels).every(id => ids.includes(id)) ? answer.body : null;
+    }, { timeout: 90_000, every: 1000 });
+    if (!listing) throw new Error('the four Shots did not reach the Location\'s list in 90 s');
+    // DYE2 works out its recents a moment after a Shot is stored.
+    await sleep(2000);
+    const rowOf = id => listing.shots.find(row => row.id === id);
+    const { recipes } = await stage.server('GET', `/locations/${stage.location.id}/recipes`);
+    const profiles = await stage.server('GET', '/profiles').then(answer => (answer.profiles || answer).map(p => ({ id: p.id, title: p.title ?? p.content?.profile?.title ?? null })));
+    const sample = JSON.parse(await readFile(join(OUT, 'sample-data.json'), 'utf8'));
+    await writeSync('decent-sync', {
+        about: 'Decent Sync\'s plugin serving the first Machine at its Location (scripts/fake-decaid-recorder/decent-sync.mjs): the state the fake plugin starts from (fake-decaid/decent-sync.js). DYE2\'s keys as its Library\'s sync left them, the tablet\'s Shots pulled at the Location after the sample data\'s, and the server\'s Recipes, Profiles and Shots of the second Machine.',
+        labels,
+        plugin: (await decaid('GET', '/plugins')).find(p => p.id === PLUGIN),
+        skin: (await raw('GET', `${P}/skin`)).body,
+        status: (await raw('GET', `${P}/status`)).body,
+        store: { 'dye2.reaplugin': await decaid('GET', '/store/dye2.reaplugin?full=1') },
+        shots: [await decaid('GET', `/shots/${A.id}`), await decaid('GET', `/shots/${B.id}`)],
+        server: {
+            machine: { id: stage.machine.id, name: stage.machine.name },
+            location: { id: stage.location.id, name: stage.location.name },
+            profiles,
+            recipes: recipes.map(r => ({ id: r.id, name: r.name, slot: r.slot ?? null, archived: !!r.archived, profileId: r.content?.profileId ?? null, referenceShotId: r.referenceShot?.id ?? null })),
+            own: { [A.id]: { unfinished: rowOf(A.id).unfinished }, [B.id]: { unfinished: rowOf(B.id).unfinished } },
+            others: await Promise.all([C, D].map(async shot => ({
+                shot: (await raw('GET', `${P}/shot?id=${shot.id}`)).body.shot,
+                machine: rowOf(shot.id).machine,
+                recipeId: rowOf(shot.id).recipe?.id ?? null,
+                unfinished: rowOf(shot.id).unfinished,
+            }))),
+        },
+    });
+    console.log('recorded decent-sync');
+    const sync = {
+        records: Object.fromEntries(records.map(row => [row.name, row.id])),
+        recipeIds: Object.fromEntries(records.map(row => [row.name, row.decentSyncId])),
+        shots: labels,
+        sampleShot: sample.shots[0].id,
+    };
+    await (await import('./decent-sync-scenarios.mjs')).recordDecentSyncScenarios({ raw, ws, write: writeSync, sleep, opened, stage, sync, only: SCENARIO });
+}
+
 // The order matters: the scenarios start from the sample data's state, and the
 // boot and the pour come after them, so no Shot but the sample data's is there.
+// Decent Sync's stage comes last, as its sync rewrites DYE2's records.
 try {
     if (ONLY.includes('sample-data')) await sampleData();
     if (ONLY.includes('scenarios')) {
@@ -268,7 +342,10 @@ try {
     }
     if (ONLY.includes('boot')) await boot();
     if (ONLY.includes('pour')) await pour();
+    if (ONLY.includes('decent-sync')) await decentSyncStage();
 } finally {
+    if (stage && !KEEP) stage.stop();
+    else if (stage) console.log(`kept the second setup: server ${stage.url}, second Decaid ${stage.second.api} (container ${stage.second.id.slice(0, 12)}); remove both with the label filter in docs/cafe/TESTING.md`);
     if (KEEP && stack.id) {
         // The token is a credential: kept in a file only its owner reads, never printed.
         const tokenFile = join(CACHE, `kept-${stack.id.slice(0, 12)}.token`);

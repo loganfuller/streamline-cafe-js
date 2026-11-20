@@ -28,10 +28,19 @@
 import { copy } from './workflow.js';
 
 /** Decaid's local time with no offset, as `DateTime.toIso8601String()` writes it, to the microsecond. */
+// One formatter for each zone: making one is far slower than using it.
+const formatters = new Map();
+const formatterFor = timeZone => {
+    if (!formatters.has(timeZone)) {
+        formatters.set(timeZone, new Intl.DateTimeFormat('en-GB', {
+            timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+        }));
+    }
+    return formatters.get(timeZone);
+};
+
 export function localTime(ms, timeZone) {
-    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
-        timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-    }).formatToParts(new Date(ms)).map(part => [part.type, part.value]));
+    const parts = Object.fromEntries(formatterFor(timeZone).formatToParts(new Date(ms)).map(part => [part.type, part.value]));
     const fraction = String(((ms % 1000) + 1000) % 1000).padStart(3, '0');
     return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${fraction}000`;
 }
