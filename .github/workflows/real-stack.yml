@@ -1,10 +1,14 @@
 name: Real stack
+# A run against the newest releases is named apart, so the Pre-Tag Gate's run
+# against the pins can be told from it (docs/AI_RELEASE_NOTES.md).
+run-name: ${{ (github.event_name == 'schedule' || inputs.latest == true) && 'Real stack, newest releases' || 'Real stack' }}
 
 # The real stack (docs/cafe/TESTING.md, "The real-stack workflow"): the recorder
 # and the real journeys, on headless Decaid in Docker on GitHub's arm64 runner.
 #
-# - A pull request that changes the pins, the journeys, the recorder or this
-#   file: against the pins. A fresh recording the fake no longer answers as it
+# - A pull request that changes the pins, the recordings or their replay, the
+#   journeys, the recorder, this file, or the sample data and helpers they
+#   import (the paths below): against the pins. A fresh recording the fake no longer answers as it
 #   did, or whose shape differs from the committed one, fails it; so does a
 #   journey.
 # - On demand (Actions → Real stack → Run workflow), and before each release tag
@@ -22,6 +26,10 @@ on:
       - test/real/**
       - test/fake-decaid-recordings.test.mjs
       # What the recorder and the journeys import from the page tests and the smoke run.
+      # Left out on purpose: the fake (fake-decaid/), which `npm test` replays the
+      # committed recordings against on every pull request, and the page (src/),
+      # whose writes AGENTS.md has a pull request run the journeys for by hand;
+      # the Pre-Tag Gate runs everything before a release.
       - test/cafe-smoke/sample-data.mjs
       - test/cafe-smoke/page-helpers.mjs
       - test/page/support/page-files.mjs
@@ -43,7 +51,7 @@ permissions:
 # A newer push cancels a pull request's run; the weekly run and a run on demand
 # (the Pre-Tag Gate's) never cancel each other.
 concurrency:
-  group: real-stack-${{ github.event_name }}-${{ github.ref }}
+  group: real-stack-${{ github.event_name }}-${{ inputs.latest == true && 'latest' || 'pins' }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

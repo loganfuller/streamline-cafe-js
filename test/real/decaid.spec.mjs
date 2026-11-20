@@ -128,6 +128,9 @@ test.describe('the unload after a pour on the real stack', { tag: '@real-unload-
         const before = (await side.decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
         const unloads = [];
         page.on('request', request => { if (isUnload(request)) unloads.push(Date.now()); });
+        // Answered unloads: the page retries one DYE2 refuses, which is not a second unload.
+        let unloadsTaken = 0;
+        page.on('response', response => { if (isUnload(response.request()) && response.ok()) unloadsTaken += 1; });
         let storedAt = null;
         const watching = expect.poll(async () => {
             const newest = (await side.decaid('GET', '/shots?limit=1')).items?.[0]?.id ?? null;
@@ -146,13 +149,13 @@ test.describe('the unload after a pour on the real stack', { tag: '@real-unload-
         await watching;
         expect(tappedAt, 'the tap came before Decaid stored the Shot').toBeLessThan(storedAt);
         expect(recipeIdOf(shot.workflow), 'the Shot Decaid stored names the recipe').toBe(houseRecord.id);
-        await expect.poll(() => unloads.length, { message: 'the page asks for the unload once' }).toBe(1);
+        await expect.poll(() => unloadsTaken, { message: 'the page asks for the unload, and DYE2 takes it' }).toBe(1);
         expect(unloads[0], 'after the Shot is stored').toBeGreaterThan(storedAt);
         await expect.poll(() => loadedInWorkflow(side)).toBeNull();
         expectNoRecipeSelected(await selection(side));
         await expectNoRecipePage(page);
         await untilStripSettled(page);
-        expect(unloads, 'and asks only once').toHaveLength(1);
+        expect(unloadsTaken, 'and only one unload is taken').toBe(1);
         test.info().annotations.push({ type: 'timing', description: `stored ${storedAt - tappedAt} ms after the tap; unload asked ${unloads[0] - storedAt} ms after the store` });
     });
 });
