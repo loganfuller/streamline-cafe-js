@@ -13,7 +13,7 @@
 // Reference Shot, and puts back what it changed: the Recipe's content, its
 // name, its Reference Shot, the server running.
 
-import { test, expect, pull, quiet, shoot, card } from './support/journey.mjs';
+import { test, expect, pull, quiet, shoot, card, DYE2 } from './support/journey.mjs';
 import { legend, remarks, chartLines, shotsHeader, REFERENCE_LINES } from '../page/support/page-reads.mjs';
 import {
     HOUSE, LOCATION, MACHINE, MACHINE_TWO, SAVED_LABEL, BADGE, POLL_MS,
@@ -31,19 +31,46 @@ const served = async side => (await maybe(() => side.decaid('GET', PLUGIN_STATUS
 const differing = (content, wanted) => Object.keys(wanted).filter(field => JSON.stringify(content?.[field] ?? null) !== JSON.stringify(wanted[field] ?? null));
 
 /**
+ * What a tablet's DYE2 record of the Recipe holds of `wanted`'s fields: its
+ * name, profile, dose, yield and setting, and its grinder, batch and basket by
+ * that Decaid's own ids.
+ */
+function recordHolds(row) {
+    const context = row?.workflow?.context || {};
+    return row && {
+        name: row.name, profileId: row.profileId,
+        dose: Number(context.targetDoseWeight), yield: Number(context.targetYield), grindSetting: parseFloat(context.grinderSetting),
+        grinder: recordGrinder(row), batch: recordBatch(row), basket: String(context.extras?.basketId ?? ''),
+    };
+}
+
+/** `wanted` as `recordHolds` reads it on `side`: the Location's ids turned into that Decaid's (each item's `decentSyncId`). */
+async function recordAs(side, wanted) {
+    const list = answer => (Array.isArray(answer) ? answer : answer?.items || []);
+    const grinders = list(await side.decaid('GET', '/grinders'));
+    const beans = list(await side.decaid('GET', '/beans'));
+    const batches = (await Promise.all(beans.map(bean => side.decaid('GET', `/beans/${bean.id}/batches`)))).flatMap(list);
+    const baskets = await side.decaid('GET', `/store/${DYE2}/baskets`);
+    const own = (rows, id, syncIdOf = row => row?.extras?.decentSyncId) => String(rows.find(row => syncIdOf(row) === id)?.id ?? '');
+    return {
+        name: wanted.name, profileId: wanted.profileId,
+        dose: Number(wanted.dose), yield: Number(wanted.yield), grindSetting: parseFloat(wanted.grindSetting),
+        grinder: own(grinders, wanted.grinderId), batch: own(batches, wanted.beanBatchId), basket: own(baskets, wanted.basketId, row => row?.decentSyncId),
+    };
+}
+
+/**
  * The Recipe's content made `wanted` on the server where it differs, and both
- * tablets' records holding it, by the plugins' Library sync.
+ * tablets' records holding every field of it, by the plugins' Library sync.
+ * It waits for the records even when the server already holds `wanted`: an
+ * earlier journey's put-back may not have reached a tablet yet.
  */
 async function putBack(sync, id, wanted) {
     const off = differing((await recipeOn(sync, id))?.content, wanted);
-    if (!off.length) return;
-    await sync.server('PATCH', `/recipes/${id}`, { content: Object.fromEntries(off.map(field => [field, wanted[field] ?? null])) });
-    const held = async side => {
-        const row = await recordFor(side, id);
-        return { name: row?.name, profileId: row?.profileId };
-    };
-    await expect.poll(async () => [await held(sync), await held(sync.second)], { message: 'both tablets\' records hold the Recipe as put back', timeout: 90_000 })
-        .toEqual([{ name: wanted.name, profileId: wanted.profileId }, { name: wanted.name, profileId: wanted.profileId }]);
+    if (off.length) await sync.server('PATCH', `/recipes/${id}`, { content: Object.fromEntries(off.map(field => [field, wanted[field] ?? null])) });
+    const expected = [await recordAs(sync, wanted), await recordAs(sync.second, wanted)];
+    await expect.poll(async () => [recordHolds(await recordFor(sync, id)), recordHolds(await recordFor(sync.second, id))], { message: 'both tablets\' records hold the Recipe as put back', timeout: 90_000 })
+        .toEqual(expected);
 }
 
 /**
