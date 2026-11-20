@@ -131,7 +131,6 @@ async function serverStopped(cafe, fake) {
     await expect(cafe.page.locator('#cafe-legend-notice')).toBeVisible();
 }
 
-/** The server back: its connection pushed, and the page's asks after it answered. */
 /**
  * The status the plugin answers now, asked of the fake and not by the page: in
  * the catch-up race it already says served while `shots` and `shot` refuse.
@@ -140,6 +139,7 @@ async function serverStopped(cafe, fake) {
  */
 const pluginStatus = fake => fake.request({ method: 'GET', url: `${PLUGIN}/status` }).status;
 
+/** The server back: its connection pushed, and the page's asks after it answered. */
 async function serverBack(cafe, fake) {
     fake.decentSync.startServer();
     fake.flush();

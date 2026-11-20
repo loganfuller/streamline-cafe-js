@@ -497,6 +497,17 @@ test('Decent Sync: a Shot stored while the server is out of reach joins the Loca
     const id = fake.storeShot();
     fake.decentSync.startServer();
     assert.equal(get(fake, `${PLUGIN}/shots?limit=1`).body.shots[0].id, id);
+
+    // Sharing turned off meanwhile: reported, but listed nowhere.
+    const off = served();
+    off.decentSync.stopServer();
+    off.startPour();
+    off.finishPour();
+    const unshared = off.storeShot();
+    off.decentSync.setSharing(false);
+    off.decentSync.startServer();
+    off.decentSync.setSharing(true);
+    assert.equal(get(off, `${PLUGIN}/shots?limit=50`).body.shots.some(row => row.id === unshared), false);
 });
 
 test('Decent Sync: a Shot stored on the tablet joins the Location\'s Shots, with its duration past the Preheat', () => {

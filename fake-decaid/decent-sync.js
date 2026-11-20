@@ -434,9 +434,9 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
          * it joins no Location's.
          */
         shotStored(id) {
-            if (!sharing || own.has(id)) return;
-            if (state === 'served') own.set(id, { unfinished: false });
-            else if (state === 'unreachable') unreported.add(id);
+            if (own.has(id)) return;
+            if (state === 'unreachable') unreported.add(id);
+            else if (servedNow()) own.set(id, { unfinished: false });
         },
         /** A Shot of the tablet's own changed in Decaid: the copies follow. */
         ownShotChanged() {
@@ -453,7 +453,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
             startServer() {
                 if (state !== 'unreachable') return;
                 state = 'served';
-                for (const id of unreported) if (!own.has(id)) own.set(id, { unfinished: false });
+                // Reported now, to a server that lists them only if the Machine shares.
+                if (sharing) for (const id of unreported) if (!own.has(id)) own.set(id, { unfinished: false });
                 unreported.clear();
                 announce({ what: 'connection', connected: true });
                 refreshCopies();
