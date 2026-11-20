@@ -12,8 +12,6 @@ import { test as base, expect } from 'playwright/test';
 
 import { createFakeDecaid } from '../../../fake-decaid/index.js';
 import { attach, recording } from './adapter.mjs';
-
-const POUR = recording('pour');
 import { servePage, PAGE_ORIGIN } from './page-files.mjs';
 
 export { expect };
@@ -120,11 +118,12 @@ class Cafe {
             this.idleSeenAt = null;
         }
         const end = Math.min(toMs, this.fake.machine.pourLength());
+        const { idleAtMs } = this.fake.machine.pourTimes();
         const from = this.pouring.at;
         const play = at => {
             this.fake.playPour(at);
             // The page's time when the machine's frame back at rest reached it.
-            if (this.idleSeenAt === null && at >= POUR.idleAtMs) this.idleSeenAt = this.fake.now();
+            if (this.idleSeenAt === null && at >= idleAtMs) this.idleSeenAt = this.fake.now();
         };
         if (end > from) {
             await this.advance(end - from, { step, during: moved => play(from + moved) });
@@ -146,7 +145,8 @@ class Cafe {
      */
     async untilStored() {
         if (this.idleSeenAt == null) throw new Error('untilStored() follows a whole pour()');
-        const at = this.idleSeenAt + (POUR.storedAtMs - POUR.idleAtMs);
+        const { idleAtMs, storedAtMs } = this.fake.machine.pourTimes();
+        const at = this.idleSeenAt + (storedAtMs - idleAtMs);
         for (;;) {
             const left = at - await this.page.evaluate(() => Date.now());
             if (left <= 0) return;
@@ -190,9 +190,16 @@ export const test = base.extend({
      * through `fake.decentSync`.
      */
     decentSync: [false, { option: true }],
-    fake: async ({ start, timezoneId, decentSync }, use) => {
+    /**
+     * The recorded pour the fake's machine plays: the pinned stack's simulated
+     * one (recordings/pour.json), unless a spec names another with
+     * `test.use({ pour: 'real/de1pro-pour' })`, the real DE1Pro's
+     * (docs/cafe/TESTING.md, "The real pour").
+     */
+    pour: ['pour', { option: true }],
+    fake: async ({ start, timezoneId, decentSync, pour }, use) => {
         const fake = createFakeDecaid({
-            sampleData: recording('sample-data'), boot: recording('boot'), pour: recording('pour'),
+            sampleData: recording('sample-data'), boot: recording('boot'), pour: recording(pour),
             ...(decentSync ? { decentSync: recording('decent-sync') } : {}),
             now: start, timeZone: timezoneId ?? 'UTC',
         });
