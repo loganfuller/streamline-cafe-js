@@ -21,8 +21,10 @@ if (!committedDir || !freshDir) throw new Error('usage: compare.mjs <committed d
 // stands for any such key: the ids are new on every stack.
 // An id inside a key (DYE2 keys its shot index by bean, profile and grinder id,
 // and by the recipe ids it makes at random, `recipe-mwo9hohd6k2t`) is one too.
+// Only these forms: a field's name, however long (`targetGroupTemperature`),
+// stays itself, so a field renamed upstream is reported.
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\brecipe-[a-z0-9]{8,}\b/gi;
-const ID = /^([0-9a-f]{24,}|\d+|[A-Za-z0-9_-]{20,})$/i;
+const ID = /^([0-9a-f]{24,}|\d+)$/i;
 const keyOf = key => (ID.test(key) ? '<id>' : key.replace(UUID, '<id>'));
 const kind = value => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);
 

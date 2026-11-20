@@ -6,10 +6,12 @@
 // machine's or cafe's: the stack is a simulated machine with made-up data.
 //
 //   node scripts/fake-decaid-recorder/weekly-issue.mjs --pins=<file> --record=<outcome> \
-//       --replay=<tap file> --compare=<markdown file> --journeys=<outcome> --results=<playwright json> \
-//       [--run=<url>] [--dry-run]
+//       --record-job=<outcome> --replay=<tap file> --compare=<markdown file> \
+//       --journeys=<outcome> --results=<playwright json> [--run=<url>] [--dry-run]
 //
-// Outcomes are the jobs' (success, failure, cancelled, skipped). It needs `gh`,
+// Outcomes are the jobs' (success, failure, cancelled, skipped); --record is the
+// recording step's alone, --record-job the whole recorder job's, so a replay or
+// comparison that failed without naming anything is still reported. It needs `gh`,
 // signed in with the right to write issues (GH_TOKEN in Actions).
 
 import { execFileSync } from 'node:child_process';
@@ -49,8 +51,8 @@ export function failedJourneys(results) {
 }
 
 /** The report's text, or null when nothing differs and nothing failed. */
-export function report({ ran, pinned, record, replays, compare, journeys, journeyOutcome, run }) {
-    const problems = record !== 'success' || replays.length || compare.trim() || journeys.length || journeyOutcome !== 'success';
+export function report({ ran, pinned, record, recordJob, replays, compare, journeys, journeyOutcome, run }) {
+    const problems = record !== 'success' || recordJob !== 'success' || replays.length || compare.trim() || journeys.length || journeyOutcome !== 'success';
     if (!problems) return null;
     const version = key => `${ran[key].version}${ran[key].version === pinned[key].version ? ' (the pin)' : ` (pinned ${pinned[key].version})`}`;
     const lines = [
@@ -65,6 +67,7 @@ export function report({ ran, pinned, record, replays, compare, journeys, journe
     if (record !== 'success') lines.push(`**The recorder did not finish** (${record}); see the run's log.`, '');
     if (replays.length) lines.push('**Recordings the fake no longer answers as the fresh one did** (`test/fake-decaid-recordings.test.mjs` on the fresh recordings):', '', ...replays.map(name => `- ${name}`), '');
     if (compare.trim()) lines.push('**Recordings whose shape differs from the committed one** (`compare.mjs`: + only in the fresh one, - only in the committed one, ~ another kind of value):', '', compare.trim(), '');
+    else if (record === 'success' && recordJob !== 'success' && !replays.length) lines.push(`**The recorder's job failed after recording** (${recordJob}), naming no recording; see the run's log.`, '');
     if (journeys.length) lines.push('**Journeys that failed:**', '', ...journeys.map(j => `- \`${j.file}\`: ${j.title}${j.error ? `: ${j.error}` : ''}`), '');
     else if (journeyOutcome !== 'success') lines.push(`**The journeys did not finish** (${journeyOutcome}); see the run's log.`, '');
     lines.push('A bump to these versions is its own pull request, which records again (docs/cafe/TESTING.md, "Bumping a pin").');
@@ -76,6 +79,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         ran,
         pinned,
         record: flag('record'),
+        recordJob: flag('record-job'),
         replays: failedReplays(read(flag('replay'))),
         compare: read(flag('compare')),
         journeys: failedJourneys(JSON.parse(read(flag('results')) || 'null')),

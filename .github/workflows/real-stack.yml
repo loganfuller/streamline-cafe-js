@@ -139,6 +139,7 @@ jobs:
           node scripts/fake-decaid-recorder/weekly-issue.mjs
           --pins="$A/real-stack-record/pins.json"
           --record="${{ needs.record.outputs.recorded || 'skipped' }}"
+          --record-job="${{ needs.record.result }}"
           --replay="$A/real-stack-record/replay.tap"
           --compare="$A/real-stack-record/compare.md"
           --journeys="${{ needs.journeys.result }}"
