@@ -421,6 +421,17 @@ test.describe('the preview', { tag: '@preview' }, () => {
         expect(list).toEqual(expect.arrayContaining(['other-tab.key', 'this-tab.key', 'streamline.dye2Enabled']));
     });
 
+    test('"Start over" opens the page again from an address with a hash', async ({ preview }) => {
+        const { page } = preview;
+        await page.goto(`${preview.site}#top`);
+        await preview.started();
+        await page.evaluate(() => { window.__before = true; });
+        await page.locator('#preview-start-over').click();
+        await expect.poll(() => page.evaluate(() => window.__before ?? false), 'the page was opened again, not jumped within').toBe(false);
+        await preview.started();
+        expect(new URL(page.url()).hash).toBe('');
+    });
+
     test('a reload, and "Start over", find the page as a first visit did; storage that isn\'t the skin\'s is untouched', async ({ preview }) => {
         const { page } = preview;
         let frame = await preview.open();

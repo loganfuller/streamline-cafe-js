@@ -64,6 +64,17 @@ test('the preview\'s skin page is index.html with the stand-in as its first scri
     assert.equal(existsSync(join(ROOT, 'preview', 'skin.html')), false, 'not kept in the repository');
 });
 
+test('the stand-in goes after the import map however the map is closed, and a page it can\'t place it in is refused', () => {
+    const page = '<head>\n  <meta charset="UTF-8">\n  <script type="importmap">{"imports":{}}</script> \n  <script>theme()</script>\n</head>\n';
+    assert.equal(skinPage(page), page.replace('<script>theme', '<script src="preview/stand-in.js"></script>\n  <script>theme'), 'a one-line map, a space after it');
+    const crlf = skinPage(page.replace(/\n/g, '\r\n'));
+    assert.ok(crlf.indexOf('stand-in.js') < crlf.indexOf('theme()'), 'CRLF');
+    assert.throws(() => skinPage(page.replace('</script> ', '</script><script>x()</script>')), /more on the line that closes its import map/);
+    assert.throws(() => skinPage(page.replace('<script type="importmap">{"imports":{}}</script>', '')), /no import map/);
+    assert.throws(() => skinPage(page.replace('<meta charset="UTF-8">', '<script>early()</script>')), /a script before its import map/);
+    assert.throws(() => skinPage(page + '<script type="importmap">{}</script>\n'), /more than one import map/);
+});
+
 test('the Pages site is the preview, staged by its one script', () => {
     assert.match(pages, /^\s*run: node preview\/stage\.mjs _site$/m);
     assert.match(pages, /path: '\.\/_site'/);

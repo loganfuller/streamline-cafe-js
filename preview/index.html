@@ -79,7 +79,8 @@
         // Each visit starts fresh (preview/stand-in.js), so starting over is
         // opening the page again. Not a reload: a browser may reload the frame
         // at the address it had moved to, such as Settings, not at its src.
-        document.getElementById('preview-start-over').addEventListener('click', () => location.replace(location.href));
+        // Without the hash, which would make it a jump within the page.
+        document.getElementById('preview-start-over').addEventListener('click', () => location.replace(location.pathname + location.search));
     </script>
 </body>
 </html>

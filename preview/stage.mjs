@@ -18,19 +18,27 @@ const ROOT = resolve(import.meta.dirname, '..');
 // What the stand-in starts the fake from (preview/stand-in.js, RECORDINGS).
 const RECORDINGS = ['sample-data', 'boot', 'pour'];
 const STAND_IN = '<script src="preview/stand-in.js"></script>';
-// The import map, to its closing line. The stand-in goes right after it: a
-// browser that takes no import map once a module has loaded (the stand-in's
-// import() is one) would drop a map that came later.
-const IMPORT_MAP = /<script type="importmap">[\s\S]*?^([ \t]*)<\/script>\r?\n/m;
+// The stand-in goes on the line after the import map's: a browser that takes
+// no import map once a module has loaded (the stand-in's import() is one)
+// would drop a map that came later.
+const IMPORT_MAP = '<script type="importmap">';
 
 /** The skin's page with the stand-in as its first script after the import map, from index.html as it is. */
 export function skinPage(html) {
-    const found = html.match(IMPORT_MAP);
-    if (!found) throw new Error('index.html has no import map to put the stand-in after');
-    if (html.split('<script type="importmap">').length !== 2) throw new Error('index.html has more than one import map');
-    if (html.slice(0, found.index).includes('<script')) throw new Error('index.html has a script before its import map');
-    const at = found.index + found[0].length;
-    return `${html.slice(0, at)}${found[1]}${STAND_IN}\n${html.slice(at)}`;
+    const open = html.indexOf(IMPORT_MAP);
+    if (open < 0) throw new Error('index.html has no import map to put the stand-in after');
+    if (html.indexOf(IMPORT_MAP, open + 1) >= 0) throw new Error('index.html has more than one import map');
+    if (html.slice(0, open).includes('<script')) throw new Error('index.html has a script before its import map');
+    // The map ends at the first "</script" after it, as the HTML parser reads it.
+    const close = html.indexOf('</script', open);
+    const end = close < 0 ? -1 : html.indexOf('>', close);
+    const lineEnd = end < 0 ? -1 : html.indexOf('\n', end);
+    if (lineEnd < 0) throw new Error('index.html\'s import map has no closing line');
+    if (html.slice(end + 1, lineEnd).trim()) throw new Error('index.html has more on the line that closes its import map');
+    const lineStart = html.lastIndexOf('\n', close) + 1;
+    const indent = html.slice(lineStart).match(/^[ \t]*/)[0];
+    const at = lineEnd + 1;
+    return `${html.slice(0, at)}${indent}${STAND_IN}\n${html.slice(at)}`;
 }
 
 /** Stages the site into `out`, emptied first. Answers the paths staged, relative to it. */
