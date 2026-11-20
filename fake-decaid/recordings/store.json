@@ -5,7 +5,6 @@
   "streamline": "0.2.28"
  },
  "rule": "fake-decaid/store.js",
- "about": "Decaid's store: a key never written answers null, a write answers {} and is read back as written, a namespace lists its keys or, with full=1, its values, and a delete answers {}.",
  "given": {
   "workflow": {
    "id": "73363cf2-4da3-47fd-99eb-5387a422b49f",

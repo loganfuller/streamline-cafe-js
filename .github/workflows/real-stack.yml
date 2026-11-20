@@ -14,6 +14,9 @@ name: Real stack
 #   one open.
 
 on:
+  # DEMO (#62, reverted next commit): the weekly run on this branch.
+  push:
+    branches: [62-real-stack-journeys]
   pull_request:
     paths:
       - fake-decaid/pins.json
@@ -38,7 +41,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LATEST: ${{ github.event_name == 'schedule' || inputs.latest == true }}
+  LATEST: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.latest == true }}
 
 jobs:
   record:
@@ -118,7 +121,7 @@ jobs:
   # The weekly run's issue: opened, or added to, when anything differs or failed.
   report:
     needs: [record, journeys]
-    if: always() && (github.event_name == 'schedule' || inputs.latest == true)
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'push' || inputs.latest == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
