@@ -31,13 +31,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # Streamline Cafe: publish the built skin only, the files a release ships,
-      # not the whole repository.
-      - name: Stage the skin
-        run: |
-          set -euo pipefail
-          mkdir -p _site
-          cp -r index.html skin-manifest.json src _site/
+      # Streamline Cafe: the site is the public preview, the skin's page on the
+      # fake Decaid with sample data (docs/cafe/DESIGN.md, "The public preview"),
+      # staged by the script the preview's page test runs.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Stage the preview
+        run: node preview/stage.mjs _site
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
