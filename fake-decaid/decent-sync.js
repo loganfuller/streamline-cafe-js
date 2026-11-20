@@ -69,7 +69,7 @@
 //   profile; then, if the Workflow still names that Recipe on that profile
 //   and no load came meanwhile, the plugin asks DYE2's `record` (`POST`, `{}`),
 //   which writes the record and pushes on DYE2's `changed`. Its ask is not in
-//   the fake's request log, as no request of the page's is.
+//   the fake's request log, since it is no request of the page's.
 //
 // What the test makes happen (`events`): the connection lost and found
 // (`stopServer`, `startServer`), sharing off and on (`setSharing`), any other
@@ -229,7 +229,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     const timeZone = decaid.timeZone;
     let state = 'served';
     let sharing = true;
-    /** Whether the server last told the plugin its Machine is Capture-only: kept while it can't be asked (`setCaptureOnly`). */
+    /** Whether the server last told the plugin its Machine is Capture-only: kept while it can't be asked or refuses the Machine (`setCaptureOnly`). */
     let captureOnly = false;
     const machine = copy(server.machine);
     const location = copy(server.location);
@@ -545,8 +545,9 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
              */
             setSharing(on) {
                 sharing = !!on;
-                // The server tells a connected plugin; one out of reach hears it once connected.
-                if (state !== 'unreachable') captureOnly = !sharing;
+                // The server tells a plugin it welcomed (served or Capture-only); one out
+                // of reach, or refused its Machine, hears nothing of it until then.
+                if (state === 'served' || state === 'captureOnly') captureOnly = state === 'captureOnly' || !sharing;
                 if (!sharing) copies.clear();
                 if (servedNow()) refreshCopies();
             },

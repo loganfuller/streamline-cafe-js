@@ -314,6 +314,16 @@ test('DYE2 record: the brew temperature moved moves every step of the stored pro
     assert.deepEqual(row.workflow.profile.steps.map(step => step.temperature), profile.steps.map(step => step.temperature + 2));
     assert.deepEqual(row.profileSnapshot, house.profileSnapshot);
     assert.equal(send(fake, 'POST', RECORD, {}).body.saved, false, 'the armed temperature is the saved one now');
+    // Stepped back: it moved off the temperature armed by the last record, so it is written back.
+    send(fake, 'PUT', '/api/v1/workflow', { profile });
+    assert.equal(send(fake, 'POST', RECORD, {}).body.saved, true);
+    assert.equal(houseRecord(fake).dashboardVariables.brewC, profile.steps[0].temperature, 'armed afresh by each record');
+    // Written only once moved off the armed temperature, and never with none armed.
+    const at90 = { profile: { steps: [{ temperature: 90 }] } };
+    const holds95 = { dashboardVariables: { brewC: 95 } };
+    assert.deepEqual(itemPatch(holds95, at90, 90), {}, 'not moved off the armed one');
+    assert.deepEqual(itemPatch(holds95, at90, null), {}, 'none armed');
+    assert.deepEqual(itemPatch(holds95, at90, 88), { brewC: 90 });
     assert.deepEqual(profileAtBrewC({ steps: [{ temperature: 94 }, { temperature: 90 }, { temperature: 'x' }] }, 92).steps.map(s => s.temperature), [92, 88, 92]);
     assert.equal(profileAtBrewC({ steps: [] }, null), null);
 });
@@ -702,6 +712,31 @@ test('Decent Sync save: none for the change that loads a recipe, none after a ch
     stepDose(fake, 23);
     fake.flush();
     assert.equal(JSON.stringify(recordsOf(fake)), before, 'no recipe loaded');
+    // House applied again, the dose moved in the same write: a load, which saves nothing.
+    send(fake, 'PUT', '/api/v1/workflow', { ...applied(house), context: { ...applied(house).context, targetDoseWeight: 24 } });
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before, 'loaded again after DYE2 cleared it');
+});
+
+test('Decent Sync save: none after a change of profile that DYE2 keeps the recipe through', () => {
+    const { fake, house } = servedHouse();
+    // As the profile dialog writes: the record's profile first, then the Workflow's (dye2#38).
+    const other = recordsOf(fake).find(row => row.name === 'Single origin').workflow.profile;
+    send(fake, 'POST', '/api/v1/store/dye2.reaplugin/recipes', recordsOf(fake).map(row => (row.id === house.id ? { ...row, workflow: { ...row.workflow, profile: other } } : row)));
+    const before = JSON.stringify(recordsOf(fake));
+    send(fake, 'PUT', '/api/v1/workflow', { profile: other, context: { targetDoseWeight: 17 } });
+    assert.equal(fake.selection()?.id, house.id, 'DYE2 keeps the recipe');
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before);
+});
+
+test('Decent Sync save: a Workflow the test starts from is decided on, its Recipe loaded', () => {
+    const fake = served();
+    const house = houseRecord(fake);
+    fake.given({ workflow: deepMerge(fake.workflow(), applied(house)) });
+    stepDose(fake, 18.5);
+    fake.flush();
+    assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, 'a save, not a load');
 });
 
 test('Decent Sync save: none for a recipe whose record carries no Recipe of the Location', () => {
@@ -728,6 +763,33 @@ test('Decent Sync save: none on a Capture-only Machine or with DYE2 disabled; sa
         stepDose(fake, 18.5);
         fake.flush();
         assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, what);
+    }
+    {
+        // At no Location, the Machine stays Capture-only with sharing on.
+        const { fake, house } = servedHouse();
+        fake.decentSync.setState('captureOnly');
+        fake.decentSync.setSharing(true);
+        stepDose(fake, 18.5);
+        fake.flush();
+        assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, 'Capture-only, sharing on');
+    }
+    {
+        // Capture-only when the change was made: nothing waits, though sharing is on again by the flush.
+        const { fake, house } = servedHouse();
+        fake.decentSync.setSharing(false);
+        stepDose(fake, 18.5);
+        fake.decentSync.setSharing(true);
+        fake.flush();
+        assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, 'Capture-only at the change');
+    }
+    for (const refused of ['hardwareMismatch', 'serverTooOld']) {
+        // A refused Machine hears no word of its sharing, so the plugin saves on.
+        const { fake } = servedHouse();
+        fake.decentSync.setState(refused);
+        fake.decentSync.setSharing(false);
+        stepDose(fake, 18.5);
+        fake.flush();
+        assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, refused);
     }
     const { fake } = servedHouse();
     fake.decentSync.stopServer();
