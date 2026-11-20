@@ -718,6 +718,18 @@ test('Decent Sync save: none for the change that loads a recipe, none after a ch
     assert.equal(JSON.stringify(recordsOf(fake)), before, 'loaded again after DYE2 cleared it');
 });
 
+test('Decent Sync save: the plugin hears the change of profile before DYE2 clears the recipe, so the page loading it again is a load', () => {
+    const { fake, house } = servedHouse();
+    const other = recordsOf(fake).find(row => row.name === 'Single origin').workflow.profile;
+    send(fake, 'PUT', '/api/v1/workflow', { profile: other, context: { targetDoseWeight: 22 } });
+    fake.flush();
+    const before = JSON.stringify(recordsOf(fake));
+    // As Streamline's strip marks the recipe loaded again (dyeStrip.js).
+    send(fake, 'POST', '/api/v1/plugins/dye2.reaplugin/selection', { kind: 'recipe', id: house.id });
+    fake.flush();
+    assert.equal(JSON.stringify(recordsOf(fake)), before);
+});
+
 test('Decent Sync save: none after a change of profile that DYE2 keeps the recipe through', () => {
     const { fake, house } = servedHouse();
     // As the profile dialog writes: the record's profile first, then the Workflow's (dye2#38).
@@ -782,14 +794,23 @@ test('Decent Sync save: none on a Capture-only Machine or with DYE2 disabled; sa
         fake.flush();
         assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, 'Capture-only at the change');
     }
-    for (const refused of ['hardwareMismatch', 'serverTooOld']) {
-        // A refused Machine hears no word of its sharing, so the plugin saves on.
+    {
+        // A mismatched connection hears no word of its sharing, so the plugin saves on.
         const { fake } = servedHouse();
-        fake.decentSync.setState(refused);
+        fake.decentSync.setState('hardwareMismatch');
         fake.decentSync.setSharing(false);
         stepDose(fake, 18.5);
         fake.flush();
-        assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, refused);
+        assert.equal(houseRecord(fake).dashboardVariables.dose, 18.5, 'hardwareMismatch');
+    }
+    {
+        // A server too old to answer the plugin's asks still tells it of its sharing.
+        const { fake, house } = servedHouse();
+        fake.decentSync.setState('serverTooOld');
+        fake.decentSync.setSharing(false);
+        stepDose(fake, 18.5);
+        fake.flush();
+        assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose, 'serverTooOld');
     }
     const { fake } = servedHouse();
     fake.decentSync.stopServer();

@@ -229,7 +229,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
     const timeZone = decaid.timeZone;
     let state = 'served';
     let sharing = true;
-    /** Whether the server last told the plugin its Machine is Capture-only: kept while it can't be asked or refuses the Machine (`setCaptureOnly`). */
+    /** Whether the server last told the plugin its Machine is Capture-only: kept while it is out of reach or the Machine is mismatched (`setCaptureOnly`). */
     let captureOnly = false;
     const machine = copy(server.machine);
     const location = copy(server.location);
@@ -545,9 +545,10 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
              */
             setSharing(on) {
                 sharing = !!on;
-                // The server tells a plugin it welcomed (served or Capture-only); one out
-                // of reach, or refused its Machine, hears nothing of it until then.
-                if (state === 'served' || state === 'captureOnly') captureOnly = state === 'captureOnly' || !sharing;
+                // The server tells every connection but a mismatched one (a server too old
+                // to answer the plugin's asks included); one out of reach hears it once
+                // connected.
+                if (state !== 'unreachable' && state !== 'hardwareMismatch') captureOnly = state === 'captureOnly' || !sharing;
                 if (!sharing) copies.clear();
                 if (servedNow()) refreshCopies();
             },
