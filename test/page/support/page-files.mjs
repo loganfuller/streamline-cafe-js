@@ -28,19 +28,23 @@ const TYPES = {
 // Read once per process: every test opens the same files.
 const cache = new Map();
 
-/** Answers every request to the page's origin from the repository at `root`. */
-export async function servePage(context, root) {
-    await context.route(`${PAGE_ORIGIN}/**`, async route => {
+/**
+ * Answers every request to the page's origin from the repository at `root`.
+ * `origin` serves another page beside it (the real journeys' official Streamline).
+ */
+export async function servePage(context, root, origin = PAGE_ORIGIN) {
+    await context.route(`${origin}/**`, async route => {
         const path = normalize(decodeURIComponent(new URL(route.request().url()).pathname));
         if (path.includes('..')) return route.fulfill({ status: 403, body: 'outside the repository' });
-        let body = cache.get(path);
+        const key = `${root}\0${path}`;
+        let body = cache.get(key);
         if (body === undefined) {
             try {
                 body = await readFile(join(root, path));
             } catch {
                 body = null;
             }
-            cache.set(path, body);
+            cache.set(key, body);
         }
         if (body === null) return route.fulfill({ status: 404, body: `no file ${path}` });
         return route.fulfill({ body, contentType: TYPES[extname(path)] || 'application/octet-stream' });

@@ -140,6 +140,15 @@ git diff --check
 git status --short
 ```
 
+Then run the real stack against the pins on the commit to be tagged, and tag only once it is green (`docs/cafe/TESTING.md`, "The real-stack workflow"). The release workflow does not wait for it:
+
+```sh
+gh workflow run real-stack.yml --ref main
+gh run list --workflow real-stack.yml --branch main --limit 1   # its headSha must be the commit to be tagged
+```
+
+A failure there is fixed, or its cause named in the release notes, before the tag.
+
 Inspect `.github/workflows/release.yml` directly and confirm:
 
 - triggers and permissions are still intended;

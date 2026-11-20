@@ -1,15 +1,20 @@
 // The page tests' own rules (docs/cafe/TESTING.md): no fixed sleep and no
 // swallowed timeout. Time moves only through the clock helper in
-// test/page/support/test.mjs, and a wait that runs out fails the test.
+// test/page/support/test.mjs, and a wait that runs out fails the test. The real
+// journeys (test/real/) keep the same rules: their one fixed wait, for proving
+// nothing arrives, is `quiet(ms, why)` in test/real/support/journey.mjs, the
+// one file left out.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
-const DIR = new URL('./page/', import.meta.url);
+const inside = dir => readdirSync(new URL(dir, import.meta.url)).filter(name => name.endsWith('.mjs')).map(name => new URL(`${dir}${name}`, import.meta.url));
 const files = [
-    ...readdirSync(DIR).filter(name => name.endsWith('.mjs')).map(name => new URL(name, DIR)),
-    ...readdirSync(new URL('support/', DIR)).filter(name => name.endsWith('.mjs')).map(name => new URL(`support/${name}`, DIR)),
+    ...inside('./page/'),
+    ...inside('./page/support/'),
+    ...inside('./real/'),
+    ...inside('./real/support/').filter(url => !url.pathname.endsWith('/journey.mjs')),
 ];
 
 // The arguments of the call whose `(` is at `open`: the text to its matching
@@ -28,7 +33,7 @@ function call(source, open) {
     return { text: source.slice(open), comma };
 }
 
-test('no page test holds a fixed sleep or swallows a timeout', () => {
+test('no page test or real journey holds a fixed sleep or swallows a timeout', () => {
     assert.ok(files.length > 0);
     for (const file of files) {
         // Comments only: a // that starts a line or follows a space, not one in a URL.

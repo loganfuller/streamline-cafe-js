@@ -1,19 +1,51 @@
 name: Real stack
 
-# SPIKE (#62): does headless Decaid run on GitHub's arm64 runner? Temporary
-# push trigger; the real triggers come once it does.
+# The real stack (docs/cafe/TESTING.md, "The real-stack workflow"): the recorder
+# and the real journeys, on headless Decaid in Docker on GitHub's arm64 runner.
+#
+# - A pull request that changes the pins, the journeys, the recorder or this
+#   file: against the pins. A fresh recording the fake no longer answers as it
+#   did, or whose shape differs from the committed one, fails it; so does a
+#   journey.
+# - On demand (Actions → Real stack → Run workflow), and before each release tag
+#   (docs/AI_RELEASE_NOTES.md): against the pins, or with "latest" the weekly run.
+# - Weekly: against the newest stable Decaid, DYE2 and Decent Sync. A difference
+#   or a failed journey opens an issue labelled real-stack-weekly, or adds to the
+#   one open.
+
 on:
-  push:
-    branches: [62-real-stack-journeys]
+  pull_request:
+    paths:
+      - fake-decaid/pins.json
+      - scripts/fake-decaid-recorder/**
+      - test/real/**
+      - playwright.real.config.mjs
+      - .github/workflows/real-stack.yml
   workflow_dispatch:
+    inputs:
+      latest:
+        description: Against the newest stable Decaid, DYE2 and Decent Sync instead of the pins, and report as the weekly run does
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 7 * * 1'
 
 permissions:
   contents: read
+
+concurrency:
+  group: real-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LATEST: ${{ github.event_name == 'schedule' || inputs.latest == true }}
 
 jobs:
   record:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
+    outputs:
+      recorded: ${{ steps.record.outcome }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -22,16 +54,93 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps --only-shell chromium
-      - run: docker version && nproc && free -m
-      - name: Record from the pinned stack
-        run: node scripts/fake-decaid-recorder/record.mjs --out="$RUNNER_TEMP/recordings"
-      - name: Replay the fresh recordings against the fake
+      - name: The newest stable releases
+        if: env.LATEST == 'true'
         env:
-          FAKE_DECAID_RECORDINGS: ${{ runner.temp }}/recordings
-        run: node --test test/fake-decaid-recordings.test.mjs
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/fake-decaid-recorder/latest-pins.mjs "$RUNNER_TEMP/pins.json"
+          echo "FAKE_DECAID_PINS=$RUNNER_TEMP/pins.json" >> "$GITHUB_ENV"
+      - name: Record afresh
+        id: record
+        run: node scripts/fake-decaid-recorder/record.mjs --out="$RUNNER_TEMP/real-stack/recordings"
+      - name: Replay the fresh recordings against the fake
+        if: always() && steps.record.outcome == 'success'
+        env:
+          FAKE_DECAID_RECORDINGS: ${{ runner.temp }}/real-stack/recordings
+        run: >-
+          node --test
+          --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=tap --test-reporter-destination="$RUNNER_TEMP/real-stack/replay.tap"
+          test/fake-decaid-recordings.test.mjs
+      - name: Compare their shape with the committed recordings
+        if: always() && steps.record.outcome == 'success'
+        run: node scripts/fake-decaid-recorder/compare.mjs fake-decaid/recordings "$RUNNER_TEMP/real-stack/recordings" --markdown="$RUNNER_TEMP/real-stack/compare.md"
+      - name: Keep the pins run
+        if: always()
+        run: cp "${FAKE_DECAID_PINS:-fake-decaid/pins.json}" "$RUNNER_TEMP/real-stack/pins.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: recordings
-          path: ${{ runner.temp }}/recordings
-          retention-days: 14
+          name: real-stack-record
+          path: ${{ runner.temp }}/real-stack/
+          retention-days: 30
+
+  journeys:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps --only-shell chromium
+      - name: The newest stable releases
+        if: env.LATEST == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/fake-decaid-recorder/latest-pins.mjs "$RUNNER_TEMP/pins.json"
+          echo "FAKE_DECAID_PINS=$RUNNER_TEMP/pins.json" >> "$GITHUB_ENV"
+      - name: The real journeys
+        run: npm run test:real
+      # Results, the report, screenshots and a failure's traces; the stacks'
+      # tokens are kept in ~/.cache, outside this folder.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-stack-journeys
+          path: test/real/out/
+          retention-days: 30
+
+  # The weekly run's issue: opened, or added to, when anything differs or failed.
+  report:
+    needs: [record, journeys]
+    if: always() && (github.event_name == 'schedule' || inputs.latest == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Open or add to the weekly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          A: ${{ runner.temp }}/artifacts
+        run: >-
+          node scripts/fake-decaid-recorder/weekly-issue.mjs
+          --pins="$A/real-stack-record/pins.json"
+          --record="${{ needs.record.outputs.recorded || 'skipped' }}"
+          --replay="$A/real-stack-record/replay.tap"
+          --compare="$A/real-stack-record/compare.md"
+          --journeys="${{ needs.journeys.result }}"
+          --results="$A/real-stack-journeys/results.json"
+          --run="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -7,6 +7,7 @@ Three layers, each answering a different question.
 | Unit tests | Pure modules, under `node:test` | `test/*.test.mjs` | `npm test`, every pull request (Node 22, 24 and 26) |
 | Page tests | The real page in Chromium, against a fake Decaid | `test/page/*.spec.mjs` | `npm run test:page`, every pull request (Node 26) |
 | The real stack, pinned | The scenarios behind each rule the fake follows, recorded from the real Decaid, DYE2 and Decent Sync, replayed against the fake | `fake-decaid/recordings/`, replayed by `test/fake-decaid-recordings.test.mjs` | Replayed in `npm test`; recorded again on a version bump |
+| The real journeys | The real page against the real pinned stack, for what only it can show | `test/real/*.spec.mjs` | `npm run test:real`; in the real-stack workflow on a pins change, before a release tag, on demand, and weekly against the newest stable releases |
 
 The by-hand smoke run ([`SMOKE.md`](SMOKE.md)) came before the page tests, and its steps are moving to them. These have moved: steps 1 and 2 (the "DYE2 is needed" screen, `test/page/dye2-gate.spec.mjs`), step 3 (the seed, which is the fake's sample data), steps 4 and 5 (the strip and a tap that loads, `strip.spec.mjs`), step 6 (stepping the dial-in, `dial-in.spec.mjs`), step 7 (a live shot and the graph at rest, `live-shot.spec.mjs`), step 8 (the reference on the graph and its comparison row, `reference.spec.mjs` and `reference-edges.spec.mjs`), step 9 (rating and notes, `remarks.spec.mjs`, and the legend in every finished language, `legend-fit.spec.mjs`), step 10 (the full-screen chart and Settings, `full-screen-and-settings.spec.mjs`), steps 11 and 12 (the long-press menus and arranging the strip, `slot-menu.spec.mjs`), step 13 (German, Arabic and French, `languages.spec.mjs`), step 15 (the dial-in label with Decent Sync, `decent-sync-label.spec.mjs`), step 16 (two shots with no recipe, `last-shot.spec.mjs`), step 17 (the Shots list, `shots-list.spec.mjs`), step 18 (the grinder dialog, `grinder-dialog.spec.mjs`), step 19 (a short touchscreen and the soft keyboard, `touch-keyboard.spec.mjs`), step 20 (every dialog at a tablet's size, `dialog-sizes.spec.mjs`), step 21 (the Grind row, `grind-row.spec.mjs`), step 22 (the bean and batch dialog and the basket dialog, `bean-basket-dialogs.spec.mjs`), step 23 (the barista, `barista.spec.mjs`), step 24 (a tap on the loaded card unloads it, `unload-tap.spec.mjs`) and step 25 (the profile changed with the recipe kept loaded, `profile-change.spec.mjs`). The second run's tablet-side checks have moved too, each step's page half to a `sync-*.spec.mjs` (the reference, its pushes, rating and notes, an outage, a Capture-only Machine, the Location's Shots and their outage, the picks), on the fake plugin; what is left of `run-decent-sync.mjs` needs the real server, plugin or second tablet. A change to a part of the page whose step has not moved yet still does that step's smoke run. A new slice writes its closing check as page tests, never as a new smoke step.
 
@@ -100,6 +101,50 @@ Three things headless Decaid v0.9.2 does that the recorder works around, and whi
 4. Add a unit test of the rule to `test/fake-decaid.test.mjs`.
 
 A pull request that changes what the model does adds or records again the scenario that proves it. A Streamline release adopted records the boot again.
+
+### Bumping a pin
+
+A bump is a pull request of its own, one release at a time where they can be told apart:
+
+1. In `fake-decaid/pins.json`, set the version and the release file's checksum (`gh api repos/<repo>/releases/tags/v<version> -q '.assets[] | [.name, .digest] | @tsv'` gives both; Decaid has an arm64 and an x64 file, Decent Sync a plugin file and an image tag of the same version). `node scripts/fake-decaid-recorder/latest-pins.mjs <file>` writes the newest stable releases' pins to compare with.
+2. Record everything again on a fresh stack (`npm run record:fake-decaid`) and run `npm test`. Where the replay now fails, the real stack has changed under the fake: change the model to answer as the new version does, naming the version in its file's opening comment, as in "Adding a rule to the model".
+3. Run the page tests and the real journeys (`npm run test:real`), and fix what the new version changed.
+4. Open the pull request. The pins changed, so the real-stack workflow runs the recorder and the journeys on it.
+
+Adopting a Streamline release moves its pin with the merge of that release (`version` and `commit`), and records the boot again.
+
+## The real journeys
+
+Playwright tests of the real page against the real pinned stack, for what only it can show: what Decaid, DYE2, Decent Sync's server and a second tablet make of the page's writes, and what they push back. Everything else is a page test.
+
+```sh
+npm run test:real                                  # stand both stacks up, run every journey, remove them
+REAL_STACK_KEEP=1 npm run test:real                # leave the stacks up afterwards
+REAL_STACK=~/.cache/streamline-cafe-fake-decaid/journeys-stack.json \
+  npx playwright test -c playwright.real.config.mjs test/real/decaid.spec.mjs   # on the kept stacks
+```
+
+It needs what the recorder needs (Docker, GitHub and ghcr.io). `test/real/support/stacks.mjs` stands up two stacks at once with the recorder's own scripts, from the same pins: `decaid`, a Decaid with the pinned DYE2 and the sample data, and `sync`, another such Decaid with Decent Sync's second setup on it (the server's pinned image and its PostgreSQL, the pinned plugin, and a second Decaid, a simulated Bengle, as the Location's second Machine). That takes a little over a minute on an Apple-silicon Mac. Their addresses and extensions tokens go in a state file in the recorder's cache (`~/.cache/streamline-cafe-fake-decaid/journeys-stack.json`), never printed; `REAL_STACK=<file>` names another, and `REAL_STACK_PORT` moves the four ports (18257 to 18260 by default, apart from the recorder's) for a second set beside the first. The stacks carry the recorder's label, so the label filter under "Recording" removes what a killed run left.
+
+The journeys run one at a time (`workers: 1`): Decaid admits about 15 sockets per client address. `test/real/support/journey.mjs` gives each test `stacks` and `tablet(side)`, a page on that side's Decaid in a Chromium whose `127.0.0.1:8080` is that Decaid, as on its tablet, with the page's files answered from the repository; `tablet(side, { streamline: true })` opens official Streamline at its pinned commit instead. Any error on a page fails the test. A journey sets up what it needs and puts back what it changes, so each can run again on kept stacks, in any order. It waits on conditions, never a fixed sleep, but for proving that nothing arrives: `quiet(ms, why)`, its wait named (Decent Sync's poll interval, five seconds as the stacks set it). `test/page-test-rules.test.mjs` holds the journeys to the page tests' rules. Screenshots go to `test/real/out/screenshots/`, and Playwright's results to `test/real/out/results.json`.
+
+JOURNEY_LIST_PLACEHOLDER
+
+## The real-stack workflow
+
+`.github/workflows/real-stack.yml` runs the recorder and the journeys as two jobs on GitHub's arm64 runner (`ubuntu-24.04-arm`), where headless Decaid runs in Docker as it does on a Mac:
+
+- on a pull request that changes the pins, the journeys, the recorder or the workflow;
+- on demand (Actions → Real stack → Run workflow, or `gh workflow run real-stack.yml --ref <branch>`), and before each release tag (`docs/AI_RELEASE_NOTES.md`, "Pre-Tag Gate");
+- weekly, on Monday mornings (UTC), against the newest stable releases (below).
+
+The recorder's job records everything afresh into a folder of its own (`record.mjs --out=`), then fails when the fresh recordings differ from the committed ones in either of two ways: the fake no longer answers as the fresh recordings say (`FAKE_DECAID_RECORDINGS=<folder> node --test test/fake-decaid-recordings.test.mjs`, the same replay `npm test` runs), or their shape differs (`node scripts/fake-decaid-recorder/compare.mjs fake-decaid/recordings <folder>`: a field present in one and not the other, or holding another kind of value; ids, times and the pour's frames are new on every stack, so values are left to the replay). Both run on a Mac too. The fresh recordings, the replay's results and the comparison are kept as the run's `real-stack-record` artifact, the journeys' results and screenshots as `real-stack-journeys`.
+
+Measured on the spike (#62): the recorder's job takes about nine minutes, the recording itself about seven.
+
+## The weekly run
+
+Every Monday, and on demand with "latest" ticked, the workflow runs against the newest stable releases of Decaid, DYE2 and Decent Sync instead of the pins: `scripts/fake-decaid-recorder/latest-pins.mjs` writes their pins (GitHub's latest release of each, never a pre-release, each file with the checksum GitHub gives it; Streamline stays at its pin), and `FAKE_DECAID_PINS` points the recorder, the stacks and the replay at that file. Nothing else downloads a "latest". When a fresh recording differs, the recorder fails, or a journey fails, `scripts/fake-decaid-recorder/weekly-issue.mjs` opens an issue labelled `real-stack-weekly`, or adds a comment to the one open, naming the versions it ran, the recordings that differ and the journeys that failed, with a link to the run. The stack is a simulated machine with made-up data, so the issue carries no machine's or cafe's. A difference is the start of a bump.
 
 ## Screenshots for a pull request
 
