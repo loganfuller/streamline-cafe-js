@@ -1,0 +1,167 @@
+name: Real stack
+# A run against the newest releases is named apart, so the Pre-Tag Gate's run
+# against the pins can be told from it (docs/AI_RELEASE_NOTES.md).
+run-name: ${{ (github.event_name == 'schedule' || inputs.latest == true) && 'Real stack, newest releases' || 'Real stack' }}
+
+# The real stack (docs/cafe/TESTING.md, "The real-stack workflow"): the recorder
+# and the real journeys, on headless Decaid in Docker on GitHub's arm64 runner.
+#
+# - A pull request that changes the pins, the recordings or their replay, the
+#   journeys, the recorder, this file, or the sample data and helpers they
+#   import (the paths below): against the pins. A fresh recording the fake no longer answers as it
+#   did, or whose shape differs from the committed one, fails it; so does a
+#   journey.
+# - On demand (Actions → Real stack → Run workflow), and before each release tag
+#   (docs/AI_RELEASE_NOTES.md): against the pins, or with "latest" the weekly run.
+# - Weekly: against the newest stable Decaid, DYE2 and Decent Sync. A difference
+#   or a failed journey opens an issue labelled real-stack-weekly, or adds to the
+#   one open.
+
+on:
+  pull_request:
+    paths:
+      - fake-decaid/pins.json
+      - fake-decaid/recordings/**
+      - scripts/fake-decaid-recorder/**
+      - test/real/**
+      - test/fake-decaid-recordings.test.mjs
+      # What the recorder and the journeys import from the page tests and the smoke run.
+      # Left out on purpose: the fake (fake-decaid/), which `npm test` replays the
+      # committed recordings against on every pull request, and the page (src/),
+      # whose writes AGENTS.md has a pull request run the journeys for by hand;
+      # the Pre-Tag Gate runs everything before a release.
+      - test/cafe-smoke/sample-data.mjs
+      - test/cafe-smoke/page-helpers.mjs
+      - test/page/support/page-files.mjs
+      - test/page/support/page-reads.mjs
+      - playwright.real.config.mjs
+      - .github/workflows/real-stack.yml
+  workflow_dispatch:
+    inputs:
+      latest:
+        description: Against the newest stable Decaid, DYE2 and Decent Sync instead of the pins, and report as the weekly run does
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 7 * * 1'
+
+permissions:
+  contents: read
+
+# A newer push cancels a pull request's run; the weekly run and a run on demand
+# (the Pre-Tag Gate's) never cancel each other.
+concurrency:
+  group: real-stack-${{ github.event_name }}-${{ inputs.latest == true && 'latest' || 'pins' }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  LATEST: ${{ github.event_name == 'schedule' || inputs.latest == true }}
+
+jobs:
+  record:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    outputs:
+      recorded: ${{ steps.record.outcome }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps --only-shell chromium
+      - name: The newest stable releases
+        if: env.LATEST == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/fake-decaid-recorder/latest-pins.mjs "$RUNNER_TEMP/pins.json"
+          echo "FAKE_DECAID_PINS=$RUNNER_TEMP/pins.json" >> "$GITHUB_ENV"
+      - name: Record afresh
+        id: record
+        run: node scripts/fake-decaid-recorder/record.mjs --out="$RUNNER_TEMP/real-stack/recordings"
+      - name: Replay the fresh recordings against the fake
+        if: always() && steps.record.outcome == 'success'
+        env:
+          FAKE_DECAID_RECORDINGS: ${{ runner.temp }}/real-stack/recordings
+        run: >-
+          node --test
+          --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=tap --test-reporter-destination="$RUNNER_TEMP/real-stack/replay.tap"
+          test/fake-decaid-recordings.test.mjs
+      - name: Compare their shape with the committed recordings
+        if: always() && steps.record.outcome == 'success'
+        run: node scripts/fake-decaid-recorder/compare.mjs fake-decaid/recordings "$RUNNER_TEMP/real-stack/recordings" --markdown="$RUNNER_TEMP/real-stack/compare.md"
+      # Not in a "latest" run whose newest releases could not be resolved: the
+      # report then says so, rather than name the pins as run.
+      - name: Keep the pins run
+        if: always() && (env.LATEST != 'true' || env.FAKE_DECAID_PINS != '')
+        run: mkdir -p "$RUNNER_TEMP/real-stack" && cp "${FAKE_DECAID_PINS:-fake-decaid/pins.json}" "$RUNNER_TEMP/real-stack/pins.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-stack-record
+          path: ${{ runner.temp }}/real-stack/
+          retention-days: 30
+
+  journeys:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps --only-shell chromium
+      - name: The newest stable releases
+        if: env.LATEST == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/fake-decaid-recorder/latest-pins.mjs "$RUNNER_TEMP/pins.json"
+          echo "FAKE_DECAID_PINS=$RUNNER_TEMP/pins.json" >> "$GITHUB_ENV"
+      - name: The real journeys
+        run: npm run test:real
+      # Results, the report, screenshots and a failure's traces; the stacks'
+      # tokens are kept in ~/.cache, outside this folder.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-stack-journeys
+          path: test/real/out/
+          retention-days: 30
+
+  # The weekly run's issue: opened, or added to, when anything differs or failed.
+  # A run cancelled (by hand) reports nothing.
+  report:
+    needs: [record, journeys]
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.latest == true) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Open or add to the weekly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          A: ${{ runner.temp }}/artifacts
+        run: >-
+          node scripts/fake-decaid-recorder/weekly-issue.mjs
+          --pins="$A/real-stack-record/pins.json"
+          --record="${{ needs.record.outputs.recorded || 'skipped' }}"
+          --record-job="${{ needs.record.result }}"
+          --replay="$A/real-stack-record/replay.tap"
+          --compare="$A/real-stack-record/compare.md"
+          --journeys="${{ needs.journeys.result }}"
+          --results="$A/real-stack-journeys/results.json"
+          --run="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

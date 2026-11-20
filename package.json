@@ -10,6 +10,7 @@
     "watch:css": "tailwindcss -i ./src/input.css -o ./src/css/app.css --watch",
     "test": "node --test test/*.test.mjs",
     "test:page": "playwright test",
+    "test:real": "playwright test -c playwright.real.config.mjs",
     "record:fake-decaid": "node scripts/fake-decaid-recorder/record.mjs"
   },
   "repository": {
