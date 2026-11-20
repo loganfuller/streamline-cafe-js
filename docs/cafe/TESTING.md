@@ -201,6 +201,14 @@ Every layer runs desktop Chromium against a simulated machine or a model of one.
 - **A real machine**, beyond the one real pour: a real scale on every other shot, a real Preheat (the simulated one is about half a second; `preheat.spec.mjs` holds frames back to stand in for a longer one), a shot a barista stops early (the fake adds an Unfinished Shot instead), the machine's own buttons, steam and hot water.
 - **Other screens** than 1920 by 1200, and the 1340 and 1280 by 800 the dialog tests measure.
 
-## Measured in the pilot (#57)
+## Measured
 
-On an Apple-silicon Mac, Chromium 158: each test takes 0.5 to 1.9 s on one worker, a median of 1.0 s, its page's boot (about 170 files and 55 requests, 0.4 s to the strip) included. All nine take about 10 s on one worker and 4 s on five. Twenty repeats of both specs on five workers: 180 runs, no failure. The two smoke steps they replace held at least 81 s of fixed waits, real-time pours and fade waits between them, before any page's boot or Decaid's store.
+On 2026-11-20 at `868f4b8`, on an Apple-silicon Mac (10 cores) with Chromium 158, and on GitHub's runners:
+
+| Layer | Size | On the Mac | In CI |
+|---|---|---|---|
+| `npm test` (unit tests and the recordings' replay) | 2400 tests | 4 s | under 30 s a Node version |
+| Page tests | 241 tests (and 3 `fixme`), in 33 specs | 100 s on five workers (the default here), 207 s on one; a median of 0.71 s a test, the slowest 3.5 s | the `page` job, 8 min |
+| Real journeys (`npm run test:real`) | 12 journeys | 5.0 min, the stacks' stand-up included | 6.7 min (`journeys`), beside 8.5 min for the fresh recording (`record`) |
+
+The by-hand smoke run they replace, timed the same day at `4740af5` (its last commit before the porting began) on the pinned Decaid v0.9.2 and DYE2 v0.1.42, with Decent Sync 1.12.0: `run.mjs` passed 858 of 858 checks in 26.0 min, and `run-decent-sync.mjs` 178 of 178 in 6.8 min, so 33 min for one run of both, on one stack at a time, with a person to stand the stacks up and read the screenshots. It never ran in CI.
