@@ -1,33 +1,32 @@
-// The graph goes live at the Preheat, issue #64 (docs/cafe/DESIGN.md, "When
-// the graph goes live", "The live cards"; once step 26 of the smoke run): with
-// a recipe loaded whose latest Shot is drawn against its reference, the
-// Preheat empties the graph of the latest's lines and stage names, on the main
-// graph and the full-screen chart, in Reference leaving the reference behind
-// it on the live axis and in Targets nothing, on an axis from zero to one
-// second; the legend reads "Live shot" and the six live cards have no values
-// but a time of zero. A shot stopped in the Preheat puts the latest back, and
-// so it does with no recipe loaded, as "Last shot". A page reloaded during a
-// Preheat is live. A real shot with a long Preheat draws nothing until the
-// profile starts, then its first sample at time zero with the axis unmoved,
-// frames appended; and a shot whose Preheat frames are left out goes live and
-// draws as before.
+// The graph goes live at the Preheat, issue #64 (docs/cafe/DESIGN.md, "When the
+// graph goes live", "The live cards"): with a recipe loaded whose latest Shot
+// is drawn against its reference, the Preheat empties the graph of the latest's
+// lines and stage names, on the main graph and the full-screen chart, in
+// Reference leaving the reference behind it on the live axis and in Targets
+// nothing, on an axis from zero to one second; the legend reads "Live shot" and
+// the six live cards have no values but a time of zero. A shot stopped in the
+// Preheat puts the latest back, and so it does with no recipe loaded, as "Last
+// shot". A page reloaded during a Preheat is live. A real shot with a long
+// Preheat draws nothing until the profile starts, then its first sample at time
+// zero with the axis unmoved, frames appended; and a shot whose Preheat frames
+// are left out goes live and draws as before.
 //
 // The recorded pour's Preheat is about half a second (its first five machine
 // frames, to 0.47 s), too short to stop a shot in or reload a page during, so
-// the page's machine snapshot socket goes through `machineFeed`, as the smoke
-// run's went through its own: it can hold the pour's frames as a Preheat
-// until it lets the profile start, leave out the Preheat's frames, or send
-// the machine's frames at rest in a state of its own with no shot pulled.
+// the page's machine snapshot socket goes through `machineFeed`: it can hold
+// the pour's frames as a Preheat until it lets the profile start, leave out the
+// Preheat's frames, or send the machine's frames at rest in a state of its own
+// with no shot pulled.
 //
 // The recipe's two Shots, the reference and the latest, are seeded before the
 // page opens, as reference.spec.mjs seeds them: the sample data's two Shots,
 // other pours of the pinned stack's simulated machine, copied as pulled with
-// the recipe loaded (the smoke run pulled two shots).
+// the recipe loaded.
 
 import { test, expect } from './support/test.mjs';
 import { legend, row, keys, stageNames, chartLines, load, watchDraws, drawCounts, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { shiftTime } from '../../fake-decaid/machine.js';
 
 // The recipe on the recorded pour's profile (Default).
@@ -36,14 +35,14 @@ const CAFE = 'streamlineCafe';
 const SNAPSHOT = '/ws/v1/machine/snapshot';
 const LIVE = 'time weight weightFlow flow pressure temperature';
 const REST_REFERENCE = 'time firstDrip yield ratio peak';
-// How long a held Preheat lasts, as the smoke run held it.
+// How long a held Preheat lasts: long enough to stop a shot in or reload a
+// page during.
 const HELD_MS = 2500;
 
 // ── The machine's frames, as the page sees them ──────────────────────────────
 
 /**
- * Stands between the page's machine snapshot socket and the fake's machine,
- * as the smoke run's `machineFeed()` did:
+ * Stands between the page's machine snapshot socket and the fake's machine:
  * - `pass()`: the machine's frames as they come;
  * - `hold()`: the machine's frames, an `espresso` frame's substate given as
  *   `preparingForShot`, so the pour is a Preheat to the page until `pass()`,

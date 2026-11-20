@@ -1,26 +1,23 @@
 // The reference on the graph (docs/cafe/DESIGN.md, "Shots and the reference",
-// "The reference on the graph", "The comparison row"; once the first part of
-// step 8 of the smoke run, its checks up to Replace confirmed): the Reference
-// view with no reference yet; Make reference choosing at once, the badge, and
-// the choice in Decaid's store; a second shot with the reference faded behind
-// it on the main graph and the full-screen one, the time axis at the
-// reference's length, frames appended and not drawn again, and the live cards
-// in Reference and Targets; the new Shot as the latest against the reference
-// at rest; Targets at rest, the view kept in Decaid's store and after a
-// reload; and "Replace the reference?", cancelled, then confirmed.
+// "The reference on the graph", "The comparison row"): the Reference view with
+// no reference yet; Make reference choosing at once, the badge, and the choice
+// in Decaid's store; a second shot with the reference faded behind it on the
+// main graph and the full-screen one, the time axis at the reference's length,
+// frames appended and not drawn again, and the live cards in Reference and
+// Targets; the new Shot as the latest against the reference at rest; Targets at
+// rest, the view kept in Decaid's store and after a reload; and "Replace the
+// reference?", cancelled, then confirmed.
 //
 // Every shot is the one recorded pour (fake-decaid/recordings/pour.json),
 // replayed with the page's clock moving with its frames, with House espresso
 // loaded: the pour was recorded on its profile (Default), so the live frames'
-// steps and targets are the loaded profile's. (The smoke run had the second
-// sample recipe loaded, on Adaptive v3.) A second pour would be the
-// first one again, every card beside it "0.0", so the tests past the first
-// start from a reference chosen before the page opens: the sample data's
-// newest Shot, another pour of the pinned stack's simulated machine, as Decaid
-// would have stored it with the recipe loaded (`seedReference`). It ran
-// longer than the recorded pour, as the smoke run's first shot ran shorter
-// than its second: see the time axis checks. With no Decent Sync, the choice
-// of reference is the tablet's own, in Decaid's key-value store
+// steps and targets are the loaded profile's. A second pour would be the first
+// one again, every card beside it "0.0", so the tests past the first start from
+// a reference chosen before the page opens: the sample data's newest Shot,
+// another pour of the pinned stack's simulated machine, as Decaid would have
+// stored it with the recipe loaded (`seedReference`). It ran longer than the
+// recorded pour: see the time axis checks. With no Decent Sync, the choice of
+// reference is the tablet's own, in Decaid's key-value store
 // (fake-decaid/store.js); the recipe's load is DYE2's selection
 // (fake-decaid/recordings/dye2-selection.json).
 //
@@ -34,7 +31,7 @@ import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, remarks, paint, load, writes, watchDraws, drawCounts, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { shotNumbers, shotSamples, restCards, liveCards } from '../../src/cafe/comparison.js';
 import { shotCurves } from '../../src/cafe/shot-model.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
@@ -49,7 +46,6 @@ const REST_TARGETS = 'time dose yield ratio peak';
 const LIVE = 'time weight weightFlow flow pressure temperature';
 // The shot's own four lines, which carry the live labels during a shot
 // (src/modules/chart.js, `setLiveLineLabels`; test/cafe-live-labels.test.mjs).
-// The smoke run's check named this `OWN_LABELLED` without defining it here.
 const OWN_LABELLED = ['Pressure', 'Flow', '°C', 'Weight'];
 // Two moments of the pour, each well before the reference's end (the profile
 // starts 0.5 s in and runs 17.6 s): one in its fourth step, one in its fifth.
@@ -282,11 +278,10 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
         const sofar = frameAt(MID_MS, fake.workflow());
         expect(lines.points[0], 'the live shot\'s own frames so far').toBe(POUR.frames.filter(entry => entry.ms <= MID_MS && inShot(entry)).length);
         // Every pour is the recorded one, so the second shot can't run longer
-        // than a first one poured here, as the smoke run's did. The reference
-        // is the sample Shot instead, which ran longer, and the axis is
-        // checked while the shot is well short of its end: there it is the
-        // reference's length (on the main graph, the length it has at rest,
-        // the smoke run's `liveEnd`), not the shot's own.
+        // than a first one poured here. The reference is the sample Shot
+        // instead, which ran longer, and the axis is checked while the shot is
+        // well short of its end: there it is the reference's length (on the
+        // main graph, the length it has at rest), not the shot's own.
         expect(lines.referenceEnd, 'the reference\'s lines run to its end').toBe(curves.seconds);
         expect(sofar.seconds, 'the shot has not reached the reference\'s end').toBeLessThan(curves.seconds - 5);
         expect(lines.end, 'the time axis shows the whole reference from the start, at its length as at rest').toBe(curves.seconds);
@@ -368,8 +363,7 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
         const cards = await row(page);
         expect(cards.mode).toBe('rest');
         expect(keys(cards)).toBe(REST_REFERENCE);
-        // Both pours weigh, so the first drip is each Shot's own: the smoke
-        // run's simulated scale read no weight and had "—".
+        // Both pours weigh, so the first drip is each Shot's own.
         expect(shownCards(cards), 'at rest, in Reference: each card gives the Shot\'s value, the reference\'s beside it and the difference')
             .toEqual(drawn(restCards({ view: 'reference', shot: shotNumbers(latest), reference: shotNumbers(reference) })));
         expect(cards.cards[1], 'the first drip of each, and the difference').toEqual({

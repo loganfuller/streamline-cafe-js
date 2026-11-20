@@ -1,10 +1,10 @@
 // The strip and a recipe loaded from it (docs/cafe/DESIGN.md, "Recipes and the
-// strip"; once steps 4 and 5 of the smoke run): the nine cards in one row,
-// each recipe's name and bean and each empty slot's outline, a tap on an empty
-// slot doing nothing, the page with no recipe loaded, the dial-in column's
-// rows each one size, Settings and Sleep, and what is gone from Streamline's
-// page; then two and three taps in quick succession, of which only the newest
-// is the machine's, and one tap's load with everything it shows.
+// strip"): the nine cards in one row, each recipe's name and bean and each
+// empty slot's outline, a tap on an empty slot doing nothing, the page with no
+// recipe loaded, the dial-in column's rows each one size, Settings and Sleep,
+// and what is gone from Streamline's page; then two and three taps in quick
+// succession, of which only the newest is the machine's, and one tap's load
+// with everything it shows.
 //
 // The taps in quick succession are made in one turn of the page, before any
 // answer to the first can arrive: the loader (src/cafe/recipe-loader.js) runs
@@ -19,7 +19,7 @@
 import { test, expect } from './support/test.mjs';
 import { card, writes } from './support/page-reads.mjs';
 import { records, recordOf, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house, single, decaf] = RECIPES;
 const EMPTY_SLOTS = [4, 6, 8];

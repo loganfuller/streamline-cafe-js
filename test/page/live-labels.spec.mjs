@@ -1,47 +1,43 @@
 // The line names during a shot (docs/cafe/DESIGN.md, "Line names during a
-// shot", issue #66; once step 28 of the smoke run): on the main graph Pressure,
-// Flow, °C and Weight are named at their lines' newest points from the
-// profile's first sample, in Reference and Targets, with a recipe loaded and
-// with none, at 1920 by 1200 and 1340 by 800, in English and in the language
-// whose labels are widest; none during a Preheat, none on a target or the
-// reference line; no label reaching past the chart; frames appended with no
-// full draw; the labels where they were when the shot ends; and the four of
-// them on the Shot Decaid stored once it is drawn in the shot's place.
+// shot", issue #66): on the main graph Pressure, Flow, °C and Weight are named
+// at their lines' newest points from the profile's first sample, in Reference
+// and Targets, with a recipe loaded and with none, at 1920 by 1200 and 1340 by
+// 800, in English and in the language whose labels are widest; none during a
+// Preheat, none on a target or the reference line; no label reaching past the
+// chart; frames appended with no full draw; the labels where they were when the
+// shot ends; and the four of them on the Shot Decaid stored once it is drawn in
+// the shot's place.
 //
 // Every shot is the one recorded pour (fake-decaid/recordings/pour.json, 17.6 s
 // of the Default profile after a half-second Preheat), played with the page's
-// clock moving with its frames. The smoke run stopped its shots at ten seconds
-// and held the simulated machine's Preheat two seconds by rewriting its frames
-// (`machineFeed()`); here the pour plays to its end, and the Preheat is held by
-// the machine socket sending the pour's first Preheat frame, stamped with the
-// page's time, for two seconds before the pour starts, so the recorded Preheat
-// follows it and every frame's time still runs forward.
+// clock moving with its frames. The pour plays to its end, and the Preheat is
+// held by the machine socket sending the pour's first Preheat frame, stamped
+// with the page's time, for two seconds before the pour starts, so the recorded
+// Preheat follows it and every frame's time still runs forward.
 //
-// The smoke run pulled a six-second shot to be the reference, so that in
-// Reference the live axis grows past it and the labels need their room. The
-// fake has one pour, so the reference is seeded before the page opens: the
-// sample data's newest Shot, a pour of the same simulated machine, as Decaid
-// would have stored it with the recipe loaded, cut eight seconds into its
-// profile.
+// The reference is shorter than the pour, so that in Reference the live axis
+// grows past it and the labels need their room. The fake has one pour, so the
+// reference is seeded before the page opens: the sample data's newest Shot, a
+// pour of the same simulated machine, as Decaid would have stored it with the
+// recipe loaded, cut eight seconds into its profile.
 //
 // The last check, the stored Shot drawn: on the real stack it is Decaid's own
-// record, which can end a sample away from what the page drew live, and the
-// smoke run only said how far each label moved. Here the live frames and the
-// stored Shot come from one recording, so it proves nothing about Decaid's
-// record. What it still proves is the page's: that the live draw is swapped
-// for the stored Shot's (the stars show), and that the stored Shot's draw names
-// the same four lines, inside the chart. How far each label moved is kept as
-// the test's annotation, as the smoke run printed it. Even from the same
-// frames it is not nothing: the page's draw of a stored Shot ends at its last
-// sample in the profile (17.60 s), one frame before the last the live draw had
-// (17.71 s), and its weight line two frames earlier still, so Weight moves
-// about 11 px to the left.
+// record, which can end a sample away from what the page drew live. Here the
+// live frames and the stored Shot come from one recording, so it proves nothing
+// about Decaid's record. What it still proves is the page's: that the live draw
+// is swapped for the stored Shot's (the stars show), and that the stored Shot's
+// draw names the same four lines, inside the chart. How far each label moved is
+// kept as the test's annotation. Even from the same frames it is not nothing:
+// the page's draw of a stored Shot ends at its last sample in the profile
+// (17.60 s), one frame before the last the live draw had (17.71 s), and its
+// weight line two frames earlier still, so Weight moves about 11 px to the
+// left.
 
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { chartLines, load, watchDraws, drawCounts, stageNames, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { localTime, shiftTime } from '../../fake-decaid/machine.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
 
@@ -58,7 +54,7 @@ const HELD_PREHEAT_MS = 2000;
 // How long the seeded reference runs into its profile: shorter than the pour.
 const REFERENCE_PROFILE_MS = 8000;
 const OWN_LABELLED = 'Pressure,Flow,°C,Weight';
-// How far a label may move in one frame, as the smoke run allowed.
+// How far a label may move in one frame.
 const FRAME_TRAVEL_PX = 12;
 // The stages the pour has reached by `ms`, as reference.spec.mjs counts them:
 // the chart draws a new stage's line in full.
@@ -126,8 +122,7 @@ function seedShortReference(fake) {
 /**
  * The labels the main chart's lines carry, as drawn: each label's line, text,
  * colour, where it points and its line's newest point, and how far its text
- * reaches to the right, against the chart's width. The smoke run's
- * `lineLabels`.
+ * reaches to the right, against the chart's width.
  */
 const lineLabels = page => page.evaluate(async () => {
     const { echarts } = await import('/src/modules/echarts-streamline.min.js');

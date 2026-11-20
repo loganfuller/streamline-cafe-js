@@ -2,7 +2,8 @@
 // stylesheet and Streamline's scaling (docs/cafe/DESIGN.md, "How the code is
 // shaped"; issue #39). A modal <dialog> draws in the top layer, outside
 // #scaled-content and its transform, so each carries a canvas of its own.
-// What the sizes come to on a smaller screen is measured by the smoke run.
+// What the sizes come to on a smaller screen is measured by the page tests
+// (test/page/dialog-sizes.spec.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

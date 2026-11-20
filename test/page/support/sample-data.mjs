@@ -1,4 +1,5 @@
-// Made-up data for the smoke run. Nothing here is a real cafe's: the names say
+// Made-up data for the page tests, the real journeys and the recorder, which
+// writes it into the real stack. Nothing here is a real cafe's: the names say
 // what each thing is and nothing else.
 
 export const BEANS = [

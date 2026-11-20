@@ -1,13 +1,12 @@
-// The full-screen chart, Settings and back, and DYE2 switched off in Settings
-// (once step 10 of the smoke run). With a recipe loaded, a tap on the graph
-// puts the page in Streamline's zoomed layout (src/modules/chart.js,
-// `openExpandedChart`) and a tap on the full-screen chart leaves it. Settings
-// opens over the page, and leaving it (the browser's back, as the smoke run
-// left it) comes back to the page with the recipe still loaded and nothing
-// written. DYE2 switched off while Settings is open: leaving it reloads the
-// page (src/cafe/start.js, on `streamline:mainpagevisible`), which then lands
-// on the "DYE2 is needed" screen, opens no machine socket, and Decaid's store
-// holds the setting off (src/modules/settingsSync.js mirrors the write).
+// The full-screen chart, Settings and back, and DYE2 switched off in Settings.
+// With a recipe loaded, a tap on the graph puts the page in Streamline's zoomed
+// layout (src/modules/chart.js, `openExpandedChart`) and a tap on the
+// full-screen chart leaves it. Settings opens over the page, and leaving it
+// (the browser's back) comes back to the page with the recipe still loaded and
+// nothing written. DYE2 switched off while Settings is open: leaving it reloads
+// the page (src/cafe/start.js, on `streamline:mainpagevisible`), which then
+// lands on the "DYE2 is needed" screen, opens no machine socket, and Decaid's
+// store holds the setting off (src/modules/settingsSync.js mirrors the write).
 //
 // Nothing here leans on a recorded scenario of its own: the recipe's load is
 // DYE2's selection (fake-decaid/recordings/dye2-selection.json), and the
@@ -16,9 +15,9 @@
 import { test, expect } from './support/test.mjs';
 import { load, writes, legend } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
-// The recipe the smoke run had loaded at this step.
+// The recipe loaded.
 const target = RECIPES[1];
 const SETTINGS = 'streamlineSettings';
 const DYE2_ENABLED = 'streamline.dye2Enabled';
@@ -39,7 +38,7 @@ async function openSettings(cafe) {
     await cafe.settle();
 }
 
-/** Leaves Settings with the browser's back, as the smoke run did, onto a page that reloads itself. */
+/** Leaves Settings with the browser's back, onto a page that reloads itself. */
 async function backToReload(cafe) {
     const { page } = cafe;
     // A mark on this document, which a reload leaves behind.
@@ -64,8 +63,8 @@ async function expectGatedOff(cafe) {
 test.describe('the full-screen chart, Settings and back', { tag: '@fullscreen' }, () => {
     test('a tap on the graph opens the full-screen chart, and a tap on it comes back', async ({ cafe }) => {
         const page = await openLoaded(cafe);
-        // A Shot with the recipe in the graph, as the smoke run had pulled one
-        // at step 7 (the sample data's Shots name no recipe).
+        // A Shot with the recipe in the graph (the sample data's Shots name no
+        // recipe).
         await cafe.pour();
         await cafe.untilStored();
         await cafe.storeShot();
@@ -124,9 +123,9 @@ test.describe('the full-screen chart, Settings and back', { tag: '@fullscreen' }
         expect(fake.store.get(SETTINGS, DYE2_ENABLED), 'the setting is on to start with').toBe('true');
 
         await openSettings(cafe);
-        // Switched off as the smoke run did: the write Streamline's own toggle
-        // makes (src/settings/settings.js, `setupDye2Extra`). The toggle itself
-        // is the fixme test below.
+        // Switched off by the write Streamline's own toggle makes
+        // (src/settings/settings.js, `setupDye2Extra`). The toggle itself is
+        // the fixme test below.
         const mark = fake.log.length;
         await page.evaluate(key => localStorage.setItem(key, 'false'), DYE2_ENABLED);
         await cafe.settle();

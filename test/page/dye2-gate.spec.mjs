@@ -1,11 +1,11 @@
-// The "DYE2 is needed" screen (docs/cafe/DESIGN.md, "Recipes and the strip";
-// once steps 1 and 2 of the smoke run): the card that takes the page's place
-// while DYE2 is older than the page needs, not installed, installed but not
-// loaded, or switched off in Streamline's settings. In each case nothing is
-// drawn behind it, no recipe is read or loaded and nothing is installed;
-// Settings opens the settings page and leaving it comes back to the check;
-// Reload runs the check again; "Turn DYE2 on" writes the setting and the page
-// starts (src/cafe/dye2-gate.js, gate-screen.js, start.js).
+// The "DYE2 is needed" screen (docs/cafe/DESIGN.md, "Recipes and the strip"):
+// the card that takes the page's place while DYE2 is older than the page needs,
+// not installed, installed but not loaded, or switched off in Streamline's
+// settings. In each case nothing is drawn behind it, no recipe is read or
+// loaded and nothing is installed; Settings opens the settings page and leaving
+// it comes back to the check; Reload runs the check again; "Turn DYE2 on"
+// writes the setting and the page starts (src/cafe/dye2-gate.js,
+// gate-screen.js, start.js).
 //
 // What the gate reads is the model's state, set before the page opens:
 // Decaid's plugin list (`fake.plugins`; DYE2 disabled and enabled through it,
@@ -32,7 +32,7 @@ const NOT_LOADED = 'DYE2 is installed but not loaded';
 const SETTING_OFF = 'DYE2 is turned off in Settings';
 
 const line = page => page.locator('#cafe-gate-line');
-// A recipe read or loaded, or a plugin installed, as the smoke run looked for.
+// A recipe read or loaded, or a plugin installed: what the gate must not do.
 const touches = entry => /dye2\.reaplugin\/(recipes|selection)|\/plugins\/install/.test(entry.path)
     || (entry.method === 'PUT' && /\/workflow$/.test(entry.path));
 
@@ -51,7 +51,7 @@ async function openGate(cafe, theme = 'light') {
 /**
  * The gate took the page's place: its line, its title, nothing behind it,
  * Reload and Settings offered, no recipe read or loaded, nothing installed,
- * and no error on the page (run.mjs `checkGate`'s six checks).
+ * and no error on the page.
  */
 async function expectGate(cafe, text) {
     const { page, fake } = cafe;

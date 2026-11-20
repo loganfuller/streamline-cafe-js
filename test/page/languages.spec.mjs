@@ -1,11 +1,11 @@
-// The languages (once step 13 of the smoke run, #59): in English with a recipe
-// loaded nothing overflows its place; in German, which has the longest text,
-// and in Arabic, which is translated and laid out left to right by design
-// (docs/cafe/DESIGN.md, "Translations"), the page's text, the roast date, no
-// label overflowing or shrunk below 14px, and the layout left to right; the
-// long-press menu and the recipe list in German; the page with no recipe in
-// German; the "DYE2 is needed" screen in German, and a change of language made
-// while it shows, which re-texts it where it stands.
+// The languages (#59): in English with a recipe loaded nothing overflows its
+// place; in German, which has the longest text, and in Arabic, which is
+// translated and laid out left to right by design (docs/cafe/DESIGN.md,
+// "Translations"), the page's text, the roast date, no label overflowing or
+// shrunk below 14px, and the layout left to right; the long-press menu and the
+// recipe list in German; the page with no recipe in German; the "DYE2 is
+// needed" screen in German, and a change of language made while it shows, which
+// re-texts it where it stands.
 //
 // Each test opens the page in its language: the language is Streamline's
 // synced setting `language` in Decaid's store (namespace `streamlineSettings`,
@@ -20,7 +20,7 @@
 import { test, expect } from './support/test.mjs';
 import { card, load, holdCard, menu, menuItems, paint, row } from './support/page-reads.mjs';
 import { loadedId, recordOf } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [, single] = RECIPES;
 const SETTINGS = 'streamlineSettings';
@@ -28,7 +28,7 @@ const PAGE_WIDTH = 1920;
 /** A slot the sample data leaves empty, shown on the strip. */
 const EMPTY_SLOT = 4;
 
-// ── Measuring the page (as test/cafe-smoke/run.mjs measured it) ──────────────
+// ── Measuring the page ───────────────────────────────────────────────────────
 
 /**
  * Text that does not fit its place: wider than its own box, cut short where a
@@ -63,8 +63,8 @@ const inLanguage = (fake, code) => fake.store.set(SETTINGS, 'language', code);
 
 /**
  * The page open in `code` with Single origin loaded and a Shot pulled with it,
- * so its graph's row reads "Latest": the fullest page, as the smoke run had it
- * after the steps before. The sample data's Shots name no recipe.
+ * so its graph's row reads "Latest": the fullest page. The sample data's Shots
+ * name no recipe.
  */
 async function openLoaded(cafe, fake, code, { pour = true } = {}) {
     if (code) inLanguage(fake, code);

@@ -3,7 +3,8 @@
 // worked out in profile-change.js, which touches no browser global.
 //
 // The profile dialog (profile-dialog.js) calls it, and nothing else on the page
-// does. The smoke run calls `changeProfile` from the page itself too.
+// does. The page tests (test/page/profile-change.spec.mjs) call `changeProfile`
+// from the page itself too.
 import { getProfiles, getWorkflow, getDye2KvArray, callPluginEndpoint, updateWorkflow, getEspressoEndedAt } from '../modules/api.js';
 import { setActiveProfile, availableProfiles, loadAvailableProfiles } from '../modules/profileManager.js';
 import { logger } from '../modules/logger.js';

@@ -1,19 +1,18 @@
 // The Location's Shots with Decent Sync serving (docs/cafe/DESIGN.md, "The
 // Location's Shots", "Rating and notes" and "The reference with Decent Sync";
-// the page's half of the second smoke run's step "10.", run-decent-sync.mjs,
-// up to the server stopping): the list on this tablet, read through the
-// plugin and headed with the Location's name, with the Machine and Time
-// columns, the other Machine's rows among this one's, an Unfinished Shot
-// marked, the Reference chip and the Shot in the graph highlighted; the same
-// list at 1340 by 800; another Machine's Shot opened, read whole through the
-// plugin, with its recipe's Reference Shot behind it and a legend naming who
-// and never where; rated and noted through the plugin; the kept list showing
-// the edits, and the list read afresh showing them; its edits refused, with a
-// reason or as out of reach, while the page has the Machine served; Make
-// reference on it, and a reference chosen on the server followed while it is
-// still opened; and the
-// next page of the Location's list read by the plugin's cursor, past fifty
-// Shots counted at the Location with `fake.decentSync.atLocation`.
+// the server stopping is sync-location-outage.spec.mjs): the list on this
+// tablet, read through the plugin and headed with the Location's name, with the
+// Machine and Time columns, the other Machine's rows among this one's, an
+// Unfinished Shot marked, the Reference chip and the Shot in the graph
+// highlighted; the same list at 1340 by 800; another Machine's Shot opened,
+// read whole through the plugin, with its recipe's Reference Shot behind it and
+// a legend naming who and never where; rated and noted through the plugin; the
+// kept list showing the edits, and the list read afresh showing them; its edits
+// refused, with a reason or as out of reach, while the page has the Machine
+// served; Make reference on it, and a reference chosen on the server followed
+// while it is still opened; and the next page of the Location's list read by
+// the plugin's cursor, past fifty Shots counted at the Location with
+// `fake.decentSync.atLocation`.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
 // Machine at "Sample Cafe" from recordings/decent-sync.json. Its four Shots at
@@ -36,7 +35,7 @@ import { test, expect } from './support/test.mjs';
 import { legend, chartLines, row, remarks, shotsHeader, paint, load, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { recording } from './support/adapter.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { REFUSALS } from '../../fake-decaid/decent-sync.js';
 
@@ -54,7 +53,7 @@ const BADGE = 'This shot is the reference';
 
 const dialog = page => page.locator('#cafe-shots-dialog');
 
-/** Each row of the list, as the smoke run read them. */
+/** Each row of the list. */
 const listRows = page => page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-row')].map(item => {
     // A cell shows where it has a box: the Machine's name sits in a cell the tablet's own list hides.
     const visible = selector => { const cell = item.querySelector(selector); return cell && cell.offsetParent !== null ? cell.textContent.trim() : null; };
@@ -95,10 +94,10 @@ async function openRow(cafe, id, label) {
 }
 
 /**
- * The Shots dialog as drawn while it is open, measured as the smoke run's
- * `dialogDrawn` measured it (issue #39): the page's scale off Streamline's
- * canvas, the dialog's box, each part's width and height (the first match of
- * each selector), and what shows a sideways scrollbar. Sizes are screen px.
+ * The Shots dialog as drawn while it is open, measured (issue #39): the page's
+ * scale off Streamline's canvas, the dialog's box, each part's width and height
+ * (the first match of each selector), and what shows a sideways scrollbar.
+ * Sizes are screen px.
  */
 const shotsDrawn = (page, parts) => page.evaluate(selectors => {
     const shots = document.getElementById('cafe-shots-dialog');

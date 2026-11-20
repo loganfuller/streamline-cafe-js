@@ -1,14 +1,13 @@
 // The profile changed with the recipe kept loaded (docs/cafe/DESIGN.md,
-// "Changing the profile"; once step 25 of the smoke run, #50): a loaded
-// recipe's DYE2 record takes the profile first, then the Workflow, and the
-// recipe stays loaded, at once, after DYE2's window, through a temperature
-// step, a load of another recipe and back, a shot and DYE2 starting again;
-// straight after a dial-in step and with DYE2 saving around the change; with
-// the record written back over the change in DYE2's window, before or after
-// the Workflow write; a recipe DYE2 named takes the new profile's name and one
-// named by hand keeps its own; and with no recipe loaded no record changes.
-// The tests call `changeProfile` from the page, as the profile dialog does
-// (src/cafe/profile-changer.js).
+// "Changing the profile"; #50): a loaded recipe's DYE2 record takes the profile
+// first, then the Workflow, and the recipe stays loaded, at once, after DYE2's
+// window, through a temperature step, a load of another recipe and back, a shot
+// and DYE2 starting again; straight after a dial-in step and with DYE2 saving
+// around the change; with the record written back over the change in DYE2's
+// window, before or after the Workflow write; a recipe DYE2 named takes the new
+// profile's name and one named by hand keeps its own; and with no recipe loaded
+// no record changes. The tests call `changeProfile` from the page, as the
+// profile dialog does (src/cafe/profile-changer.js).
 //
 // The DYE2 behaviour they rely on is recorded from the pinned stack: DYE2
 // clearing a recipe whose Workflow moves off both the profile it noted at the
@@ -22,7 +21,7 @@
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickClosed, tapAt, card } from './support/page-reads.mjs';
 import { records, recordOf, loadedId, isRecordWrite, matchMachine, PROFILES } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';
 
 const [house, single] = RECIPES;
@@ -239,9 +238,9 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(loadedId(fake), 'and the recipe is loaded').toBe(before.id);
     });
 
-    // The smoke run raced two `POST record`s, Decent Sync's plugin's ask of
-    // DYE2, with the change. The page never sends one, and the fake has no
-    // answer for it; what the check was for is the change surviving DYE2 saves
+    // Two DYE2 saves race the change, as two `POST record`s (Decent Sync's
+    // plugin's ask of DYE2) would. The page never sends one, and the fake has
+    // no answer for it; what is checked is the change surviving DYE2 saves
     // around it. One read the list before the change and writes it back as the
     // page's record write is on its way, which that write then replaces. The
     // other reads the list while the change runs, after the record write, and
@@ -339,11 +338,10 @@ test.describe('the profile changed with the recipe kept loaded', { tag: '@profil
         expect(loadedId(fake)).toBe(before.id);
     });
 
-    // The smoke run wrote the record back after the change and then unloaded
-    // the recipe itself (`POST selection {}`), as DYE2 does when it hears the
-    // Workflow before the record. Here the write-back lands between the
-    // page's record write and its Workflow write, and DYE2's own rule drops
-    // the recipe when the Workflow moves off both profiles.
+    // The record written back between the page's record write and its
+    // Workflow write: DYE2's own rule drops the recipe when the Workflow moves
+    // off both profiles, as DYE2 does when it hears the Workflow before the
+    // record.
     test('written back before the Workflow write, DYE2 drops the recipe: the check writes the record again and loads the recipe once', async ({ cafe, fake }) => {
         const before = await openLoaded(cafe);
         const page = cafe.page;

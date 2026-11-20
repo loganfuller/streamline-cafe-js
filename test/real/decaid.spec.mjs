@@ -12,7 +12,7 @@
 import { test, expect, pull, shoot, loadByCard, recipeIdOf, card, untilStripSettled } from './support/journey.mjs';
 import { startClean, selection, loadedInWorkflow, expectNoRecipeSelected, expectNoRecipePage, settingsOf, pressed, isUnload } from './support/decaid-helpers.mjs';
 import { legend, row, keys, chartLines, pickDialog, pickRows } from '../page/support/page-reads.mjs';
-import { RECIPES, TYPED_BARISTA } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, TYPED_BARISTA } from '../page/support/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 
 const [house] = RECIPES;

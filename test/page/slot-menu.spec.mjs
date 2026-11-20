@@ -1,12 +1,12 @@
 // The long-press menu on a recipe card, and arranging the strip from it
-// (docs/cafe/DESIGN.md, "Recipes and the strip"; once steps 11 and 12 of the
-// smoke run): an empty slot's two items and a filled card's three; the list a
-// recipe is chosen from, empty or sorted by name; a new recipe made from what
-// the machine is set to, in a slot above 5, and on the loaded card; a recipe
-// chosen for a slot, replacing another, and taken out of its slot, the loaded
-// one among them; and no menu while a shot runs. A tap still loads. None of it
-// leaves the page or opens one of DYE2's pages, writes Streamline's strip mode,
-// or keeps state of the page's own in Decaid's store.
+// (docs/cafe/DESIGN.md, "Recipes and the strip"): an empty slot's two items and
+// a filled card's three; the list a recipe is chosen from, empty or sorted by
+// name; a new recipe made from what the machine is set to, in a slot above 5,
+// and on the loaded card; a recipe chosen for a slot, replacing another, and
+// taken out of its slot, the loaded one among them; and no menu while a shot
+// runs. A tap still loads. None of it leaves the page or opens one of DYE2's
+// pages, writes Streamline's strip mode, or keeps state of the page's own in
+// Decaid's store.
 //
 // The DYE2 behaviour they rely on is recorded from the pinned stack: its
 // save-recipe, the name it gives and the recipe it marks loaded
@@ -20,7 +20,7 @@ import { records, recordOf, loadedId } from './support/fake-reads.mjs';
 import { recording } from './support/adapter.mjs';
 import { PAGE_ORIGIN } from './support/page-files.mjs';
 import { proposeRecipeName } from '../../fake-decaid/dye2.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house, single, decaf, long] = RECIPES;
 const DYE2 = 'dye2.reaplugin';

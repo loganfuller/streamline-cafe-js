@@ -1,26 +1,24 @@
 // The legend at its fullest, in every language (docs/cafe/DESIGN.md, "The
-// latest Shot", "Shots and the reference"; once the end of step 9 of the smoke
-// run, `ratingAndNotes` in test/cafe-smoke/run.mjs): the Shot's row with its
-// time and barista, its stars, its note and Make reference, and the reference's
-// row with its time and barista, its rating and its note; that row fits in
-// English and each language Streamline has finished, nothing running past it
-// and nothing cut short but a barista's name; then the same with "Different
-// profile", where a time may be cut short too.
+// latest Shot", "Shots and the reference"): the Shot's row with its time and
+// barista, its stars, its note and Make reference, and the reference's row with
+// its time and barista, its rating and its note; that row fits in English and
+// each language Streamline has finished, nothing running past it and nothing
+// cut short but a barista's name; then the same with "Different profile", where
+// a time may be cut short too.
 //
-// The starting state, as the smoke run had it by then: House espresso loaded,
-// its latest Shot rated and noted, and an older Shot of the same recipe, rated
-// and noted, chosen as its reference on the tablet (the `streamlineCafe`
-// namespace's `references`, src/cafe/cafe-store.js), each naming a barista.
-// The two Shots are copies of a sample Shot, added before the page opens.
-// The reference's profile is changed through Decaid's `PUT /shots/<id>`
-// (fake-decaid/shots.js, recordings/shots.json) and the page looks again as
-// when it comes back into view, as the smoke run did.
+// The starting state: House espresso loaded, its latest Shot rated and noted,
+// and an older Shot of the same recipe, rated and noted, chosen as its
+// reference on the tablet (the `streamlineCafe` namespace's `references`,
+// src/cafe/cafe-store.js), each naming a barista. The two Shots are copies of a
+// sample Shot, added before the page opens. The reference's profile is changed
+// through Decaid's `PUT /shots/<id>` (fake-decaid/shots.js,
+// recordings/shots.json) and the page looks again as when it comes back into
+// view.
 //
 // A language is changed through the page's `setLanguage` (src/modules/i18n.js),
-// the function Streamline's Settings list calls, as the smoke run changed it;
-// the legend is painted again on its `streamline:languagechange`
-// (src/cafe/graph.js). The language it writes to Decaid's store is this test's
-// fake's alone.
+// the function Streamline's Settings list calls; the legend is painted again on
+// its `streamline:languagechange` (src/cafe/graph.js). The language it writes
+// to Decaid's store is this test's fake's alone.
 //
 // The zone is pinned to UTC, where both Shots were pulled today: in a zone
 // where the start is just past midnight they are yesterday's, and the legend
@@ -32,7 +30,7 @@ import { recordOf } from './support/fake-reads.mjs';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { localTime } from '../../fake-decaid/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
-import { RECIPES, BARISTAS } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, BARISTAS } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const FINISHED_LANGUAGES = SUPPORTED_LANGUAGES.filter(code => code !== 'en' && !code.includes('unfinished'));
@@ -101,7 +99,7 @@ async function inLanguage(cafe, code) {
  * The legend's fit in English and each finished language: `unfit`, each
  * language where something runs past the row or is cut short (a time or a name
  * given way entirely counts), and `cut`, each where a time lacks a tenth of a
- * pixel or more. `name` takes the German screenshot, as the smoke run did.
+ * pixel or more. `name` takes the German screenshot.
  */
 async function inEveryLanguage(cafe, name) {
     const unfit = [];
@@ -160,7 +158,7 @@ test.describe('the legend at its fullest, in every language', { tag: '@legend' }
 
         const fits = await inEveryLanguage(cafe, 'legend-fullest');
         expect(fits.unfit, 'nothing runs past the row, and nothing but the names and the times is cut short').toEqual([]);
-        // The smoke run noted where a time is cut short here, and passed either way.
+        // Where a time is cut short here is noted, and passes either way.
         test.info().annotations.push({ type: 'times cut short', description: fits.cut.length ? fits.cut.join(', ') : 'none' });
     });
 });

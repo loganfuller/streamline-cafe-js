@@ -1,9 +1,9 @@
-// The barista at the machine (docs/cafe/DESIGN.md, "The barista"; once step 23
-// of the smoke run, #47), on a page at 1920 by 1200 and on one at 1340 by 800:
-// the title band's button, its dialog of the names on recent Shots, "No
-// barista" and a typed name, each one write of the Workflow's barista alone; a
-// Shot that records the name; a recipe load that keeps it, from a record that
-// holds another; and the machine's sleep, which clears it.
+// The barista at the machine (docs/cafe/DESIGN.md, "The barista"; #47), on a
+// page at 1920 by 1200 and on one at 1340 by 800: the title band's button, its
+// dialog of the names on recent Shots, "No barista" and a typed name, each one
+// write of the Workflow's barista alone; a Shot that records the name; a recipe
+// load that keeps it, from a record that holds another; and the machine's
+// sleep, which clears it.
 //
 // The sample data's two Shots name no barista, so each test that lists names
 // adds three older Shots that do, copies of a sample Shot (`namedShots`). That
@@ -20,7 +20,7 @@ import { pickDialog, pickRows, writes, paint, load, untilPickClosed } from './su
 import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { SHOT_STORE_MS } from '../../src/cafe/barista-model.js';
-import { RECIPES, BARISTAS, RECIPE_BARISTA, TYPED_BARISTA, LONG_BARISTA } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, BARISTAS, RECIPE_BARISTA, TYPED_BARISTA, LONG_BARISTA } from './support/sample-data.mjs';
 
 const [house, , other] = RECIPES;
 const [SAMPLE, EXAMPLE] = BARISTAS;

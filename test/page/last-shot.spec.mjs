@@ -2,35 +2,33 @@
 // DESIGN.md, "The latest Shot": "With no recipe loaded, the history module
 // draws" and "The 'Last shot' row names the Shot the history module handed the
 // chart"; "Rating and notes": "'Last shot', with no recipe loaded, is rated and
-// noted too"; "The reference on the graph": "The legend"; once step 16 of the
-// smoke run, its second part). The history arrows and the shot panel out of
-// reach at rest and during each shot; each Shot drawn once Decaid has stored
-// it, named "Last shot" with its time and barista and "Pick a recipe to
-// compare"; empty stars and a plus; a star that rates the Shot drawn and not
-// the one before; the note's dialog titled "Last shot" with the legend's time,
-// and its note saved; the seam asked for the newest Shot only; the rating and
-// note still shown after a reload. And the legend's day and time with the
-// page's clock and zone pinned: "Today" on a twelve-hour clock (the page's
-// locale is en-US, whose hours are twelve: src/cafe/text.js, `cafeDateLocale`;
-// src/cafe/shot-model.js, `whenText`), and a Shot pulled before midnight and
-// drawn after it, which reads with its date: the day is the Shot's against the
-// page's clock when the legend is painted, and the legend is painted again as
-// the local day turns, so a page left at rest past midnight reads yesterday's
-// Shot, and a recipe's reference, with their dates (#80).
+// noted too"; "The reference on the graph": "The legend"). The history arrows
+// and the shot panel out of reach at rest and during each shot; each Shot drawn
+// once Decaid has stored it, named "Last shot" with its time and barista and
+// "Pick a recipe to compare"; empty stars and a plus; a star that rates the
+// Shot drawn and not the one before; the note's dialog titled "Last shot" with
+// the legend's time, and its note saved; the seam asked for the newest Shot
+// only; the rating and note still shown after a reload. And the legend's day
+// and time with the page's clock and zone pinned: "Today" on a twelve-hour
+// clock (the page's locale is en-US, whose hours are twelve: src/cafe/text.js,
+// `cafeDateLocale`; src/cafe/shot-model.js, `whenText`), and a Shot pulled
+// before midnight and drawn after it, which reads with its date: the day is the
+// Shot's against the page's clock when the legend is painted, and the legend is
+// painted again as the local day turns, so a page left at rest past midnight
+// reads yesterday's Shot, and a recipe's reference, with their dates (#80).
 //
-// The fake replays one pour, so the two shots are the same measurements (the
-// smoke run pulled 10 s then 16 s, so each drawing told the two apart by its
-// length). The second Shot is told from the first by what Decaid stamps on it:
-// its time, a minute or more later, and its barista, which the legend names;
-// and by its id, which the star's and the note's writes name. That Decaid
-// copies the Workflow, its barista included, into the Shot it stores is the
-// recorded pour (fake-decaid/recordings/pour.json); the Shot list's newest
-// first and a Shot's edit are Decaid's (fake-decaid/shots.js).
+// The fake replays one pour, so the two shots are the same measurements. The
+// second Shot is told from the first by what Decaid stamps on it: its time, a
+// minute or more later, and its barista, which the legend names; and by its id,
+// which the star's and the note's writes name. That Decaid copies the Workflow,
+// its barista included, into the Shot it stores is the recorded pour
+// (fake-decaid/recordings/pour.json); the Shot list's newest first and a Shot's
+// edit are Decaid's (fake-decaid/shots.js).
 
 import { test, expect } from './support/test.mjs';
 import { legend, chartLines, remarks, noteDialog, load } from './support/page-reads.mjs';
 import { shotCurves, drawnShot } from '../../src/cafe/shot-model.js';
-import { BARISTAS, RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { BARISTAS, RECIPES } from './support/sample-data.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 

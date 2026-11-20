@@ -6,7 +6,7 @@
 // through an outage.
 
 import { expect, pull, DYE2, recipeIdOf, card } from './journey.mjs';
-import { RECIPES } from '../../cafe-smoke/sample-data.mjs';
+import { RECIPES } from '../../page/support/sample-data.mjs';
 
 export const HOUSE = RECIPES[0];
 export const LOCATION = 'Sample Cafe';

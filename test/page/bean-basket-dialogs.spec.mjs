@@ -1,14 +1,13 @@
 // The bean and batch dialog and the basket dialog (docs/cafe/DESIGN.md, "The
-// grinder, bean and basket dialogs" and "The bean and batch dialog"; once step
-// 22 of the smoke run), without Decent Sync: a tap on Dose's name lists the
-// beans with a batch beside the highlighted bean's batches, and a tap on
-// Yield's lists DYE2's baskets. A tap on a batch highlights it and writes
-// nothing; "Use this batch" under the batches chooses it (#70). A batch of the
-// recipe's own bean and a basket write the Workflow and nothing else. With a
-// recipe loaded, a batch of another bean becomes the recipe's bean (#52): its
-// DYE2 record first, then the Workflow, the recipe kept loaded, a name DYE2
-// gave following the bean and one named by hand kept. With no recipe loaded
-// each choice writes the Workflow alone.
+// grinder, bean and basket dialogs" and "The bean and batch dialog"), without
+// Decent Sync: a tap on Dose's name lists the beans with a batch beside the
+// highlighted bean's batches, and a tap on Yield's lists DYE2's baskets. A tap
+// on a batch highlights it and writes nothing; "Use this batch" under the
+// batches chooses it (#70). A batch of the recipe's own bean and a basket write
+// the Workflow and nothing else. With a recipe loaded, a batch of another bean
+// becomes the recipe's bean (#52): its DYE2 record first, then the Workflow,
+// the recipe kept loaded, a name DYE2 gave following the bean and one named by
+// hand kept. With no recipe loaded each choice writes the Workflow alone.
 //
 // The sample data (fake-decaid/recordings/sample-data.json) holds the three
 // beans with their batches (Sample Blend's two, and a third archived), DYE2's
@@ -22,7 +21,7 @@
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickRows, pickRow, tapAt, isWrite, writes, paint, openPage, card, load, untilPickClosed } from './support/page-reads.mjs';
 import { records, recordOf, loadedId, isRecordWrite, matchMachine, PROFILES } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';

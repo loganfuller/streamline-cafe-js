@@ -1,9 +1,8 @@
-// The made-up sample data, written into the real Decaid the way the smoke run
-// writes it (test/cafe-smoke/run.mjs), so DYE2's records have the shape DYE2
-// writes. The recorder then reads the state back as the page tests' starting
+// The made-up sample data, written into the real Decaid through its API, so
+// DYE2's records have the shape DYE2 writes. The recorder then reads the state back as the page tests' starting
 // point (fake-decaid/recordings/sample-data.json).
 
-import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, PRESET_GRINDER, QUARTER_GRINDER, GRINDER_USE, RECIPES, MORE_BATCHES, BASKETS } from '../../test/cafe-smoke/sample-data.mjs';
+import { BEANS, GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, PRESET_GRINDER, QUARTER_GRINDER, GRINDER_USE, RECIPES, MORE_BATCHES, BASKETS } from '../../test/page/support/sample-data.mjs';
 
 const DYE2 = 'dye2.reaplugin';
 
@@ -29,8 +28,8 @@ export async function seed(decaid, machine) {
     const second = await decaid('POST', '/grinders', SECOND_GRINDER);
     const retired = await decaid('POST', '/grinders', ARCHIVED_GRINDER);
     await decaid('PUT', `/grinders/${retired.id}`, { ...retired, archived: true });
-    // The Grind row's two (#42), archived, as the smoke run left them: a page
-    // test that needs one takes it out of the archive in the fake.
+    // The Grind row's two (#42), archived: a page test that needs one takes it
+    // out of the archive in the fake.
     for (const spec of [PRESET_GRINDER, QUARTER_GRINDER]) {
         const made = await decaid('POST', '/grinders', spec);
         await decaid('PUT', `/grinders/${made.id}`, { ...made, archived: true });
@@ -54,7 +53,7 @@ export async function seed(decaid, machine) {
         ids[saved.id] = recipe;
     }
     // The names, and the slots above 5, which DYE2's own pages cannot set: the
-    // fixture's write, as in the smoke run.
+    // fixture's write.
     const rows = await decaid('GET', `/store/${DYE2}/recipes`);
     await decaid('POST', `/store/${DYE2}/recipes`, rows.map(row => (ids[row.id]
         ? { ...row, name: ids[row.id].name, title: ids[row.id].name, stripSlot: ids[row.id].slot, showOnStreamlineDashboard: true }

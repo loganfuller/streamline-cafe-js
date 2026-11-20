@@ -1,14 +1,12 @@
 // The reference with Decent Sync serving (docs/cafe/DESIGN.md, "The reference
-// with Decent Sync"; once the second smoke run's steps "2." to "4." in
-// test/cafe-smoke/run-decent-sync.mjs, SMOKE.md's S3 to S5), the page's half:
-// the column labelled "saved to the recipe"; the latest Shot alone with Make
-// reference, though the tablet's own store holds a choice for the recipe, which
-// is never read; the reference asked of the plugin by the recipe's DYE2 record
-// id; Make reference as one PUT to the plugin and nothing written to the
-// tablet's store, then the badge from the plugin's answer; a live pour with the
-// Reference Shot behind it, its frames appended; and at rest the legend saying
-// when each Shot was pulled and who pulled it, never where, with Make reference
-// back for the new Shot.
+// with Decent Sync"), the page's half: the column labelled "saved to the
+// recipe"; the latest Shot alone with Make reference, though the tablet's own
+// store holds a choice for the recipe, which is never read; the reference asked
+// of the plugin by the recipe's DYE2 record id; Make reference as one PUT to
+// the plugin and nothing written to the tablet's store, then the badge from the
+// plugin's answer; a live pour with the Reference Shot behind it, its frames
+// appended; and at rest the legend saying when each Shot was pulled and who
+// pulled it, never where, with Make reference back for the new Shot.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
 // Machine at "Sample Cafe" from recordings/decent-sync.json. House espresso's
@@ -17,16 +15,15 @@
 // pour is the recorded one (recordings/pour.json), on House espresso's profile,
 // with "Sample Barista" in the Workflow, so the two Shots' credits differ.
 //
-// What the smoke run also checked there and stays in the real journey: the
-// server holding the choice as the Recipe's Reference Shot after the PUT (the
-// fake's own rule, read here only to confirm the PUT reached it), and the
-// tablet's recipes joining the Location's Library.
+// What stays in the real journey: the server holding the choice as the Recipe's
+// Reference Shot after the PUT (the fake's own rule, read here only to confirm
+// the PUT reached it), and the tablet's recipes joining the Location's Library.
 
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { legend, chartLines, paint, load, writes, watchDraws, drawCounts, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { shotCurves } from '../../src/cafe/shot-model.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
 

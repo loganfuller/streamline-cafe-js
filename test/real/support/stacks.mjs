@@ -129,7 +129,7 @@ export async function attachStacks() {
 
 /**
  * Official Streamline at its pinned commit, downloaded once into the cache and
- * unpacked: the directory its files are served from (smoke step 14).
+ * unpacked: the directory its files are served from.
  */
 export async function officialStreamline() {
     const { repo, commit } = PINS.streamline;

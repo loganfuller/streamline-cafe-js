@@ -1,35 +1,35 @@
-// The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen shows";
-// once step 21 of the smoke run): a preset grinder's setting is shown by its
-// name, with − and + writing nothing, a name is fitted between − and + and cut
-// with an ellipsis only past the fitting's floor, a wide number is shown whole,
-// and a 0.25-step grinder's setting keeps its places through a Workflow read
-// and steps on its own grid (src/cafe/grind-text.js, `fitGrind` in
-// src/cafe/page.js, the hooks in src/modules/ui.js).
+// The Grind row's number (#42; docs/cafe/DESIGN.md, "What the screen shows"): a
+// preset grinder's setting is shown by its name, with − and + writing nothing,
+// a name is fitted between − and + and cut with an ellipsis only past the
+// fitting's floor, a wide number is shown whole, and a 0.25-step grinder's
+// setting keeps its places through a Workflow read and steps on its own grid
+// (src/cafe/grind-text.js, `fitGrind` in src/cafe/page.js, the hooks in
+// src/modules/ui.js).
 //
 // The sample data (fake-decaid/recordings/sample-data.json) holds the preset
 // grinder and the 0.25-step one archived; a test un-archives the one it needs,
-// as the smoke run did on Decaid. A grinder setting is put in the Workflow as
-// the smoke run's `setGrind` did, by a Workflow write the page then reads
-// (`streamline:workflow-refresh`, as a plugin's `changed` push makes it). That
-// Decaid's merge of a Workflow write leaves the rest of the Workflow alone is a
-// recorded scenario (fake-decaid/recordings/workflow-merge.json); that
-// `GET /grinders/<id>` answers the grinder whole is recordings/grinders.json.
+// in the fake. A grinder setting is put in the Workflow by a Workflow write the
+// page then reads (`streamline:workflow-refresh`, as a plugin's `changed` push
+// makes it). That Decaid's merge of a Workflow write leaves the rest of the
+// Workflow alone is a recorded scenario
+// (fake-decaid/recordings/workflow-merge.json); that `GET /grinders/<id>`
+// answers the grinder whole is recordings/grinders.json.
 
 import { test, expect } from './support/test.mjs';
 import { writes } from './support/page-reads.mjs';
 import { profileOverride } from './support/fake-reads.mjs';
-import { GRINDER, PRESET_GRINDER, QUARTER_GRINDER } from '../cafe-smoke/sample-data.mjs';
+import { GRINDER, PRESET_GRINDER, QUARTER_GRINDER } from './support/sample-data.mjs';
 
 const VALUE = '#grind-value';
 
-/** The sample data's grinder by model, un-archived as the smoke run's `ensure()` did. */
+/** The sample data's grinder by model, un-archived. */
 function grinder(fake, spec) {
     const found = fake.library.state.grinders.find(g => g.model === spec.model);
     found.archived = false;
     return found;
 }
 
-/** The smoke run's `setGrind`: a Workflow write of the grinder and its setting, as another client makes it. */
+/** A Workflow write of the grinder and its setting, as another client makes it. */
 function setGrind(fake, { id, model }, grinderSetting) {
     const answer = fake.request({ method: 'PUT', url: '/api/v1/workflow', body: { context: { grinderId: id, grinderModel: model, grinderSetting } } });
     expect(answer.status, 'the Workflow write').toBe(200);

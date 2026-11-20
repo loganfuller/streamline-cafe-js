@@ -1,10 +1,9 @@
-// Stepping the dial-in (once step 6 of the smoke run): with a recipe loaded, a
-// step reaches the Workflow and changes this machine only, never DYE2's record
-// of the recipe; Temp | Vol picks which of hot water's two numbers the buttons
-// step; the steam row steps the flow whatever mode Streamline's steam tile is
-// in; and a change made just before another recipe is tapped is written before
-// that recipe loads, so it does not land on it, and the first recipe comes back
-// with its own numbers.
+// Stepping the dial-in: with a recipe loaded, a step reaches the Workflow and
+// changes this machine only, never DYE2's record of the recipe; Temp | Vol
+// picks which of hot water's two numbers the buttons step; the steam row steps
+// the flow whatever mode Streamline's steam tile is in; and a change made just
+// before another recipe is tapped is written before that recipe loads, so it
+// does not land on it, and the first recipe comes back with its own numbers.
 //
 // The page's steppers write a moment after their last tap (Streamline's
 // `API_DEBOUNCE_MS`, src/modules/workflow-watch.js), on the page's clock, which
@@ -17,12 +16,11 @@
 import { test, expect } from './support/test.mjs';
 import { card, load, isWrite, writes } from './support/page-reads.mjs';
 import { records, recordOf, loadedId, matchMachine } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { API_DEBOUNCE_MS } from '../../src/modules/workflow-watch.js';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';
 
-// The recipe the smoke run had loaded when it stepped (run.mjs: `target`), and
-// the one it tapped next.
+// The recipe loaded for the steps, and the one tapped next.
 const [, single, , longBlack] = RECIPES;
 
 const isWorkflowWrite = entry => entry.method === 'PUT' && entry.path === '/api/v1/workflow';

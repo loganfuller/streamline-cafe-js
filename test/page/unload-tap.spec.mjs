@@ -1,12 +1,11 @@
 // A tap on the loaded card unloads it (docs/cafe/DESIGN.md, "Recipes and the
-// strip"; once step 24 of the smoke run, #53), on a page at 1920 by 1200 and on
-// one at 1340 by 800: the tap clears DYE2's selection alone, and the page is the
-// no-recipe page with the machine set as it was; a step afterwards reaches the
-// Workflow and no record; a tap loads the recipe again as stored; a double tap
-// on another card leaves that recipe loaded; during a shot no card takes a tap;
-// tapped just after a pour, the unload waits for Decaid to store the Shot, which
-// names the recipe; and an unload DYE2 refuses is a toast, the recipe still
-// loaded.
+// strip"; #53), on a page at 1920 by 1200 and on one at 1340 by 800: the tap
+// clears DYE2's selection alone, and the page is the no-recipe page with the
+// machine set as it was; a step afterwards reaches the Workflow and no record;
+// a tap loads the recipe again as stored; a double tap on another card leaves
+// that recipe loaded; during a shot no card takes a tap; tapped just after a
+// pour, the unload waits for Decaid to store the Shot, which names the recipe;
+// and an unload DYE2 refuses is a toast, the recipe still loaded.
 //
 // What DYE2 does with the page's `POST selection {}` (it writes the Workflow's
 // recipeId alone, and answers the selection it derives: a recent favourite the
@@ -19,7 +18,7 @@
 import { test, expect } from './support/test.mjs';
 import { card, writes, legend } from './support/page-reads.mjs';
 import { records, recordOf, loadedId } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { UNLOAD_HOLD_MS } from '../../src/cafe/recipe-loader.js';
 import { SHOT_STORE_MS } from '../../src/cafe/barista-model.js';
 
@@ -81,7 +80,7 @@ async function expectNoRecipePage(page) {
 
 test.describe('a tap on the loaded card unloads it', { tag: '@unload' }, () => {
     for (const viewport of SIZES) {
-        // The smoke run's names: unload-before-1920x1200-light and the like.
+        // The screenshots' names: unload-before-1920x1200-light and the like.
         const size = `${viewport.width}x${viewport.height}`;
 
         test.describe(size, () => {

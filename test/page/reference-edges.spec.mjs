@@ -1,12 +1,12 @@
 // The reference at its edges (docs/cafe/DESIGN.md, "Shots and the reference",
-// "The comparison row"; once the end of step 8 of the smoke run): an Unfinished
-// Shot that does not take the latest Shot's place; a recipe with no Shot on
-// this machine, whose reference is drawn alone and flagged "Different
-// profile", with "—" and the reference's numbers on the cards, its stage
-// names, and "No shot yet" in Targets; a choice that names a Shot the tablet
-// no longer has, read after a reload as no reference; loading another recipe,
-// which changes the graph to its latest Shot and reference; and the row with
-// every number in it, a weighed Shot against a weighed reference.
+// "The comparison row"): an Unfinished Shot that does not take the latest
+// Shot's place; a recipe with no Shot on this machine, whose reference is drawn
+// alone and flagged "Different profile", with "—" and the reference's numbers
+// on the cards, its stage names, and "No shot yet" in Targets; a choice that
+// names a Shot the tablet no longer has, read after a reload as no reference;
+// loading another recipe, which changes the graph to its latest Shot and
+// reference; and the row with every number in it, a weighed Shot against a
+// weighed reference.
 //
 // A pour can't be stopped early in the fake, so the Unfinished Shot is added
 // with `fake.shots.add`: the stored pour cut to its Preheat and its first two
@@ -35,14 +35,14 @@ import { test, expect } from './support/test.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, paint, load, card, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, unfinishedParts } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { recording } from './support/adapter.mjs';
 import { shotStages } from '../../src/cafe/stage-names.js';
 import { isUnfinished } from '../../src/cafe/shot-model.js';
 
 // The pour is recorded on the first recipe's profile (Default). The recipe with
-// no Shot is one on another profile (Adaptive v3), as the smoke run chose.
+// no Shot is one on another profile (Adaptive v3).
 const [house, single] = RECIPES;
 const CAFE = 'streamlineCafe';
 const REFERENCES = 'references';
@@ -144,7 +144,7 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         const page = await cafe.open();
         await load(cafe, house);
         const latest = await pourAndStore(cafe);
-        // The recipe's latest made its reference, as the smoke run had it here.
+        // The recipe's latest made its reference.
         await page.locator('#cafe-make-reference').click();
         await expect.poll(async () => (await legend(page)).badge, 'the latest is the reference').toBe('This shot is the reference');
         const before = await legend(page);
@@ -172,7 +172,7 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         // The recipe loaded after: its latest Shot, which is its reference.
         const houseLatest = shotWithRecipe(fake, start, houseId, 30, '00000000-0000-4000-8000-0000000e0002');
         // The page has no way to choose a reference for a recipe with no Shot:
-        // the choice is written into Decaid's store, as the smoke run wrote it.
+        // the choice is written into Decaid's store.
         choose(fake, { [houseId]: houseLatest.id, [singleId]: reference.id });
 
         const page = await cafe.open();

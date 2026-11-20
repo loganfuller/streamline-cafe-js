@@ -1,12 +1,12 @@
 // The dial-in column's label with Decent Sync serving, refusing and not yet
 // connected, and the remaining screenshots (docs/cafe/DESIGN.md, "Recipes and
-// the strip" and "Shots and the reference"; once step 15 of the smoke run, its
-// "14." in run.mjs): a recipe loaded in the dark theme, a machine with buttons
-// of its own in light and dark, the column labelled "saved to the recipe" where
-// the plugin serves the Machine and "not saved" where it refuses, each with the
-// plugin's Status asked; the plugin not connected yet when the page opens, with
-// the latest Shot alone and the line saying why, until the plugin's connection
-// comes and the page asks again; and the page with no recipe loaded, dark.
+// the strip" and "Shots and the reference"): a recipe loaded in the dark theme,
+// a machine with buttons of its own in light and dark, the column labelled
+// "saved to the recipe" where the plugin serves the Machine and "not saved"
+// where it refuses, each with the plugin's Status asked; the plugin not
+// connected yet when the page opens, with the latest Shot alone and the line
+// saying why, until the plugin's connection comes and the page asks again; and
+// the page with no recipe loaded, dark.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
 // Machine at its Location from recordings/decent-sync.json, with its sharing
@@ -30,7 +30,7 @@ import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { statusRetryMs } from '../../src/cafe/sync-status.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const REST_REFERENCE = 'time firstDrip yield ratio peak';

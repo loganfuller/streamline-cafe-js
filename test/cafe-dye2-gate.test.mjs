@@ -2,6 +2,7 @@
 // (docs/cafe/DESIGN.md, "Recipes and the strip").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { dye2Gate, gateScreen, MIN_DYE2_VERSION, DYE2_PLUGIN_ID } from '../src/cafe/dye2-gate.js';
 
@@ -64,4 +65,13 @@ test('the version in the line is the floor the check uses', () => {
     const { line, vars } = gateScreen('outdated');
     assert.ok(line.endsWith('v{version}'));
     assert.equal(vars.version, MIN_DYE2_VERSION);
+});
+
+// Every test runs against the pinned DYE2 (fake-decaid/pins.json): the fake's
+// recordings, the real journeys, and the weekly run's newest DYE2 through the
+// journeys, which open on the gate if it is too old. This keeps the pin and
+// the page's minimum from parting without a page test noticing.
+test('the pinned DYE2 is one the page accepts', () => {
+    const pins = JSON.parse(readFileSync(new URL('../fake-decaid/pins.json', import.meta.url), 'utf8'));
+    assert.equal(dye2Gate({ plugins: [dye2({ version: pins.dye2.version })], enabled: true }), null, `DYE2 v${pins.dye2.version} is older than v${MIN_DYE2_VERSION}`);
 });

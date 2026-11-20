@@ -1,7 +1,7 @@
-// The grinder dialog (docs/cafe/DESIGN.md, "The grinder dialog"; once step 18
-// of the smoke run): a tap on the Grind row's name lists the tablet's grinders,
-// and a choice sets the machine to that grinder at the setting it was last used
-// at, in one write of the Workflow and nothing else.
+// The grinder dialog (docs/cafe/DESIGN.md, "The grinder dialog"): a tap on the
+// Grind row's name lists the tablet's grinders, and a choice sets the machine
+// to that grinder at the setting it was last used at, in one write of the
+// Workflow and nothing else.
 //
 // The sample data (fake-decaid/recordings/sample-data.json) holds the three
 // grinders and a Shot on each of the two not archived at a setting of its own.
@@ -13,7 +13,7 @@ import { test, expect } from './support/test.mjs';
 import { PAGE_ORIGIN } from './support/page-files.mjs';
 import { pickDialog, pickRows, pickRow, tapAt, isWrite, writes, paint, openPage, load, untilPickClosed } from './support/page-reads.mjs';
 import { recordOf, profileOverride } from './support/fake-reads.mjs';
-import { GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { GRINDER, SECOND_GRINDER, ARCHIVED_GRINDER, GRINDER_USE, RECIPES } from './support/sample-data.mjs';
 
 const [house, , decaf] = RECIPES;
 const NAME = '#grind-section .cafe-row-name';

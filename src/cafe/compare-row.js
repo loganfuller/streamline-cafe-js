@@ -68,7 +68,7 @@ function titled(part) {
 
 /**
  * Write the row. `cards` is `restCards()` or `liveCards()`; `mode` is `rest` or
- * `live`, kept on the row for the stylesheet and the smoke run.
+ * `live`, kept on the row for the stylesheet and the page tests.
  */
 export function paintRow(cards, mode) {
     const row = document.getElementById('cafe-compare');

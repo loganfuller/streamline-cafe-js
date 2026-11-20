@@ -1,15 +1,14 @@
 // The page's picks with Decent Sync serving the Machine (docs/cafe/DESIGN.md,
 // "The grinder, bean and basket dialogs", "The profile dialog", "Changing the
-// profile" and "Recipes and the strip"; the page's half of the second smoke
-// run's steps 11, 13, 14, 15 and 16, in test/cafe-smoke/run-decent-sync.mjs):
-// the grinder, bean and basket dialogs say a choice is saved to the recipe,
-// and a bean other than the recipe's that it changes the recipe's bean; a
-// grinder, a batch of the recipe's own bean and a basket are each one write of
-// the Workflow and no DYE2 record, the plugin being the one that saves them; a
-// tap on the loaded card unloads it, at 1920 by 1200 and at 1340 by 800, the
-// column going from "saved to the recipe" to "not saved to a recipe", and a
-// step then reaches the Workflow alone; and the profile dialog says "saved to
-// the recipe" and lists the profiles sorted, the recipe's in use.
+// profile" and "Recipes and the strip"): the grinder, bean and basket dialogs
+// say a choice is saved to the recipe, and a bean other than the recipe's that
+// it changes the recipe's bean; a grinder, a batch of the recipe's own bean and
+// a basket are each one write of the Workflow and no DYE2 record, the plugin
+// being the one that saves them; a tap on the loaded card unloads it, at 1920
+// by 1200 and at 1340 by 800, the column going from "saved to the recipe" to
+// "not saved to a recipe", and a step then reaches the Workflow alone; and the
+// profile dialog says "saved to the recipe" and lists the profiles sorted, the
+// recipe's in use.
 //
 // Without Decent Sync the same dialogs and the unload are
 // grinder-dialog.spec.mjs, bean-basket-dialogs.spec.mjs, unload-tap.spec.mjs
@@ -35,7 +34,7 @@
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickRow, tapAt, writes, openPage, card, untilPickClosed } from './support/page-reads.mjs';
 import { recordOf, loadedId, matchMachine, profileOverride, PROFILES } from './support/fake-reads.mjs';
-import { RECIPES, GRINDER, SECOND_GRINDER, GRINDER_USE } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, GRINDER, SECOND_GRINDER, GRINDER_USE } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }];
@@ -246,7 +245,7 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
                 await expect(page.locator('#cafe-pick-pane-in-use')).toBeVisible();
 
                 if (size === '1920x1200') {
-                    // As the smoke run took it: another profile highlighted, its description beside the list.
+                    // Another profile highlighted, its description beside the list.
                     const gentle = byTitle('Gentle and sweet');
                     await page.locator(`#cafe-pick-side .cafe-pick-side-row[data-id="${gentle.id}"]`).click();
                     await expect(page.locator('#cafe-pick-pane-title')).toHaveText(gentle.profile.title);

@@ -1,11 +1,11 @@
 // A touchscreen whose screen rests short of its window, and the soft keyboard
-// (issue #38; once step 19 of the smoke run). A button takes focus as it is
-// pressed, and Streamline's keyboard lift used to move the canvas then, so the
-// button left the finger and the first tap missed. One tap on Settings, Shots
-// or Sleep acts, and the canvas doesn't move. A keyboard over a Shot's note
-// still leaves the note's dialog in view, through Streamline's own scaling
-// (src/modules/scaling.js, keyboard-fit.js; src/cafe/note-dialog.js), and a
-// button focused with the keyboard up is lifted clear of it.
+// (issue #38). A button takes focus as it is pressed, and Streamline's keyboard
+// lift used to move the canvas then, so the button left the finger and the
+// first tap missed. One tap on Settings, Shots or Sleep acts, and the canvas
+// doesn't move. A keyboard over a Shot's note still leaves the note's dialog in
+// view, through Streamline's own scaling (src/modules/scaling.js,
+// keyboard-fit.js; src/cafe/note-dialog.js), and a button focused with the
+// keyboard up is lifted clear of it.
 //
 // The tablet is a 1340x800 Android WebView whose visualViewport rests half a
 // pixel, or a 30 px system bar, short of the window; a keyboard is the
@@ -26,13 +26,13 @@ const KEYBOARD = 360;
 const SLEEP = 'PUT /api/v1/machine/state/sleeping';
 
 // On the page, before any of its own scripts: visualViewport's height is
-// `window.__cafeSmokeShort` px short of the window, and every change of the
+// `window.__cafeShort` px short of the window, and every change of the
 // canvas's transform is kept in `window.__cafeTransforms`.
 function shortScreen() {
     const height = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
     Object.defineProperty(VisualViewport.prototype, 'height', {
         configurable: true,
-        get() { return Math.max(0, height.get.call(this) - window.__cafeSmokeShort); },
+        get() { return Math.max(0, height.get.call(this) - window.__cafeShort); },
     });
     window.__cafeTransforms = [];
     document.addEventListener('DOMContentLoaded', () => {
@@ -49,7 +49,7 @@ function shortScreen() {
  */
 async function openShort(cafe, fake, short) {
     fake.patchBoot('GET /api/v1/machine/info', info => ({ ...info, GHC: true }));
-    await cafe.page.addInitScript(gap => { window.__cafeSmokeShort = gap; }, short);
+    await cafe.page.addInitScript(gap => { window.__cafeShort = gap; }, short);
     await cafe.open({ before: shortScreen });
     await cafe.advance(SHRINK_ADOPT_MS + 500);
     expect(await moved(cafe.page), 'the log saw the canvas laid out at load').not.toEqual([]);
@@ -70,7 +70,7 @@ const bottomOf = locator => locator.evaluate(element => {
 /** A keyboard that leaves the screen `short` px short of the window, as its resize reaches the page. */
 async function keyboard(cafe, short) {
     await cafe.page.evaluate(gap => {
-        window.__cafeSmokeShort = gap;
+        window.__cafeShort = gap;
         window.visualViewport.dispatchEvent(new Event('resize'));
     }, short);
     // Past the resize's frame and scaling.js's settle pass 250 ms after it.

@@ -1,18 +1,16 @@
 // Rating and notes with Decent Sync serving (docs/cafe/DESIGN.md, "Rating and
-// notes"; once the page's half of step "5." of the second smoke run,
-// test/cafe-smoke/run-decent-sync.mjs, SMOKE.md's S6): every edit of the
-// latest Shot is one request to the plugin's `shot`, with the field edited
-// alone, and none to Decaid's own Shot edit; the plugin writes the tablet's
-// Shot through Decaid. A rating and a note given to the Reference Shot on the
-// server reach the open page by the plugin's push, with its row written and
-// the chart not drawn again, and its note opens to read. And the plugin's
-// refusals of an edit: one with a reason shows the plugin's message and puts
-// the stars back; `shotUnwritten` and `unreachable` are read again first, and
-// one that was made after all is shown as made, with no toast. The plugin
-// writes the tablet's own Shot through Decaid whatever the server, so it never
-// refuses one `captureOnly` or `unreachable`: those are injected here to try
-// the page's handling, which is the same for every Shot. Another Machine's
-// Shot refused so, as can happen, is sync-location-shots.spec.mjs's.
+// notes"): every edit of the latest Shot is one request to the plugin's `shot`,
+// with the field edited alone, and none to Decaid's own Shot edit; the plugin
+// writes the tablet's Shot through Decaid. A rating and a note given to the
+// Reference Shot on the server reach the open page by the plugin's push, with
+// its row written and the chart not drawn again, and its note opens to read.
+// And the plugin's refusals of an edit: one with a reason shows the plugin's
+// message and puts the stars back; `shotUnwritten` and `unreachable` are read
+// again first, and one that was made after all is shown as made, with no toast.
+// The plugin writes the tablet's own Shot through Decaid whatever the server,
+// so it never refuses one `captureOnly` or `unreachable`: those are injected
+// here to try the page's handling, which is the same for every Shot. Another
+// Machine's Shot refused so, as can happen, is sync-location-shots.spec.mjs's.
 //
 // The plugin is the fake's (fake-decaid/decent-sync.js), serving the Machine
 // from recordings/decent-sync.json. House espresso's latest Shot on this
@@ -28,7 +26,7 @@ import { recording } from './support/adapter.mjs';
 import { load, legend, remarks, noteDialog, watchDraws, drawCounts } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { REFUSALS } from '../../fake-decaid/decent-sync.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const { A: LATEST, C: REFERENCE } = recording('decent-sync').labels;
@@ -138,7 +136,7 @@ test.describe('rating and notes with Decent Sync', { tag: '@sync-remarks' }, () 
     });
 
     test('a rating and a note given to the Reference Shot on the server show on its row by the push, with the chart not drawn again, and its note opens to read', async ({ cafe, fake }) => {
-        // The latest Shot rated and noted already, as the smoke run left it.
+        // The latest Shot rated and noted already.
         fake.decentSync.editShot(LATEST, { rating: 10, note: NOTE });
         const page = await openWithReference(cafe);
         expect(await remarks(page)).toEqual({ stars: [100, 100, 100, 100, 100], note: 'note', referenceRating: null, referenceNote: false });

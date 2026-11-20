@@ -25,13 +25,12 @@ on:
       - scripts/fake-decaid-recorder/**
       - test/real/**
       - test/fake-decaid-recordings.test.mjs
-      # What the recorder and the journeys import from the page tests and the smoke run.
+      # What the recorder and the journeys import from the page tests.
       # Left out on purpose: the fake (fake-decaid/), which `npm test` replays the
       # committed recordings against on every pull request, and the page (src/),
       # whose writes AGENTS.md has a pull request run the journeys for by hand;
       # the Pre-Tag Gate runs everything before a release.
-      - test/cafe-smoke/sample-data.mjs
-      - test/cafe-smoke/page-helpers.mjs
+      - test/page/support/sample-data.mjs
       - test/page/support/page-files.mjs
       - test/page/support/page-reads.mjs
       - playwright.real.config.mjs
