@@ -50,13 +50,16 @@ test('nothing a build ships names the preview or the fake Decaid', () => {
     assert.deepEqual(naming, []);
 });
 
-test('the preview\'s skin page is index.html with the stand-in as its first script, made when the site is staged', () => {
+test('the preview\'s skin page is index.html with the stand-in as its first script after the import map, made when the site is staged', () => {
     const html = read('index.html');
     const page = skinPage(html);
     const STAND_IN = /^[ \t]*<script src="preview\/stand-in\.js"><\/script>\n/m;
     assert.equal(page.replace(STAND_IN, ''), html, 'index.html with one line added');
     const at = page.indexOf('preview/stand-in.js');
-    assert.equal(page.indexOf('<script'), page.lastIndexOf('<script', at), 'the first script of the page');
+    const scripts = [...page.matchAll(/<script\b[^>]*>/g)].map(match => ({ tag: match[0], at: match.index }));
+    assert.equal(scripts[0].tag, '<script type="importmap">', 'the import map comes first');
+    assert.equal(scripts[1].at, page.lastIndexOf('<script', at), 'the stand-in is the first script after it');
+    assert.ok(page.indexOf('</script>', scripts[0].at) < scripts[1].at, 'after the import map has closed');
     assert.equal(existsSync(join(ROOT, 'skin.html')), false, 'not kept in the repository');
     assert.equal(existsSync(join(ROOT, 'preview', 'skin.html')), false, 'not kept in the repository');
 });

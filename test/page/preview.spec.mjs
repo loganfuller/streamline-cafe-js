@@ -224,7 +224,7 @@ for (const origin of Object.keys(SITES)) {
 }
 
 test.describe('the preview', { tag: '@preview' }, () => {
-    test('two minutes at rest: no error, the update check and the plugin look come round answered, and the machine stays connected', async ({ preview }) => {
+    test('seven minutes at rest: no error, the update check and the plugin look come round answered, the log is kept short, and the machine stays connected', async ({ preview }) => {
         test.slow();
         const frame = await preview.open();
         await preview.advance(125_000, 1000);
@@ -232,7 +232,9 @@ test.describe('the preview', { tag: '@preview' }, () => {
         const after = (request, ms) => log.some(entry => entry.request === request && entry.at >= START + ms);
         expect(after('GET /api/v1/webui/skins', 30_000), 'Streamline\'s update check, thirty seconds on').toBe(true);
         expect(after('GET /api/v1/plugins', 60_000), 'the plugin look, sixty seconds on').toBe(true);
-        expect(log.length, 'the fake\'s request log is kept short').toBeLessThanOrEqual(200);
+        // On to well past 200 requests: at rest the page makes about one every two seconds.
+        await preview.advance(300_000, 1000);
+        expect((await preview.read('log')).length, 'the fake\'s request log is kept to its last 200').toBe(200);
         await expect(frame.locator('#machine-status')).toHaveText('Ready');
         const lines = preview.unanswered();
         expect(lines, 'each request with no answer named once').toEqual([...new Set(lines)]);
@@ -395,6 +397,29 @@ test.describe('the preview', { tag: '@preview' }, () => {
             await preview.page.screenshot({ path: join(SCREENSHOTS, `preview-${name}.png`) });
         });
     }
+
+    test('Decaid at a saved address is answered in the page too', async ({ preview }) => {
+        // As a visitor who once pointed the plain skin at a tablet: api.js
+        // calls the saved host, and the stand-in answers it there.
+        await preview.page.context().addInitScript(() => window.localStorage.setItem('reaHostname', 'decaid-tablet.test'));
+        const frame = await preview.open();
+        expect(await frame.evaluate(() => window.localStorage.getItem('reaHostname'))).toBe('decaid-tablet.test');
+        await expect(frame.locator('#machine-status')).toHaveText('Ready');
+        expect((await preview.read('log')).some(entry => entry.request === 'GET /api/v1/machine/info'), 'the boot read reached the model').toBe(true);
+        // Nothing went to the network: the fixture's check of what left the page.
+    });
+
+    test('a key noted by another preview tab stays noted when this one notes its own', async ({ preview }) => {
+        const frame = await preview.open();
+        const list = await frame.evaluate(() => {
+            const NOTED = 'streamlineCafePreview.written';
+            // Another tab of the same origin notes a key of its own.
+            window.localStorage.setItem(NOTED, JSON.stringify([...JSON.parse(window.localStorage.getItem(NOTED)), 'other-tab.key']));
+            window.localStorage.setItem('this-tab.key', '1');
+            return JSON.parse(window.localStorage.getItem(NOTED));
+        });
+        expect(list).toEqual(expect.arrayContaining(['other-tab.key', 'this-tab.key', 'streamline.dye2Enabled']));
+    });
 
     test('a reload, and "Start over", find the page as a first visit did; storage that isn\'t the skin\'s is untouched', async ({ preview }) => {
         const { page } = preview;

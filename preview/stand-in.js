@@ -1,7 +1,7 @@
 // The public preview's stand-in for Decaid (docs/cafe/DESIGN.md, "The public
 // preview"). A classic script, the first in the <head> of the preview's copy of
-// the skin's page (made from index.html by preview/stage.mjs), so it runs
-// before any of the page's own scripts. It is never on a tablet: nothing a
+// the skin's page after its import map (made from index.html by
+// preview/stage.mjs), so it runs before any of the page's own scripts. It is never on a tablet: nothing a
 // release or a `dist` build ships names it.
 //
 // It replaces the browser's `fetch` and `WebSocket` for Decaid's address, the
@@ -54,7 +54,6 @@
     const setItem = storageProto.setItem;
     const getItem = storageProto.getItem;
     const removeItem = storageProto.removeItem;
-    const areas = new Map();
 
     function area(storage) {
         try {
@@ -73,15 +72,14 @@
         }
     }
 
+    // The list is read again each time, not kept: another preview tab of the
+    // same origin may have noted keys since.
     function note(storage, key) {
-        const name = area(storage);
-        if (!name || key === NOTED || key === NOTED_DATABASES) return;
-        if (!areas.has(name)) areas.set(name, new Set(noted(storage, NOTED)));
-        const keys = areas.get(name);
-        if (keys.has(key)) return;
-        keys.add(key);
+        if (!area(storage) || key === NOTED || key === NOTED_DATABASES) return;
+        const keys = noted(storage, NOTED);
+        if (keys.includes(key)) return;
         try {
-            setItem.call(storage, NOTED, JSON.stringify([...keys]));
+            setItem.call(storage, NOTED, JSON.stringify([...keys, key]));
         } catch {
             // Storage full or refused: the key is still written, only not noted.
         }

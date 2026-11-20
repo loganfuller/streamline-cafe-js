@@ -18,13 +18,17 @@ const ROOT = resolve(import.meta.dirname, '..');
 // What the stand-in starts the fake from (preview/stand-in.js, RECORDINGS).
 const RECORDINGS = ['sample-data', 'boot', 'pour'];
 const STAND_IN = '<script src="preview/stand-in.js"></script>';
-const CHARSET = /^([ \t]*)<meta charset="UTF-8">\r?\n/im;
+// The import map, to its closing line. The stand-in goes right after it: a
+// browser that takes no import map once a module has loaded (the stand-in's
+// import() is one) would drop a map that came later.
+const IMPORT_MAP = /<script type="importmap">[\s\S]*?^([ \t]*)<\/script>\r?\n/m;
 
-/** The skin's page with the stand-in as its first script, from index.html as it is. */
+/** The skin's page with the stand-in as its first script after the import map, from index.html as it is. */
 export function skinPage(html) {
-    const found = html.match(CHARSET);
-    if (!found) throw new Error('index.html has no <meta charset="UTF-8"> line to put the stand-in after');
-    if ((html.match(new RegExp(CHARSET.source, 'gim')) || []).length !== 1) throw new Error('index.html has more than one charset line');
+    const found = html.match(IMPORT_MAP);
+    if (!found) throw new Error('index.html has no import map to put the stand-in after');
+    if (html.split('<script type="importmap">').length !== 2) throw new Error('index.html has more than one import map');
+    if (html.slice(0, found.index).includes('<script')) throw new Error('index.html has a script before its import map');
     const at = found.index + found[0].length;
     return `${html.slice(0, at)}${found[1]}${STAND_IN}\n${html.slice(at)}`;
 }

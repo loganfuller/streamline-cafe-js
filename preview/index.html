@@ -76,8 +76,10 @@
         <iframe id="preview-skin" src="skin.html" title="Streamline Cafe" allow="fullscreen"></iframe>
     </main>
     <script>
-        // Each visit starts fresh (preview/stand-in.js), so starting over is a reload.
-        document.getElementById('preview-start-over').addEventListener('click', () => location.reload());
+        // Each visit starts fresh (preview/stand-in.js), so starting over is
+        // opening the page again. Not a reload: a browser may reload the frame
+        // at the address it had moved to, such as Settings, not at its src.
+        document.getElementById('preview-start-over').addEventListener('click', () => location.replace(location.href));
     </script>
 </body>
 </html>
