@@ -98,9 +98,11 @@ for (const { name, recording } of scenarios) {
             fake.flush();
             assert.ok(got, `${where}: the fake has no answer`);
             assert.equal(got.status, step.answer.status, `${where}: status`);
-            // A refusal is compared by its status: the page reads no error's text.
+            // Decaid's and DYE2's refusals are compared by their status, as the
+            // page reads no error's text; Decent Sync's whole, as it reads their
+            // `code` and the fields beside it.
             if (path.endsWith('/save-recipe') && step.answer.status === 200) made.set(step.answer.body.id, got.body.id);
-            if (step.answer.status < 400) assert.deepEqual(normal(got.body), normal(step.answer.body, made), `${where}: answer`);
+            if (step.answer.status < 400 || path.startsWith('/plugins/decent-sync.reaplugin/')) assert.deepEqual(normal(got.body), normal(step.answer.body, made), `${where}: answer`);
             if (recording.socket) assert.deepEqual(pushed(pushes), pushed(step.pushes), `${where}: what was pushed`);
         });
     });

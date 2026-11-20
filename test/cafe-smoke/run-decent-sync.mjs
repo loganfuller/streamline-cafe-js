@@ -397,9 +397,12 @@ async function unloadAtSize({ page, seen, size, house, two, machine, tablet2 }) 
     //     on to the second Machine, is given the time to land.
     const stored = await content();
     const theirDose = (await decaid2('GET', '/workflow')).context.targetDoseWeight;
+    const dose = parseFloat(await page.locator('#dose-in-value').textContent());
     await page.locator('#dose-in-plus').click();
     const stepped = parseFloat(await page.locator('#dose-in-value').textContent());
-    await until(async () => (Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001 || null), { timeout: 10_000 });
+    //     Without the step in this Machine's Workflow, the checks after the wait would hold whatever happened.
+    const reached = await until(async () => (Math.abs((await decaid('GET', '/workflow')).context.targetDoseWeight - stepped) < 0.001 || null), { timeout: 10_000 });
+    check(`unload ${size}: a step afterwards reaches this Machine's Workflow`, stepped > dose && !!reached, `${dose} g to ${stepped} g, Workflow ${(await decaid('GET', '/workflow')).context.targetDoseWeight} g`);
     await sleep(15_000);
     check(`unload ${size}: and is saved to no Recipe: the server's Recipe keeps its dose`, (await content()).dose === stored.dose, `${stored.dose} then ${(await content()).dose}`);
     check(`unload ${size}: nor reaches the second Machine, which keeps the Recipe loaded`,

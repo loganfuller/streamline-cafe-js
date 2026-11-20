@@ -386,6 +386,7 @@ test('Decent Sync: status served, then each state it may be in, with its refusal
     fake.decentSync.setState('served');
     fake.decentSync.setSharing(false);
     assert.equal(get(fake, `${PLUGIN}/status`).body.code, 'captureOnly', 'sharing off is a Capture-only Machine');
+    assert.deepEqual(get(fake, `${PLUGIN}/status`).body.location, decentSync.status.location, 'still at its Location');
     assert.equal(get(fake, `${PLUGIN}/shots`).status, 409, 'and every endpoint that asks the server is refused so');
 });
 
@@ -430,6 +431,10 @@ test('Decent Sync: a Reference Shot chosen by DYE2 record id, pushed for a slott
     assert.equal(send(fake, 'PUT', `${PLUGIN}/reference?recipe=${house}`, { shotId: A }).status, 503, 'no choice is kept for later');
     fake.flush();
     assert.deepEqual(pushes.at(-1), { what: 'connection', connected: false });
+    fake.decentSync.setState('serverTooOld');
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=${house}`).body.source, 'tablet', 'a server too old to ask is answered from the copy too');
+    fake.decentSync.setState('hardwareMismatch');
+    assert.equal(get(fake, `${PLUGIN}/reference?recipe=${house}`).status, 409, 'a Machine the server refuses gets no copy');
 });
 
 test('Decent Sync: an edit of the tablet\'s own Shot goes through Decaid whatever the server; another Machine\'s through the server, now or not at all', () => {

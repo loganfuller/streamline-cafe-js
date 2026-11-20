@@ -20,8 +20,9 @@
 //
 // - **status:** 200 `{ connected, served: true, machine, location }` when
 //   served; any other state answers its refusal's HTTP status with `code` and
-//   `message` beside the same fields: `captureOnly` (409, its Machine set, no
-//   Location), `hardwareMismatch` (409, no Machine), `serverTooOld` (503,
+//   `message` beside the same fields: `captureOnly` (409, its Machine set; its
+//   Location too when it is sharing turned off, none for `setState`, a Machine
+//   at no Location), `hardwareMismatch` (409, no Machine), `serverTooOld` (503,
 //   still connected), and `unreachable` (503, not connected, no Machine or
 //   Location), which is also what a plugin not yet connected answers.
 // - **Every other endpoint** refuses with the status's refusal while the
@@ -31,9 +32,9 @@
 // - **reference?recipe=<DYE2 record id>:** the record's `decentSyncId` is the
 //   Recipe; a record with none, or no record, is `noSuchRecipe` (404).
 //   `{ recipe, reference: { shot, recipe, referenceOf, rating, note,
-//   profileDiffers } | null, source: 'server' }`. Unreachable, a Recipe in a
-//   slot is answered from the copy with `source: 'tablet'`; any other is
-//   refused `unreachable`. A PUT `{ shotId }` chooses: a Shot the Location's
+//   profileDiffers } | null, source: 'server' }`. Unreachable or too old to
+//   ask, a Recipe in a slot is answered from the copy with `source: 'tablet'`;
+//   any other is refused so. A PUT `{ shotId }` chooses: a Shot the Location's
 //   list lists, or one already a Reference Shot of its Recipes, else
 //   `noSuchShot`; an Archived Recipe is `archived` (409). A tablet can't clear one.
 // - **shots?limit=1..50&cursor=:** `{ shots, nextCursor }`, newest first by
@@ -299,7 +300,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         connected: connected(),
         served: servedNow(),
         machine: state === 'unreachable' || state === 'hardwareMismatch' || state === 'serverTooOld' ? null : { id: machine.id, name: machine.name },
-        location: servedNow() ? { id: location.id, name: location.name } : null,
+        // Sharing off, the Machine is still at its Location, and the server names it.
+        location: state === 'served' ? { id: location.id, name: location.name } : null,
     });
     const refused = () => {
         const code = notServed();
@@ -383,8 +385,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         if (method === 'GET') {
             const not = refused();
             if (!not) return recipe ? json({ ...referenceAnswer(recipe), source: 'server' }) : refusal('noSuchRecipe');
-            // Only while the server can't be asked does the copy answer.
-            if (connected()) return not;
+            // Only while the server can't be asked (out of reach, or too old to ask) does the copy answer.
+            if (notServed() !== 'unreachable' && notServed() !== 'serverTooOld') return not;
             const held = copies.get(recipeId);
             return held ? json({ ...JSON.parse(held), source: 'tablet' }) : not;
         }
