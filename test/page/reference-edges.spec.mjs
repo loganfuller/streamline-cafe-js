@@ -15,13 +15,21 @@
 // Shots newest first and answers one it no longer has with a 404 is the fake's
 // Shots (fake-decaid/shots.js, recordings/shots.json).
 //
-// The weighted row stands on the recorded pour (fake-decaid/recordings/
-// pour.json), whose simulated scale weighs: its first drip, yield (34.6 g) and
-// weight flow are the scale's own, and its weighed dose is the Workflow's dose,
-// as the fake stores it. A real DE1Pro capture with a real scale is still owed
-// (#60). Its reference is a sample-data Shot, weighed by the same simulated
-// scale, so each difference has a size. Every expected number is worked out
-// from the stored Shots through `shotNumbers` (src/cafe/comparison.js).
+// The weighted row stands on the real pour (fake-decaid/recordings/real/
+// de1pro-pour.json, #79): a DE1Pro with a real scale, on Decaid's "Best
+// practice (light roast)", 20 g in and 44 g asked for. Its first drip, yield
+// (43.6 g) and weight flow are the scale's own. Its weighed dose is the
+// Workflow's, as Decaid stores every Shot's, and the dose put in that cup was
+// 20.0 g too, so the Targets dose card reads no difference. A weighed dose
+// other than the target reaches a Shot only through an edit made after the
+// pour (DYE2's Edit Shot), which the cafe page never makes: the test then
+// makes one, a made-up 20.4 g, sent as DYE2 sends it, and the page reads it on
+// its next look. The recipe is the sample data's House espresso with that
+// pour's profile, dose and yield, so the Shot names the profile it was pulled
+// on. Its reference is a sample-data Shot from the pinned stack (Default,
+// weighed by its simulated scale), so each difference has a size. Every
+// expected number is worked out from the stored Shots through `shotNumbers`
+// (src/cafe/comparison.js).
 
 import { test, expect } from './support/test.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, paint, load, card, REFERENCE_LINES } from './support/page-reads.mjs';
@@ -29,6 +37,7 @@ import { recordOf, unfinishedParts } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
+import { recording } from './support/adapter.mjs';
 import { shotStages } from '../../src/cafe/stage-names.js';
 import { isUnfinished } from '../../src/cafe/shot-model.js';
 
@@ -225,8 +234,33 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         expect(now.label).toBe('Latest');
         expect(now.line).toBeNull();
     });
+});
 
-    test('the row with every number in it: first drip, yield and ratio beside the reference\'s with their differences, and in Targets against what was set', async ({ cafe, fake }) => {
+// ── The weighted row, on the real pour ───────────────────────────────────────
+
+const REAL_POUR = 'real/de1pro-pour';
+/** The made-up weighed dose a barista enters afterwards (DYE2's Edit Shot), other than the 20 g target. */
+const WEIGHED = 20.4;
+
+/** House espresso's record with the real pour's profile, dose and yield, as if it had been saved with them. */
+function asPulled(fake, recipe) {
+    const { workflowBefore } = recording(REAL_POUR);
+    const rows = fake.store.get('dye2.reaplugin', 'recipes');
+    fake.store.set('dye2.reaplugin', 'recipes', rows.map(row => (row?.name !== recipe.name ? row : {
+        ...row,
+        workflow: {
+            ...row.workflow,
+            profile: workflowBefore.profile,
+            context: { ...row.workflow.context, targetDoseWeight: workflowBefore.context.targetDoseWeight, targetYield: workflowBefore.context.targetYield },
+        },
+    })));
+}
+
+test.describe('the row with every number in it, on the real pour', { tag: '@reference' }, () => {
+    test.use({ pour: REAL_POUR });
+
+    test('first drip, yield and ratio beside the reference\'s with their differences, in Targets against what was set, and a weighed dose entered afterwards', async ({ cafe, fake }) => {
+        asPulled(fake, house);
         const houseId = String(recordOf(fake, house.name).id);
         const reference = sampleShot(fake);
         choose(fake, { [houseId]: reference.id });
@@ -234,6 +268,7 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         await load(cafe, house);
         const shot = await pourAndStore(cafe);
         await expect(page.locator('#cafe-make-reference'), 'the latest is not the reference').toBeVisible();
+        expect(shot.workflow.profile.title, 'the Shot names the profile it was pulled on').toBe(recording(REAL_POUR).shot.workflow.profile.title);
 
         const mine = shotNumbers(shot);
         const theirs = shotNumbers(reference);
@@ -241,6 +276,7 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
             expect(mine[key], `the poured Shot has its ${key}`).not.toBeNull();
             expect(theirs[key], `the reference has its ${key}`).not.toBeNull();
         }
+        expect(mine.yield, 'the real scale\'s yield').toBe(recording(REAL_POUR).shot.annotations.actualYield);
         let full = await row(page);
         expect(keys(full)).toBe(REST_REFERENCE);
         expect(full.cards.map(entry => entry.value), 'the Shot\'s own numbers').toEqual(full.cards.map(entry => shown(mine[entry.key], REST_KINDS[entry.key])));
@@ -255,14 +291,38 @@ test.describe('the reference at its edges', { tag: '@reference' }, () => {
         await paint(page, 'light');
 
         await view(cafe, 'targets');
-        full = await row(page);
-        expect(keys(full)).toBe(REST_TARGETS);
-        const [time, dose, yielded, ratio, peak] = full.cards;
-        expect(time).toMatchObject({ value: shown(mine.time, 'seconds'), side: `First drip ${shown(mine.firstDrip, 'seconds')}`, diff: '' });
-        expect(dose).toMatchObject({ value: shown(mine.weighedDose, 'grams'), side: `Target ${shown(mine.targetDose, 'grams')}`, diff: signed(mine.weighedDose, mine.targetDose, 'grams') });
-        expect(yielded).toMatchObject({ value: shown(mine.yield, 'grams'), side: `Target ${shown(mine.targetYield, 'grams')}`, diff: signed(mine.yield, mine.targetYield, 'grams') });
-        expect(ratio).toMatchObject({ value: shown(mine.ratio, 'ratio'), side: `Target ${shown(mine.targetRatio, 'ratio')}`, diff: signed(mine.ratio, mine.targetRatio, 'ratio') });
-        expect(peak).toMatchObject({ value: shown(mine.peak, 'bar'), side: '', diff: '' });
+        const targets = async numbers => {
+            full = await row(page);
+            expect(keys(full)).toBe(REST_TARGETS);
+            const [time, dose, yielded, ratio, peak] = full.cards;
+            expect(time).toMatchObject({ value: shown(numbers.time, 'seconds'), side: `First drip ${shown(numbers.firstDrip, 'seconds')}`, diff: '' });
+            expect(dose).toMatchObject({ value: shown(numbers.weighedDose, 'grams'), side: `Target ${shown(numbers.targetDose, 'grams')}`, diff: signed(numbers.weighedDose, numbers.targetDose, 'grams') });
+            expect(yielded).toMatchObject({ value: shown(numbers.yield, 'grams'), side: `Target ${shown(numbers.targetYield, 'grams')}`, diff: signed(numbers.yield, numbers.targetYield, 'grams') });
+            expect(ratio).toMatchObject({ value: shown(numbers.ratio, 'ratio'), side: `Target ${shown(numbers.targetRatio, 'ratio')}`, diff: signed(numbers.ratio, numbers.targetRatio, 'ratio') });
+            expect(peak).toMatchObject({ value: shown(numbers.peak, 'bar'), side: '', diff: '' });
+            return full.cards;
+        };
+        const [, doseAsPoured] = await targets(mine);
+        expect(doseAsPoured.diff, 'as stored, the weighed dose is the target').toBe('0.0 g');
         await cafe.screenshot('row-targets-light');
+
+        // The weighed dose entered afterwards, as DYE2's Edit Shot sends it
+        // (edit-shot.ts: the Shot's annotations and Workflow).
+        const put = fake.request({ method: 'PUT', url: `/api/v1/shots/${shot.id}`, body: { annotations: { ...shot.annotations, actualDoseWeight: WEIGHED }, workflow: shot.workflow } });
+        expect(put.status).toBe(200);
+        await cafe.page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+        await cafe.advance(1500);
+        const edited = shotNumbers(fake.shots.get(shot.id));
+        expect(edited.weighedDose).toBe(WEIGHED);
+        await expect.poll(async () => (await row(page)).cards[1].value, 'the page reads the edit on its next look').toBe(shown(WEIGHED, 'grams'));
+        const [, doseWeighed, , ratioWeighed] = await targets(edited);
+        expect(doseWeighed.diff, 'a weighed dose over the target').toBe('+0.4 g');
+        expect(ratioWeighed.value, 'the ratio worked from the weighed dose').toBe(shown(mine.yield / WEIGHED, 'ratio'));
+        await cafe.screenshot('row-targets-weighed-light');
+
+        await view(cafe, 'reference');
+        full = await row(page);
+        expect(full.cards[3].title, 'the Ratio card names the weighed dose').toBe(`RATIO · ${shown(WEIGHED, 'grams')} DOSE`);
+        expect(full.cards[3].value).toBe(shown(edited.ratio, 'ratio'));
     });
 });

@@ -1,7 +1,8 @@
 // The fake Decaid against the pinned real stack: each scenario recorded in
 // fake-decaid/recordings/ is sent to the model, which must answer as the real
 // stack did, and push on DYE2's socket what DYE2 pushed. The recorded pour is
-// replayed and its Shot compared with the one Decaid stored. Decent Sync's
+// replayed and its Shot compared with the one Decaid stored, and so is the
+// real DE1Pro's pour (recordings/real/), captured by hand. Decent Sync's
 // scenarios start from a fake made with recordings/decent-sync.json, and their
 // events on the server are the fake plugin's. How to record them again is in
 // docs/cafe/TESTING.md.
@@ -162,4 +163,74 @@ test(`pour: the replayed pour stores the Shot Decaid ${pour.recordedWith.decaid}
     assert.deepEqual(stored.measurements, recorded.measurements);
     const row = fake.request({ method: 'GET', url: '/api/v1/shots?limit=1' }).body.items[0];
     assert.deepEqual(normal({ ...row, id: recorded.id, createdAt: recorded.createdAt }), normal(pour.listRow), 'its row in Decaid\'s list');
+});
+
+// The real pour (#79), captured by hand on a DE1Pro with a real scale
+// (docs/cafe/TESTING.md, "The real pour"). No recorder makes it afresh, so it
+// is read from the committed folder, whichever recordings the rest replays,
+// with the committed recordings it was scrubbed against.
+const committed = name => JSON.parse(readFileSync(new URL(`../fake-decaid/recordings/${name}.json`, import.meta.url), 'utf8'));
+const realPour = committed('real/de1pro-pour');
+const committedSample = committed('sample-data');
+const committedNewest = Math.max(...committedSample.shots.map(shot => recordedMs(shot.timestamp)));
+
+test(`the real pour: replayed, it stores the Shot a DE1Pro's Decaid ${realPour.capturedWith.decaid} stored, its dose the Workflow's`, () => {
+    const fake = createFakeDecaid({ sampleData: committedSample, boot: committed('boot'), pour: realPour, now: committedNewest + 3_600_000 });
+    assert.equal(fake.request({ method: 'PUT', url: '/api/v1/workflow', body: realPour.workflowBefore }).status, 200);
+    const first = realPour.frames.find(f => f.socket === 'machine/snapshot');
+    fake.setNow(recordedMs(first.frame.timestamp) - first.ms);
+    const frames = [];
+    for (const path of ['/ws/v1/machine/snapshot', '/ws/v1/machine/shotState', '/ws/v1/scale/snapshot']) {
+        fake.connect(path, text => frames.push({ path, frame: JSON.parse(text) }));
+    }
+    fake.flush();
+    frames.length = 0;
+    const id = fake.startPour();
+    fake.finishPour();
+    fake.flush();
+    const restAt = realPour.idleAtMs + 500;
+    // DYE2's push is the model's own, at the store (dye2.js).
+    assert.equal(frames.length, realPour.frames.filter(f => f.ms <= restAt && !f.socket.startsWith('plugins/')).length, 'every frame of the machine, its scale and the shot-state socket is sent');
+    const states = frames.filter(f => f.path === '/ws/v1/machine/snapshot').map(f => f.frame.state.state);
+    assert.ok(states.includes('espresso') && states.at(-1) !== 'espresso', 'into espresso and out of it');
+    assert.ok(frames.filter(f => f.path === '/ws/v1/scale/snapshot').length > 100, 'the real scale weighs through the pour');
+    // On the real machine the shot-state socket said "finished" and DYE2
+    // pushed before the machine's own frame back at rest, so Decaid stored the
+    // Shot before it. The fake stores when the test says, after the pour; the
+    // order at the store is the pinned recording's to show (the test above).
+    fake.storeShot();
+    fake.flush();
+    const stored = fake.shots.get(id);
+    const recorded = realPour.shot;
+    assert.equal(stored.timestamp, recorded.timestamp, 'its time is the shot\'s start');
+    // The scrub wrote one Workflow into the recording's Workflow and its Shot,
+    // so this shows only that the fake stores the Workflow it was given. What
+    // the real Decaid shows here is its dose rule, its list row and the frames.
+    assert.deepEqual(normal(stored.workflow), normal(recorded.workflow), 'the Workflow it was given');
+    assert.deepEqual(stored.annotations, recorded.annotations, 'the dose is the Workflow\'s; the yield is the scale\'s');
+    assert.equal(recorded.annotations.actualDoseWeight, realPour.workflowBefore.context.targetDoseWeight, 'the real Decaid stored the Workflow\'s dose as the weighed dose');
+    assert.equal(stored.stopReason, recorded.stopReason);
+    assert.deepEqual(stored.measurements, recorded.measurements);
+    const row = fake.request({ method: 'GET', url: '/api/v1/shots?limit=100' }).body.items.find(item => item.id === id);
+    assert.deepEqual(normal({ ...row, id: recorded.id, createdAt: recorded.createdAt }), normal(realPour.listRow), 'its row in Decaid\'s list');
+});
+
+test('the real pour holds nothing of the machine it was taken on', () => {
+    const text = JSON.stringify(realPour);
+    assert.equal(realPour.shot.workflow.machine.serialNumber, '10001', 'a made-up serial');
+    assert.doesNotMatch(text, /\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b/i, 'no Bluetooth address');
+    assert.doesNotMatch(text, /\b(?:\d{1,3}\.){3}\d{1,3}\b/, 'no network address');
+    assert.doesNotMatch(text, /uploaded_to_decent|visualizer/i, 'no shot-upload plugin\'s extras');
+    // The Workflow is the sample data's but for the profile, dose and yield.
+    // Its ids are those of the recordings it was scrubbed against, which a
+    // later recording gives new values, so they are left out of the match.
+    const unnamed = ({ id, context: { grinderId, beanBatchId, extras: { dye, ...extras } = {}, ...context } = {}, ...workflow }) => ({
+        ...workflow, context: { ...context, extras: { ...extras, dye: { ...dye, recipeId: undefined } } },
+    });
+    const { profile, ...rest } = unnamed(realPour.workflowBefore);
+    const { profile: _profile, ...sampleRest } = unnamed(committed('pour').workflowBefore);
+    const asSet = workflow => ({ ...workflow, context: { ...workflow.context, targetDoseWeight: 0, targetYield: 0 } });
+    assert.deepEqual(asSet(rest), asSet(sampleRest));
+    const bundled = committed('boot').requests['GET /api/v1/profiles?includeHidden=true'].body.filter(entry => entry.metadata?.source === 'bundled').map(entry => entry.profile);
+    assert.ok(bundled.some(shipped => ['title', 'notes', 'author'].every(key => shipped[key] === profile[key])), 'a profile Decaid ships, its title, notes and author as Decaid has them');
 });

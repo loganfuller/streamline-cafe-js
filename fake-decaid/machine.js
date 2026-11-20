@@ -11,7 +11,10 @@
 // last weight there, is the recorded Shot's, as are its measurements and stop
 // reason).
 // Recorded: recordings/pour.json, one pour of the simulated machine on the
-// pinned Decaid with its frames through the store, and the Shot it stored.
+// pinned Decaid with its frames through the store, and the Shot it stored;
+// and recordings/real/de1pro-pour.json, one on a real DE1Pro with a real
+// scale, captured by hand, whose Shot Decaid stored with the Workflow's dose
+// too. A fake plays the one it is made with.
 //
 // The machine's calibration, which Streamline's settings page reads as it
 // opens (`GET /machine/calibration/<target>?source=`): as de1handler.dart
@@ -161,6 +164,13 @@ export function createMachine({ pour, timeZone, now, emit, nextId, workflow, sto
         finishPour: () => play(Infinity),
         /** How long the recorded pour runs, to its last frame. */
         pourLength: () => frames[frames.length - 1].ms,
+        /**
+         * When the recorded machine was back at rest, and when the recorder
+         * had the stored Shot from Decaid's list, in ms from the pour's start.
+         * The real pour's capture polled the list from the frame at rest on,
+         * though Decaid had stored its Shot about 1.8 s before that frame.
+         */
+        pourTimes: () => ({ idleAtMs: pour.idleAtMs, storedAtMs: pour.storedAtMs }),
         /** The ms from the pour's start of the first frame matching `test`. */
         pourMoment: test => frames.find(entry => test(entry.frame, entry.socket))?.ms ?? null,
         /** Decaid stores the Shot: the pour's own record, with the Workflow as it is now. */
