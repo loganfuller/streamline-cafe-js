@@ -745,6 +745,28 @@ test('Decent Sync save: none on a Capture-only Machine or with DYE2 disabled; sa
     assert.equal(houseRecord(fake).dashboardVariables.dose, 19, 'heard on connecting: Capture-only');
 });
 
+test('Decent Sync save: a save waiting is dropped when a load, Capture-only or DYE2 disabled comes before the flush', () => {
+    const unloadAndReload = (fake, house) => {
+        send(fake, 'PUT', '/api/v1/workflow', { context: { extras: { dye: null } } });
+        // Loaded again with the dose moved in the same write: a save made now would write 21.
+        send(fake, 'PUT', '/api/v1/workflow', { ...applied(house), context: { ...applied(house).context, targetDoseWeight: 21 } });
+    };
+    for (const [what, make] of [
+        ['another recipe loaded', fake => send(fake, 'PUT', '/api/v1/workflow', applied(recordsOf(fake).find(row => row.name === 'Single origin')))],
+        ['unloaded and loaded again', unloadAndReload],
+        ['sharing off', fake => fake.decentSync.setSharing(false)],
+        ['Capture-only', fake => fake.decentSync.setState('captureOnly')],
+        ['DYE2 disabled', fake => fake.disableDye2()],
+    ]) {
+        const { fake, house } = servedHouse();
+        const before = JSON.stringify(recordsOf(fake));
+        stepDose(fake, 18.5);
+        make(fake, house);
+        fake.flush();
+        assert.equal(JSON.stringify(recordsOf(fake)), before, what);
+    }
+});
+
 test('Decent Sync save: a fake made without the plugin saves nothing on a Workflow change', () => {
     const { fake, house } = houseLoaded();
     stepDose(fake, 18.5);
