@@ -203,7 +203,10 @@ test(`the real pour: replayed, it stores the Shot a DE1Pro's Decaid ${realPour.c
     const stored = fake.shots.get(id);
     const recorded = realPour.shot;
     assert.equal(stored.timestamp, recorded.timestamp, 'its time is the shot\'s start');
-    assert.deepEqual(normal(stored.workflow), normal(recorded.workflow), 'the Workflow as it was at the end of the pour');
+    // The scrub wrote one Workflow into the recording's Workflow and its Shot,
+    // so this shows only that the fake stores the Workflow it was given. What
+    // the real Decaid shows here is its dose rule, its list row and the frames.
+    assert.deepEqual(normal(stored.workflow), normal(recorded.workflow), 'the Workflow it was given');
     assert.deepEqual(stored.annotations, recorded.annotations, 'the dose is the Workflow\'s; the yield is the scale\'s');
     assert.equal(recorded.annotations.actualDoseWeight, realPour.workflowBefore.context.targetDoseWeight, 'the real Decaid stored the Workflow\'s dose as the weighed dose');
     assert.equal(stored.stopReason, recorded.stopReason);
@@ -219,9 +222,14 @@ test('the real pour holds nothing of the machine it was taken on', () => {
     assert.doesNotMatch(text, /\b(?:\d{1,3}\.){3}\d{1,3}\b/, 'no network address');
     assert.doesNotMatch(text, /uploaded_to_decent|visualizer/i, 'no shot-upload plugin\'s extras');
     // The Workflow is the sample data's but for the profile, dose and yield.
-    const { profile, context, ...rest } = realPour.workflowBefore;
-    const { profile: _profile, context: sampleContext, ...sampleRest } = committed('pour').workflowBefore;
-    assert.deepEqual(rest, sampleRest);
-    assert.deepEqual({ ...context, targetDoseWeight: 0, targetYield: 0 }, { ...sampleContext, targetDoseWeight: 0, targetYield: 0 });
+    // Its ids are those of the recordings it was scrubbed against, which a
+    // later recording gives new values, so they are left out of the match.
+    const unnamed = ({ id, context: { grinderId, beanBatchId, extras: { dye, ...extras } = {}, ...context } = {}, ...workflow }) => ({
+        ...workflow, context: { ...context, extras: { ...extras, dye: { ...dye, recipeId: undefined } } },
+    });
+    const { profile, ...rest } = unnamed(realPour.workflowBefore);
+    const { profile: _profile, ...sampleRest } = unnamed(committed('pour').workflowBefore);
+    const asSet = workflow => ({ ...workflow, context: { ...workflow.context, targetDoseWeight: 0, targetYield: 0 } });
+    assert.deepEqual(asSet(rest), asSet(sampleRest));
     assert.equal(profile.author, 'Decent', 'one of Decaid\'s own profiles');
 });

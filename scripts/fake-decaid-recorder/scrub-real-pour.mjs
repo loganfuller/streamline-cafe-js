@@ -31,6 +31,10 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const SHOT_ID = '00000000-0000-4000-8000-0000000de1a1';
 const SERIAL = '10001';
 
+// The profile is kept whole, so it must be one of Decaid's own, whose title
+// and notes are Decent's, not the cafe's.
+if (raw.workflowBefore.profile?.author !== 'Decent') throw new Error(`the profile "${raw.workflowBefore.profile?.title}" is not one of Decaid's own; nothing written`);
+
 const workflow = copy(simulated.workflowBefore);
 workflow.profile = copy(raw.workflowBefore.profile);
 workflow.context.targetDoseWeight = raw.workflowBefore.context.targetDoseWeight;
@@ -44,9 +48,11 @@ const machine = { provenanceStatus, flowCalibration, serialNumber: SERIAL, model
  * the shot-upload plugin's extras and any text, such as notes, left out.
  */
 const decaidAnnotations = annotations => Object.fromEntries(Object.entries(annotations ?? {}).filter(([, value]) => typeof value === 'number'));
+/** What a Shot keeps of the capture's, besides its Workflow and annotations, which are made again below. */
+const SHOT_KEYS = new Set(['id', 'timestamp', 'createdAt', 'updatedAt', 'measurements', 'workflow', 'annotations', 'stopReason']);
 /** A Shot of the capture with the Workflow above, the made-up id, and none of the plugin's extras. */
 function scrubShot(shot, { measurements = true } = {}) {
-    const { metadata, ...rest } = shot;
+    const rest = Object.fromEntries(Object.entries(shot).filter(([key]) => SHOT_KEYS.has(key)));
     const out = {
         ...rest,
         id: SHOT_ID,

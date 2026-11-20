@@ -139,9 +139,10 @@ class Cafe {
     }
 
     /**
-     * Moves the clock on after a whole pour to the moment Decaid stored the
-     * recorded Shot: as long after the page had the machine back at rest as in
-     * the recording. The Shot is not stored; `storeShot()` does that.
+     * Moves the clock on after a whole pour to the moment the recorder had
+     * the stored Shot from Decaid's list: as long after the page had the
+     * machine back at rest as in the recording (`pourTimes()`). The Shot is
+     * not stored; `storeShot()` does that.
      */
     async untilStored() {
         if (this.idleSeenAt == null) throw new Error('untilStored() follows a whole pour()');

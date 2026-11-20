@@ -69,6 +69,9 @@ for (const until = Date.now() + 120_000; Date.now() < until && idleAt === null; 
 }
 if (idleAt === null) throw new Error('the machine did not leave espresso within 2 min');
 log(`back at rest ${(idleAt / 1000).toFixed(1)} s after the start`);
+// When the capture first sees the Shot in Decaid's list, polled from the
+// frame back at rest on, so never before it: Decaid may have stored it
+// earlier (its createdAt says when).
 let listRow = null;
 let storedAt = null;
 for (const until = Date.now() + 30_000; Date.now() < until && !listRow; await sleep(50)) {

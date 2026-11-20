@@ -164,7 +164,12 @@ export function createMachine({ pour, timeZone, now, emit, nextId, workflow, sto
         finishPour: () => play(Infinity),
         /** How long the recorded pour runs, to its last frame. */
         pourLength: () => frames[frames.length - 1].ms,
-        /** When the recorded machine was back at rest, and when Decaid had stored its Shot, in ms from the pour's start. */
+        /**
+         * When the recorded machine was back at rest, and when the recorder
+         * had the stored Shot from Decaid's list, in ms from the pour's start.
+         * The real pour's capture polled the list from the frame at rest on,
+         * though Decaid had stored its Shot about 1.8 s before that frame.
+         */
         pourTimes: () => ({ idleAtMs: pour.idleAtMs, storedAtMs: pour.storedAtMs }),
         /** The ms from the pour's start of the first frame matching `test`. */
         pourMoment: test => frames.find(entry => test(entry.frame, entry.socket))?.ms ?? null,

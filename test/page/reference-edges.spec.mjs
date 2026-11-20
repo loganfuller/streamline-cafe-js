@@ -319,5 +319,10 @@ test.describe('the row with every number in it, on the real pour', { tag: '@refe
         expect(doseWeighed.diff, 'a weighed dose over the target').toBe('+0.4 g');
         expect(ratioWeighed.value, 'the ratio worked from the weighed dose').toBe(shown(mine.yield / WEIGHED, 'ratio'));
         await cafe.screenshot('row-targets-weighed-light');
+
+        await view(cafe, 'reference');
+        full = await row(page);
+        expect(full.cards[3].title, 'the Ratio card names the weighed dose').toBe(`RATIO · ${shown(WEIGHED, 'grams')} DOSE`);
+        expect(full.cards[3].value).toBe(shown(edited.ratio, 'ratio'));
     });
 });
