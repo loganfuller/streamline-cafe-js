@@ -167,11 +167,15 @@ test(`pour: the replayed pour stores the Shot Decaid ${pour.recordedWith.decaid}
 
 // The real pour (#79), captured by hand on a DE1Pro with a real scale
 // (docs/cafe/TESTING.md, "The real pour"). No recorder makes it afresh, so it
-// is read from the committed folder, whichever recordings the rest replays.
-const realPour = JSON.parse(readFileSync(new URL('../fake-decaid/recordings/real/de1pro-pour.json', import.meta.url), 'utf8'));
+// is read from the committed folder, whichever recordings the rest replays,
+// with the committed recordings it was scrubbed against.
+const committed = name => JSON.parse(readFileSync(new URL(`../fake-decaid/recordings/${name}.json`, import.meta.url), 'utf8'));
+const realPour = committed('real/de1pro-pour');
+const committedSample = committed('sample-data');
+const committedNewest = Math.max(...committedSample.shots.map(shot => recordedMs(shot.timestamp)));
 
 test(`the real pour: replayed, it stores the Shot a DE1Pro's Decaid ${realPour.capturedWith.decaid} stored, its dose the Workflow's`, () => {
-    const fake = createFakeDecaid({ sampleData, boot, pour: realPour, now: newest + 3_600_000 });
+    const fake = createFakeDecaid({ sampleData: committedSample, boot: committed('boot'), pour: realPour, now: committedNewest + 3_600_000 });
     assert.equal(fake.request({ method: 'PUT', url: '/api/v1/workflow', body: realPour.workflowBefore }).status, 200);
     const first = realPour.frames.find(f => f.socket === 'machine/snapshot');
     fake.setNow(recordedMs(first.frame.timestamp) - first.ms);
@@ -204,7 +208,7 @@ test(`the real pour: replayed, it stores the Shot a DE1Pro's Decaid ${realPour.c
     assert.equal(recorded.annotations.actualDoseWeight, realPour.workflowBefore.context.targetDoseWeight, 'the real Decaid stored the Workflow\'s dose as the weighed dose');
     assert.equal(stored.stopReason, recorded.stopReason);
     assert.deepEqual(stored.measurements, recorded.measurements);
-    const row = fake.request({ method: 'GET', url: '/api/v1/shots?limit=1' }).body.items[0];
+    const row = fake.request({ method: 'GET', url: '/api/v1/shots?limit=100' }).body.items.find(item => item.id === id);
     assert.deepEqual(normal({ ...row, id: recorded.id, createdAt: recorded.createdAt }), normal(realPour.listRow), 'its row in Decaid\'s list');
 });
 
@@ -216,7 +220,7 @@ test('the real pour holds nothing of the machine it was taken on', () => {
     assert.doesNotMatch(text, /uploaded_to_decent|visualizer/i, 'no shot-upload plugin\'s extras');
     // The Workflow is the sample data's but for the profile, dose and yield.
     const { profile, context, ...rest } = realPour.workflowBefore;
-    const { profile: _profile, context: sampleContext, ...sampleRest } = pour.workflowBefore;
+    const { profile: _profile, context: sampleContext, ...sampleRest } = committed('pour').workflowBefore;
     assert.deepEqual(rest, sampleRest);
     assert.deepEqual({ ...context, targetDoseWeight: 0, targetYield: 0 }, { ...sampleContext, targetDoseWeight: 0, targetYield: 0 });
     assert.equal(profile.author, 'Decent', 'one of Decaid\'s own profiles');
