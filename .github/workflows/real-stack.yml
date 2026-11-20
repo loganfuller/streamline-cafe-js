@@ -17,8 +17,15 @@ on:
   pull_request:
     paths:
       - fake-decaid/pins.json
+      - fake-decaid/recordings/**
       - scripts/fake-decaid-recorder/**
       - test/real/**
+      - test/fake-decaid-recordings.test.mjs
+      # What the recorder and the journeys import from the page tests and the smoke run.
+      - test/cafe-smoke/sample-data.mjs
+      - test/cafe-smoke/page-helpers.mjs
+      - test/page/support/page-files.mjs
+      - test/page/support/page-reads.mjs
       - playwright.real.config.mjs
       - .github/workflows/real-stack.yml
   workflow_dispatch:
@@ -33,9 +40,11 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels a pull request's run; the weekly run and a run on demand
+# (the Pre-Tag Gate's) never cancel each other.
 concurrency:
-  group: real-stack-${{ github.ref }}
-  cancel-in-progress: true
+  group: real-stack-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   LATEST: ${{ github.event_name == 'schedule' || inputs.latest == true }}
@@ -76,9 +85,11 @@ jobs:
       - name: Compare their shape with the committed recordings
         if: always() && steps.record.outcome == 'success'
         run: node scripts/fake-decaid-recorder/compare.mjs fake-decaid/recordings "$RUNNER_TEMP/real-stack/recordings" --markdown="$RUNNER_TEMP/real-stack/compare.md"
+      # Not in a "latest" run whose newest releases could not be resolved: the
+      # report then says so, rather than name the pins as run.
       - name: Keep the pins run
-        if: always()
-        run: cp "${FAKE_DECAID_PINS:-fake-decaid/pins.json}" "$RUNNER_TEMP/real-stack/pins.json"
+        if: always() && (env.LATEST != 'true' || env.FAKE_DECAID_PINS != '')
+        run: mkdir -p "$RUNNER_TEMP/real-stack" && cp "${FAKE_DECAID_PINS:-fake-decaid/pins.json}" "$RUNNER_TEMP/real-stack/pins.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -116,9 +127,10 @@ jobs:
           retention-days: 30
 
   # The weekly run's issue: opened, or added to, when anything differs or failed.
+  # A run cancelled (by hand) reports nothing.
   report:
     needs: [record, journeys]
-    if: always() && (github.event_name == 'schedule' || inputs.latest == true)
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.latest == true) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

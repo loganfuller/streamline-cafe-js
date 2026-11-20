@@ -144,7 +144,7 @@ Then run the real stack against the pins on the commit to be tagged, and tag onl
 
 ```sh
 gh workflow run real-stack.yml --ref main
-gh run list --workflow real-stack.yml --branch main --limit 1   # its headSha must be the commit to be tagged
+gh run list --workflow real-stack.yml --branch main --event workflow_dispatch --limit 1   # its headSha must be the commit to be tagged
 ```
 
 A failure there is fixed, or its cause named in the release notes, before the tag.

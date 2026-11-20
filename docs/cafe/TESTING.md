@@ -148,7 +148,7 @@ The journeys, each tagged (`--grep @real-pour`):
 
 `.github/workflows/real-stack.yml` runs the recorder and the journeys as two jobs on GitHub's arm64 runner (`ubuntu-24.04-arm`), where headless Decaid runs in Docker as it does on a Mac:
 
-- on a pull request that changes the pins, the journeys, the recorder or the workflow;
+- on a pull request that changes the pins, the committed recordings or their replay, the journeys, the recorder, the workflow, or the sample data and page-test helpers the recorder and the journeys import (the paths are in the workflow); a newer push cancels its run, while the weekly run and a run on demand never cancel each other;
 - on demand (Actions → Real stack → Run workflow, or `gh workflow run real-stack.yml --ref <branch>`), and before each release tag (`docs/AI_RELEASE_NOTES.md`, "Pre-Tag Gate");
 - weekly, on Monday mornings (UTC), against the newest stable releases (below).
 

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,11 @@ function compare(committed, fresh) {
         mkdirSync(join(root, dir));
         writeFileSync(join(root, dir, 'store.json'), JSON.stringify(body));
     }
-    return spawnSync(process.execPath, [COMPARE, join(root, 'committed'), join(root, 'fresh')], { encoding: 'utf8' });
+    try {
+        return spawnSync(process.execPath, [COMPARE, join(root, 'committed'), join(root, 'fresh')], { encoding: 'utf8' });
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
 }
 
 const recorded = shotId => ({
@@ -48,6 +52,12 @@ const clean = { ran: versions, pinned: versions, record: 'success', recordJob: '
 
 test('the weekly report: nothing to say when everything passed', () => {
     assert.equal(report(clean), null);
+});
+
+test('the weekly report: with no pins file it says the versions run are unknown, not the pins', () => {
+    const text = report({ ...clean, ran: null, record: 'skipped', recordJob: 'failure' });
+    assert.match(text, /newest releases were not resolved/);
+    assert.doesNotMatch(text, /\(the pin\)/);
 });
 
 test('the weekly report: a recorder job that failed after recording, naming nothing, is still reported', () => {

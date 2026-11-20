@@ -26,7 +26,9 @@ export const LABEL = 'real-stack-weekly';
 const TITLE = 'The weekly real-stack run differs from the pins';
 
 const pinned = JSON.parse(readFileSync(join(ROOT, 'fake-decaid', 'pins.json'), 'utf8'));
-const ran = JSON.parse(read(flag('pins')) || 'null') || pinned;
+// No pins file from the recorder's job: the newest releases were not resolved
+// there (or the job stopped before), so what ran is unknown.
+const ranPins = JSON.parse(read(flag('pins')) || 'null');
 
 /** The replay's failed tests: each recording the fake no longer answers as the fresh one did. */
 export function failedReplays(tap) {
@@ -52,18 +54,21 @@ export function failedJourneys(results) {
 
 /** The report's text, or null when nothing differs and nothing failed. */
 export function report({ ran, pinned, record, recordJob, replays, compare, journeys, journeyOutcome, run }) {
-    const problems = record !== 'success' || recordJob !== 'success' || replays.length || compare.trim() || journeys.length || journeyOutcome !== 'success';
+    const problems = !ran || record !== 'success' || recordJob !== 'success' || replays.length || compare.trim() || journeys.length || journeyOutcome !== 'success';
     if (!problems) return null;
     const version = key => `${ran[key].version}${ran[key].version === pinned[key].version ? ' (the pin)' : ` (pinned ${pinned[key].version})`}`;
-    const lines = [
-        `The weekly run against the newest stable releases${run ? ` ([run](${run}))` : ''}:`,
-        '',
-        `- Decaid ${version('decaid')}`,
-        `- DYE2 ${version('dye2')}`,
-        `- Decent Sync ${version('decentSync')}`,
-        `- Streamline ${ran.streamline.version} (the pin; the skin is built on it)`,
-        '',
-    ];
+    const lines = [`The weekly run against the newest stable releases${run ? ` ([run](${run}))` : ''}:`, ''];
+    if (ran) {
+        lines.push(
+            `- Decaid ${version('decaid')}`,
+            `- DYE2 ${version('dye2')}`,
+            `- Decent Sync ${version('decentSync')}`,
+            `- Streamline ${ran.streamline.version} (the pin; the skin is built on it)`,
+            '',
+        );
+    } else {
+        lines.push("**The newest releases were not resolved** (no pins file from the recorder's job; `latest-pins.mjs` may have failed): the versions run are unknown; see the run's log.", '');
+    }
     if (record !== 'success') lines.push(`**The recorder did not finish** (${record}); see the run's log.`, '');
     if (replays.length) lines.push('**Recordings the fake no longer answers as the fresh one did** (`test/fake-decaid-recordings.test.mjs` on the fresh recordings):', '', ...replays.map(name => `- ${name}`), '');
     if (compare.trim()) lines.push('**Recordings whose shape differs from the committed one** (`compare.mjs`: + only in the fresh one, - only in the committed one, ~ another kind of value):', '', compare.trim(), '');
@@ -76,7 +81,7 @@ export function report({ ran, pinned, record, recordJob, replays, compare, journ
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     const text = report({
-        ran,
+        ran: ranPins,
         pinned,
         record: flag('record'),
         recordJob: flag('record-job'),

@@ -5,9 +5,9 @@
 // Every journey here starts with no recipe loaded and no barista
 // (`startClean`), whatever the one before left: a tap on the loaded card
 // unloads it, so a journey that starts with a tap on House espresso's card
-// needs it not loaded already. Their `test` is decaid-helpers.mjs's, whose
-// `stacks` attaches this Decaid alone, so they run while the Decent Sync
-// journeys have that side's server stopped.
+// needs it not loaded already. Their `test` is journey.mjs's, as every
+// journey's is: it attaches both stacks, and starts the sync stack's server
+// again after a journey that left it stopped.
 
 import { test, expect, pull, shoot, loadByCard, recipeIdOf, card, untilStripSettled } from './support/journey.mjs';
 import { startClean, selection, loadedInWorkflow, expectNoRecipeSelected, expectNoRecipePage, settingsOf, pressed, isUnload } from './support/decaid-helpers.mjs';
@@ -152,6 +152,7 @@ test.describe('the unload after a pour on the real stack', { tag: '@real-unload-
         expectNoRecipeSelected(await selection(side));
         await expectNoRecipePage(page);
         await untilStripSettled(page);
+        expect(unloads, 'and asks only once').toHaveLength(1);
         test.info().annotations.push({ type: 'timing', description: `stored ${storedAt - tappedAt} ms after the tap; unload asked ${unloads[0] - storedAt} ms after the store` });
     });
 });
