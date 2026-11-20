@@ -39,7 +39,7 @@
 
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
-import { chartLines, load, watchDraws, drawCounts, REFERENCE_LINES } from './support/page-reads.mjs';
+import { chartLines, load, watchDraws, drawCounts, stageNames, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
 import { RECIPES } from '../cafe-smoke/sample-data.mjs';
 import { localTime, shiftTime } from '../../fake-decaid/machine.js';
@@ -237,12 +237,18 @@ async function watchShot({ cafe, fake, timezoneId }, { viewport, graphView, load
     const samples = [];
     await cafe.pour(PROFILE_START_MS + 700);
     samples.push(await lineLabels(page));
+    const namesBefore = await stageNames(page);
     await watchDraws(page);
     for (let i = 1; i <= 6; i += 1) {
         await cafe.pour(PROFILE_START_MS + 700 + i * 250);
         samples.push(await lineLabels(page));
     }
     const draws = await drawCounts(page);
+    // A stage line's name is drawn once there is room for it, which depends on
+    // the font's measure (Linux's fonts name one sooner than macOS's): that
+    // changes the chart's layout, which is drawn in full too.
+    const namesAfter = await stageNames(page);
+    const namesShown = namesAfter.filter((name, index) => name !== null && name !== (namesBefore[index] ?? null)).length;
     const stagesReached = stagesBy(PROFILE_START_MS + 700 + 6 * 250, fake.workflow()).length - stagesBy(PROFILE_START_MS + 700, fake.workflow()).length;
     // The last frame before the stop, while the page is live.
     await cafe.pour(POUR_LENGTH_MS);
@@ -273,7 +279,8 @@ async function watchShot({ cafe, fake, timezoneId }, { viewport, graphView, load
     times.slice(1).forEach((t, i) => expect(t, `look ${i + 1} is no earlier than look ${i}`).toBeGreaterThanOrEqual(times[i]));
     expect(times.at(-1), 'they move with the shot').toBeGreaterThan(times[0]);
     expect(draws.appended, 'the frames were appended').toBeGreaterThan(0);
-    expect(draws.full, 'the lines were not drawn again in full, but for a new stage\'s line').toBe(stagesReached);
+    expect(draws.full, 'a new stage\'s line is drawn in full').toBeGreaterThanOrEqual(stagesReached);
+    expect(draws.full, 'the lines were not drawn again in full, but for a new stage\'s line or a stage name given room').toBeLessThanOrEqual(stagesReached + namesShown);
 
     // The shot's end, before Decaid has stored it: nothing has moved.
     await cafe.pour();
