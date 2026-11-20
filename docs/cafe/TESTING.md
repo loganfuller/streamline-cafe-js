@@ -33,7 +33,7 @@ npx playwright test --repeat-each=20                  # look for a flaky one
 CAFE_TZ=Asia/Tokyo npx playwright test                # in a zone other than UTC
 ```
 
-Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`, `@shot`, `@fullscreen`, `@menu`, `@languages`, `@grinder`, `@touch`, `@dialogs`, `@grind`, `@bean`, `@barista`, `@unload`, `@profile`, `@reference`, `@remarks`, `@legend`, `@sync`, `@lastshot`, `@shots`, and with Decent Sync serving `@sync-reference`, `@sync-pushes`, `@sync-remarks`, `@sync-outage`, `@sync-capture`, `@sync-shots`, `@sync-shots-outage` and `@sync-picks`, with and without it `@dialin-saved`, and `@preheat`, `@profile-dialog`, `@live-labels` and `@preview`. A failure keeps its trace, screenshot and page snapshot in `test/page/out/results/` (`npx playwright show-trace <path>/trace.zip` opens a trace). The CI job uploads that folder when a test fails.
+Each spec file is one feature and carries its tag: `@gate`, `@strip`, `@dialin`, `@shot`, `@fullscreen`, `@menu`, `@languages`, `@grinder`, `@touch`, `@dialogs`, `@grind`, `@bean`, `@barista`, `@unload`, `@profile`, `@reference`, `@remarks`, `@legend`, `@sync`, `@lastshot`, `@shots`, and with Decent Sync serving `@sync-reference`, `@sync-pushes`, `@sync-remarks`, `@sync-outage`, `@sync-capture`, `@sync-shots`, `@sync-shots-outage` and `@sync-picks`, with and without it `@dialin-saved`, and `@preheat`, `@profile-dialog`, `@live-labels` and `@preview`. A failure keeps its trace, screenshot and page snapshot in `test/page/out/results/` (`npx playwright show-trace <path>/trace.zip` opens a trace). In CI the page tests run as four `page` jobs, each with a quarter of the tests (`--shard`), and a job that fails uploads that folder as `page-tests-<shard>`.
 
 ## How a page test works
 
@@ -215,7 +215,9 @@ On 2026-11-20 at `868f4b8`, on an Apple-silicon Mac (10 cores) with Chromium 158
 | Layer | Size | On the Mac | In CI |
 |---|---|---|---|
 | `npm test` (unit tests and the recordings' replay) | 2400 tests | 4 s | under 30 s a Node version |
-| Page tests | 241 tests (and 3 `fixme`), in 33 specs | 100 s on five workers (the default here), 207 s on one; a median of 0.71 s a test, the slowest 3.5 s | the `page` job, 8 min |
+| Page tests | 241 tests (and 3 `fixme`), in 33 specs | 100 s on five workers (the default here), 207 s on one; a median of 0.71 s a test, the slowest 3.5 s | 8 min in one `page` job; see below for the split |
 | Real journeys (`npm run test:real`) | 12 journeys | 5.0 min, the stacks' stand-up included | 6.7 min (`journeys`), beside 8.5 min for the fresh recording (`record`) |
 
 The by-hand smoke run they replace, timed the same day at `4740af5` (its last commit before the porting began) on the pinned Decaid v0.9.2 and DYE2 v0.1.42, with Decent Sync 1.12.0: `run.mjs` passed 858 of 858 checks in 26.0 min, and `run-decent-sync.mjs` 178 of 178 in 6.8 min, so 33 min for one run of both, on one stack at a time, with a person to stand the stacks up and read the screenshots. It never ran in CI.
+
+**The `page` job's split.** On one `ubuntu-latest` runner (4 vCPUs) the page tests took between 5.4 and 8.5 min on Playwright's default of two workers. A run on unchanged `main` compared worker counts on separate runners on 2026-11-20 ([44834819836](https://github.com/loganfuller/streamline-cafe-js/actions/runs/44834819836)). Two workers took 5.6 and 6.6 min, three took 6.3 and 6.0 min, and four took 7.6, 8.2 and 5.1 min. The tests' summed time rose with the worker count (2 workers: 651 and 784 s; 4 workers: 1,173 to 1,921 s), and in two of the three four-worker runs `reference-edges.spec.mjs:262` passed its 30 s timeout. So the job splits the tests across four runners (`--shard`) and keeps two workers on each.
