@@ -446,7 +446,7 @@ test('Decent Sync: an edit of the tablet\'s own Shot goes through Decaid whateve
     assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=${C}`, { rating: 6 }).status, 503);
     fake.decentSync.startServer();
     assert.deepEqual(send(fake, 'PUT', `${PLUGIN}/shot?id=${C}`, { rating: 6 }).body, { rating: 6, note: null });
-    for (const body of [{}, { rating: 11 }, { rating: 4, extra: 1 }, { note: null }]) assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=${A}`, body).status, 400, JSON.stringify(body));
+    for (const body of [{}, { rating: 11 }, { rating: 4, extra: 1 }, { note: null }, { note: '\ud800' }, { note: 'a\udc00b' }]) assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=${A}`, body).status, 400, JSON.stringify(body));
     assert.equal(send(fake, 'PUT', `${PLUGIN}/shot?id=no-such-shot`, { rating: 2 }).status, 404);
 });
 

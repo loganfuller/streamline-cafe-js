@@ -121,7 +121,7 @@ export function readEdit(body) {
     const other = Object.keys(others)[0];
     if (other !== undefined) return `Only a Shot's rating and note can be set: ${JSON.stringify(other.slice(0, 40))} is neither.`;
     if (rating !== undefined && !(typeof rating === 'number' && rating >= 0 && rating <= MAX_SHOT_RATING)) return `Give rating as a number from 0 to ${MAX_SHOT_RATING}, where 0 is unrated.`;
-    if (note !== undefined && !(typeof note === 'string' && !note.includes('\u0000') && note.length <= MAX_SKIN_NOTE_LENGTH)) {
+    if (note !== undefined && !(typeof note === 'string' && !note.includes('\u0000') && note.isWellFormed() && note.length <= MAX_SKIN_NOTE_LENGTH)) {
         return `Give note as text of at most ${MAX_SKIN_NOTE_LENGTH} characters, where empty is none, without a NUL or an unpaired surrogate.`;
     }
     if (rating === undefined && note === undefined) return NOTHING_TO_SET;
