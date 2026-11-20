@@ -142,7 +142,7 @@ The journeys, each tagged (`--grep @real-pour`):
 | | A grinder chosen (a Workflow write alone), a batch of another Bean (#52), another profile in the dialog (#50, #51), and an unload, each followed to the server and the second tablet | `@real-sync-picks` |
 | | The server stopped: the tablet's copy drawn, the list this machine's own, a profile chosen meanwhile caught up once it is back | `@real-sync-outage` |
 
-`test/real/support/decaid-helpers.mjs` and `sync-helpers.mjs` hold what each file's journeys share. On an Apple-silicon Mac a whole run takes about TOTAL_PLACEHOLDER, the stand-up included.
+`test/real/support/decaid-helpers.mjs` and `sync-helpers.mjs` hold what each file's journeys share. On an Apple-silicon Mac a whole run took 4.9 minutes, 65 seconds of it the stand-up.
 
 ## The real-stack workflow
 
