@@ -31,6 +31,7 @@ import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, remarks, paint, load, writes, watchDraws, drawCounts, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf, matchMachine } from './support/fake-reads.mjs';
+import { late } from './support/late-frame.mjs';
 import { RECIPES } from './support/sample-data.mjs';
 import { shotNumbers, shotSamples, restCards, liveCards } from '../../src/cafe/comparison.js';
 import { shotCurves } from '../../src/cafe/shot-model.js';
@@ -197,6 +198,30 @@ function liveExpected(fake, ms, view, reference) {
     return drawn(liveCards({ view, frame: frameAt(ms, fake.workflow()), reference: asReference(reference), stopAt: target.yield }));
 }
 
+/**
+ * The scale's frames sent after the last machine frame in the shot, once the
+ * pour has played to `ms`, and the scale's last weight before that machine
+ * frame.
+ */
+function scaleAfterMachine(ms) {
+    const played = POUR.frames.filter(entry => entry.ms <= ms && !entry.socket.startsWith('plugins/'));
+    const at = played.findLastIndex(inShot);
+    const weighed = list => list.filter(entry => entry.socket === 'scale/snapshot' && Number.isFinite(entry.frame.weight));
+    return { after: weighed(played.slice(at + 1)), before: weighed(played.slice(0, at)).at(-1)?.frame.weight ?? null };
+}
+
+// A moment of the pour, between MID_MS and LATER_MS, that ends on a scale frame
+// sent after the machine's last, weighing a tenth or more over the one before
+// it. Should the chart draw the machine frame before the scale's arrives, no
+// machine frame comes after to draw the Weight card again (issue #92).
+const TRAILING_MS = (() => {
+    for (let ms = MID_MS + 250; ms < LATER_MS; ms += 250) {
+        const { after, before } = scaleAfterMachine(ms);
+        if (after.length && before !== null && Math.abs(after.at(-1).frame.weight - before) >= 0.15) return ms;
+    }
+    return null;
+})();
+
 /** When a Shot was pulled, as the page writes it (src/cafe/shot-model.js, `whenText`, in the page's zone). */
 const creditOf = (page, shot) => page.evaluate(async timestamp => {
     const { whenText } = await import('/src/cafe/shot-model.js');
@@ -337,6 +362,34 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
         await page.locator('#expanded-chart').click();
         await expect(page.locator('#main-page:not(.chart-zoomed)')).toBeAttached();
         await cafe.pour();
+    });
+
+    // The pour's frames reach the page with its clock paused, so the chart draws
+    // a step's frames only once all of them are in, as it would have by the
+    // next machine frame on a tablet. The scale's last frame is held up for
+    // longer than the chart waits to draw: a page clock running by itself would
+    // draw the machine's frame before it, and keep the card a frame behind.
+    test('the live Weight card reads the scale\'s last frame, one held up after the machine\'s last included (issue #92)', async ({ cafe, fake }) => {
+        expect(TRAILING_MS, 'the recorded pour has a moment ending on a scale frame after the machine\'s').not.toBeNull();
+        const trailing = scaleAfterMachine(TRAILING_MS).after.at(-1).frame;
+        late(cafe, {
+            path: '/ws/v1/scale/snapshot',
+            matches: frame => frame.weight === trailing.weight && frame.weightFlow === trailing.weightFlow,
+            ms: 300,
+        });
+        const { id: first } = seedReference(fake);
+        const page = await openLoaded(cafe);
+        const reference = fake.shots.get(first);
+        await expect.poll(async () => (await legend(page)).badge, 'the seeded Shot is the latest, and the reference').toBe('This shot is the reference');
+
+        await pourTo(cafe, TRAILING_MS);
+        const cards = await row(page);
+        expect(cards.mode).toBe('live');
+        const expected = liveExpected(fake, TRAILING_MS, 'reference', reference);
+        const { before } = scaleAfterMachine(TRAILING_MS);
+        const behind = drawn(liveCards({ view: 'reference', frame: { ...frameAt(TRAILING_MS, fake.workflow()), weight: before }, reference: asReference(reference), stopAt: target.yield }));
+        expect(behind, 'a card a frame behind would read otherwise').not.toEqual(expected);
+        expect(shownCards(cards), 'the cards as the chart drew them once every frame of the step was in').toEqual(expected);
     });
 
     test('at rest the new Shot is the latest, against the reference, which keeps its row and is drawn faded', async ({ cafe, fake }) => {

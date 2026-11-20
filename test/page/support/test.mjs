@@ -91,8 +91,8 @@ class Cafe {
      * Moves the page's clock `ms` forward in steps of `step`, firing each timer
      * due, the fake's machine sending its frames at rest, and the requests the
      * timers made answered before the next step. The clock also runs on by
-     * itself, as Playwright installs it; this is the only way a test moves it
-     * on faster.
+     * itself, as Playwright installs it, but for the length of a `pour`; this
+     * is the only way a test moves it on faster.
      */
     async advance(ms, { step = 500, during } = {}) {
         for (let moved = 0; moved < ms; moved += step) {
@@ -109,8 +109,42 @@ class Cafe {
     /**
      * Pours the recorded shot up to `toMs` from its start (all of it by default),
      * the page's clock moving with its frames. The pour starts if it has not.
+     *
+     * The clock is paused meanwhile, so it moves only as each step moves it and
+     * the page's timers fire only then, after every frame of the step before
+     * has reached the page. Running on by itself it could fire one between two
+     * frames of a step: the chart's draw, between the machine's last frame and
+     * the scale's after it, leaves the live Weight card a frame behind, as no
+     * later machine frame comes to draw it again (issue #92).
      */
     async pour(toMs = Infinity, { step = 250 } = {}) {
+        await this.pauseClock();
+        try {
+            await this.pourPaused(toMs, step);
+        } finally {
+            if (!this.page.isClosed()) await this.page.clock.resume();
+        }
+    }
+
+    /**
+     * Pauses the page's clock where it is. Playwright pauses it only at a time
+     * given, a moment on from the page's now, which the clock may have passed
+     * by itself before the call arrives: then it is paused where it was, and
+     * paused again at its now.
+     */
+    async pauseClock() {
+        for (;;) {
+            const now = await this.page.evaluate(() => Date.now());
+            try {
+                await this.page.clock.pauseAt(now + 20);
+                return;
+            } catch (error) {
+                if (!/past/i.test(String(error))) throw error;
+            }
+        }
+    }
+
+    async pourPaused(toMs, step) {
         if (!this.pouring) {
             this.fake.setNow(await this.page.evaluate(() => Date.now()));
             this.fake.startPour();
