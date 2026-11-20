@@ -28,6 +28,10 @@ export const SCREENSHOTS = join(ROOT, 'test', 'real', 'out', 'screenshots');
 export const STREAMLINE_ORIGIN = 'http://127.0.0.1:24801';
 export const DYE2 = 'dye2.reaplugin';
 
+// No transition or animation runs, as in the page tests: a dialog drawn closing
+// would still be on a screenshot, and nothing in src/ waits for one to end.
+const NO_MOTION = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
+
 /** The only fixed wait a journey holds: for proving that nothing arrives in `ms`, `why` naming the wait. */
 export async function quiet(ms, why) {
     if (!why) throw new Error('quiet() needs the reason for its wait');
@@ -43,6 +47,13 @@ export async function shoot(page, name) {
 export const test = base.extend({
     // The stacks, read from the state file the global setup wrote.
     stacks: [async ({}, use) => { await use(await attachStacks()); }, { scope: 'worker' }],
+
+    // A journey that failed with Decent Sync's server stopped leaves it started
+    // again for the next, whose own `finally` the test's timeout may have skipped.
+    serverBack: [async ({ stacks }, use) => {
+        await use();
+        if (!stacks.sync.serverRunning()) await stacks.sync.startServer();
+    }, { auto: true }],
 
     // One browser per Decaid, its 8080 mapped to that Decaid's port: a tablet
     // of that Machine. Kept for the worker.
@@ -77,7 +88,17 @@ export const test = base.extend({
             const browser = await browsers(side.port);
             const context = await browser.newContext({ viewport, timezoneId: 'UTC', locale: 'en-US' });
             contexts.push(context);
+            // A tap on a control that never takes one fails in 30 s, not at the
+            // test's timeout, which would skip the journey's own `finally`.
+            context.setDefaultTimeout(30_000);
             await servePage(context, ROOT);
+            await context.addInitScript(css => {
+                document.addEventListener('DOMContentLoaded', () => {
+                    const style = document.createElement('style');
+                    style.textContent = css;
+                    document.head.appendChild(style);
+                });
+            }, NO_MOTION);
             if (streamline) await servePage(context, await officialStreamline(), STREAMLINE_ORIGIN);
             const page = await context.newPage();
             page.on('pageerror', error => errors.push(`${streamline ? 'Streamline' : 'cafe page'} on ${side.api}: ${error.message}`));
@@ -111,11 +132,23 @@ export const recipeIdOf = workflow => workflow?.context?.extras?.dye?.recipeId ?
 export const card = (page, slot) => page.locator('#cafe-strip .cafe-card').nth(slot - 1);
 
 /**
- * A tap on a sample recipe's card, and the load through Streamline's apply seen
- * on the page (its title) and in `side`'s Workflow. Answers the DYE2 record.
+ * The strip's load or unload over, and for an unload its hold against a
+ * double tap (src/cafe/recipe-loader.js, `UNLOAD_HOLD_MS`): the page keeps the
+ * dial-in still, and ignores a tap on the strip, until then (`cafe-loading` on
+ * the main page, src/cafe/page.js).
+ */
+export async function untilStripSettled(page) {
+    await expect(page.locator('#main-page:not(.cafe-loading)'), 'the strip\'s load or unload has finished').toBeAttached();
+}
+
+/**
+ * A tap on a sample recipe's card, once the strip has settled, and the load
+ * through Streamline's apply seen on the page (its title) and in `side`'s
+ * Workflow. Answers the DYE2 record.
  */
 export async function loadByCard(page, side, recipe) {
     const loaded = await record(side, recipe.name);
+    await untilStripSettled(page);
     await card(page, recipe.slot).click();
     await expect(page.locator('#cafe-title')).toHaveText(recipe.name);
     await expect.poll(async () => recipeIdOf(await side.decaid('GET', '/workflow')), { message: `${recipe.name} is loaded into the Workflow` }).toBe(loaded.id);

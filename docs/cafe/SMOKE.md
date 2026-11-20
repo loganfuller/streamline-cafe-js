@@ -2,7 +2,7 @@
 
 A run of the real page in a real Chromium against a real Decaid with a simulated machine. It is done by hand before a release, and for a change to a part of the page whose step below has not moved to the page tests yet. It is not in CI: it needs Docker, a browser and several minutes.
 
-Its steps are moving to the page tests, which run on every pull request against a fake Decaid ([`TESTING.md`](TESTING.md)). Steps 1 to 13 and 15 to 25 have moved; what is left of steps 3, 7 and 18 below only sets up what later steps rely on, and steps 14 and 26 to 28 are left. A new slice writes its closing check as page tests, not as a step here.
+Every step has moved: to the page tests, which run on every pull request against a fake Decaid, and to the real journeys on the pinned stack ([`TESTING.md`](TESTING.md)). Step 14 and the second run are real journeys (`test/real/`), steps 26 to 28 page tests. The scripts stay until #63 removes them; nothing needs them run. A new slice writes its closing check as page tests, not as a step here.
 
 There are two runs. The first, `test/cafe-smoke/run.mjs`, is the page against Decaid alone. The second, `test/cafe-smoke/run-decent-sync.mjs`, is the page against the same Decaid with Decent Sync's plugin and a local Decent Sync server, and a second Decaid as a second Machine at the same Location: see [The second run](#the-second-run-with-decent-sync).
 

@@ -90,8 +90,16 @@ export async function standUpStacks() {
 export async function attachStacks() {
     if (!existsSync(STATE)) throw new Error(`no real stack at ${STATE}: run the journeys with npm run test:real, which stands one up`);
     const state = JSON.parse(await readFile(STATE, 'utf8'));
-    const server = serverClient(state.sync.server.url);
-    await server('POST', '/session', { email: state.sync.server.email, password: state.sync.server.password });
+    // Signed in at its first use, so a journey with no Decent Sync in it runs
+    // while another has the server stopped.
+    const client = serverClient(state.sync.server.url);
+    const signIn = () => client('POST', '/session', { email: state.sync.server.email, password: state.sync.server.password });
+    let signedIn = null;
+    const server = async (...args) => {
+        signedIn ||= signIn().catch(error => { signedIn = null; throw error; });
+        await signedIn;
+        return client(...args);
+    };
     const at = side => ({ ...side, port: Number(new URL(side.api).port), decaid: decaidClient(side.api, side.token) });
     return {
         decaid: at(state.decaid),
@@ -110,8 +118,11 @@ export async function attachStacks() {
                 docker('start', state.sync.server.name);
                 const url = state.sync.server.url;
                 if (!await until(async () => (await fetch(`${url}/api/setup`)).ok, { timeout: 120_000, every: 1000 })) throw new Error('the server did not answer again in 120 s');
-                await server('POST', '/session', { email: state.sync.server.email, password: state.sync.server.password });
+                signedIn = signIn();
+                await signedIn;
             },
+            /** Whether the server's container is running. */
+            serverRunning: () => docker('inspect', '-f', '{{.State.Running}}', state.sync.server.name) === 'true',
         },
     };
 }
