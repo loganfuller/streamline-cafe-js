@@ -1,4 +1,4 @@
-> **Streamline Cafe** is a fork of [Streamline.js](https://github.com/decentespresso/streamline-js) with a recipe-first main page for cafes. Its design is in [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md). The manual below is Streamline's, and everything in it but the main page applies here. Changed from Streamline since 2026-11-15, under the same GPL-3.0 licence.
+> **Streamline Cafe** is a fork of [Streamline.js](https://github.com/decentespresso/streamline-js) with a recipe-first main page for cafes. Its design is in [`docs/cafe/DESIGN.md`](docs/cafe/DESIGN.md). **[Try the preview](https://loganfuller.github.io/streamline-cafe-js/)**: its main page in your browser, on a made-up cafe with a pretend machine, no Decaid needed. The manual below is Streamline's, and everything in it but the main page applies here. Changed from Streamline since 2026-11-15, under the same GPL-3.0 licence.
 
 # Decaid and Streamline.js — User Manual
 

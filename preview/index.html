@@ -4,6 +4,8 @@
   "The public preview"). It holds the bar and, under it, the skin's page in a
   frame at a tablet's 16:10 shape. The frame's page is index.html with the
   stand-in added first (preview/stage.mjs); nothing here is part of the skin.
+  The bar's controls reach the pretend machine through the stand-in's handle,
+  `window.cafePreview` in the frame, which tells the bar what changes.
 -->
 <html lang="en">
 <head>
@@ -48,7 +50,18 @@
             padding: 3px 12px;
             cursor: pointer;
         }
-        #preview-bar button:hover { background: rgba(255, 255, 255, 0.08); }
+        #preview-bar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+        #preview-bar button:disabled { opacity: 0.5; cursor: default; }
+        #preview-bar #preview-pull { border-color: var(--bar-accent); color: var(--bar-accent); }
+        #preview-mode { color: var(--bar-muted); }
+        #preview-bar .preview-line { flex: 1 1 100%; color: var(--bar-muted); }
+        #preview-notice { color: var(--bar-text); }
+        #preview-phone { display: none; }
+        /* A phone in portrait: the frame at the window's width, and a word on why it is small. */
+        @media (orientation: portrait) {
+            #preview-bar #preview-phone { display: block; }
+            #preview-stage { place-items: start center; }
+        }
         #preview-stage {
             flex: 1 1 auto;
             min-height: 0;
@@ -68,9 +81,14 @@
 </head>
 <body>
     <header id="preview-bar">
-        <p>Preview on sample data. No machine is connected.</p>
+        <p id="preview-about">Preview on sample data, with a pretend machine.</p>
+        <span id="preview-mode"></span>
+        <button type="button" id="preview-switch"></button>
+        <button type="button" id="preview-pull" disabled>Pull a shot</button>
         <a href="https://github.com/loganfuller/streamline-cafe-js" target="_blank" rel="noopener">Repository</a>
         <button type="button" id="preview-start-over">Start over</button>
+        <p id="preview-notice" class="preview-line" role="status" hidden>Settings are Streamline's own and aren't part of this preview.</p>
+        <p id="preview-phone" class="preview-line">The skin is made for a tablet. A wider screen, or the phone turned on its side, shows it larger.</p>
     </header>
     <main id="preview-stage">
         <iframe id="preview-skin" src="skin.html" title="Streamline Cafe" allow="fullscreen"></iframe>
@@ -81,6 +99,47 @@
         // at the address it had moved to, such as Settings, not at its src.
         // Without the hash, which would make it a jump within the page.
         document.getElementById('preview-start-over').addEventListener('click', () => location.replace(location.pathname + location.search));
+
+        // The mode is in the address, so a reload stays in it and a link can
+        // name it; switching opens the preview again in the other.
+        const served = new URLSearchParams(location.search).get('decent-sync') !== 'off';
+        document.getElementById('preview-mode').textContent = served
+            ? 'Sample Machine at Sample Cafe, served by Decent Sync.'
+            : 'Sample Machine without Decent Sync.';
+        const toggle = document.getElementById('preview-switch');
+        toggle.textContent = served ? 'Try without Decent Sync' : 'Try with Decent Sync';
+        toggle.addEventListener('click', () => location.assign(served ? `${location.pathname}?decent-sync=off` : location.pathname));
+
+        // "Pull a shot" stands in for the group head's own button: offered
+        // while the machine is at rest and awake.
+        const frame = document.getElementById('preview-skin');
+        const pull = document.getElementById('preview-pull');
+        const handle = () => {
+            try {
+                return frame.contentWindow && frame.contentWindow.cafePreview;
+            } catch {
+                return null;
+            }
+        };
+        const show = machine => {
+            pull.disabled = !machine.ready || machine.pouring || machine.asleep;
+            pull.textContent = machine.pouring ? 'Pouring…' : 'Pull a shot';
+            pull.title = machine.asleep ? 'The machine is asleep. Tap the screen to wake it.' : '';
+        };
+        pull.addEventListener('click', () => handle()?.pull());
+        frame.addEventListener('load', () => { const preview = handle(); if (preview) show(preview.machine()); });
+
+        // The notice for Settings goes at the next tap anywhere.
+        const notice = document.getElementById('preview-notice');
+        document.addEventListener('pointerdown', () => { notice.hidden = true; }, true);
+        window.addEventListener('message', event => {
+            if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+            const message = event.data && event.data.cafePreview;
+            if (!message) return;
+            if (message.type === 'machine') show(message);
+            else if (message.type === 'tap') notice.hidden = true;
+            else if (message.type === 'settings') notice.hidden = false;
+        });
     </script>
 </body>
 </html>

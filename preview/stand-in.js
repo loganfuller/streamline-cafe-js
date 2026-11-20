@@ -19,9 +19,20 @@
 // Each visit starts fresh: before the page reads anything, the browser storage
 // the skin wrote on an earlier visit, and only that, is cleared.
 //
-// `window.cafePreview` is the preview's own handle, for its test and the
-// curious: `ready` (the fake, once made), `opened` (each socket path opened,
-// in order) and `drop(path)` (Decaid closing a path's sockets).
+// The fake starts as the sample cafe (preview/sample-cafe.js): served by
+// Decent Sync, or without it where the preview's own address says
+// `?decent-sync=off`. Its machine plays the real DE1Pro pour when the bar's
+// "Pull a shot" asks, in real time on the page's clock, as the group head's
+// own button would start it; the Shot is stored as Decaid stored the
+// recorded one. A tap on Settings opens nothing, and the bar says why.
+//
+// `window.cafePreview` is the preview's own handle, for its bar, its test and
+// the curious: `ready` (the fake, once made), `opened` (each socket path
+// opened, in order), `drop(path)` (Decaid closing a path's sockets), `served`
+// (whether Decent Sync serves the machine), `pull()` (the group head's
+// button) and `machine()` (whether a pour runs, and whether the machine
+// sleeps). It tells the bar, in the page above it, when either changes, at
+// each tap, and at a tap on Settings.
 
 (function () {
     'use strict';
@@ -31,9 +42,21 @@
     const LOG_KEPT = 200; // the fake's request log, kept from growing for as long as a tab is open
     const UNREAD_ANSWER_MS = 50; // pushes wait this long for an answer the page never reads
     // What the fake starts from. preview/stage.mjs copies these and no others.
-    const RECORDINGS = ['sample-data', 'boot', 'pour'];
+    const RECORDINGS = ['sample-data', 'boot', 'pour', 'real/de1pro-pour', 'decent-sync'];
+    // The controls of the skin's page that open Streamline's settings.
+    const SETTINGS = '#settings-btn, #cafe-gate-settings, #steam-label, #hotwater-label, #flush-label';
 
     const here = document.currentScript.src;
+    // The preview's own address names the mode, so a reload stays in it.
+    const served = (() => {
+        let search = window.location.search;
+        try {
+            if (window.parent !== window) search = window.parent.location.search;
+        } catch {
+            // A parent of another origin: the frame's own address.
+        }
+        return new URLSearchParams(search).get('decent-sync') !== 'off';
+    })();
     const realFetch = window.fetch.bind(window);
     const RealWebSocket = window.WebSocket;
 
@@ -136,6 +159,16 @@
     } catch {
         // Without storage the page shows its "DYE2 is needed" screen.
     }
+    // Neither of Streamline's prompts for a phone: the frame is the preview's,
+    // never the phone's whole screen, nor ever in portrait (src/modules/app.js,
+    // src/modules/scaling.js). Set as the visitor's own dismissal, not noted.
+    for (const key of ['fullscreenPromptDismissed', 'rotationPromptDismissed']) {
+        try {
+            setItem.call(window.sessionStorage, key, 'true');
+        } catch {
+            // No storage: a phone may see a prompt, and dismiss it.
+        }
+    }
 
     // ── Decaid's address ─────────────────────────────────────────────────────
 
@@ -199,29 +232,134 @@
     }
 
     const ready = (async () => {
-        const [model, ...recorded] = await Promise.all([
+        // Decent Sync's recording only where it serves the machine.
+        const wanted = RECORDINGS.filter(name => served || name !== 'decent-sync');
+        const [model, cafe, ...recorded] = await Promise.all([
             import(new URL('../fake-decaid/index.js', here).href),
-            ...RECORDINGS.map(recording),
+            import(new URL('sample-cafe.js', here).href),
+            ...wanted.map(recording),
         ]);
-        const [sampleData, boot, pour] = recorded;
+        const named = Object.fromEntries(wanted.map((name, i) => [name, recorded[i]]));
         const made = model.createFakeDecaid({
-            sampleData, boot, pour,
+            ...cafe.sampleCafe({
+                sampleData: named['sample-data'],
+                boot: named.boot,
+                simulated: named.pour,
+                real: named['real/de1pro-pour'],
+                decentSync: named['decent-sync'] || null,
+            }),
             now: Date.now(),
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         });
         // A machine with buttons of its own, as a DE1Pro has: the page draws
         // none, and puts Settings, Shots and Sleep under the dial-in column.
         made.patchBoot('GET /api/v1/machine/info', info => ({ ...info, GHC: true }));
+        const real = named['real/de1pro-pour'];
+        frameTimes = [...new Set(real.frames.map(frame => frame.ms))].sort((a, b) => a - b);
         fake = made;
         setInterval(() => {
             fake.setNow(Date.now());
             fake.tick();
             keepLogShort();
             flushSoon();
+            report();
         }, AT_REST_MS);
+        report();
         return made;
     })();
     ready.catch(error => console.error('Streamline Cafe preview: the sample machine could not start.', error));
+
+    // ── The bar ──────────────────────────────────────────────────────────────
+
+    /** A word to the preview's page above, where there is one of this origin. */
+    function tell(message) {
+        if (window.parent === window) return;
+        try {
+            window.parent.postMessage({ cafePreview: message }, window.location.origin);
+        } catch {
+            // No page above to tell.
+        }
+    }
+
+    function asleep() {
+        return fake.machine.state.snapshot?.state?.state === 'sleeping';
+    }
+
+    let told = null;
+    /** Tells the bar whether a pour runs and whether the machine sleeps, when either changed. */
+    function report() {
+        if (!fake) return;
+        const state = machineNow();
+        const key = JSON.stringify(state);
+        if (key === told) return;
+        told = key;
+        tell({ type: 'machine', ...state });
+    }
+
+    function machineNow() {
+        return fake ? { ready: true, pouring: pour !== null, asleep: asleep() } : { ready: false, pouring: false, asleep: false };
+    }
+
+    // ── The pour ─────────────────────────────────────────────────────────────
+    //
+    // The recorded pour's frames, each sent at its own moment after the
+    // start by the page's clock, as the page tests' `pour()` plays them but
+    // in real time. Its Shot is stored once the pour has played and the
+    // recorded store's moment has come, as the page tests' `untilStored()`
+    // has it, and the page draws it by itself.
+
+    let frameTimes = [];
+    let pour = null;
+
+    function pull() {
+        if (!fake || pour !== null || asleep()) return false;
+        fake.setNow(Date.now());
+        fake.startPour();
+        pour = { startedAt: Date.now(), played: false, timer: null };
+        report();
+        pourStep();
+        return true;
+    }
+
+    function pourStep() {
+        const at = Date.now() - pour.startedAt;
+        fake.setNow(Date.now());
+        const length = fake.machine.pourLength();
+        const storeAt = Math.max(length, fake.machine.pourTimes().storedAtMs);
+        if (!pour.played) {
+            if (at >= length) {
+                fake.finishPour();
+                pour.played = true;
+            } else {
+                fake.playPour(at);
+            }
+        }
+        if (pour.played && at >= storeAt) {
+            fake.storeShot();
+            pour = null;
+            flushSoon();
+            report();
+            return;
+        }
+        flushSoon();
+        report();
+        const next = pour.played ? storeAt : (frameTimes.find(ms => ms > at) ?? length);
+        pour.timer = setTimeout(pourStep, Math.max(0, Math.min(next, storeAt) - at));
+    }
+
+    // ── Settings, and each tap ───────────────────────────────────────────────
+
+    // Ahead of the page's own listeners, which run on the control or the document.
+    window.addEventListener('pointerdown', event => {
+        tell({ type: 'tap' });
+        if (event.target instanceof Element && event.target.closest(SETTINGS)) event.stopImmediatePropagation();
+    }, true);
+    window.addEventListener('click', event => {
+        if (!(event.target instanceof Element) || !event.target.closest(SETTINGS)) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        tell({ type: 'settings' });
+    }, true);
 
     // ── fetch ────────────────────────────────────────────────────────────────
 
@@ -297,6 +435,7 @@
         made.setNow(Date.now());
         const answer = made.request({ method, url: `${url.pathname}${url.search}`, body });
         keepLogShort();
+        report();
         if (!answer) {
             unanswered(`${method} ${url.pathname}`);
             return delivered({ error: 'Not found' }, 404);
@@ -423,8 +562,11 @@
     window.cafePreview = Object.freeze({
         ready,
         opened,
+        served,
         drop(path) {
             for (const socket of [...sockets]) if (new URL(socket.url).pathname === path) socket.dropped();
         },
+        pull,
+        machine: machineNow,
     });
 })();
