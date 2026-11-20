@@ -1,10 +1,10 @@
 // The real journeys with Decent Sync (docs/cafe/TESTING.md, "The real
-// journeys"; what is left of test/cafe-smoke/run-decent-sync.mjs): the skin's
-// own writes on one tablet carried by the real plugin to the real server and on
-// to the second tablet, and what the server changes pushed back to the page.
-// The page's half of each (what it asks of the plugin, what it draws from the
-// answers) is the page tests' on a fake plugin, test/page/sync-*.spec.mjs;
-// these hold only what the real server, plugin and second tablet can show.
+// journeys"): the skin's own writes on one tablet carried by the real plugin to
+// the real server and on to the second tablet, and what the server changes
+// pushed back to the page. The page's half of each (what it asks of the plugin,
+// what it draws from the answers) is the page tests' on a fake plugin,
+// test/page/sync-*.spec.mjs; these hold only what the real server, plugin and
+// second tablet can show.
 //
 // The sync stack (stacks.sync): the first Decaid, "Sample Machine" at "Sample
 // Cafe", the second (stacks.sync.second), a simulated Bengle, "Sample Machine
@@ -21,7 +21,7 @@ import {
     recordGrinder, recordBatch, grinderOn, batchesOn, profileOn, ownTemperature, nothingLoaded, houseShot, loadsOf, loadHouse, sampleContent,
     chooseGrinder, chooseBatch, chooseProfile, brewRow, grindRow, openList, closeList, listRows, maybe,
 } from './support/sync-helpers.mjs';
-import { RECIPES, GRINDER, SECOND_GRINDER, GRINDER_USE } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, GRINDER, SECOND_GRINDER, GRINDER_USE } from '../page/support/sample-data.mjs';
 
 const PLUGIN_STATUS = '/plugins/decent-sync.reaplugin/status';
 /** Whether the plugin on `side` serves its Machine: false while it answers 503 or 409. */

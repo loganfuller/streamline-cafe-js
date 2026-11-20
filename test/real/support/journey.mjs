@@ -24,7 +24,7 @@ export { expect, pull, until, appliedWith, PLUGIN };
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 export const SCREENSHOTS = join(ROOT, 'test', 'real', 'out', 'screenshots');
-/** Where official Streamline is served from (smoke step 14): another origin, calling the same Decaid. */
+/** Where official Streamline is served from: another origin, calling the same Decaid. */
 export const STREAMLINE_ORIGIN = 'http://127.0.0.1:24801';
 export const DYE2 = 'dye2.reaplugin';
 

@@ -1,12 +1,11 @@
-// Rating and notes (docs/cafe/DESIGN.md, "Rating and notes"; once step 9 of
-// the smoke run, `ratingAndNotes` in test/cafe-smoke/run.mjs, but for the
-// legend's fit in every language): the latest Shot's five stars, a tap that
-// rates it at once and sends the rating alone, a tap on the chosen star that
-// clears it, a rating given elsewhere drawn in half stars, a rating that fails
-// and one whose answer was lost; the note's dialog, its fit above a soft
-// keyboard, a slow save, a note saved trimmed and alone, one that fails and is
-// kept, Cancel and an unchanged save that send nothing, and an emptied note;
-// and the reference's rating and its note, opened to read.
+// Rating and notes (docs/cafe/DESIGN.md, "Rating and notes"; the legend's fit
+// in every language is legend-fit.spec.mjs): the latest Shot's five stars, a
+// tap that rates it at once and sends the rating alone, a tap on the chosen
+// star that clears it, a rating given elsewhere drawn in half stars, a rating
+// that fails and one whose answer was lost; the note's dialog, its fit above a
+// soft keyboard, a slow save, a note saved trimmed and alone, one that fails
+// and is kept, Cancel and an unchanged save that send nothing, and an emptied
+// note; and the reference's rating and its note, opened to read.
 //
 // The page has the first sample recipe loaded, with no Decent Sync, so every
 // edit is Decaid's own Shot edit (src/cafe/tablet-shots.js). Its latest Shot
@@ -23,7 +22,7 @@ import { dropAnswer, hold } from './support/faults.mjs';
 import { load, legend, remarks, noteDialog, paint, writes } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const POUR = recording('pour');

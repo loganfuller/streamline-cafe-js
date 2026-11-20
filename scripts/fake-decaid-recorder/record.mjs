@@ -17,7 +17,7 @@ import { join, resolve } from 'node:path';
 
 import { standUp, opened, CACHE, PINS, ROOT } from './stack.mjs';
 import { seed } from './seed.mjs';
-import { RECIPES } from '../../test/cafe-smoke/sample-data.mjs';
+import { RECIPES } from '../../test/page/support/sample-data.mjs';
 import { servePage, PAGE_ORIGIN } from '../../test/page/support/page-files.mjs';
 
 const args = process.argv.slice(2);

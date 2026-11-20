@@ -1,13 +1,13 @@
-// The profile dialog (docs/cafe/DESIGN.md, "The profile dialog"; once step 27
-// of the smoke run, #51): a tap on the Brew row's name, or on the profile's
-// under it, lists the profiles Decaid shows, sorted by title, and opens on the
-// profile in use with its description; a tap on another row highlights it and
-// writes nothing, nor does Close or a tap outside; "Use this profile" makes
-// #50's change (src/cafe/profile-changer.js), with a recipe loaded, which stays
-// loaded, and with none, which changes this machine only. A change refused, a
-// list that can't be read, a recipe load and a shot each keep it from opening
-// or close it. A hidden profile is not listed, and one in use still opens with
-// its description. It is checked at 1340 by 800 too.
+// The profile dialog (docs/cafe/DESIGN.md, "The profile dialog"; #51): a tap on
+// the Brew row's name, or on the profile's under it, lists the profiles Decaid
+// shows, sorted by title, and opens on the profile in use with its description;
+// a tap on another row highlights it and writes nothing, nor does Close or a
+// tap outside; "Use this profile" makes #50's change
+// (src/cafe/profile-changer.js), with a recipe loaded, which stays loaded, and
+// with none, which changes this machine only. A change refused, a list that
+// can't be read, a recipe load and a shot each keep it from opening or close
+// it. A hidden profile is not listed, and one in use still opens with its
+// description. It is checked at 1340 by 800 too.
 //
 // What is already page-tested elsewhere is not tested again here: the change
 // itself, field by field, in profile-change.spec.mjs (called as the dialog
@@ -20,14 +20,13 @@
 // keeps no profile state, and has no answer for Decaid's
 // `PUT /profiles/{id}/visibility`. A profile hidden through that call is
 // Decaid's list with that profile's `visibility` set to "hidden", which
-// `fake.patchBoot` gives the next read, as the smoke run's page read it after
-// the call.
+// `fake.patchBoot` gives the next read, as the page reads it after the call.
 
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickClosed, tapAt, card, openPage, untilPickClosed, isWrite } from './support/page-reads.mjs';
 import { records, recordOf, loadedId, isRecordWrite, matchMachine, PROFILES } from './support/fake-reads.mjs';
 import { hold } from './support/faults.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { AFTER_CHECK_MS } from '../../src/cafe/profile-change.js';
 
 const [house, , decaf] = RECIPES;
@@ -56,7 +55,7 @@ const isChange = entry => isWrite(entry) && (entry.path === '/api/v1/workflow' |
     || entry.path.startsWith('/api/v1/store/dye2.reaplugin/') || entry.path.startsWith('/api/v1/profiles'));
 
 // What the dialog shows: its title and line, the list on the left, and the
-// description on the right (as the smoke run's `profileDialogShown`).
+// description on the right.
 const shown = page => page.evaluate(() => {
     const text = id => document.getElementById(id)?.textContent ?? null;
     const visible = id => { const element = document.getElementById(id); return !!element && !element.hidden && element.offsetParent !== null; };

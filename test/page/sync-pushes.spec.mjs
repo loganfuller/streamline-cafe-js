@@ -1,14 +1,12 @@
 // Decent Sync's pushes reaching an open page (docs/cafe/DESIGN.md, "The
 // reference with Decent Sync", its "A reference chosen elsewhere" and "The
-// socket"; the page's half of the second smoke run's "6." and "7.",
-// test/cafe-smoke/run-decent-sync.mjs, SMOKE.md's S7–S8): a Reference Shot
-// chosen on the server becomes the page's reference with no reload, a Shot
-// on another Profile flagged "Different profile" and named by its barista,
-// one cleared there goes, and one chosen again comes back; a Recipe renamed
-// on the server is read again and draws nothing; one `changes` socket
-// however often the main page mounts; the socket dropped and reopened, which
-// counts as a push; a push repeated, which draws nothing; and a push with a
-// `what` the page doesn't know, which it ignores.
+// socket"): a Reference Shot chosen on the server becomes the page's reference
+// with no reload, a Shot on another Profile flagged "Different profile" and
+// named by its barista, one cleared there goes, and one chosen again comes
+// back; a Recipe renamed on the server is read again and draws nothing; one
+// `changes` socket however often the main page mounts; the socket dropped and
+// reopened, which counts as a push; a push repeated, which draws nothing; and a
+// push with a `what` the page doesn't know, which it ignores.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving
 // the Machine at "Sample Cafe" from recordings/decent-sync.json, where no
@@ -26,7 +24,7 @@ import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { load, legend, row, sides, chartLines, watchDraws, drawCounts } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const { A, B } = recording('decent-sync').labels;

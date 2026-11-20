@@ -1,25 +1,24 @@
-// The Shots list (docs/cafe/DESIGN.md, "The Shots list"; once step 17 of the
-// smoke run): the Shots button beside Settings and Sleep; the list headed
-// "Shots" and no more, its columns, no Time or Machine column and no
-// Unfinished mark; 50 rows under a header for each day, the Shot in the graph
-// highlighted and a reference chipped; the next 50 as it is scrolled, none
-// twice; a row's recipe, stars, "Not rated" and note icon; a Shot of the
-// loaded recipe opened as "Viewing" and rated, and the list kept where it was
-// left; a Shot of another recipe opened under its name and made that recipe's
-// reference; a Shot with no recipe; "Back to latest", after which the list is
-// read afresh; and a shot started with a Shot opened, drawn live by appending
-// frames, with the latest in the graph once Decaid has stored it. And the
-// day headers across local midnight, in a kept list and one read afresh.
+// The Shots list (docs/cafe/DESIGN.md, "The Shots list"): the Shots button
+// beside Settings and Sleep; the list headed "Shots" and no more, its columns,
+// no Time or Machine column and no Unfinished mark; 50 rows under a header for
+// each day, the Shot in the graph highlighted and a reference chipped; the next
+// 50 as it is scrolled, none twice; a row's recipe, stars, "Not rated" and note
+// icon; a Shot of the loaded recipe opened as "Viewing" and rated, and the list
+// kept where it was left; a Shot of another recipe opened under its name and
+// made that recipe's reference; a Shot with no recipe; "Back to latest", after
+// which the list is read afresh; and a shot started with a Shot opened, drawn
+// live by appending frames, with the latest in the graph once Decaid has stored
+// it. And the day headers across local midnight, in a kept list and one read
+// afresh.
 //
-// The list is the tablet's own (no Decent Sync plugin in Decaid's list), so
-// it is Decaid's `GET /shots` read by offset (fake-decaid/shots.js,
+// The list is the tablet's own (no Decent Sync plugin in Decaid's list), so it
+// is Decaid's `GET /shots` read by offset (fake-decaid/shots.js,
 // recordings/shots.json) and the choice of reference kept on the tablet
 // (`streamlineCafe/references` in Decaid's store). The sixty Shots are the
-// model's starting state, copies of a sample Shot made as the smoke run made
-// its copies: recipe cycling none, the loaded recipe and another, barista
-// cycling, every 25 minutes back from the evening before, rated and noted by
-// index, one of them Unfinished. The smoke run imported them through Decaid;
-// here they are added to the fake before the page opens.
+// model's starting state, copies of a sample Shot: recipe cycling none, the
+// loaded recipe and another, barista cycling, every 25 minutes back from the
+// evening before, rated and noted by index, one of them Unfinished, added to
+// the fake before the page opens.
 //
 // "Today", "Yesterday", the date and the twelve-hour clock are the page's own
 // (src/cafe/shot-list.js `dayOf`/`dayTitle`, the row's `toLocaleTimeString`
@@ -31,11 +30,11 @@ import { legend, chartLines, shotsHeader, remarks, load, writes, watchDraws, dra
 import { recordOf, unfinishedParts } from './support/fake-reads.mjs';
 import { localTime } from '../../fake-decaid/index.js';
 import { shotCurves, isUnfinished } from '../../src/cafe/shot-model.js';
-import { RECIPES, BARISTAS } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES, BARISTAS } from './support/sample-data.mjs';
 
 // A zone behind UTC with daylight saving, out of it in November.
 const ZONE = 'America/Los_Angeles';
-// The smoke run's recipes: the loaded one, and another on the same profile.
+// The recipes: the loaded one, and another on the same profile.
 const target = RECIPES[1];
 const another = RECIPES[4];
 const REFERENCES = ['streamlineCafe', 'references'];
@@ -75,7 +74,7 @@ function copyOf(fake, { id, at, recipeId, barista, enjoyment, note }) {
 /**
  * Sixty Shots, from 18:00 the evening before `start` back, every 25 minutes:
  * of no recipe, of the loaded recipe and of another in turn, the two
- * baristas in turn, a rating and a note by index, as the smoke run gave them.
+ * baristas in turn, a rating and a note by index.
  */
 function sixtyShots(fake, evening) {
     const targetId = String(recordOf(fake, target.name).id);
@@ -102,7 +101,7 @@ function sixtyShots(fake, evening) {
 
 // ── On the page ──────────────────────────────────────────────────────────────
 
-/** Each row of the list, as the smoke run read them, with its time. */
+/** Each row of the list, with its time. */
 const rows = page => page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-row')].map(row => ({
     id: row.dataset.shotId,
     current: row.getAttribute('aria-current') === 'true',
@@ -139,7 +138,7 @@ async function openRow(cafe, id, label) {
     await cafe.settle();
 }
 
-/** A star of the legend's row tapped, as the smoke run's `star`. */
+/** A star of the legend's row tapped. */
 const star = (page, n) => page.locator('#cafe-stars .cafe-star').nth(n - 1).click();
 
 /** "Today 01:30 PM": a time Decaid wrote, `YYYY-MM-DDTHH:MM…`, on the twelve-hour clock en-US gives it. */

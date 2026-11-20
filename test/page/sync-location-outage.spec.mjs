@@ -1,15 +1,13 @@
 // The Location's Shots while Decent Sync's server can't be reached, and as it
 // comes back (docs/cafe/DESIGN.md, "The Location's Shots", "While the server
-// can't be reached"; once the end of step "10." in the second smoke run,
-// test/cafe-smoke/run-decent-sync.mjs): another Machine's Shot opened from the
-// Location's list, then the server stopped: the line "Decent Sync can't be
-// reached, so this shot can't be changed", its stars and Make reference muted
-// and taking no tap, its note open to read only. Back to the latest, the list
-// is this machine's own, from Decaid, under "This machine only" and the line
-// saying why, with no chip and the choice kept on the tablet not read; the
-// tablet's own Shot opened there is rated, through the plugin's edit, which is
-// Decaid's own. The server back: the opened Shot can be changed again, and the
-// list is the Location's.
+// can't be reached"): another Machine's Shot opened from the Location's list,
+// then the server stopped: the line "Decent Sync can't be reached, so this shot
+// can't be changed", its stars and Make reference muted and taking no tap, its
+// note open to read only. Back to the latest, the list is this machine's own,
+// from Decaid, under "This machine only" and the line saying why, with no chip
+// and the choice kept on the tablet not read; the tablet's own Shot opened
+// there is rated, through the plugin's edit, which is Decaid's own. The server
+// back: the opened Shot can be changed again, and the list is the Location's.
 //
 // And the catch-up race: the plugin refuses `shots` and `shot` as
 // `unreachable` for a while after its connection comes back, though its status
@@ -23,8 +21,7 @@
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving
 // the Machine at "Sample Cafe" with the four recorded Shots: A and B this
 // tablet's, C and D "Sample Machine Two"'s. C, House espresso's, is the Shot
-// opened. It is rated and noted on the server before the page opens, as the
-// smoke run had rated and noted it through the page just before.
+// opened. It is rated and noted on the server before the page opens.
 //
 // What stays in the real journey: the server's container stopped and started,
 // the plugin's own catch-up after a reconnection, and that the second tablet
@@ -35,7 +32,7 @@ import { legend, remarks, noteDialog, shotsHeader, load, writes } from './suppor
 import { recording } from './support/adapter.mjs';
 import { lockedRetryMs } from '../../src/cafe/graph-state.js';
 import { LIST_UNREACHABLE } from '../../src/cafe/shot-list.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house, single] = RECIPES;
 const { A, B, C, D } = recording('decent-sync').labels;
@@ -59,7 +56,7 @@ const isReferencesRead = entry => entry.path.startsWith(REFERENCES);
 
 // ── On the page ──────────────────────────────────────────────────────────────
 
-/** The list's rows, as the smoke run read them. A cell shows where it has a box. */
+/** The list's rows. A cell shows where it has a box. */
 const listRows = page => page.evaluate(() => [...document.querySelectorAll('#cafe-shots-list .cafe-shots-row')].map(row => {
     const visible = selector => { const cell = row.querySelector(selector); return cell && cell.offsetParent !== null ? cell.textContent.trim() : null; };
     return {

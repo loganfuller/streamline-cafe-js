@@ -1,33 +1,32 @@
-// The page's dialogs at a tablet's size (issue #39; once step 20 of the smoke
-// run). A modal dialog draws in the top layer, outside Streamline's scaled
-// canvas, so each carries a canvas of its own (`.cafe-dialog-canvas` in
-// src/cafe/cafe.css), scaled by the factors src/modules/scaling.js sets. Each
-// dialog is opened at 1920 by 1200, where the page's scale is 1 and its sizes
-// are design px, then at 1340 by 800 and 1280 by 800: there each part measures
-// its size at 1920 times the page's scale, within a pixel, the box fits inside
-// the window, and nothing scrolls sideways. The Shots box's height is the
-// screen's, less a margin, so it is checked only to fit.
+// The page's dialogs at a tablet's size (issue #39). A modal dialog draws in
+// the top layer, outside Streamline's scaled canvas, so each carries a canvas
+// of its own (`.cafe-dialog-canvas` in src/cafe/cafe.css), scaled by the
+// factors src/modules/scaling.js sets. Each dialog is opened at 1920 by 1200,
+// where the page's scale is 1 and its sizes are design px, then at 1340 by 800
+// and 1280 by 800: there each part measures its size at 1920 times the page's
+// scale, within a pixel, the box fits inside the window, and nothing scrolls
+// sideways. The Shots box's height is the screen's, less a margin, so it is
+// checked only to fit.
 //
-// One page is resized rather than a page opened at each size, as the smoke run
-// did: scaling.js adopts a window whose width changed at once (trackBaseline in
+// One page is resized rather than a page opened at each size: scaling.js adopts
+// a window whose width changed at once (trackBaseline in
 // src/modules/keyboard-fit.js), with no keyboard taken for it, and every dialog
 // is opened afresh at each size, so what it draws comes from the factors then.
 //
 // Nothing here relies on a rule of Decaid's or DYE2's beyond reads: the
 // grinders, beans and batches, DYE2's records and baskets, the profiles and the
-// Shots are the sample data (fake-decaid/recordings/sample-data.json, boot.json).
-// The recipe list needs a recipe in no slot, which the sample data has none of,
-// so one is added to DYE2's records before the page opens. The Shots list draws
-// stars only for a rated Shot, and the sample data's are unrated, so the newest
-// is rated through Decaid's own Shot edit (recorded: recordings/shots.json),
-// as the smoke run had by its step 20. The reference's
-// dialog asks before a chosen reference is replaced, which needs one already
-// chosen: it is opened as src/cafe/graph.js opens it, with made-up names in it.
+// Shots are the sample data (fake-decaid/recordings/sample-data.json,
+// boot.json). The recipe list needs a recipe in no slot, which the sample data
+// has none of, so one is added to DYE2's records before the page opens. The
+// Shots list draws stars only for a rated Shot, and the sample data's are
+// unrated, so the newest is rated through Decaid's own Shot edit (recorded:
+// recordings/shots.json). The reference's dialog asks before a chosen reference
+// is replaced, which needs one already chosen: it is opened as
+// src/cafe/graph.js opens it, with made-up names in it.
 
 import { test, expect } from './support/test.mjs';
-import { tapAt, load } from './support/page-reads.mjs';
-import { dialogDrawn } from '../cafe-smoke/page-helpers.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { tapAt, load, dialogDrawn } from './support/page-reads.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const SIZES = [{ width: 1920, height: 1200 }, { width: 1340, height: 800 }, { width: 1280, height: 800 }];

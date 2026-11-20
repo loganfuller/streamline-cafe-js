@@ -1,10 +1,9 @@
 // A Capture-only Machine and back, with Decent Sync's plugin (docs/cafe/
-// DESIGN.md, "The reference with Decent Sync" and "The Location's Shots"; the
-// page's half of the second smoke run's "9." in run-decent-sync.mjs, SMOKE.md's
-// S10): a served Machine draws Decent Sync's Reference Shot and never the
-// choice kept on the tablet. Its sharing turned off on the server, the page
-// learns it at its next Status ask, which a recipe load makes, and falls back to
-// the tablet's own choice, flagged "Different profile" where it is on another
+// DESIGN.md, "The reference with Decent Sync" and "The Location's Shots"): a
+// served Machine draws Decent Sync's Reference Shot and never the choice kept
+// on the tablet. Its sharing turned off on the server, the page learns it at
+// its next Status ask, which a recipe load makes, and falls back to the
+// tablet's own choice, flagged "Different profile" where it is on another
 // Profile, with Make reference live and the column reading "not saved to the
 // recipe". There Make reference, and Replace, keep the choice on the tablet and
 // ask the plugin nothing; the Shots list is the tablet's own, from Decaid,
@@ -33,7 +32,7 @@ import { legend, shotsHeader, load } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { recording } from './support/adapter.mjs';
 import { NOT_AT_A_LOCATION } from '../../src/cafe/shot-list.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house, single] = RECIPES;
 const CAFE = 'streamlineCafe';
@@ -67,7 +66,7 @@ const statusAsks = (cafe, mark) => cafe.since(mark, entry => entry.method === 'G
 
 /**
  * Another recipe loaded, then House espresso again: each load asks the status
- * again (src/cafe/page.js, `afterRecipeLoad`), as the smoke run had it.
+ * again (src/cafe/page.js, `afterRecipeLoad`).
  */
 async function reloadHouse(cafe) {
     const mark = cafe.fake.log.length;

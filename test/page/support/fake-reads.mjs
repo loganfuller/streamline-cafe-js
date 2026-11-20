@@ -21,7 +21,7 @@ export const isRecordWrite = entry => entry.method === 'POST' && entry.path === 
 // reports whatever its settings hold (a flush at 90 °C, where the sample
 // recipes hold 25 °C), written into a recipe's record, so that DYE2 does not
 // call it changed the moment it loads and "not called changed" says something.
-// The fixture's write, as the smoke run's `matchMachine`.
+// The fixture's write.
 const MACHINE_FIELDS = { steamTempC: ['steamSettings', 'targetTemperature'], steamTimeS: ['steamSettings', 'duration'], steamFlowMls: ['steamSettings', 'flow'], steamStopAtTempC: ['steamSettings', 'stopAtTemperature'], hotWaterTempC: ['hotWaterData', 'targetTemperature'], hotWaterTimeS: ['hotWaterData', 'duration'], hotWaterMl: ['hotWaterData', 'volume'], hotWaterFlowMls: ['hotWaterData', 'flow'], flushTempC: ['rinseData', 'targetTemperature'], flushS: ['rinseData', 'duration'], flushFlowMls: ['rinseData', 'flow'] };
 export function matchMachine(fake, name) {
     const machineNow = fake.workflow();

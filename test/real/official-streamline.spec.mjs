@@ -1,16 +1,16 @@
-// Official Streamline on the same Decaid as the cafe page, and back (once step
-// 14 of the smoke run; docs/cafe/SMOKE.md): the settings the two skins share
-// in Decaid's store are kept, and Streamline's strip mode is as Streamline left
-// it, though the cafe page arranged DYE2's strip in between. Streamline is the
-// pinned commit (fake-decaid/pins.json), served at another origin and calling
-// the same Decaid, as a skin switched to on the tablet would.
+// Official Streamline on the same Decaid as the cafe page, and back: the
+// settings the two skins share in Decaid's store are kept, and Streamline's
+// strip mode is as Streamline left it, though the cafe page arranged DYE2's
+// strip in between. Streamline is the pinned commit (fake-decaid/pins.json),
+// served at another origin and calling the same Decaid, as a skin switched to
+// on the tablet would.
 //
 // The journey puts back what it changes: Streamline's strip mode, and DYE2's
 // records should the strip not be arranged back as it was.
 
 import { test, expect, shoot, loadByCard, record, card, untilStripSettled } from './support/journey.mjs';
 import { startClean, holdAndPick } from './support/decaid-helpers.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from '../page/support/sample-data.mjs';
 
 const [house, , decaf] = RECIPES;
 const DYE2_ON = '/store/streamlineSettings/streamline.dye2Enabled';

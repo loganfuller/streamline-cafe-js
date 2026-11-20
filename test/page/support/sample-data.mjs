@@ -1,4 +1,5 @@
-// Made-up data for the smoke run. Nothing here is a real cafe's: the names say
+// Made-up data for the page tests, the real journeys and the recorder, which
+// writes it into the real stack. Nothing here is a real cafe's: the names say
 // what each thing is and nothing else.
 
 export const BEANS = [
@@ -25,9 +26,10 @@ export const BASKETS = [
 ];
 
 // The grinder dialog's: a second grinder, with burrs and a step of its own, and
-// one archived, which the dialog does not list. The run pulls a shot on each of
-// the two at a setting of its own (`GRINDER_USE`), which the dialog then says
-// each was last used at and a choice of it takes.
+// one archived, which the dialog does not list. The seed
+// (`scripts/fake-decaid-recorder/seed.mjs`) pulls a shot on each of the two at a
+// setting of its own (`GRINDER_USE`), which the dialog then says each was last
+// used at and a choice of it takes.
 export const SECOND_GRINDER = { model: 'Sample Grinder 38', burrType: 'conical', settingSmallStep: 0.5, settingBigStep: 2 };
 export const ARCHIVED_GRINDER = { model: 'Sample Retired Grinder' };
 export const GRINDER_USE = { first: { setting: '2.6', rpm: null }, second: { setting: '11.5', rpm: 800 } };
@@ -37,17 +39,18 @@ export const GRINDER_USE = { first: { setting: '2.6', rpm: null }, second: { set
 export const PRESET_GRINDER = { model: 'Sample Preset Grinder', settingType: 'preset', settingValues: ['Fine', 'Medium', 'Coarse'] };
 export const QUARTER_GRINDER = { model: 'Sample Grinder 0.25', settingType: 'numeric', settingSmallStep: 0.25, settingBigStep: 1 };
 
-// The baristas the run's two shots with no recipe loaded record, one each, so
-// the legend is seen to follow each Shot.
+// The baristas the page tests' Shots record, one each where a test has two, so
+// the legend and the Shots list are seen to follow each Shot.
 export const BARISTAS = ['Sample Barista', 'Example Barista'];
-// The barista step's (#47): a name a recipe's record holds, which a load must
-// not apply; a name typed under "New barista"; one too long for the button.
+// The barista button's (#47, `barista.spec.mjs` and the real journey): a name a
+// recipe's record holds, which a load must not apply; a name typed under "New
+// barista"; one too long for the button.
 export const RECIPE_BARISTA = 'Sample Recipe Barista';
 export const TYPED_BARISTA = 'Sample Typed Barista';
 export const LONG_BARISTA = 'Sample Barista With A Name Far Too Long For The Button';
 
 // `profile` is the title of a profile Decaid ships. `slot` is where the recipe
-// ends up; DYE2 places 1 to 5 itself and the run writes 6 to 9 into its records.
+// ends up; DYE2 places 1 to 5 itself and the seed writes 6 to 9 into its records.
 export const RECIPES = [
     { slot: 1, name: 'House espresso', bean: 'Sample Blend', profile: 'Default', dose: 18, yield: 36, grind: '2.4', basket: '18 g sample basket' },
     { slot: 2, name: 'Single origin', bean: 'Sample Single Origin', profile: 'Adaptive v3', dose: 18, yield: 40, grind: '2.1', basket: '18 g sample basket' },

@@ -1,14 +1,12 @@
 // Decent Sync's server out of reach, for the graph and the reference
 // (docs/cafe/DESIGN.md, "The reference with Decent Sync" and "Rating and
-// notes"; the page's half of the second smoke run's step "8." in
-// test/cafe-smoke/run-decent-sync.mjs, SMOKE.md's S9): the server stopped
-// with the page open, the page told on the plugin's `changes` socket, the
-// tablet's copy of the Reference Shot still drawn, Make reference muted and
-// the line saying why, the column still "saved to the recipe"; a page opened
-// while the server is stopped, drawing the copy with its rating and note, and
-// the tablet's own Shot rated by Decaid's own edit; the server back, and the
-// reference changeable again with no reload; and the pace the Status is asked
-// again at meanwhile.
+// notes"): the server stopped with the page open, the page told on the plugin's
+// `changes` socket, the tablet's copy of the Reference Shot still drawn, Make
+// reference muted and the line saying why, the column still "saved to the
+// recipe"; a page opened while the server is stopped, drawing the copy with its
+// rating and note, and the tablet's own Shot rated by Decaid's own edit; the
+// server back, and the reference changeable again with no reload; and the pace
+// the Status is asked again at meanwhile.
 //
 // Decent Sync's plugin is the fake's (fake-decaid/decent-sync.js), serving the
 // Machine at its Location. Before the page opens, House espresso's Reference
@@ -23,8 +21,7 @@
 // (`shotSource` in src/cafe/sync-status.js), and `editShot` in
 // src/cafe/shot-sources.js sends an edit to the tablet's own source whenever
 // the source is not `plugin`: Decaid's `PUT /api/v1/shots/<id>`
-// (src/cafe/tablet-shots.js), the same request the smoke run saw. The plugin
-// is not asked.
+// (src/cafe/tablet-shots.js). The plugin is not asked.
 //
 // Staying in the real journey: the Docker container stopped and started, the
 // server's own Reference Shot after the outage, and the second tablet.
@@ -34,7 +31,7 @@ import { recording } from './support/adapter.mjs';
 import { legend, chartLines, remarks, load, REFERENCE_LINES } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
 import { statusRetryMs } from '../../src/cafe/sync-status.js';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 
 const [house] = RECIPES;
 const { A, C } = recording('decent-sync').labels;

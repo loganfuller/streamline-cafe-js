@@ -309,7 +309,7 @@ function paintLiveWeight() {
 }
 
 // The legend's own change for a running shot is graph.js's. The class marks the
-// page for cafe.css and the smoke run.
+// page for cafe.css and the page tests.
 function shotStarted() {
     shotEnded();
     el('main-page')?.classList.add('cafe-shot-live');

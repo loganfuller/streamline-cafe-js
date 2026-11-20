@@ -1,9 +1,8 @@
 // A live shot and the graph at rest (docs/cafe/DESIGN.md, "When the graph goes
-// live", "The live cards", "The latest Shot", "The comparison row"; once step 7
-// of the smoke run): during a shot the weight against its target, the status,
-// the six live cards and the stage names; once Decaid has stored it, the Shot
-// in the graph, its time in the legend, and the five cards under the graph with
-// the Shot's own numbers.
+// live", "The live cards", "The latest Shot", "The comparison row"): during a
+// shot the weight against its target, the status, the six live cards and the
+// stage names; once Decaid has stored it, the Shot in the graph, its time in
+// the legend, and the five cards under the graph with the Shot's own numbers.
 //
 // The pour is the one recorded from the pinned Decaid with the first sample
 // recipe loaded (fake-decaid/recordings/pour.json), replayed with the page's
@@ -13,7 +12,7 @@
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';
 import { legend, row, keys, sides, stageNames, chartLines, load } from './support/page-reads.mjs';
-import { RECIPES } from '../cafe-smoke/sample-data.mjs';
+import { RECIPES } from './support/sample-data.mjs';
 import { shotNumbers } from '../../src/cafe/comparison.js';
 import { shotStages } from '../../src/cafe/stage-names.js';
 
