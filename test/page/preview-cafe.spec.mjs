@@ -502,6 +502,19 @@ test.describe('the bar', { tag: '@preview-cafe' }, () => {
         await expect(notice).toBeVisible();
         await preview.bar.locator('#preview-about').click();
         await expect(notice, 'or in the bar').toBeHidden();
+
+        // The Steam, Hot water and Flush rows open the settings from the keyboard too.
+        for (const row of ['#flush-label', '#steam-label', '#hotwater-label']) {
+            for (const key of ['Enter', ' ']) {
+                await frame.locator(row).press(key);
+                await expect(notice, `${row} and ${JSON.stringify(key)}`).toBeVisible();
+                await preview.advance(1000);
+                expect(new URL(frame.url()).searchParams.get('page'), 'no settings page').not.toBe('settings');
+                await expect(frame.locator('#cafe-title')).toHaveText(HOUSE.name);
+                await preview.bar.locator('#preview-about').click();
+                await expect(notice).toBeHidden();
+            }
+        }
     });
 });
 

@@ -360,6 +360,15 @@
         event.preventDefault();
         tell({ type: 'settings' });
     }, true);
+    // The Steam, Hot water and Flush rows are role="button" and open the
+    // settings on Enter or Space too (src/modules/app.js).
+    window.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (!(event.target instanceof Element) || !event.target.closest(SETTINGS)) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        tell({ type: 'settings' });
+    }, true);
 
     // ── fetch ────────────────────────────────────────────────────────────────
 
