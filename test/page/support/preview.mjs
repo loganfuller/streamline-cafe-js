@@ -23,7 +23,7 @@ export { expect };
 export const START = Date.parse('2026-11-18T19:00:00Z');
 export const ZONE = 'America/Toronto';
 export const UNANSWERED = 'Streamline Cafe preview: the sample machine has no answer for';
-const NO_MOTION = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
+const NO_MOTION = `*, *::before, *::after, *::backdrop { transition: none !important; animation: none !important; }`;
 
 /** The address of the preview in a mode: served by Decent Sync, or without it. */
 export const addressOf = (site, mode) => (mode === 'tablet' ? `${site}?decent-sync=off` : site);
