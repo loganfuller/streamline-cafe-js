@@ -24,7 +24,7 @@ export const START = Date.parse('2026-11-18T14:00:00Z');
 
 // No transition or animation runs: they run on the browser's own time, which
 // the page's clock does not jump, and nothing in src/ waits for one to end.
-const NO_MOTION = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
+const NO_MOTION = `*, *::before, *::after, *::backdrop { transition: none !important; animation: none !important; }`;
 
 class Cafe {
     constructor(page, fake, routes, errors) {

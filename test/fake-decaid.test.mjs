@@ -455,6 +455,9 @@ test('the sample data\'s Shots are moved so the newest was pulled an hour before
     const fake = fresh();
     const newest = get(fake, '/api/v1/shots/latest').body;
     assert.equal(newest.timestamp.slice(0, 16), '2026-11-18T13:00');
+    const [first] = get(fake, `/api/v1/shots/${newest.id}`).body.measurements;
+    assert.ok(first.machine.timestamp <= newest.timestamp, 'the first sample is no later than the Shot\'s stamp');
+    assert.equal(first.machine.timestamp.slice(0, 23), '2026-11-18T13:00:00.000', 'and is what lands on the hour');
 });
 
 test('boot: the recorded answers, matched by method, path and query, and a write by its body too; anything else has none', () => {

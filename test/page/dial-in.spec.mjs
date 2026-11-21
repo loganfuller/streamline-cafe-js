@@ -148,14 +148,10 @@ test.describe('stepping the dial-in', { tag: '@dialin' }, () => {
         const workflow = fake.workflow();
         expect(loadedId(fake), 'the other recipe is loaded').toBe(other.id);
         expect(workflow.rinseData.duration, 'the flush is the other recipe\'s, not the step').toBe(other.dashboardVariables.flushS);
-        // Streamline's apply writes a recipe's steam flow only when the recipe
-        // says it is in flow mode (src/modules/dyeStrip.js,
-        // `mergeRecipeLiveSettings`), and the sample records name no steam
-        // mode: the machine keeps the flow stepped, written before the load.
         expect(other.dashboardVariables.steamMode, 'the other recipe names no steam mode').toBeUndefined();
-        expect(workflow.steamSettings.flow, 'the steam flow is the one stepped, which the load leaves').toBe(flowStepped);
+        expect(workflow.steamSettings.flow, 'the steam flow is the other recipe\'s too, not the step').toBe(other.dashboardVariables.steamFlowMls);
         expect(await number(page, 'flush-value'), 'the page shows the other recipe\'s flush').toBe(other.dashboardVariables.flushS);
-        expect(await number(page, 'steam-flow-value'), 'and the machine\'s steam flow').toBe(flowStepped);
+        expect(await number(page, 'steam-flow-value'), 'and its steam flow').toBe(other.dashboardVariables.steamFlowMls);
         expect(records(fake), 'neither record took the steps, nor any other').toEqual(recordsBefore);
 
         // The two steps were written before the load's own Workflow write.
@@ -174,8 +170,10 @@ test.describe('stepping the dial-in', { tag: '@dialin' }, () => {
         expect(loadedId(fake), 'the first recipe is loaded again').toBe(first.id);
         expect(await number(page, 'dose-in-value'), 'with its own dose').toBe(first.dashboardVariables.dose);
         expect(await number(page, 'flush-value'), 'and its own flush').toBe(first.dashboardVariables.flushS);
+        expect(await number(page, 'steam-flow-value'), 'and its own steam flow').toBe(first.dashboardVariables.steamFlowMls);
         const back = fake.workflow();
-        expect([back.context.targetDoseWeight, back.rinseData.duration], 'the Workflow holds the record\'s dose and flush').toEqual([first.dashboardVariables.dose, first.dashboardVariables.flushS]);
+        expect([back.context.targetDoseWeight, back.rinseData.duration, back.steamSettings.flow], 'the Workflow holds the record\'s dose, flush and steam flow')
+            .toEqual([first.dashboardVariables.dose, first.dashboardVariables.flushS, first.dashboardVariables.steamFlowMls]);
         expect(records(fake), 'and still no record changed').toEqual(recordsBefore);
         expect(writes(cafe.since(markBack).filter(isDye2Write)), 'nothing written to DYE2 but the selection the load makes').toEqual([{ write: 'POST /api/v1/plugins/dye2.reaplugin/selection', body: { kind: 'recipe', id: first.id } }]);
     });

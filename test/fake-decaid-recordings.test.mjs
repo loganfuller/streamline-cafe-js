@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-import { createFakeDecaid } from '../fake-decaid/index.js';
+import { createFakeDecaid, newestPulled } from '../fake-decaid/index.js';
 
 // FAKE_DECAID_RECORDINGS replays a fresh recording instead of the committed one,
 // and FAKE_DECAID_PINS names the pins it was made with (the real-stack workflow).
@@ -27,7 +27,7 @@ const recordedMs = text => Date.parse(`${text.slice(0, 23)}Z`);
 
 // The sample data's Shots keep the times they were recorded at when the page's
 // clock is an hour past the newest (fake-decaid/index.js moves them otherwise).
-const newest = Math.max(...sampleData.shots.map(shot => recordedMs(shot.timestamp)));
+const newest = newestPulled(sampleData.shots);
 const fresh = (served = false) => createFakeDecaid({ sampleData, boot, pour, ...(served ? { decentSync } : {}), now: newest + 3_600_000 });
 // A push the plugin may repeat is compared once.
 const once = pushes => pushes.filter((push, index) => index === 0 || JSON.stringify(push) !== JSON.stringify(pushes[index - 1]));
@@ -175,7 +175,7 @@ test(`pour: the replayed pour stores the Shot Decaid ${pour.recordedWith.decaid}
 const committed = name => JSON.parse(readFileSync(new URL(`../fake-decaid/recordings/${name}.json`, import.meta.url), 'utf8'));
 const realPour = committed('real/de1pro-pour');
 const committedSample = committed('sample-data');
-const committedNewest = Math.max(...committedSample.shots.map(shot => recordedMs(shot.timestamp)));
+const committedNewest = newestPulled(committedSample.shots);
 
 test(`the real pour: replayed, it stores the Shot a DE1Pro's Decaid ${realPour.capturedWith.decaid} stored, its dose the Workflow's`, () => {
     const fake = createFakeDecaid({ sampleData: committedSample, boot: committed('boot'), pour: realPour, now: committedNewest + 3_600_000 });

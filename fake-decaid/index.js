@@ -62,6 +62,12 @@ export function OWNED(method, path) {
     return OWNED_REST.some(pattern => pattern.test(path));
 }
 
+export function newestPulled(shots) {
+    const ms = text => Date.parse(/[zZ]$/.test(text) ? text : `${text.slice(0, 23)}Z`);
+    const pulled = shot => Math.min(ms(shot.timestamp), ...[shot.measurements?.[0]?.machine?.timestamp].filter(Boolean).map(ms));
+    return Math.max(...shots.map(pulled));
+}
+
 /**
  * Moves a recorded Shot back in time as the sample data's are moved, keeping
  * their spacing, so the newest sample Shot was pulled an hour before `now`,
@@ -70,8 +76,7 @@ export function OWNED(method, path) {
  */
 function mover(shots, now, timeZone) {
     if (!shots.length) return shot => shot;
-    const ms = text => Date.parse(/[zZ]$/.test(text) ? text : `${text.slice(0, 23)}Z`);
-    const shift = now - 3_600_000 - Math.max(...shots.map(shot => ms(shot.timestamp)));
+    const shift = now - 3_600_000 - newestPulled(shots);
     const moved = text => shiftTime(text, shift, timeZone);
     return shot => ({
         ...shot,

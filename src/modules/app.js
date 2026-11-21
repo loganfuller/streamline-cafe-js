@@ -19,7 +19,6 @@ import { endPerfShot, initPerfProbe, measure, startPerfShot } from './perf-probe
 import { workflowGrindStep, workflowGrindRange } from './grinder-sync.js';
 import { isDye2Enabled } from './dye2-enabled.js';
 import { deriveScreensaverAction, isMachineAsleep, isScreensaverSuppressed } from './screensaver-policy.js';
-import { onMachineStateChange as ledStripOnMachineStateChange, forceStop as ledStripForceStop } from './led-strip-runner.js';
 import { createMachineLinkWatcher, machineFromDevicesPayload } from './machine-link.js';
 import { resolveProfileKeyByTitle } from './active-profile.js';
 import { setMachineModel, isBengleMachine, setRefillKitPresent, isRefillKitPresent } from './machine.js';
@@ -570,12 +569,17 @@ function onScaleDisconnect() {
     scaleAutoRetryTimer = setTimeout(attemptScaleAutoRetry, SCALE_AUTO_RETRY_INTERVAL_MS);
 }
 
+// Each value is the English CSV key as well as the English text, so these are
+// translated like every other string -- they used to reach the toast raw, which
+// left them in English in every language. adapterOff deliberately reuses the
+// 'Bluetooth is not on' row that already exists, translated, rather than adding
+// a near-duplicate of it.
 const deviceErrorCopy = {
     scaleConnectFailed: 'Scale did not connect. Wake it and retry.',
-    machineConnectFailed: 'DE1 did not connect. Retry scan.',
+    machineConnectFailed: 'Machine did not connect. Retry scan.',
     scaleDisconnected: 'Scale dropped. Retry scan.',
-    machineDisconnected: 'DE1 dropped. Retry scan.',
-    adapterOff: 'Bluetooth is off. Turn it on to continue.',
+    machineDisconnected: 'Connection dropped. Retry scan.',
+    adapterOff: 'Bluetooth is not on',
     bluetoothPermissionDenied: 'Grant Bluetooth permission to continue.',
     scanFailed: 'Scan could not start. Retry.',
 };
@@ -596,7 +600,10 @@ function handleDeviceConnectionError(err) {
     // machine is NOT connected the banner still shows, since BT may genuinely be
     // the missing piece.
     if ((err.kind === 'adapterOff' || err.kind === 'bluetoothPermissionDenied') && isDe1Connected) return;
-    const msg = deviceErrorCopy[err.kind] ?? `${err.message}${err.suggestion ? `\n${err.suggestion}` : ''}`;
+    // Only our own copy is translatable; the fallback is whatever the failure
+    // itself said, which has no key.
+    const copy = deviceErrorCopy[err.kind];
+    const msg = copy ? getTranslation(copy) : `${err.message}${err.suggestion ? `\n${err.suggestion}` : ''}`;
     ui.showToast(msg, 5000, 'error');
 }
 
@@ -1026,20 +1033,6 @@ function handleData(data) {
         })();
     }
 
-    // Bengle LED colour-sequence trigger (led-strip-runner.js): reacts to the
-    // SAME snapshot stream this function already owns rather than opening a
-    // second subscription -- only on an actual state change, not every frame
-    // at ~10 Hz. A no-op for non-Bengle machines (the Lighting settings page
-    // that configures triggerStates is Bengle-only, so there is nothing to
-    // resolve) and for a machine with no sequence mapped to this state. On
-    // ERROR (the machine link itself is down, per isDe1Connected above) stop
-    // unconditionally -- manual or trigger -- rather than resolve a trigger
-    // for a state nothing should ever be mapped to.
-    if (state !== previousState.state) {
-        if (state === MachineState.ERROR) ledStripForceStop();
-        else ledStripOnMachineStateChange(state);
-    }
-
     // Shot-history arrows: inert while the machine is pulling espresso, so a
     // step back cannot repaint the chart the running shot is drawing on. Every
     // frame, not just the state-change edge: markMachineDisconnected() releases
@@ -1103,18 +1096,12 @@ function handleData(data) {
                 // gateway mode so the fallback heuristics run at shot end.
                 seqTrackedShot = false;
                 seqStopToastShown = false;
-                // Not while the user is reading a past shot: these three wipe
-                // the chart, the data panel and the label they are looking at.
-                // A cleaning profile starts five shots, so without this the
-                // review survives at most one flush.
-                if (!history.isReviewingHistory()) {
-                    chart.clearChart();
-                    shotData.clearShotData();
-                    const historyLabelEl = document.getElementById('shot-history-label');
-                    if (historyLabelEl) {
-                        historyLabelEl.textContent = getTranslation('NEWEST');
-                    }
+                if (history.endHistoryReview()) {
+                    logger.warn('Shot started while a past shot was under review; returning to the live chart.');
                 }
+                chart.clearChart();
+                shotData.clearShotData();
+                history.setHistoryLabel('NEWEST');
                 startPerfShot();
             }
             // Bengle: use the machine's true gravimetric flow (GFlow) straight from
@@ -2032,6 +2019,10 @@ async function refreshWorkflowTiles() {
         workflow = await getWorkflow();
     } catch (e) {
         logger.warn('Workflow refresh failed:', e);
+        if (pendingForcedRefresh && !tileEditPending()) {
+            const confirmed = tilesToPaint(lastWorkflowTiles, lastWorkflowTiles, { force: true });
+            for (const key of Object.keys(confirmed)) WORKFLOW_TILE_PAINTERS[key]?.(confirmed[key]);
+        }
         return;
     }
     if (!workflow) return;
@@ -2695,7 +2686,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             profileNameEl.style.cursor = 'pointer';
             ui.setupPressAndHold(
                 profileNameEl,
-                () => loadPage('src/profiles/profile_selector.html'),
+                () => {
+                    sessionStorage.removeItem('pendingAssignmentIndex');
+                    loadPage('src/profiles/profile_selector.html');
+                },
                 (el) => {
                     const activeRecord = resolveHeaderProfileRecord(el);
                     const profileTitle = activeRecord
@@ -2704,7 +2698,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const items = [
                         {
                             label: getTranslation('Browse Profiles'),
-                            onSelect: () => loadPage('src/profiles/profile_selector.html'),
+                            onSelect: () => {
+                                sessionStorage.removeItem('pendingAssignmentIndex');
+                                loadPage('src/profiles/profile_selector.html');
+                            },
                         },
                         {
                             label: profileTitle ? `${getTranslation('Edit')} "${profileTitle}"` : getTranslation('Edit Profile'),
@@ -2738,6 +2735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileSelectBtn = document.getElementById('profile-select-btn');
         if (profileSelectBtn) {
             profileSelectBtn.addEventListener('click', () => {
+                sessionStorage.removeItem('pendingAssignmentIndex');
                 loadPage('src/profiles/profile_selector.html');
             });
         }

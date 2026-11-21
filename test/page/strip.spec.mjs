@@ -96,26 +96,11 @@ const showing = (record, roasted) => {
     };
 };
 
-/**
- * The Workflow a record loaded alone leaves: the record's own Workflow whole,
- * with only what Streamline's apply legitimately adds, clears or leaves:
- * - the Workflow's id and names are the machine's;
- * - Streamline's marker names the recipe (DYE2's field flags in the record's
- *   marker are never written to the machine), and the `selection` DYE2 last
- *   mirrored into it stays;
- * - the grinder's rpm and feed rate, which the record names none of, are
- *   cleared (src/modules/workflow-fields.js, `clearInheritedFields`);
- * - each step's limiter at 0 is written as none (src/modules/api.js, the step
- *   sanitising before a Workflow write);
- * - of the steam, the stop temperature alone is written, the duration and
- *   flow only with a steam mode the sample records hold none of; of the
- *   flush, the duration alone; the hot water whole (src/modules/dyeStrip.js,
- *   `mergeRecipeLiveSettings`). The rest stays the machine's.
- */
 function workflowOf(record, machine) {
     const { extras, ...context } = record.workflow.context;
     const { dye, ...rest } = extras;
-    const { profile, steamSettings, hotWaterData, rinseData } = record.workflow;
+    const { profile, hotWaterData } = record.workflow;
+    const dv = record.dashboardVariables;
     return {
         ...record.workflow,
         id: machine.id,
@@ -126,36 +111,37 @@ function workflowOf(record, machine) {
             extras: { ...rest, dye: { selection: null, v: 1, recipeId: record.id }, rpm: null, feedRate: null },
         },
         profile: { ...profile, steps: profile.steps.map(step => ({ ...step, limiter: step.limiter && Number(step.limiter.value) !== 0 ? step.limiter : null })) },
-        steamSettings: { ...machine.steamSettings, stopAtTemperature: steamSettings.stopAtTemperature },
+        steamSettings: { ...machine.steamSettings, targetTemperature: dv.steamTempC, duration: dv.steamTimeS, flow: dv.steamFlowMls, stopAtTemperature: dv.steamStopAtTempC },
         hotWaterData,
-        rinseData: { ...machine.rinseData, duration: rinseData.duration },
+        rinseData: { ...machine.rinseData, targetTemperature: dv.flushTempC, duration: dv.flushS, flow: dv.flushFlowMls },
     };
 }
 
-/**
- * A record given hot water, a steam stop and a flush duration of its own. The
- * sample records hold the machine's (`matchMachine`), so a load that wrote none
- * of them would leave the Workflow as `workflowOf` expects it. Written in both
- * the record's dashboard values, which Streamline's apply writes, and its own
- * Workflow, which `workflowOf` reads, so DYE2 does not call the recipe changed.
- */
 function ownLiveSettings(fake, name) {
     const machine = fake.workflow();
     const water = { volume: machine.hotWaterData.volume + 70, targetTemperature: machine.hotWaterData.targetTemperature + 10, duration: machine.hotWaterData.duration + 15, flow: machine.hotWaterData.flow - 2 };
-    const stopAtTemperature = machine.steamSettings.stopAtTemperature + 65;
-    const flushS = machine.rinseData.duration + 5;
+    const steam = { targetTemperature: machine.steamSettings.targetTemperature + 5, duration: machine.steamSettings.duration + 10, flow: machine.steamSettings.flow + 0.3, stopAtTemperature: machine.steamSettings.stopAtTemperature + 65 };
+    const rinse = { targetTemperature: machine.rinseData.targetTemperature - 20, duration: machine.rinseData.duration + 5, flow: machine.rinseData.flow - 1 };
     fake.store.set('dye2.reaplugin', 'recipes', records(fake).map(row => {
         if (!row || row.name !== name) return row;
         return {
             ...row,
-            dashboardVariables: { ...row.dashboardVariables, hotWaterMl: water.volume, hotWaterTempC: water.targetTemperature, hotWaterTimeS: water.duration, hotWaterFlowMls: water.flow, steamStopAtTempC: stopAtTemperature, flushS },
-            workflow: { ...row.workflow, hotWaterData: { ...row.workflow.hotWaterData, ...water }, steamSettings: { ...row.workflow.steamSettings, stopAtTemperature }, rinseData: { ...row.workflow.rinseData, duration: flushS } },
+            dashboardVariables: {
+                ...row.dashboardVariables,
+                hotWaterMl: water.volume, hotWaterTempC: water.targetTemperature, hotWaterTimeS: water.duration, hotWaterFlowMls: water.flow,
+                steamTempC: steam.targetTemperature, steamTimeS: steam.duration, steamFlowMls: steam.flow, steamStopAtTempC: steam.stopAtTemperature,
+                flushTempC: rinse.targetTemperature, flushS: rinse.duration, flushFlowMls: rinse.flow,
+            },
+            workflow: { ...row.workflow, hotWaterData: { ...row.workflow.hotWaterData, ...water }, steamSettings: { ...row.workflow.steamSettings, ...steam }, rinseData: { ...row.workflow.rinseData, ...rinse } },
         };
     }));
     const record = recordOf(fake, name);
-    expect(record.workflow.hotWaterData, `${name}'s hot water differs from the machine's`).not.toEqual(machine.hotWaterData);
-    expect([record.workflow.steamSettings.stopAtTemperature, record.workflow.rinseData.duration], `${name}'s steam stop and flush duration are its own, not the machine's`)
-        .toEqual([machine.steamSettings.stopAtTemperature + 65, machine.rinseData.duration + 5]);
+    for (const [group, own] of Object.entries({ hotWaterData: water, steamSettings: steam, rinseData: rinse })) {
+        for (const [field, value] of Object.entries(own)) {
+            expect(record.workflow[group][field], `${name}'s ${group}.${field} is its own`).toBe(value);
+            expect(value, `and not the machine's`).not.toBe(machine[group][field]);
+        }
+    }
 }
 
 /** The recipe ids each Workflow write and each DYE2 selection named, in order. */

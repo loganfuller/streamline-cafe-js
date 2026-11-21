@@ -412,6 +412,33 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await cafe.advance(1000);
                 expect(baristaWrites(cafe.since(mark)), 'cleared once, though the page sees the machine asleep twice').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
             });
+
+            test('a page opened as Decaid comes back from a hold on Sleep clears the name', async ({ cafe, fake }) => {
+                nameElsewhere(fake, EXAMPLE);
+                const mark = fake.log.length;
+                await cafe.open({ before: () => window.localStorage.setItem('sleepExitPending', String(Date.now())) });
+                await expect.poll(() => named(fake)).toBeNull();
+                await cafe.advance(1000);
+                expect(baristaWrites(cafe.since(mark)), 'cleared in one write').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
+                expect(writes(cafe.since(mark)).map(({ write }) => write), 'Streamline woke the machine').toContain('PUT /api/v1/machine/state/idle');
+                await expect(shown(cafe.page)).toHaveText('Barista');
+            });
+
+            test('a page that outlived the hold on Sleep clears the name when Decaid shows it again', async ({ cafe, fake }) => {
+                nameElsewhere(fake, EXAMPLE);
+                const page = await cafe.open();
+                await expect(shown(page)).toHaveText(EXAMPLE);
+                const mark = fake.log.length;
+                await page.evaluate(() => {
+                    window.localStorage.setItem('sleepExitPending', String(Date.now()));
+                    document.dispatchEvent(new Event('visibilitychange'));
+                    document.dispatchEvent(new Event('visibilitychange'));
+                });
+                await expect.poll(() => named(fake)).toBeNull();
+                await cafe.advance(1000);
+                expect(baristaWrites(cafe.since(mark)), 'cleared in one write, though Decaid showed the page twice').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
+                await expect(shown(page)).toHaveText('Barista');
+            });
         });
     }
 

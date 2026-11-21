@@ -7,7 +7,7 @@
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
 import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight, getMachineState } from '../modules/api.js';
-import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
+import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction, cameBackFromSleepExit } from '../modules/ui.js';
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
@@ -438,6 +438,8 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // sleeping machine that sends no frame; a second clear finds no name and
     // writes nothing.
     document.addEventListener('streamline:machine-asleep', clearAsleep);
+    document.addEventListener('streamline:sleep-exit-return', clearAsleep);
+    if (cameBackFromSleepExit()) clearAsleep();
     getMachineState().then(snapshot => { if (asleep(snapshot)) clearAsleep(); }).catch(() => {});
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);

@@ -27,10 +27,12 @@ Start with [`docs/AI_REPO_MAP.md`](docs/AI_REPO_MAP.md). Open only the topic not
 
 ## Change Discipline
 
+- Avoid writing code comments. Make code self-explanatory through clear names and structure. When you touch code with an outdated comment, remove it on the spot.
 - Prefer small pure helpers and existing modules over new globals. Add to `window.app` only when injected HTML or an established cross-page bridge requires it.
 - Use the existing logger for production diagnostics and avoid noisy per-frame logging.
 - Follow existing naming and module boundaries. Do not perform broad style modernization during a functional fix.
 - When HTML is injected by the router, translate it and initialize it through its page or category mount function; do not rely on a fresh `DOMContentLoaded`.
+- For new UI text, reuse an existing key from `src/ui/de1 gui translation - Sheet1.csv` before adding a row. Add a new key only when no existing one fits.
 - Source files and generated files belong in the same change when a build input changes.
 - Add or update focused `node:test` coverage for pure policy, parsing, state-transition, queueing, migration, and rendering decisions.
 
@@ -67,6 +69,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 - Draw on the graph only through the fork's three hooks in `src/modules/chart.js`: the overlay, the Shot chooser and the live line labels. Lines added to the chart follow Streamline's own, and keep their count and their arrays through a shot. Text on a stage line goes through the fork's hook in `src/modules/echarts-renderer.js`.
 - Work out every number under the graph in `src/cafe/comparison.js`, as Decent Sync works it out. Write the live cards only from the chart's own live draw, never from a timer or a second read of the machine.
 - Key the cafe page's text with `data-cafe-text` or `cafeText()`, never `data-i18n-key`. A phrase Streamline's translation file lacks goes into `src/cafe/translations.js` in every language Streamline has finished, marked `machine: true` when a machine translated it.
+- Streamline's rule against code comments holds in the fork's own code too, with two exceptions: each hook in one of Streamline's files keeps the comment that marks it as the fork's and says why, and each of the fork's own files keeps its opening comment. Its rule for new UI text stops at the fork's code: the cafe page's text never adds a row to Streamline's translation file.
 - Leave a part of the screen out until its slice builds it, so every control on the page does something.
 - For a change to the main page, run the page tests ([`docs/cafe/TESTING.md`](docs/cafe/TESTING.md)) and put the screenshots they write in the pull request's description from the moment it opens. A new slice writes its closing check as page tests against the fake Decaid. A change to what the page writes to Decaid, DYE2 or Decent Sync's plugin also runs the real journeys that cover it (`npm run test:real`, TESTING.md's "The real journeys"); a pull request that changes the pins, the recorder or the journeys gets the real-stack workflow on its own. A change to what the fake Decaid does adds or records again the scenario that backs it. Sample data is made up: no cafe's names, beans or recipes.
 - Adopt Streamline by merging a tagged release in its own pull request, merged with a merge commit and never squashed. Never push Streamline's tags to this repository.

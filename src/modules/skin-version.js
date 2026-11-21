@@ -1,32 +1,22 @@
-// Version policy for "is something newer out there", in one DOM-free place:
+// Version policy for skins and for the Decaid app, in one DOM-free place:
 //
 //  * compareVersions -- semver-ish ordering used by the skin cards, the Decaid
 //    app-update badge, and the reload prompt.
-//  * the GitHub release-check cache: which repos we may ask about, what GitHub
-//    last answered, and how long we must stay quiet after it refused.
 //  * shouldPromptReload -- the disk-newer-than-running test behind the
 //    "tap to reload" toast.
+//  * skinUpdateOutcome -- what a "Check for updates" run actually changed.
+//  * appUpdateAvailability -- what the Decaid app-update badge may claim.
+//  * switchSkinNatively -- the accept/refuse rule for Decaid's switch hook.
 //
 // No fetch, no localStorage, no window: callers own the I/O and the storage, so
 // this stays node-testable (test/skin-version.test.mjs).
 //
-// Why the cache exists: api.github.com allows 60 unauthenticated requests an
-// hour for the whole tablet, and that budget is shared with Decaid's own
-// periodic checks for the app, its skins and its plugins. Decaid gates its side
-// behind a shared GithubRateLimit (decaid #987/#989/#1067); a browser that asks
-// GitHub directly on every settings visit spends the same budget without
-// telling anyone, which is what exhausted it in decaid #1118.
-//
-// This cache is the stopgap. Decaid #1152 asks for availableVersion /
-// lastChecked / lastError on WebUIReaMetadata -- the fields plugins already
-// have, which is why dyeStrip.js never calls GitHub. Once those land, the
-// lookups here go away and the badge becomes a read of Decaid's own state.
-
-export const SUCCESS_TTL_MS = 6 * 60 * 60 * 1000;   // a release tag is news at most this often
-export const FAILURE_TTL_MS = 10 * 60 * 1000;       // offline / 5xx: retry sooner, but not instantly
-export const DEFAULT_LIMIT_MS = 60 * 60 * 1000;     // 403/429 with no reset header: GitHub's window is an hour
-export const MAX_LIMIT_MS = 2 * 60 * 60 * 1000;     // never trust a reset header into next week
-export const MAX_REPOS = 20;                        // bounded: a tablet cannot have hundreds of skins
+// Decaid owns remote update discovery (streamline-js#199). This skin never asks
+// api.github.com anything: installed versions come from GET /webui/skins, app
+// update state from GET /api/v1/update and ws/v1/update, and installing is
+// Decaid's POST /webui/skins/update. The browser-side release-tag cache that
+// used to live here -- per-repo GitHub polling against a shared 60/h budget,
+// which is what exhausted it in decaid#1118 -- is gone with it.
 
 export function compareVersions(a, b) {
     const parse = (v) => {
@@ -49,95 +39,101 @@ export function compareVersions(a, b) {
     return 0;
 }
 
-// Accepts whatever came back out of storage -- including null, a truncated
-// write, or a shape from an older build -- and returns a usable state.
-export function normalizeReleaseState(saved) {
-    const repos = {};
-    const src = saved && typeof saved === 'object' && saved.repos && typeof saved.repos === 'object'
-        ? saved.repos : {};
-    for (const [slug, entry] of Object.entries(src)) {
-        if (!slug || !entry || typeof entry !== 'object') continue;
-        const checkedAt = Number(entry.checkedAt);
-        if (!Number.isFinite(checkedAt)) continue;
-        repos[slug] = {
-            tag: typeof entry.tag === 'string' && entry.tag ? entry.tag : null,
-            checkedAt,
-            ok: !!entry.ok,
-        };
-    }
-    const limitedUntil = Number(saved?.limitedUntil);
-    return { repos, limitedUntil: Number.isFinite(limitedUntil) ? limitedUntil : 0 };
-}
-
-export function isRateLimited(state, now = Date.now()) {
-    return Number(state?.limitedUntil) > now;
-}
-
-// Milliseconds until the cooldown ends, 0 when there is none. For logging and
-// for a caller that wants to say when the answer will be available again.
-export function limitRemainingMs(state, now = Date.now()) {
-    const until = Number(state?.limitedUntil);
-    return Number.isFinite(until) && until > now ? until - now : 0;
-}
-
-export function shouldCheck(state, slug, now = Date.now()) {
-    if (!slug || !state) return false;
-    if (isRateLimited(state, now)) return false;      // never retry through an active cooldown
-    const entry = state.repos?.[slug];
-    if (!entry) return true;
-    return now - entry.checkedAt >= (entry.ok ? SUCCESS_TTL_MS : FAILURE_TTL_MS);
-}
-
-function prune(state) {
-    const entries = Object.entries(state.repos);
-    if (entries.length <= MAX_REPOS) return;
-    entries.sort((a, b) => b[1].checkedAt - a[1].checkedAt);
-    state.repos = Object.fromEntries(entries.slice(0, MAX_REPOS));
-}
-
-export function recordSuccess(state, slug, tag, now = Date.now()) {
-    state.repos[slug] = { tag: typeof tag === 'string' && tag ? tag : null, checkedAt: now, ok: true };
-    prune(state);
-    return state;
-}
-
-// Offline, DNS failure, 404 (repo has no releases), 5xx. Keeps any tag an
-// earlier check established -- a 30-second network blip must not turn a known
-// answer into an unknown one -- but marks the entry for an earlier retry.
-export function recordFailure(state, slug, now = Date.now()) {
-    state.repos[slug] = { tag: state.repos?.[slug]?.tag ?? null, checkedAt: now, ok: false };
-    prune(state);
-    return state;
-}
-
-// GitHub refused for quota: 403 with the rate-limit headers, or 429. Stops every
-// repo, not just this one, because the budget is per-IP. `reset` is
-// x-ratelimit-reset (epoch seconds), `retryAfter` is Retry-After (seconds).
-export function recordRateLimit(state, { reset, retryAfter } = {}, now = Date.now()) {
-    const resetMs = Number(reset) * 1000;
-    const retryMs = Number(retryAfter) * 1000;
-    let until;
-    if (Number.isFinite(resetMs) && resetMs > now) until = resetMs;
-    else if (Number.isFinite(retryMs) && retryMs > 0) until = now + retryMs;
-    else until = now + DEFAULT_LIMIT_MS;
-    until = Math.min(until, now + MAX_LIMIT_MS);
-    state.limitedUntil = Math.max(Number(state.limitedUntil) || 0, until);
-    return state;
-}
-
-// What the UI may say. `known` false means we have no answer -- never checked,
-// the check failed, or the quota ran out -- and the caller must not render
-// "Up to date" off it. Only a tag GitHub actually returned counts.
-export function getTag(state, slug) {
-    const entry = slug ? state?.repos?.[slug] : null;
-    const tag = entry?.tag || null;
-    return { tag, known: !!tag };
-}
-
 // The files Decaid serves are newer than the bundle this page is running, so a
 // reload picks up a version the user already has on disk. Strictly newer only:
 // a dev build ahead of disk must not nag.
 export function shouldPromptReload({ running, disk } = {}) {
     if (!running || !disk) return false;
     return compareVersions(running, disk) < 0;
+}
+
+// What a "Check for updates" run actually did, by comparing the installed
+// skins before it with the installed skins after it.
+//
+// This is a diff and not a read of the response because `POST
+// /webui/skins/update` does not report per-skin outcomes: it answers
+// `{message: 'Skin update check completed'}` on success and HTTP 500 with a
+// plain-language error on any failure, partial completion included (checked
+// against decaid's webui_handler.dart, assets/api/rest_v1.yml, and a live call).
+// The installed versions it leaves behind are the only per-skin truth available,
+// and they are what the cards show anyway.
+//
+// A skin absent from `before` counts as unchanged: that call only updates skins
+// already installed, so an id we have never seen is a first read, not an update.
+export function skinUpdateOutcome(before, after) {
+    const prior = new Map((before || []).map((s) => [s?.id, s?.version || '']));
+    return (after || []).reduce((changes, s) => {
+        if (!s?.id || !prior.has(s.id)) return changes;
+        const to = s.version || '';
+        if (prior.get(s.id) === to) return changes;
+        changes.push({ id: s.id, name: s.name || s.id, to });
+        return changes;
+    }, []);
+}
+
+// What the Decaid app-update badge may claim, from an AppUpdateState snapshot
+// (GET /api/v1/update, ws/v1/update).
+//
+// Decaid sets `latestVersion` only while an update is actually available and
+// unskipped (`_snapshot` reads `availableUpdate?.version`), so its presence is
+// the signal; the version comparison is a guard against a stale snapshot naming
+// a release the running build has already caught up with.
+//
+// There is deliberately no "up to date" answer. `AppUpdateState` carries no
+// `lastChecked`, no `hasCompletedCheck` and no `canCheck`, so an idle phase with
+// no `latestVersion` means EITHER "checked, nothing new" OR "never checked" --
+// and on macOS, or when the install is externally managed, Decaid never checks
+// at all (`UpdateCheckService.checkForUpdate` returns at its `_isMacOS` guard,
+// Sparkle owns macOS). Claiming "Up to date" off that is the guess decaid#1118
+// called out, so the caller shows no badge instead.
+export function appUpdateAvailability(state, runningVersion) {
+    const latest = state?.latestVersion || '';
+    const current = runningVersion || state?.currentVersion || '';
+    const available = !!latest && (!current || compareVersions(current, latest) < 0);
+    return {
+        available,
+        latest: latest.replace(/^v/i, ''),
+        releaseUrl: state?.releaseUrl || '',
+    };
+}
+
+// Ask Decaid's host to switch the active skin, and report whether it took it.
+//
+// `window.decentApp.switchSkin(skinId)` is synchronous and returns true only
+// when the host accepted the request: it checks host context, a native-issued
+// nonce and the trusted main-frame SkinView first, then drives the navigation
+// and persists the new default in-process (decaid#1108). So the call is its own
+// feature probe -- a plain browser, an iframe, and a host older than the hook
+// all answer falsy, and no token is involved either way.
+//
+// Anything other than a literal `true` is a refusal, including a truthy value
+// from some future host: the caller must not treat "maybe" as a switch in
+// flight, because nothing else will tell it the switch is not coming.
+//
+// Takes the host object rather than reading `window` so this file stays
+// DOM-free; settings.js passes `window.decentApp`.
+export const switchSkinNatively = (host, skinId) =>
+    !!skinId && typeof host?.switchSkin === 'function' && host.switchSkin(skinId) === true;
+
+// Decaid gates POST /webui/skins/update behind an `extensions:manage` bearer
+// token (decaid #1163). The skin holds no token, and the tokenless exception
+// made for the embedded skin admits only a same-device loopback caller, on a
+// Decaid new enough to carry it (0.9.2+3191 has the gate but not the
+// exception). Both refusals arrive as 401 "Missing or malformed bearer token",
+// which tells the user neither what happened nor what to do -- and the way out
+// is not in this skin at all, it is Decaid's own Skins page, which runs the
+// same check in-process with no token involved.
+//
+// Everything else already answers in plain language: GitHub quota, a partial
+// update, and the 30-second tokenless throttle ("An update check just ran;
+// retry in N seconds") all arrive as a sentence worth showing as-is.
+export const SKIN_UPDATE_TOKEN_REFUSED =
+    'Decaid would not run this check from the skin. Update from the Decaid app instead: Skins > Check for updates.';
+
+// `translate` is the caller's getTranslation: this module stays DOM-free and
+// i18n-free, and the English text above is the CSV key.
+export function skinUpdateFailureText(error, translate = (text) => text) {
+    if (error?.status === 401) return translate(SKIN_UPDATE_TOKEN_REFUSED);
+    const reason = error?.message || String(error ?? 'unknown error');
+    return `Failed to update skin: ${reason}`;
 }

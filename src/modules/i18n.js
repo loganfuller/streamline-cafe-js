@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import { openDB, getSetting, setSetting } from './idb.js';
-import { SUPPORTED_LANGUAGES, parseTranslationColumn } from './i18n-parser.js';
+import { SUPPORTED_LANGUAGES, parseTranslationColumn, matchLanguage, resolveLanguage, preferredLanguage } from './i18n-parser.js';
 import { APP_VERSION } from '../version.js';
 import { largestFittingSize, predictFittingSize } from './text-fit.js';
 
@@ -54,12 +54,10 @@ async function loadTranslations(language) {
     logger.info(`Translations loaded for language: ${language}`);
 }
 
-function findSupportedLanguage(language) {
-    const normalized = String(language || '').toLowerCase();
-    if (supportedLanguages.includes(normalized)) return normalized;
-    const base = normalized.split('-')[0];
-    return supportedLanguages.includes(base) ? base : null;
-}
+// A stored preference or a device tag -> a column we can show. The matching
+// (script-aware Chinese, the sheet's own column names) lives in i18n-parser.js
+// so node:test can cover it.
+const findSupportedLanguage = (language) => matchLanguage(language);
 
 /**
  * Translates all elements on the page with a `data-i18n-key` attribute.
@@ -404,7 +402,11 @@ export function getCurrentLanguage() {
  * Sets the current language and translates the page.
  * @param {string} lang The language code (e.g., 'en', 'fr').
  */
-export async function setLanguage(lang) {
+// Set once the user picks a language themselves. Without it, a stored language
+// is just the last thing boot resolved -- see preferredLanguage.
+const LANGUAGE_SOURCE_KEY = 'languageSource';
+
+export async function setLanguage(lang, { chosen = true } = {}) {
     const requestedLanguage = findSupportedLanguage(lang);
     if (!requestedLanguage) {
         console.warn(`Language '${lang}' not supported. Defaulting to 'en'.`);
@@ -420,6 +422,7 @@ export async function setLanguage(lang) {
     currentLanguage = nextLanguage;
     if (nextLanguage === (requestedLanguage || 'en')) {
         localStorage.setItem('language', nextLanguage);
+        if (chosen) localStorage.setItem(LANGUAGE_SOURCE_KEY, 'user');
         setSetting('language', nextLanguage).catch(() => {});
     }
     logger.info(`Language set to: ${currentLanguage}`);
@@ -434,8 +437,21 @@ export async function setLanguage(lang) {
  * Initializes the internationalization module.
  */
 export async function initI18n() {
-    const localLanguage = findSupportedLanguage(localStorage.getItem('language'));
-    const initialLanguage = localLanguage || findSupportedLanguage(navigator.language) || 'en';
+    // A choice the user made wins. Otherwise read the device: every preferred
+    // language in order, not just the first, so a tablet set to "Catalan, then
+    // Spanish" gets Spanish rather than English when we are short of Catalan.
+    const chosen = localStorage.getItem(LANGUAGE_SOURCE_KEY) === 'user';
+    const deviceLanguages = navigator.languages?.length ? navigator.languages : [navigator.language];
+    const deviceLanguage = resolveLanguage(deviceLanguages);
+    const pick = (stored) => preferredLanguage({ stored, device: deviceLanguage, chosen });
+    const storedLanguage = findSupportedLanguage(localStorage.getItem('language'));
+    const initialLanguage = pick(storedLanguage);
+    // audit, not info: info is a no-op unless debug is switched on, and this is
+    // exactly the trail a "it did not pick my language" report has to carry. The
+    // WebView's own locale is the one input that cannot be seen from here, and a
+    // WebView reporting the wrong one looks identical to a matcher bug.
+    logger.audit(`i18n: device=${[...deviceLanguages].join('|') || 'none'} match=${deviceLanguage || 'none'}`
+        + ` stored=${storedLanguage || 'none'} chosen=${chosen} -> ${initialLanguage}`);
     currentLanguage = initialLanguage;
     localStorage.setItem('language', initialLanguage);
     translatePage();
@@ -445,5 +461,5 @@ export async function initI18n() {
         await openDB();
         savedLanguage = findSupportedLanguage(await getSetting('language'));
     } catch (_) {}
-    await setLanguage(savedLanguage || initialLanguage);
+    await setLanguage(savedLanguage ? pick(savedLanguage) : initialLanguage, { chosen: false });
 }

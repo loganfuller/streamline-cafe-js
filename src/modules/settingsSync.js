@@ -50,6 +50,7 @@ export const SYNCED_KEYS = [
     'screensaverDateFormat',
     'blackScreenSaver',
     'screensaverShowClock',
+    'sleepExitEnabled',
     'wakeLockEnabled',
     'wakeProfileEnabled',
     'wakeProfileId',
@@ -67,7 +68,6 @@ export const SYNCED_KEYS = [
     'streamline.dyeStripMode',
     'streamline.ecoSteam',
     'streamline.touchSound',
-    'streamline.ledSequences',
     'streamline.settings.location',
     'tempUnit',
     // Main-page quick presets. The values the buttons SET are Decaid's, but the
@@ -451,7 +451,11 @@ async function boot() {
             if (applied.language) {
                 await import('./i18n.js')
                     .then(({ setLanguage, getCurrentLanguage }) =>
-                        getCurrentLanguage() === applied.language ? null : setLanguage(applied.language))
+                        // Not a fresh choice: this is a stored value whose
+                        // provenance is the same unknown as the local one, and
+                        // an `en` written as a boot default by an older build
+                        // must not pin English (see preferredLanguage).
+                        getCurrentLanguage() === applied.language ? null : setLanguage(applied.language, { chosen: false }))
                     .catch(e => logger.info(`late language restore failed: ${e.message}`));
             }
             // Flag first, so a failed or repeated reload can never loop.
