@@ -70,19 +70,23 @@ class Cafe {
     }
 
     /**
-     * Until no request is being answered, and the page has had a turn to read
-     * what came. Fails, naming them, if requests are still being answered after
-     * 5 s of real time.
+     * Until no request the page has sent is unanswered, one still on its way to
+     * its route included, and the page has had a turn to read what came. Fails,
+     * naming them, if requests are still being answered after 5 s of real time.
      */
     async settle(page = this.page) {
         const deadline = Date.now() + 5000;
+        let sent = 0;
         for (;;) {
             if (this.routes.inflight.size === 0) {
                 this.fake.flush();
-                await page.evaluate(() => 0);
-                if (this.routes.inflight.size === 0) return;
+                sent = await page.evaluate(() => window.__cafeFetchesOpen());
+                if (sent === 0 && this.routes.inflight.size === 0) return;
             }
-            if (Date.now() > deadline) throw new Error(`requests still being answered after 5 s: ${[...this.routes.inflight].join(', ')}`);
+            if (Date.now() > deadline) {
+                const answering = [...this.routes.inflight].join(', ') || 'none';
+                throw new Error(`requests still being answered after 5 s: ${answering}; fetches the page has sent and had no answer to: ${sent}`);
+            }
             await new Promise(resolve => setImmediate(resolve));
         }
     }
