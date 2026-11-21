@@ -274,7 +274,7 @@ A row of five cards under the graph, for the Shot in the graph. The graph gives 
 - **A Shot is timed and measured as Decent Sync does it,** so a tablet and its server give one Shot the same numbers. The Preheat is the Shot's leading samples in `preparingForShot`. The profile starts at the first sample after them, and nothing in the Preheat counts.
   - **Time** runs from the start of the profile to the Shot's last sample.
   - **First drip** is Decent Sync's time to first drip (loganfuller/decent-sync#609): from the start of the profile to when the coffee first reached the cup, as the scale shows it. `firstDrip` reads it from the samples after the Preheat, passing over a sample with no scale reading:
-    1. A cup weighed before Decaid's tare landed is left out: a reading of 1 g or more in the first 2 s after which the scale reads under 1 g within them.
+    1. A cup weighed before Decaid's tare landed is left out: a reading of 1 g or more in the first 2 s after which the scale reads under 1 g within them. The tare landed at the first of those lower readings, so a rise that starts within the 2 s is read whole.
     2. The scale's first reading of 1 g or more is found. A Shot with none, as one with no scale, has no first drip.
     3. From it, back to the scale's last reading of zero or less, or to the first sample where there is none.
     4. The first drip is the first reading of 0.2 g or more after that.

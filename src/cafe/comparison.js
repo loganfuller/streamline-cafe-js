@@ -91,21 +91,22 @@ export function shotSamples(measurements) {
 
 /**
  * The index of the first sample (of `shotSamples`) the scale read after the
- * tare Decaid sends as the profile starts, without waiting for it: past a cup
- * weighed before the tare landed, a reading of 1 g or more in the first
- * TARE_LANDS seconds after which the scale reads under 1 g within them. It is
- * Decent Sync's `tareLanded`.
+ * tare Decaid sends as the profile starts, without waiting for it: 0, or past
+ * a cup weighed before the tare landed, the first reading under 1 g within the
+ * first TARE_LANDS seconds that follows a reading of 1 g or more, where the
+ * tare landed. So a rise that starts within those seconds is read whole. A
+ * sample with no reading is passed over. It is Decent Sync's `tareLanded`
+ * (loganfuller/decent-sync#609).
  */
 function tareLanded(samples) {
-    let weighed = false;
-    let landed = 0;
+    let previous = null;
     for (let n = 0; n < samples.length && samples[n].seconds <= TARE_LANDS; n++) {
         const weight = samples[n].weight;
         if (weight === null) continue;
-        if (weight >= RISE_GRAMS) weighed = true;
-        else if (weighed) landed = n;
+        if (previous !== null && previous >= RISE_GRAMS && weight < RISE_GRAMS) return n;
+        previous = weight;
     }
-    return landed;
+    return 0;
 }
 
 /**
