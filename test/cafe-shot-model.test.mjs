@@ -60,6 +60,10 @@ test('an Unfinished Shot never reached pouring and has no first drip', () => {
     // Preheat, and its own weight is not counted, having no time on the machine's clock.
     assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 5 } }] }), true, 'a weight on a sample the machine did not time is no reading');
     assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 0 } }, sample(3, 'preparingForShot', { weight: 5 })] }), false, 'a sample with no machine reading ends the Preheat');
+    for (const timestamp of [null, 0, Date.UTC(2026, 10, 12, 10, 0, 2), undefined]) {
+        const untimed = { machine: { timestamp, state: { state: 'espresso', substate: 'pouring' } } };
+        assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion'), untimed] }), true, `a pouring sample timed ${timestamp} is no sample: Decaid writes a string`);
+    }
     assert.equal(isUnfinished({ measurements: [...preheat, { machine: { state: { substate: 'preinfusion' } }, scale: { weight: 5 } }] }), true, 'nor is one whose machine reading has no time');
     assert.equal(isUnfinished({ measurements: [...preheat, { machine: { state: { substate: 'pouring' } } }] }), true, 'and a pouring sample with no time is no sample');
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: '12' })] }), true, 'a weight that is not a number is no reading');

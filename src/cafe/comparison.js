@@ -52,7 +52,8 @@ export const PHRASES = {
 
 const number = value => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 const positive = value => (number(value) !== null && value > 0 ? value : null);
-const millis = value => {
+/** A machine timestamp in milliseconds, or null: Decaid writes a string, so only a string or a `Date` is a time. */
+export const millis = value => {
     const at = typeof value === 'string' || value instanceof Date ? new Date(value).getTime() : NaN;
     return Number.isNaN(at) ? null : at;
 };

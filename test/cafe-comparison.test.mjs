@@ -1,8 +1,10 @@
 // The numbers under the graph (docs/cafe/DESIGN.md, "The comparison row").
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 import { PHRASES, shotSamples, shotNumbers, firstDrip, valueAt, difference, restCards, liveFrame, liveCards } from '../src/cafe/comparison.js';
+import { isUnfinished } from '../src/cafe/shot-model.js';
 
 const at = seconds => new Date(Date.UTC(2026, 0, 1, 8, 0, 0) + seconds * 1000).toISOString();
 const sample = (seconds, substate, machine = {}, scale = undefined) => ({
@@ -77,44 +79,51 @@ test('first drip is null for a Shot whose scale never read 1 g, as with no scale
     assert.equal(shotNumbers(shot({ measurements: exactly })).firstDrip, 2, 'a reading of exactly 1 g is the rise');
 });
 
-// When coffee first reached the cup: Decent Sync's rule (loganfuller/decent-sync#609),
-// each case as `[name, [[seconds, weight], ...], first drip]` over a Shot's
-// samples after its Preheat, a weight of null being a sample with no reading.
-const FIRST_DRIP_CASES = [
-    ['a weight that creeps from 0.1 g to 1 g: its first reading of 0.2 g or more',
-        [[0, 0], [1, 0.1], [2, 0.1], [3, 0.2], [4, 0.4], [5, 0.7], [6, 1]], 3],
-    ['a reading of 0.2 g or more that goes back to zero before the rise is not the first drip',
-        [[0, 0], [1, 0.3], [2, 0], [3, 0.1], [5, 0.2], [6, 1.2]], 5],
-    ['a reading under zero is zero or less too',
-        [[0, 0], [1, 0.3], [2, -0.1], [3, 0.2], [4, 1]], 3],
-    ['0.2 g is coffee in the cup, 0.1 g is not',
+// When coffee first reached the cup, and whether a Shot is Unfinished: Decent
+// Sync's own cases for its rule (loganfuller/decent-sync#609), copied unchanged
+// from its protocol/test/fixtures/first-drip-cases.json (decent-sync 9975d036),
+// so a tablet and its server answer the same Shots alike. Each is recorded as
+// Decaid records a Shot, as Decent Sync's test records it: its Preheat in
+// `preparingForShot`, then its profile's samples, in `pouring` from the second
+// where it poured, a weight of null being a sample with no scale reading.
+const { cases: FIRST_DRIP_CASES } = JSON.parse(readFileSync(new URL('./fixtures/first-drip-cases.json', import.meta.url), 'utf8'));
+
+const recorded = ({ preheat, samples, poured }) => {
+    const reading = weight => (weight === null ? undefined : { weight });
+    return [
+        ...preheat.map(([seconds, weight]) => sample(seconds, 'preparingForShot', {}, reading(weight))),
+        ...samples.map(([seconds, weight], n) => sample(seconds, poured && n > 0 ? 'pouring' : 'preinfusion', {}, reading(weight))),
+    ];
+};
+
+test('first drip and Unfinished: Decent Sync\'s cases for its rule, with its answers', () => {
+    assert.ok(FIRST_DRIP_CASES.length > 0);
+    for (const { name, samples, firstDrip: expected, unfinished, ...rest } of FIRST_DRIP_CASES) {
+        const measurements = recorded({ samples, ...rest });
+        assert.deepEqual(shotSamples(measurements).map(entry => entry.seconds), samples.map(([seconds]) => seconds), `${name}: the samples after the Preheat`);
+        assert.equal(firstDrip(shotSamples(measurements)), expected, name);
+        assert.equal(shotNumbers(shot({ measurements })).firstDrip, expected, `${name}: on the card`);
+        assert.equal(isUnfinished({ measurements }), unfinished, `${name}: Unfinished`);
+    }
+});
+
+// Cases Decent Sync's table has no row for, each `[name, [[seconds, weight], ...], first drip]`
+// over a Shot's samples after its Preheat.
+const MORE_FIRST_DRIP_CASES = [
+    ['0.2 g is coffee in the cup, 0.19 g is not',
         [[0, 0], [1, 0.1], [2, 0.19], [3, 0.2], [4, 1]], 3],
     ['no reading of zero or less before the rise: from the first sample',
         [[0, 0.1], [1, 0.3], [2, 1]], 1],
     ['the rise itself where it jumps straight to 1 g',
         [[0, 0], [1, 0], [2, 1.4]], 2],
-    ['a sample with no scale reading is passed over',
-        [[0, 0], [1, null], [2, 0.3], [3, null], [4, 1.1]], 2],
-    ['a scale that never reads 1 g has no first drip, whatever smaller readings it has',
-        [[0, 0], [1, 0.5], [2, 0.9], [3, 0.3]], null],
-    ['no scale has no first drip',
-        [[0, null], [1, null], [2, null]], null],
-    ['a cup weighed before the tare landed: the first drip is in the rise after the tare',
-        [[0, 18.2], [0.5, 18.1], [1, 0], [3, 0], [4, 0.3], [5, 1.5]], 4],
     ['the tare landing just under a gram within its first 2 s',
         [[0, 18.2], [1.9, 0.4], [3, 0], [4, 0.2], [5, 1]], 4],
-    ['a cup on the scale throughout, never tared, reads as before',
-        [[0, 18.2], [1, 18.2], [3, 18.4], [10, 25]], 0],
     ['a cup taken off after the tare could land is not a cup weighed before it',
         [[0, 18.2], [1, 18.2], [2.5, 0], [4, 0.3], [5, 1.5]], 0],
-    ['known limit: a scale that settles a little under 1 g within the first second reads as a first drip then',
-        [[0, 0], [0.4, 0.9], [3, 0.9], [6, 0.9], [6.4, 1]], 0.4],
-    ['known limit: a scale that reads zero again partway through has its first drip in the rise after that zero',
-        [[0, 0], [2, 0.4], [3, 0.6], [4, 0], [5, 0.3], [6, 1.2]], 5],
 ];
 
-test('first drip: when coffee first reached the cup, by Decent Sync\'s rule', () => {
-    for (const [name, readings, expected] of FIRST_DRIP_CASES) {
+test('first drip: more cases of the rule', () => {
+    for (const [name, readings, expected] of MORE_FIRST_DRIP_CASES) {
         const samples = readings.map(([seconds, weight]) => ({ seconds, weight }));
         assert.equal(firstDrip(samples), expected, name);
     }

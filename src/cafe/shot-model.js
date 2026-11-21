@@ -3,7 +3,7 @@
 // (docs/cafe/DESIGN.md, "Shots and the reference"). No browser global is touched.
 import { createPourPhaseTracker, createScaleFlowResolver, hasMachineGFlow, isPourPhase } from '../modules/historical-gflow.js';
 import { recipeName } from './strip-model.js';
-import { firstDrip, shotSamples } from './comparison.js';
+import { firstDrip, millis, shotSamples } from './comparison.js';
 
 /** How many of the tablet's newest Shots a recipe's latest is looked for among. */
 export const LATEST_WINDOW = 100;
@@ -44,8 +44,8 @@ export function shotsWithRecipe(rows, recipeId) {
  */
 export function isUnfinished(shot) {
     const samples = Array.isArray(shot?.measurements) ? shot.measurements : [];
-    // A sample the machine did not time is no sample.
-    const poured = samples.some(sample => sample?.machine?.state?.substate === 'pouring' && !Number.isNaN(new Date(sample?.machine?.timestamp).getTime()));
+    // A sample the machine did not time is no sample, by the test `shotSamples` uses.
+    const poured = samples.some(sample => sample?.machine?.state?.substate === 'pouring' && millis(sample?.machine?.timestamp) !== null);
     return !poured && firstDrip(shotSamples(samples)) === null;
 }
 
