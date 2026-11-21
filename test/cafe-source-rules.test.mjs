@@ -256,6 +256,16 @@ test('the machine seen asleep is announced from the one socket, and clears the b
         /addEventListener\('streamline:machine-asleep', drop\);/, 'and an open dialog closes, as on a shot');
 });
 
+test('a return from a hold on Sleep clears the barista', () => {
+    const ui = readFileSync(new URL('../src/modules/ui.js', import.meta.url), 'utf8');
+    assert.match(ui, /export const cameBackFromSleepExit = \(\) => sleepExitReturned;/);
+    assert.match(ui, /if \(deriveReturnWake\(currentMachineState\) !== 'wake'\) return;\s*sleepExitReturned = true;\s*document\.dispatchEvent\(new Event\('streamline:sleep-exit-return'\)\);/,
+        'set, and announced, only where the return wakes the machine');
+    assert.match(SOURCES.find(({ name }) => name === 'page.js').text,
+        /addEventListener\('streamline:sleep-exit-return', clearAsleep\);\s*if \(cameBackFromSleepExit\(\)\) clearAsleep\(\);/,
+        'heard while the page runs, and asked at its start, which comes after the return');
+});
+
 test('the barista lives in the Workflow alone', () => {
     // No copy in the page's own store, or in the browser's: DYE2's dashboard
     // field and the page then always agree.

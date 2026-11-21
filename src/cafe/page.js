@@ -7,7 +7,7 @@
 // row and the graph. This module adds what they have no word for, and reads
 // what it needs from where they already write it.
 import { getWorkflow, getBeanBatch, getScaleReading, setTargetSteamFlow, hasWorkflowWriteInFlight, getMachineState } from '../modules/api.js';
-import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction } from '../modules/ui.js';
+import { updateSteamDisplay, pushSteamSetting, isAutoSteamMode, flashPlusMinusButton, msSinceTileInteraction, cameBackFromSleepExit } from '../modules/ui.js';
 import { API_DEBOUNCE_MS } from '../modules/workflow-watch.js';
 import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
@@ -436,8 +436,13 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // seen asleep, going to sleep or in the first frame of a page opened on it
     // asleep (the hook in api.js). The state is read once at start too, for a
     // sleeping machine that sends no frame; a second clear finds no name and
-    // writes nothing.
+    // writes nothing. A hold on Sleep closes Decaid before the clear can run,
+    // and Streamline wakes the machine as Decaid opens again, before the page
+    // starts: the hook in ui.js says that wake happened, and the page clears
+    // the name then.
     document.addEventListener('streamline:machine-asleep', clearAsleep);
+    document.addEventListener('streamline:sleep-exit-return', clearAsleep);
+    if (cameBackFromSleepExit()) clearAsleep();
     getMachineState().then(snapshot => { if (asleep(snapshot)) clearAsleep(); }).catch(() => {});
     setInterval(paintBattery, BATTERY_MS);
     document.addEventListener('streamline:espresso-start', shotStarted);

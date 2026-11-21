@@ -384,8 +384,8 @@ test.describe('the long-press menu, and arranging the strip', { tag: '@menu' }, 
             { write: RECORDS, body: after },
         ]);
         expect(fake.workflow(), 'only the recipe named as loaded changed').toEqual(workflowNaming(workflowBefore, made.id));
-        // Not called changed: the load before it left the Workflow's flush
-        // temperature at the machine's own (the test above).
+        // Not called changed: the load before it wrote the recipe's own flush
+        // temperature into the Workflow (the test above).
         expect(fake.selection(), 'the new recipe is loaded, and not as changed').toEqual({ kind: 'recipe', id: made.id, modified: false });
         await expect(cardName(page, single.slot)).toHaveText(name);
         await expect(card(page, single.slot)).toHaveAttribute('aria-pressed', 'true');

@@ -412,6 +412,21 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 await cafe.advance(1000);
                 expect(baristaWrites(cafe.since(mark)), 'cleared once, though the page sees the machine asleep twice').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
             });
+
+            // A hold on Sleep closed Decaid before the page could clear the
+            // name, leaving Streamline's marker (`sleepExitPending`); Decaid
+            // opened again wakes the machine before the page starts, so the
+            // page never sees it asleep.
+            test('a page opened as Decaid comes back from a hold on Sleep clears the name', async ({ cafe, fake }) => {
+                nameElsewhere(fake, EXAMPLE);
+                const mark = fake.log.length;
+                await cafe.open({ before: () => window.localStorage.setItem('sleepExitPending', String(Date.now())) });
+                await expect.poll(() => named(fake)).toBeNull();
+                await cafe.advance(1000);
+                expect(baristaWrites(cafe.since(mark)), 'cleared in one write').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
+                expect(writes(cafe.since(mark)).map(({ write }) => write), 'Streamline woke the machine').toContain('PUT /api/v1/machine/state/idle');
+                await expect(shown(cafe.page)).toHaveText('Barista');
+            });
         });
     }
 

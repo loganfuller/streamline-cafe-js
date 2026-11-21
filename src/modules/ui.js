@@ -2200,6 +2200,10 @@ const SLEEP_EXIT_KEY = 'sleepExitPending';
 // Settings > Screen Saver > Sleep button. Default ON: absent key means enabled.
 const SLEEP_EXIT_ENABLED_KEY = 'sleepExitEnabled';
 let sleepExitReturnWired = false;
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): a hold on Sleep closes Decaid before the
+// page can clear the barista, so the page clears it when this return wakes the machine.
+let sleepExitReturned = false;
+export const cameBackFromSleepExit = () => sleepExitReturned;
 
 /** Is the long-press sleep-and-exit gesture switched on? */
 function isSleepExitEnabled() {
@@ -2233,6 +2237,8 @@ function handleSleepExitReturn() {
     // off (here or on another synced tablet) while this marker was pending.
     clearSleepExitPending();
     if (deriveReturnWake(currentMachineState) !== 'wake') return;
+    sleepExitReturned = true;
+    document.dispatchEvent(new Event('streamline:sleep-exit-return'));
     hideScreensaver();
     noteWakeRequested();
     setMachineState('idle').catch((err) => {
