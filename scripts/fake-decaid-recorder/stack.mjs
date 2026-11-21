@@ -6,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,18 +27,37 @@ async function sha256(path) {
     return createHash('sha256').update(await readFile(path)).digest('hex');
 }
 
-// A release asset, downloaded once into the cache and checked against its pinned sum.
-export async function asset(repo, tag, { name, sha256: want }) {
-    await mkdir(CACHE, { recursive: true });
+// Downloads under way, by cache path: the journeys stand two stacks up at once,
+// and both ask for the same files.
+const fetching = new Map();
+
+// A release asset, downloaded once into the cache and checked against its pinned
+// sum. A download is checked before it takes the file's name, so the name only
+// ever holds a whole file, and asks for one already under way share it.
+export function asset(repo, tag, { name, sha256: want }) {
     const path = join(CACHE, name);
-    if (!existsSync(path) || (await sha256(path)) !== want) {
-        const url = `https://github.com/${repo}/releases/download/${tag}/${name}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`${url} answered ${res.status}`);
-        await writeFile(path, Buffer.from(await res.arrayBuffer()));
+    if (!fetching.has(path)) {
+        const done = download(repo, tag, name, path, want).finally(() => fetching.delete(path));
+        fetching.set(path, done);
     }
-    const got = await sha256(path);
-    if (got !== want) throw new Error(`${name}: sha256 ${got}, pinned ${want}`);
+    return fetching.get(path);
+}
+
+async function download(repo, tag, name, path, want) {
+    await mkdir(CACHE, { recursive: true });
+    if (existsSync(path) && (await sha256(path)) === want) return path;
+    const url = `https://github.com/${repo}/releases/download/${tag}/${name}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    const part = `${path}.${randomBytes(4).toString('hex')}.part`;
+    try {
+        await writeFile(part, Buffer.from(await res.arrayBuffer()));
+        const got = await sha256(part);
+        if (got !== want) throw new Error(`${name}: sha256 ${got}, pinned ${want}`);
+        await rename(part, path);
+    } finally {
+        await rm(part, { force: true });
+    }
     return path;
 }
 
