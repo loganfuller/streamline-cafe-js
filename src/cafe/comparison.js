@@ -100,9 +100,10 @@ export function shotSamples(measurements) {
  */
 function tareLanded(samples) {
     let previous = null;
-    for (let n = 0; n < samples.length && samples[n].seconds <= TARE_LANDS; n++) {
+    for (let n = 0; n < samples.length; n++) {
         const weight = samples[n].weight;
         if (weight === null) continue;
+        if (samples[n].seconds > TARE_LANDS) break;
         if (previous !== null && previous >= RISE_GRAMS && weight < RISE_GRAMS) return n;
         previous = weight;
     }

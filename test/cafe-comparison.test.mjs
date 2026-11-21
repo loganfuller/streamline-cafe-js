@@ -122,6 +122,8 @@ const MORE_FIRST_DRIP_CASES = [
         [[0, 18.2], [1, 18.2], [2.5, 0], [4, 0.3], [5, 1.5]], 0],
     ['the tare lands at the first reading under 1 g after the cup\'s, past a sample with no reading between them',
         [[0, 18.2], [0.5, null], [1, 0], [3, 0], [4, 0.3], [5, 1.2]], 4],
+    ['only readings count towards the tare\'s 2 s, as a sample with no reading timed out of order ends nothing',
+        [[0, 18.2], [2.5, null], [1.5, 0], [3, 0], [4, 0.3], [5, 1.2]], 4],
 ];
 
 test('first drip: more cases of the rule', () => {
