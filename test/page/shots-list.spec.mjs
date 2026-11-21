@@ -324,8 +324,7 @@ test.describe('the Shots list', { tag: '@shots' }, () => {
         // Over 3 s of the recorded pour (eleven appends on every run seen).
         // Streamline's renderer draws a live chart in full once when its axes
         // change (src/modules/echarts-renderer.js `renderChart`, the layout
-        // signature), which falls in this window on some runs and not others,
-        // as the page batches its frames on real time.
+        // signature), which may fall in this window.
         expect(drawn.appended, 'a live shot still draws by appending frames').toBeGreaterThanOrEqual(10);
         expect(drawn.full, 'not by drawing the chart again').toBeLessThanOrEqual(1);
 

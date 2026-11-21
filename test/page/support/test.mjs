@@ -116,6 +116,16 @@ class Cafe {
      * frames of a step: the chart's draw, between the machine's last frame and
      * the scale's after it, leaves the live Weight card a frame behind, as no
      * later machine frame comes to draw it again (issue #92).
+     *
+     * The last step's frames have reached the page but are not yet drawn when
+     * it returns: the chart draws them on real time once the clock runs on
+     * again. A test that reads the chart or the cards straight after waits on
+     * them with `expect`, or moves the clock on first, as `pourTo` does.
+     *
+     * The clock is the browser context's, so pausing it pauses every page open
+     * in it, each at its own time. Pour with `cafe.page` the only one open: a
+     * page from `another()` whose clock ran ahead would have `pauseClock`
+     * move `cafe.page` on, firing its timers, until it caught up.
      */
     async pour(toMs = Infinity, { step = 250 } = {}) {
         await this.pauseClock();
