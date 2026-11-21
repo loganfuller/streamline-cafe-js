@@ -2,8 +2,9 @@
 // swallowed timeout. Time moves only through the clock helper in
 // test/page/support/test.mjs, and a wait that runs out fails the test. The real
 // journeys (test/real/) keep the same rules: their one fixed wait, for proving
-// nothing arrives, is `quiet(ms, why)` in test/real/support/journey.mjs, the
-// one file left out.
+// nothing arrives, is `quiet(ms, why)` in test/real/support/journey.mjs. The
+// page tests' one, for a socket frame held up, is `late()` in
+// test/page/support/late-frame.mjs. Those two files are left out.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 const inside = dir => readdirSync(new URL(dir, import.meta.url)).filter(name => name.endsWith('.mjs')).map(name => new URL(`${dir}${name}`, import.meta.url));
 const files = [
     ...inside('./page/'),
-    ...inside('./page/support/'),
+    ...inside('./page/support/').filter(url => !url.pathname.endsWith('/late-frame.mjs')),
     ...inside('./real/'),
     ...inside('./real/support/').filter(url => !url.pathname.endsWith('/journey.mjs')),
 ];
