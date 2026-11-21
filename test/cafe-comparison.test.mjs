@@ -1,8 +1,10 @@
 // The numbers under the graph (docs/cafe/DESIGN.md, "The comparison row").
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-import { PHRASES, shotSamples, shotNumbers, valueAt, difference, restCards, liveFrame, liveCards } from '../src/cafe/comparison.js';
+import { PHRASES, shotSamples, shotNumbers, firstDrip, valueAt, difference, restCards, liveFrame, liveCards } from '../src/cafe/comparison.js';
+import { isUnfinished } from '../src/cafe/shot-model.js';
 
 const at = seconds => new Date(Date.UTC(2026, 0, 1, 8, 0, 0) + seconds * 1000).toISOString();
 const sample = (seconds, substate, machine = {}, scale = undefined) => ({
@@ -11,7 +13,8 @@ const sample = (seconds, substate, machine = {}, scale = undefined) => ({
 });
 
 // Ten seconds of Preheat, with a heater test at 11 bar and a cup on the scale,
-// then a 30 s Shot: first drip at 6 s, a peak of 9.1 bar, 36.4 g out.
+// then a 30 s Shot: first drip at 3.5 s, as the rise to 1 g began, a peak of
+// 9.1 bar, 36.4 g out.
 const measurements = () => [
     sample(0, 'preparingForShot', { pressure: 11, flow: 6 }, { weight: 40 }),
     sample(10, 'preparingForShot', { pressure: 2 }, { weight: 40 }),
@@ -63,7 +66,7 @@ test('a sample the machine did not time is no sample, though it ends the Preheat
 test('time, first drip and peak pressure leave out the Preheat', () => {
     const numbers = shotNumbers(shot());
     assert.equal(numbers.time, 30);
-    assert.equal(numbers.firstDrip, 6, 'the first reading of 1 g or more after the Preheat, not the cup weighed during it');
+    assert.equal(numbers.firstDrip, 3.5, 'the first reading of 0.2 g or more in the rise to 1 g after the Preheat, not the cup weighed during it');
     assert.equal(numbers.peak, 9.1, 'not the heater test\'s 11 bar');
 });
 
@@ -72,8 +75,76 @@ test('first drip is null for a Shot whose scale never read 1 g, as with no scale
     assert.equal(shotNumbers(shot({ measurements: none })).firstDrip, null);
     const under = measurements().map(m => ({ ...m, scale: { weight: 0.9 } }));
     assert.equal(shotNumbers(shot({ measurements: under })).firstDrip, null);
-    const exactly = [sample(0, 'preinfusion', {}, { weight: 0.99 }), sample(2, 'pouring', {}, { weight: 1 })];
-    assert.equal(shotNumbers(shot({ measurements: exactly })).firstDrip, 2);
+    const exactly = [sample(0, 'preinfusion', {}, { weight: 0 }), sample(2, 'pouring', {}, { weight: 1 })];
+    assert.equal(shotNumbers(shot({ measurements: exactly })).firstDrip, 2, 'a reading of exactly 1 g is the rise');
+});
+
+// When coffee first reached the cup, and whether a Shot is Unfinished: Decent
+// Sync's own cases for its rule (loganfuller/decent-sync#609), copied unchanged
+// from its protocol/test/fixtures/first-drip-cases.json (decent-sync 6b079cc1, PR #612),
+// so a tablet and its server answer the same Shots alike. Each is recorded as
+// Decaid records a Shot, as Decent Sync's test records it: its Preheat in
+// `preparingForShot`, then its profile's samples, in `pouring` from the second
+// where it poured, a weight of null being a sample with no scale reading.
+const { cases: FIRST_DRIP_CASES } = JSON.parse(readFileSync(new URL('./fixtures/first-drip-cases.json', import.meta.url), 'utf8'));
+
+const recorded = ({ preheat, samples, poured }) => {
+    const reading = weight => (weight === null ? undefined : { weight });
+    return [
+        ...preheat.map(([seconds, weight]) => sample(seconds, 'preparingForShot', {}, reading(weight))),
+        ...samples.map(([seconds, weight], n) => sample(seconds, poured && n > 0 ? 'pouring' : 'preinfusion', {}, reading(weight))),
+    ];
+};
+
+test('first drip and Unfinished: Decent Sync\'s cases for its rule, with its answers', () => {
+    assert.ok(FIRST_DRIP_CASES.length > 0);
+    for (const { name, samples, firstDrip: expected, unfinished, ...rest } of FIRST_DRIP_CASES) {
+        const measurements = recorded({ samples, ...rest });
+        assert.deepEqual(shotSamples(measurements).map(entry => entry.seconds), samples.map(([seconds]) => seconds), `${name}: the samples after the Preheat`);
+        assert.equal(firstDrip(shotSamples(measurements)), expected, name);
+        assert.equal(shotNumbers(shot({ measurements })).firstDrip, expected, `${name}: on the card`);
+        assert.equal(isUnfinished({ measurements }), unfinished, `${name}: Unfinished`);
+    }
+});
+
+// Cases Decent Sync's table has no row for, each `[name, [[seconds, weight], ...], first drip]`
+// over a Shot's samples after its Preheat.
+const MORE_FIRST_DRIP_CASES = [
+    ['0.2 g is coffee in the cup, 0.19 g is not',
+        [[0, 0], [1, 0.1], [2, 0.19], [3, 0.2], [4, 1]], 3],
+    ['no reading of zero or less before the rise: from the first sample',
+        [[0, 0.1], [1, 0.3], [2, 1]], 1],
+    ['the rise itself where it jumps straight to 1 g',
+        [[0, 0], [1, 0], [2, 1.4]], 2],
+    ['the tare landing just under a gram within its first 2 s',
+        [[0, 18.2], [1.9, 0.4], [3, 0], [4, 0.2], [5, 1]], 4],
+    ['a cup taken off after the tare could land is not a cup weighed before it',
+        [[0, 18.2], [1, 18.2], [2.5, 0], [4, 0.3], [5, 1.5]], 0],
+    ['the tare lands at the first reading under 1 g after the cup\'s, past a sample with no reading between them',
+        [[0, 18.2], [0.5, null], [1, 0], [3, 0], [4, 0.3], [5, 1.2]], 4],
+    ['only readings count towards the tare\'s 2 s, as a sample with no reading timed out of order ends nothing',
+        [[0, 18.2], [2.5, null], [1.5, 0], [3, 0], [4, 0.3], [5, 1.2]], 4],
+];
+
+test('first drip: more cases of the rule', () => {
+    for (const [name, readings, expected] of MORE_FIRST_DRIP_CASES) {
+        const samples = readings.map(([seconds, weight]) => ({ seconds, weight }));
+        assert.equal(firstDrip(samples), expected, name);
+    }
+    assert.equal(firstDrip([]), null);
+    assert.equal(firstDrip(undefined), null);
+});
+
+test('a Shot\'s first drip is read from its samples after the Preheat', () => {
+    const creep = [
+        sample(0, 'preparingForShot', {}, { weight: 18 }),
+        sample(5, 'preinfusion', {}, { weight: 0 }),
+        sample(7, 'preinfusion', {}, { weight: 0.1 }),
+        sample(9, 'preinfusion', {}, { weight: 0.3 }),
+        sample(12, 'preinfusion', {}, { weight: 0.8 }),
+        sample(14, 'pouring', {}, { weight: 1.1 }),
+    ];
+    assert.equal(shotNumbers(shot({ measurements: creep })).firstDrip, 4);
 });
 
 test('the dose is the one the Shot weighed, or its Workflow\'s where it weighed none', () => {
@@ -169,7 +240,7 @@ test('in Reference: five cards, each beside the reference\'s with the difference
     const cards = restCards({ view: 'reference', shot: shotNumbers(shot()), reference: reference() });
     assert.deepEqual(brief(cards), [
         ['time', '30.0 s', PHRASES.ref, '27.9 s', '+2.1 s'],
-        ['firstDrip', '6.0 s', PHRASES.ref, '6.5 s', '−0.5 s'],
+        ['firstDrip', '3.5 s', PHRASES.ref, '6.5 s', '−3.0 s'],
         ['yield', '36.4 g', PHRASES.ref, '35.1 g', '+1.3 g'],
         ['ratio', '1:2.01', PHRASES.ref, '1:1.95', '+0.06'],
         ['peak', '9.1 bar', PHRASES.ref, '8.8 bar', '+0.3 bar'],
@@ -227,7 +298,7 @@ test('before the Shot was read the cards say nothing beside their dashes', () =>
 test('in Targets: time with first drip, dose, yield and ratio against what was set, and the peak alone', () => {
     const cards = restCards({ view: 'targets', shot: shotNumbers(shot()), reference: reference() });
     assert.deepEqual(brief(cards), [
-        ['time', '30.0 s', PHRASES.firstDripAt, '6.0 s', ''],
+        ['time', '30.0 s', PHRASES.firstDripAt, '3.5 s', ''],
         ['dose', '18.1 g', PHRASES.target, '18.0 g', '+0.1 g'],
         ['yield', '36.4 g', PHRASES.target, '36.0 g', '+0.4 g'],
         ['ratio', '1:2.01', PHRASES.target, '1:2.00', '+0.01'],

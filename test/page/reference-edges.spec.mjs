@@ -277,6 +277,10 @@ test.describe('the row with every number in it, on the real pour', { tag: '@refe
             expect(theirs[key], `the reference has its ${key}`).not.toBeNull();
         }
         expect(mine.yield, 'the real scale\'s yield').toBe(recording(REAL_POUR).shot.annotations.actualYield);
+        // The real scale creeps from 0.1 g at about 12.9 s; its last 0 g before
+        // the rise to 1 g is at 13.1 s, and its first 0.2 g after that at 14.19 s,
+        // where the first reading of 1 g is at 20.6 s (#98).
+        expect(mine.firstDrip, 'the real scale\'s first drip: its first 0.2 g in the rise to 1 g').toBe(14.191);
         let full = await row(page);
         expect(keys(full)).toBe(REST_REFERENCE);
         expect(full.cards.map(entry => entry.value), 'the Shot\'s own numbers').toEqual(full.cards.map(entry => shown(mine[entry.key], REST_KINDS[entry.key])));
