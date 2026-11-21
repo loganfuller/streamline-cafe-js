@@ -3,12 +3,10 @@
 // (docs/cafe/DESIGN.md, "Shots and the reference"). No browser global is touched.
 import { createPourPhaseTracker, createScaleFlowResolver, hasMachineGFlow, isPourPhase } from '../modules/historical-gflow.js';
 import { recipeName } from './strip-model.js';
+import { firstDrip, shotSamples } from './comparison.js';
 
 /** How many of the tablet's newest Shots a recipe's latest is looked for among. */
 export const LATEST_WINDOW = 100;
-
-/** The least the scale reads, in grams, once coffee has reached the cup. */
-const FIRST_DRIP_GRAMS = 1;
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
 
@@ -32,11 +30,12 @@ export function shotsWithRecipe(rows, recipeId) {
 
 /**
  * Is this an Unfinished Shot? The machine never reached pouring and the scale
- * never read 1 g. It is Decent Sync's rule, worked out here from the Shot's own
- * record: no sample is in the `pouring` substate, and no sample after the
- * Preheat, the leading samples in `preparingForShot`, has a weight of 1 g or
- * more. Both are needed: a shot stopped on weight inside a long preinfusion
- * never reports pouring, though it ran whole.
+ * shows no first drip. It is Decent Sync's rule, worked out here from the
+ * Shot's own record: no sample is in the `pouring` substate, and the Shot's
+ * samples after its Preheat have no first drip (`firstDrip`), which needs the
+ * scale to read 1 g once past a cup weighed before Decaid's tare landed. Both
+ * are needed: a shot stopped on weight inside a long preinfusion never reports
+ * pouring, though it ran whole.
  *
  * The details are Decent Sync's too (`timedSamples` in its protocol package),
  * so a tablet and its server call the same Shots Unfinished: the Preheat ends
@@ -45,17 +44,9 @@ export function shotsWithRecipe(rows, recipeId) {
  */
 export function isUnfinished(shot) {
     const samples = Array.isArray(shot?.measurements) ? shot.measurements : [];
-    let preheat = true;
-    for (const sample of samples) {
-        const substate = sample?.machine?.state?.substate;
-        if (preheat && substate !== 'preparingForShot') preheat = false;
-        // A sample the machine did not time is no sample, past ending the Preheat.
-        if (Number.isNaN(new Date(sample?.machine?.timestamp).getTime())) continue;
-        if (substate === 'pouring') return false;
-        const weight = sample?.scale?.weight;
-        if (!preheat && typeof weight === 'number' && weight >= FIRST_DRIP_GRAMS) return false;
-    }
-    return true;
+    // A sample the machine did not time is no sample.
+    const poured = samples.some(sample => sample?.machine?.state?.substate === 'pouring' && !Number.isNaN(new Date(sample?.machine?.timestamp).getTime()));
+    return !poured && firstDrip(shotSamples(samples)) === null;
 }
 
 // The chart's own smoothing for a weight flow worked out from raw weights

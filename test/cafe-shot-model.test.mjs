@@ -41,7 +41,7 @@ test('the Shots pulled with a recipe keep the list\'s order', () => {
     assert.deepEqual(shotsWithRecipe(undefined, 'r1'), []);
 });
 
-test('an Unfinished Shot never reached pouring and never read 1 g', () => {
+test('an Unfinished Shot never reached pouring and has no first drip', () => {
     const preheat = [sample(0, 'preparingForShot'), sample(1, 'preparingForShot')];
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: 0.4 })] }), true, 'stopped early in preinfusion');
     assert.equal(isUnfinished({ measurements: preheat }), true, 'stopped in its Preheat');
@@ -50,6 +50,12 @@ test('an Unfinished Shot never reached pouring and never read 1 g', () => {
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion'), sample(3, 'pouring')] }), false, 'it poured');
     assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: 1 })] }), false, 'stopped on weight inside preinfusion: it ran whole');
     assert.equal(isUnfinished({ measurements: [sample(0, 'preparingForShot', { weight: 30 }), sample(1, 'preinfusion', { weight: 0.2 })] }), true, 'a cup on the scale during Preheat is not a first drip');
+    // A cup weighed before Decaid's tare landed is no first drip (Decent Sync's #609).
+    const cup = [...preheat, sample(2, 'preinfusion', { weight: 18 }), sample(2.5, 'preinfusion', { weight: 0 }), sample(4, 'preinfusion', { weight: 0.6 })];
+    assert.equal(isUnfinished({ measurements: cup }), true, 'a cup weighed before the tare landed, and nothing poured');
+    assert.equal(isUnfinished({ measurements: [...cup, sample(6, 'preinfusion', { weight: 1 })] }), false, 'a cup weighed before the tare landed, then a rise to 1 g');
+    assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: 18 }), sample(4, 'preinfusion', { weight: 18 })] }), false, 'a cup on the scale throughout, never tared, as before');
+    assert.equal(isUnfinished({ measurements: [...preheat, sample(2, 'preinfusion', { weight: 0.3 }), sample(3, 'preinfusion', { weight: 0.9 })] }), true, 'readings under 1 g are no first drip');
     // As Decent Sync reads a record: a sample with no machine reading ends the
     // Preheat, and its own weight is not counted, having no time on the machine's clock.
     assert.equal(isUnfinished({ measurements: [...preheat, { scale: { timestamp: at(2), weight: 5 } }] }), true, 'a weight on a sample the machine did not time is no reading');

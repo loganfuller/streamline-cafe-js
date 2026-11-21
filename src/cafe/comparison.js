@@ -10,8 +10,14 @@
 // nothing in the Preheat counts.
 import { hasMachineGFlow } from '../modules/historical-gflow.js';
 
-/** The least the scale reads, in grams, once coffee has reached the cup. */
-const FIRST_DRIP_GRAMS = 1;
+/** The scale's reading, in grams, that a rise must reach for coffee to have reached the cup. */
+const RISE_GRAMS = 1;
+
+/** The least reading, in grams, two counts of the scales' 0.1 g, that is coffee in the cup. */
+const DRIP_GRAMS = 0.2;
+
+/** The seconds after the profile starts in which Decaid's tare may still land. */
+const TARE_LANDS = 2;
 
 const NONE = '—';
 const MINUS = '−';
@@ -83,10 +89,66 @@ export function shotSamples(measurements) {
 }
 
 /**
+ * The index of the first sample (of `shotSamples`) the scale read after the
+ * tare Decaid sends as the profile starts, without waiting for it: past a cup
+ * weighed before the tare landed, a reading of 1 g or more in the first
+ * TARE_LANDS seconds after which the scale reads under 1 g within them. It is
+ * Decent Sync's `tareLanded`.
+ */
+function tareLanded(samples) {
+    let weighed = false;
+    let landed = 0;
+    for (let n = 0; n < samples.length && samples[n].seconds <= TARE_LANDS; n++) {
+        const weight = samples[n].weight;
+        if (weight === null) continue;
+        if (weight >= RISE_GRAMS) weighed = true;
+        else if (weighed) landed = n;
+    }
+    return landed;
+}
+
+/**
+ * When a Shot's coffee first reached the cup, as its scale shows it, in
+ * seconds from the start of its profile, or null: Decent Sync's time to first
+ * drip (loganfuller/decent-sync#609). Read from `samples`, a Shot's samples
+ * after its Preheat (`shotSamples`), passing over a sample with no scale
+ * reading:
+ *
+ * 1. A cup weighed before Decaid's tare landed is left out (`tareLanded`).
+ * 2. The scale's first reading of 1 g or more is found. A Shot with none, as
+ *    one with no scale, has no first drip.
+ * 3. From it, back to the scale's last reading of zero or less, or to the
+ *    first sample where there is none.
+ * 4. The first drip is the first reading of 0.2 g or more after that.
+ *
+ * So a reading that comes and goes back to zero before the rise is never the
+ * first drip, and a Shot whose scale never read 1 g has none.
+ */
+export function firstDrip(samples) {
+    const list = Array.isArray(samples) ? samples : [];
+    const from = tareLanded(list);
+    const rise = list.findIndex((sample, n) => n >= from && sample.weight !== null && sample.weight >= RISE_GRAMS);
+    if (rise === -1) return null;
+    let start = from;
+    for (let n = rise - 1; n >= from; n--) {
+        const weight = list[n].weight;
+        if (weight !== null && weight <= 0) {
+            start = n + 1;
+            break;
+        }
+    }
+    for (let n = start; n <= rise; n++) {
+        const weight = list[n].weight;
+        if (weight !== null && weight >= DRIP_GRAMS) return list[n].seconds;
+    }
+    return list[rise].seconds;
+}
+
+/**
  * A finished Shot's numbers, each null where the Shot did not record it.
  *
  * - `time`: how long its profile ran, in seconds: to its last sample.
- * - `firstDrip`: the seconds at which the scale first read 1 g or more.
+ * - `firstDrip`: when coffee first reached the cup (`firstDrip`).
  * - `peak`: its highest pressure, in bar.
  * - `yield`: what it weighed out, in grams, or the scale's last reading where
  *   the Shot kept none.
@@ -102,7 +164,7 @@ export function shotNumbers(shot) {
     if (!shot) return null;
     const samples = shotSamples(shot.measurements);
     const last = samples[samples.length - 1];
-    const firstDrip = samples.find(sample => sample.weight !== null && sample.weight >= FIRST_DRIP_GRAMS);
+    const dripped = firstDrip(samples);
     const pressures = samples.map(sample => sample.pressure).filter(value => value !== null);
     const weights = samples.filter(sample => sample.weight !== null);
     const weighed = weights[weights.length - 1];
@@ -116,7 +178,7 @@ export function shotNumbers(shot) {
     const yielded = positive(shot.annotations?.actualYield) ?? positive(weighed?.weight);
     return {
         time: last ? last.seconds : null,
-        firstDrip: firstDrip ? firstDrip.seconds : null,
+        firstDrip: dripped,
         peak: pressures.length ? Math.max(...pressures) : null,
         yield: yielded,
         weighedDose,

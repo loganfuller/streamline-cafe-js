@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PHRASES, shotSamples, shotNumbers, valueAt, difference, restCards, liveFrame, liveCards } from '../src/cafe/comparison.js';
+import { PHRASES, shotSamples, shotNumbers, firstDrip, valueAt, difference, restCards, liveFrame, liveCards } from '../src/cafe/comparison.js';
 
 const at = seconds => new Date(Date.UTC(2026, 0, 1, 8, 0, 0) + seconds * 1000).toISOString();
 const sample = (seconds, substate, machine = {}, scale = undefined) => ({
@@ -11,7 +11,8 @@ const sample = (seconds, substate, machine = {}, scale = undefined) => ({
 });
 
 // Ten seconds of Preheat, with a heater test at 11 bar and a cup on the scale,
-// then a 30 s Shot: first drip at 6 s, a peak of 9.1 bar, 36.4 g out.
+// then a 30 s Shot: first drip at 3.5 s, as the rise to 1 g began, a peak of
+// 9.1 bar, 36.4 g out.
 const measurements = () => [
     sample(0, 'preparingForShot', { pressure: 11, flow: 6 }, { weight: 40 }),
     sample(10, 'preparingForShot', { pressure: 2 }, { weight: 40 }),
@@ -63,7 +64,7 @@ test('a sample the machine did not time is no sample, though it ends the Preheat
 test('time, first drip and peak pressure leave out the Preheat', () => {
     const numbers = shotNumbers(shot());
     assert.equal(numbers.time, 30);
-    assert.equal(numbers.firstDrip, 6, 'the first reading of 1 g or more after the Preheat, not the cup weighed during it');
+    assert.equal(numbers.firstDrip, 3.5, 'the first reading of 0.2 g or more in the rise to 1 g after the Preheat, not the cup weighed during it');
     assert.equal(numbers.peak, 9.1, 'not the heater test\'s 11 bar');
 });
 
@@ -72,8 +73,65 @@ test('first drip is null for a Shot whose scale never read 1 g, as with no scale
     assert.equal(shotNumbers(shot({ measurements: none })).firstDrip, null);
     const under = measurements().map(m => ({ ...m, scale: { weight: 0.9 } }));
     assert.equal(shotNumbers(shot({ measurements: under })).firstDrip, null);
-    const exactly = [sample(0, 'preinfusion', {}, { weight: 0.99 }), sample(2, 'pouring', {}, { weight: 1 })];
-    assert.equal(shotNumbers(shot({ measurements: exactly })).firstDrip, 2);
+    const exactly = [sample(0, 'preinfusion', {}, { weight: 0 }), sample(2, 'pouring', {}, { weight: 1 })];
+    assert.equal(shotNumbers(shot({ measurements: exactly })).firstDrip, 2, 'a reading of exactly 1 g is the rise');
+});
+
+// When coffee first reached the cup: Decent Sync's rule (loganfuller/decent-sync#609),
+// each case as `[name, [[seconds, weight], ...], first drip]` over a Shot's
+// samples after its Preheat, a weight of null being a sample with no reading.
+const FIRST_DRIP_CASES = [
+    ['a weight that creeps from 0.1 g to 1 g: its first reading of 0.2 g or more',
+        [[0, 0], [1, 0.1], [2, 0.1], [3, 0.2], [4, 0.4], [5, 0.7], [6, 1]], 3],
+    ['a reading of 0.2 g or more that goes back to zero before the rise is not the first drip',
+        [[0, 0], [1, 0.3], [2, 0], [3, 0.1], [5, 0.2], [6, 1.2]], 5],
+    ['a reading under zero is zero or less too',
+        [[0, 0], [1, 0.3], [2, -0.1], [3, 0.2], [4, 1]], 3],
+    ['0.2 g is coffee in the cup, 0.1 g is not',
+        [[0, 0], [1, 0.1], [2, 0.19], [3, 0.2], [4, 1]], 3],
+    ['no reading of zero or less before the rise: from the first sample',
+        [[0, 0.1], [1, 0.3], [2, 1]], 1],
+    ['the rise itself where it jumps straight to 1 g',
+        [[0, 0], [1, 0], [2, 1.4]], 2],
+    ['a sample with no scale reading is passed over',
+        [[0, 0], [1, null], [2, 0.3], [3, null], [4, 1.1]], 2],
+    ['a scale that never reads 1 g has no first drip, whatever smaller readings it has',
+        [[0, 0], [1, 0.5], [2, 0.9], [3, 0.3]], null],
+    ['no scale has no first drip',
+        [[0, null], [1, null], [2, null]], null],
+    ['a cup weighed before the tare landed: the first drip is in the rise after the tare',
+        [[0, 18.2], [0.5, 18.1], [1, 0], [3, 0], [4, 0.3], [5, 1.5]], 4],
+    ['the tare landing just under a gram within its first 2 s',
+        [[0, 18.2], [1.9, 0.4], [3, 0], [4, 0.2], [5, 1]], 4],
+    ['a cup on the scale throughout, never tared, reads as before',
+        [[0, 18.2], [1, 18.2], [3, 18.4], [10, 25]], 0],
+    ['a cup taken off after the tare could land is not a cup weighed before it',
+        [[0, 18.2], [1, 18.2], [2.5, 0], [4, 0.3], [5, 1.5]], 0],
+    ['known limit: a scale that settles a little under 1 g within the first second reads as a first drip then',
+        [[0, 0], [0.4, 0.9], [3, 0.9], [6, 0.9], [6.4, 1]], 0.4],
+    ['known limit: a scale that reads zero again partway through has its first drip in the rise after that zero',
+        [[0, 0], [2, 0.4], [3, 0.6], [4, 0], [5, 0.3], [6, 1.2]], 5],
+];
+
+test('first drip: when coffee first reached the cup, by Decent Sync\'s rule', () => {
+    for (const [name, readings, expected] of FIRST_DRIP_CASES) {
+        const samples = readings.map(([seconds, weight]) => ({ seconds, weight }));
+        assert.equal(firstDrip(samples), expected, name);
+    }
+    assert.equal(firstDrip([]), null);
+    assert.equal(firstDrip(undefined), null);
+});
+
+test('a Shot\'s first drip is read from its samples after the Preheat', () => {
+    const creep = [
+        sample(0, 'preparingForShot', {}, { weight: 18 }),
+        sample(5, 'preinfusion', {}, { weight: 0 }),
+        sample(7, 'preinfusion', {}, { weight: 0.1 }),
+        sample(9, 'preinfusion', {}, { weight: 0.3 }),
+        sample(12, 'preinfusion', {}, { weight: 0.8 }),
+        sample(14, 'pouring', {}, { weight: 1.1 }),
+    ];
+    assert.equal(shotNumbers(shot({ measurements: creep })).firstDrip, 4);
 });
 
 test('the dose is the one the Shot weighed, or its Workflow\'s where it weighed none', () => {
@@ -169,7 +227,7 @@ test('in Reference: five cards, each beside the reference\'s with the difference
     const cards = restCards({ view: 'reference', shot: shotNumbers(shot()), reference: reference() });
     assert.deepEqual(brief(cards), [
         ['time', '30.0 s', PHRASES.ref, '27.9 s', '+2.1 s'],
-        ['firstDrip', '6.0 s', PHRASES.ref, '6.5 s', '−0.5 s'],
+        ['firstDrip', '3.5 s', PHRASES.ref, '6.5 s', '−3.0 s'],
         ['yield', '36.4 g', PHRASES.ref, '35.1 g', '+1.3 g'],
         ['ratio', '1:2.01', PHRASES.ref, '1:1.95', '+0.06'],
         ['peak', '9.1 bar', PHRASES.ref, '8.8 bar', '+0.3 bar'],
@@ -227,7 +285,7 @@ test('before the Shot was read the cards say nothing beside their dashes', () =>
 test('in Targets: time with first drip, dose, yield and ratio against what was set, and the peak alone', () => {
     const cards = restCards({ view: 'targets', shot: shotNumbers(shot()), reference: reference() });
     assert.deepEqual(brief(cards), [
-        ['time', '30.0 s', PHRASES.firstDripAt, '6.0 s', ''],
+        ['time', '30.0 s', PHRASES.firstDripAt, '3.5 s', ''],
         ['dose', '18.1 g', PHRASES.target, '18.0 g', '+0.1 g'],
         ['yield', '36.4 g', PHRASES.target, '36.0 g', '+0.4 g'],
         ['ratio', '1:2.01', PHRASES.target, '1:2.00', '+0.01'],
