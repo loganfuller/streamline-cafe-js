@@ -63,5 +63,8 @@ test('the release workflow builds only under the cafe ids', () => {
     assert.match(release, /\.id == "streamline-cafe\.js" or \.id == "streamline-cafe\.js-dist"/);
     // The main build looks itself up by its own id, and its stamp has no second "-".
     assert.match(release, /SKIN_ID = 'streamline-cafe\.js-dist'/);
+    // Streamline stamps its own dist id on the same line from v0.2.29; kept
+    // beside the fork's after a merge, it would run second and win.
+    assert.doesNotMatch(release, /SKIN_ID = 'streamline\.js(-dist)?'/);
     assert.match(release, /dev="\$\{base\}\.dev\./);
 });

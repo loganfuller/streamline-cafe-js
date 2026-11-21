@@ -110,7 +110,7 @@ The capture listens to the sockets the recorder listens to and waits for a shot 
 
 ## The real stack
 
-The pins are in `fake-decaid/pins.json`: Decaid v0.9.2, DYE2 v0.1.42, Decent Sync v1.11.1, Streamline v0.2.28, each with the checksum of the release file the recorder downloads (Decent Sync's server by its published image). A bump is a pull request of its own, which records everything again and fixes what the replay then reports.
+The pins are in `fake-decaid/pins.json`: Decaid v0.9.2, DYE2 v0.1.42, Decent Sync v1.11.1, Streamline v0.2.31, each with the checksum of the release file the recorder downloads (Decent Sync's server by its published image). A bump is a pull request of its own, which records everything again and fixes what the replay then reports.
 
 **Recording.** It needs Docker and network access to GitHub and ghcr.io, and takes about eight minutes:
 
