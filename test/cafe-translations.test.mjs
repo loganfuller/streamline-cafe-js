@@ -137,7 +137,8 @@ test('the test reads Streamline\'s file as Streamline does', () => {
     const { table } = parseTranslationColumn(CSV, 'de');
     assert.equal(streamlineCells('Settings', 'de'), table.Settings);
     assert.equal(streamlineCells('roasted', 'de'), table.Roasted);
-    assert.equal(streamlineCells('Clock', 'ar'), '', 'the gap this table fills for Clock');
+    assert.equal(streamlineCells('Clock', 'arb'), '', 'the gap this table fills for Clock');
+    assert.notEqual(streamlineCells('Clock', 'ar'), '', 'which Streamline fills in every other language');
 });
 
 test('every phrase the cafe page shows has every finished language', () => {
@@ -222,8 +223,9 @@ test('a lookup tries the table, then Streamline, then English', () => {
     assert.equal(cafeTranslation('Dose', 'de', streamline), 'Dosis');
     assert.equal(cafeTranslation('Something new', 'de', streamline), 'Something new');
     assert.equal(cafeTranslation('Hold to add', 'en', streamline), 'Hold to add');
-    // Clock is here only for the languages Streamline has not filled in.
-    assert.equal(cafeTranslation('Clock', 'he', key => key), CAFE_TRANSLATIONS.Clock.he);
+    // Clock is here only for the one language Streamline has not filled in.
+    assert.equal(cafeTranslation('Clock', 'arb', key => key), CAFE_TRANSLATIONS.Clock.arb);
+    assert.equal(cafeTranslation('Clock', 'he', () => 'שעון'), 'שעון');
     assert.equal(cafeTranslation('Clock', 'de', () => 'Uhr'), 'Uhr');
 });
 

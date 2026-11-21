@@ -3,10 +3,11 @@
 //
 // English is the key, as in Streamline. A lookup tries this table, then
 // Streamline's translation file, then English. Streamline's file is not edited:
-// it is overwritten from a spreadsheet upstream. So this table holds only what
+// it is Streamline's, and each adoption brings its newer one. So this table holds only what
 // that file lacks: a phrase Streamline already translates is left to it, and
-// `Clock`, `Last shot` and `Machine` are here for the four languages Streamline
-// has not filled in.
+// `Clock`, `Last shot`, `Machine` and `Name` are here for `arb` alone, the one
+// column Streamline (from v0.2.29) has not filled in for them, each derived
+// from Streamline's own `ar`.
 //
 // The languages are Streamline's codes. Every phrase has each language
 // Streamline has finished, and test/cafe-translations.test.mjs fails when one
@@ -705,10 +706,7 @@ export const CAFE_TRANSLATIONS = {
     },
     "Clock": {
         machine: true,
-        ar: "الساعة",
         arb: "ﺔﻋﺎﺴﻟﺍ",
-        he: "שעון",
-        heb: "ןועש",
     },
     "Live shot": {
         machine: true,
@@ -732,10 +730,7 @@ export const CAFE_TRANSLATIONS = {
     },
     "Last shot": {
         machine: true,
-        ar: "آخر رشفة",
-        arb: "ﺔﻔﺷﺭ ﺮﺧﺁ",
-        he: "החליטה האחרונה",
-        heb: "הנורחאה הטילחה",
+        arb: "ﺝﺍﺮﺨﺘﺳﺍ ﺮﺧﺁ",
     },
     "Reference": {
         machine: true,
@@ -1899,10 +1894,7 @@ export const CAFE_TRANSLATIONS = {
     },
     "Machine": {
         machine: true,
-        ar: "الآلة",
-        arb: "ﺔﻟﻵﺍ",
-        he: "מכונה",
-        heb: "הנוכמ",
+        arb: "ﺔﻨﻴﻛﺎﻤﻟﺍ",
     },
     "In use": {
         machine: true,
@@ -2766,10 +2758,7 @@ export const CAFE_TRANSLATIONS = {
     },
     "Name": {
         machine: true,
-        ar: "الاسم",
         arb: "ﻢﺳﻻﺍ",
-        he: "שם",
-        heb: "םש",
     },
     "This profile has no description.": {
         machine: true,

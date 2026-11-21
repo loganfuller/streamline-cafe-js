@@ -544,7 +544,7 @@ Streamline unloads the recipe on every profile switch, and DYE2 unloads a recipe
 
 The screen's new text covers the languages Streamline supports.
 
-- New strings live in the fork's own table, `src/cafe/translations.js`, with Streamline's language codes. A lookup tries that table, then Streamline's translation file, then English. Streamline's file is not edited: it is overwritten from a spreadsheet upstream.
+- New strings live in the fork's own table, `src/cafe/translations.js`, with Streamline's language codes. A lookup tries that table, then Streamline's translation file, then English. Streamline's file is not edited: it is Streamline's own, and each adoption brings its newer one, which may fill a gap the table was covering (the test below then says which entries to take out).
 - Where Streamline already has the same English text, its translation is used, and the table holds only what Streamline's file lacks.
 - New phrases are machine-translated and marked so, entry by entry. Corrections are welcome as pull requests.
 - Arabic and Hebrew are translated, and the layout stays left to right. Streamline has no right-to-left layout, and mirroring one page would make it the only screen that flips. Streamline also carries each of the two a second time, `arb` and `heb`, with the letters in the order a renderer with no right-to-left support draws them. The table follows it, so those two read the same across the page.
