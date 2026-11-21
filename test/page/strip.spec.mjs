@@ -96,24 +96,6 @@ const showing = (record, roasted) => {
     };
 };
 
-/**
- * The Workflow a record loaded alone leaves: the record's own Workflow whole,
- * with only what Streamline's apply legitimately adds, clears or leaves:
- * - the Workflow's id and names are the machine's;
- * - Streamline's marker names the recipe (DYE2's field flags in the record's
- *   marker are never written to the machine), and the `selection` DYE2 last
- *   mirrored into it stays;
- * - the grinder's rpm and feed rate, which the record names none of, are
- *   cleared (src/modules/workflow-fields.js, `clearInheritedFields`);
- * - each step's limiter at 0 is written as none (src/modules/api.js, the step
- *   sanitising before a Workflow write);
- * - the steam, the hot water and the flush are written whole, each setting
- *   from the record's dashboard value of it: the steam's temperature, time,
- *   flow and stop, and the flush's temperature, time and flow
- *   (src/modules/dyeStrip.js, `mergeRecipeLiveSettings`, and
- *   src/modules/steam-mode.js, `recipeSteamPatch`, from Streamline v0.2.29;
- *   before, the steam's stop and the flush's time alone).
- */
 function workflowOf(record, machine) {
     const { extras, ...context } = record.workflow.context;
     const { dye, ...rest } = extras;
@@ -135,13 +117,6 @@ function workflowOf(record, machine) {
     };
 }
 
-/**
- * A record given hot water, steam and flush settings of its own, every one.
- * The sample records hold the machine's (`matchMachine`), so a load that wrote
- * none of them would leave the Workflow as `workflowOf` expects it. Written in
- * both the record's dashboard values, which Streamline's apply writes, and its
- * own Workflow, so DYE2 does not call the recipe changed.
- */
 function ownLiveSettings(fake, name) {
     const machine = fake.workflow();
     const water = { volume: machine.hotWaterData.volume + 70, targetTemperature: machine.hotWaterData.targetTemperature + 10, duration: machine.hotWaterData.duration + 15, flow: machine.hotWaterData.flow - 2 };

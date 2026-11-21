@@ -215,12 +215,6 @@ test.describe('the long-press menu, and arranging the strip', { tag: '@menu' }, 
             { write: RECORDS, body: [...recordsBefore, made] },
         ]);
         expect(fake.workflow(), 'what the machine is set to did not change: only the recipe named as loaded').toEqual(workflowNaming(workflowBefore, made.id));
-        // DYE2 does not call it changed. Its record takes the flush
-        // temperature from the machine's settings, 25 °C, where the simulated
-        // machine's Workflow starts at 90 °C (dye2-save-recipe.json, where a
-        // recipe made from that Workflow is called changed at once). Here the
-        // load of the single origin has written the recipe's own 25 °C into
-        // the Workflow, as Streamline's apply does from v0.2.29, so the two agree.
         expect(workflowBefore.rinseData.targetTemperature, 'the load wrote the recipe\'s flush temperature').toBe(recordOf(fake, single.name).dashboardVariables.flushTempC);
         expect(fake.selection(), 'DYE2 has the new recipe loaded, and not as changed').toEqual({ kind: 'recipe', id: made.id, modified: false });
         await expect(cardName(page, 8)).toHaveText(name);
@@ -384,8 +378,6 @@ test.describe('the long-press menu, and arranging the strip', { tag: '@menu' }, 
             { write: RECORDS, body: after },
         ]);
         expect(fake.workflow(), 'only the recipe named as loaded changed').toEqual(workflowNaming(workflowBefore, made.id));
-        // Not called changed: the load before it wrote the recipe's own flush
-        // temperature into the Workflow (the test above).
         expect(fake.selection(), 'the new recipe is loaded, and not as changed').toEqual({ kind: 'recipe', id: made.id, modified: false });
         await expect(cardName(page, single.slot)).toHaveText(name);
         await expect(card(page, single.slot)).toHaveAttribute('aria-pressed', 'true');

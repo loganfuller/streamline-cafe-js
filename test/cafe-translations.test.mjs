@@ -223,7 +223,6 @@ test('a lookup tries the table, then Streamline, then English', () => {
     assert.equal(cafeTranslation('Dose', 'de', streamline), 'Dosis');
     assert.equal(cafeTranslation('Something new', 'de', streamline), 'Something new');
     assert.equal(cafeTranslation('Hold to add', 'en', streamline), 'Hold to add');
-    // Clock is here only for the one language Streamline has not filled in.
     assert.equal(cafeTranslation('Clock', 'arb', key => key), CAFE_TRANSLATIONS.Clock.arb);
     assert.equal(cafeTranslation('Clock', 'he', () => 'שעון'), 'שעון');
     assert.equal(cafeTranslation('Clock', 'de', () => 'Uhr'), 'Uhr');

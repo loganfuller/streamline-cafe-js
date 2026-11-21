@@ -436,10 +436,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     // seen asleep, going to sleep or in the first frame of a page opened on it
     // asleep (the hook in api.js). The state is read once at start too, for a
     // sleeping machine that sends no frame; a second clear finds no name and
-    // writes nothing. A hold on Sleep closes Decaid before the clear can run,
-    // and Streamline wakes the machine as Decaid opens again, before the page
-    // starts: the hook in ui.js says that wake happened, and the page clears
-    // the name then.
+    // writes nothing.
     document.addEventListener('streamline:machine-asleep', clearAsleep);
     document.addEventListener('streamline:sleep-exit-return', clearAsleep);
     if (cameBackFromSleepExit()) clearAsleep();

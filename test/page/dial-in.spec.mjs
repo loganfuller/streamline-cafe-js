@@ -148,10 +148,6 @@ test.describe('stepping the dial-in', { tag: '@dialin' }, () => {
         const workflow = fake.workflow();
         expect(loadedId(fake), 'the other recipe is loaded').toBe(other.id);
         expect(workflow.rinseData.duration, 'the flush is the other recipe\'s, not the step').toBe(other.dashboardVariables.flushS);
-        // Streamline's apply writes every steam setting a recipe holds, its
-        // flow among them whatever steam mode it names, and the sample records
-        // name none (src/modules/steam-mode.js, `recipeSteamPatch`, from
-        // v0.2.29; before, only a recipe in flow mode brought its flow).
         expect(other.dashboardVariables.steamMode, 'the other recipe names no steam mode').toBeUndefined();
         expect(workflow.steamSettings.flow, 'the steam flow is the other recipe\'s too, not the step').toBe(other.dashboardVariables.steamFlowMls);
         expect(await number(page, 'flush-value'), 'the page shows the other recipe\'s flush').toBe(other.dashboardVariables.flushS);
