@@ -76,16 +76,15 @@ class Cafe {
      */
     async settle(page = this.page) {
         const deadline = Date.now() + 5000;
-        let sent = 0;
+        const sent = () => page.evaluate(() => window.__cafeFetchesOpen());
         for (;;) {
             if (this.routes.inflight.size === 0) {
                 this.fake.flush();
-                sent = await page.evaluate(() => window.__cafeFetchesOpen());
-                if (sent === 0 && this.routes.inflight.size === 0) return;
+                if (await sent() === 0 && this.routes.inflight.size === 0) return;
             }
             if (Date.now() > deadline) {
                 const answering = [...this.routes.inflight].join(', ') || 'none';
-                throw new Error(`requests still being answered after 5 s: ${answering}; fetches the page has sent and had no answer to: ${sent}`);
+                throw new Error(`requests still being answered after 5 s: ${answering}; fetches the page has sent and had no answer to: ${await sent()}`);
             }
             await new Promise(resolve => setImmediate(resolve));
         }
