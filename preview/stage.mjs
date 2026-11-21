@@ -11,12 +11,15 @@
 // its own.
 
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(import.meta.dirname, '..');
-// What the stand-in starts the fake from (preview/stand-in.js, RECORDINGS).
-const RECORDINGS = ['sample-data', 'boot', 'pour'];
+// What the stand-in starts the fake from, read from its own list
+// (preview/stand-in.js, RECORDINGS), so the two can't drift.
+export const RECORDINGS = JSON.parse(/const RECORDINGS = (\[[^\]]*\]);/.exec(readFileSync(join(ROOT, 'preview', 'stand-in.js'), 'utf8'))[1].replace(/'/g, '"'));
+// The preview's own files the page loads: the stand-in, and the sample cafe it imports.
+export const PREVIEW_FILES = ['stand-in.js', 'sample-cafe.js'];
 const STAND_IN = '<script src="preview/stand-in.js"></script>';
 // The stand-in goes on the line after the import map's: a browser that takes
 // no import map once a module has loaded (the stand-in's import() is one)
@@ -49,13 +52,15 @@ export function stage(out) {
     writeFileSync(join(out, 'skin.html'), skinPage(readFileSync(join(ROOT, 'index.html'), 'utf8')));
     cpSync(join(ROOT, 'src'), join(out, 'src'), { recursive: true });
     mkdirSync(join(out, 'preview'));
-    cpSync(join(ROOT, 'preview', 'stand-in.js'), join(out, 'preview', 'stand-in.js'));
+    for (const file of PREVIEW_FILES) cpSync(join(ROOT, 'preview', file), join(out, 'preview', file));
     mkdirSync(join(out, 'fake-decaid', 'recordings'), { recursive: true });
     for (const file of readdirSync(join(ROOT, 'fake-decaid'))) {
         if (file.endsWith('.js')) cpSync(join(ROOT, 'fake-decaid', file), join(out, 'fake-decaid', file));
     }
     for (const name of RECORDINGS) {
-        cpSync(join(ROOT, 'fake-decaid', 'recordings', `${name}.json`), join(out, 'fake-decaid', 'recordings', `${name}.json`));
+        const to = join(out, 'fake-decaid', 'recordings', `${name}.json`);
+        mkdirSync(dirname(to), { recursive: true });
+        cpSync(join(ROOT, 'fake-decaid', 'recordings', `${name}.json`), to);
     }
     return out;
 }

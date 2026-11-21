@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 import { skinPage, stage } from '../preview/stage.mjs';
 
@@ -86,13 +86,18 @@ test('the Pages site is the preview, staged by its one script', () => {
         assert.deepEqual(readdirSync(out).sort(), ['fake-decaid', 'index.html', 'preview', 'skin.html', 'src']);
         assert.equal(readFileSync(join(out, 'index.html'), 'utf8'), read('preview/index.html'), 'the root is the preview\'s own page');
         assert.equal(readFileSync(join(out, 'skin.html'), 'utf8'), skinPage(read('index.html')));
-        assert.deepEqual(readdirSync(join(out, 'preview')), ['stand-in.js'], 'of the preview, only what the page loads');
+        assert.deepEqual(readdirSync(join(out, 'preview')).sort(), ['sample-cafe.js', 'stand-in.js'], 'of the preview, only what the page loads');
         const recordings = JSON.parse(read('preview/stand-in.js').match(/const RECORDINGS = (\[[^\]]*\]);/)[1].replace(/'/g, '"'));
-        assert.deepEqual(readdirSync(join(out, 'fake-decaid', 'recordings')).sort(), recordings.map(name => `${name}.json`).sort(), 'the recordings the stand-in starts from');
+        const staged = join(out, 'fake-decaid', 'recordings');
+        assert.deepEqual(files(staged).map(path => relative(staged, path).split(sep).join('/')).sort(), recordings.map(name => `${name}.json`).sort(), 'the recordings the stand-in starts from');
         assert.deepEqual(readdirSync(join(out, 'fake-decaid')).filter(name => name !== 'recordings').sort(),
             readdirSync(join(ROOT, 'fake-decaid')).filter(name => name.endsWith('.js')).sort(), 'the fake\'s modules');
         assert.equal(files(join(out, 'src')).length, files(join(ROOT, 'src')).length, 'the skin\'s files as they are');
     } finally {
         rmSync(out, { recursive: true, force: true });
     }
+});
+
+test('the README links to the public preview, at the Pages site\'s root', () => {
+    assert.match(read('README.md').split('\n')[0], /\]\(https:\/\/loganfuller\.github\.io\/streamline-cafe-js\/\)/);
 });

@@ -1,4 +1,6 @@
 // What the page tests and the real journeys read off the page and do on it.
+// The chart's module is found from the page's own address, so a page served
+// under a path, as the public preview is, reads the chart it draws.
 
 import { expect } from './test.mjs';
 
@@ -9,7 +11,7 @@ import { expect } from './test.mjs';
  * (`cafe.pour`).
  */
 export const watchDraws = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
-    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const { echarts } = await import(new URL('src/modules/echarts-streamline.min.js', document.baseURI).href);
     const chart = echarts.getInstanceByDom(document.getElementById(chartId));
     const counts = { appended: 0, full: 0 };
     const { setOption, appendData } = chart;
@@ -115,7 +117,7 @@ export const legend = page => page.evaluate(() => {
 // What a chart holds: each line's name, how many points it has and whether it
 // carries an end label, and where the time axis ends.
 export const chartLines = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
-    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const { echarts } = await import(new URL('src/modules/echarts-streamline.min.js', document.baseURI).href);
     const chart = echarts.getInstanceByDom(document.getElementById(chartId));
     if (!chart) return null;
     const option = chart.getOption();
@@ -151,7 +153,7 @@ export const sides = shown => shown.cards.map(card => card.side);
 
 // The stage lines on a chart, each with the name written on it, or null.
 export const stageNames = (page, id = 'plotly-chart') => page.evaluate(async chartId => {
-    const { echarts } = await import('/src/modules/echarts-streamline.min.js');
+    const { echarts } = await import(new URL('src/modules/echarts-streamline.min.js', document.baseURI).href);
     const chart = echarts.getInstanceByDom(document.getElementById(chartId));
     const markers = chart?.getOption().series.find(series => series && series.id === 'markers-0');
     return (markers?.markLine?.data || []).map(line => (line.label && line.label.show ? line.label.formatter() : null));
