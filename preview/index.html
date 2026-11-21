@@ -57,17 +57,18 @@
         #preview-bar .preview-line { flex: 1 1 100%; color: var(--bar-muted); }
         #preview-notice { color: var(--bar-text); }
         #preview-phone { display: none; }
-        /* A phone in portrait: the frame at the window's width, and a word on why it is small. */
-        @media (orientation: portrait) {
-            #preview-bar #preview-phone { display: block; }
-            #preview-stage { place-items: start center; }
-        }
         #preview-stage {
             flex: 1 1 auto;
             min-height: 0;
             display: grid;
             place-items: center;
             container-type: size;
+        }
+        /* A phone in portrait: the frame at the window's width, at the top, and a word on why it is small.
+           After #preview-stage's own rule, which it overrides. */
+        @media (orientation: portrait) {
+            #preview-bar #preview-phone { display: block; }
+            #preview-stage { place-items: start center; }
         }
         /* The largest 16:10 the space under the bar holds. */
         #preview-skin {

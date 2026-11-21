@@ -339,73 +339,81 @@ async function until(preview, startedAt, ms) {
     if (startedAt + ms > now) await preview.advance(startedAt + ms - now);
 }
 
-test.describe('the pretend machine', { tag: '@preview-cafe' }, () => {
-    test('"Pull a shot" plays the real pour at its own pace through the page\'s live path, and its Shot is stored and drawn as the latest with no tap', async ({ preview }) => {
-        test.slow();
-        const frame = await preview.open();
-        const before = (await preview.read('newestShot')).id;
-        // A socket of the test's own, noting when each of the machine's frames in the shot reaches the page.
-        await frame.evaluate(() => {
-            const seen = window.__espresso = [];
-            const ws = new WebSocket(`ws://${location.hostname}:8080/ws/v1/machine/snapshot`);
-            ws.onmessage = event => { if (JSON.parse(event.data).state?.state === 'espresso') seen.push(Date.now()); };
+// The full pour and a second pull, in both modes: the Shot is stored and
+// drawn as the latest whether Decent Sync serves the machine or not.
+for (const [mode, words] of Object.entries(MODES)) {
+    test.describe(`the pretend machine, ${words}`, { tag: '@preview-cafe' }, () => {
+        test.use({ mode });
+
+        test('"Pull a shot" plays the real pour at its own pace through the page\'s live path, and its Shot is stored and drawn as the latest with no tap', async ({ preview }) => {
+            test.slow();
+            const frame = await preview.open();
+            const before = (await preview.read('newestShot')).id;
+            // A socket of the test's own, noting when each of the machine's frames in the shot reaches the page.
+            await frame.evaluate(() => {
+                const seen = window.__espresso = [];
+                const ws = new WebSocket(`ws://${location.hostname}:8080/ws/v1/machine/snapshot`);
+                ws.onmessage = event => { if (JSON.parse(event.data).state?.state === 'espresso') seen.push(Date.now()); };
+            });
+            await expect(pullButton(preview)).toHaveText('Pull a shot');
+            // The clock held, so only the test's steps move it, to the millisecond.
+            await preview.page.clock.pauseAt(await frame.evaluate(() => Date.now()) + 1000);
+            const startedAt = await pull(preview);
+            await expect(pullButton(preview)).toHaveText('Pouring…');
+
+            await until(preview, startedAt, ESPRESSO_FRAMES[0] + 100);
+            await expect(frame.locator('#main-page'), 'the graph goes live at the Preheat\'s start').toHaveClass(/cafe-shot-live/);
+            await until(preview, startedAt, 30_000);
+            await expect(frame.locator('#cafe-live'), 'the live cards').toBeVisible();
+            expect((await chartLines(frame)).labelled.length, 'the lines named').toBeGreaterThan(0);
+            if (mode === 'served') await preview.screenshot('preview-cafe-pour');
+
+            await until(preview, startedAt, STORE_AT - 100);
+            expect((await preview.read('newestShot')).id, 'not stored before the recorded moment').toBe(before);
+            await expect(pullButton(preview), 'not offered while the pour runs').toBeDisabled();
+            await until(preview, startedAt, STORE_AT + 1000);
+            const stored = await preview.read('newestShot');
+            expect(stored.id, 'stored at the recorded moment').not.toBe(before);
+            expect(stored.workflow.context.extras.dye.recipeId, 'named for the recipe loaded').toBe(HOUSE.id);
+            await preview.advance(3000);
+            const shown = await legend(frame);
+            expect(shown.label).toBe('Latest');
+            expect(shown.when, 'the new Shot drawn as the latest, with no tap').toMatch(/^Today 02:00 PM/);
+            await expect(frame.locator('#main-page')).not.toHaveClass(/cafe-shot-live/);
+            await expect(pullButton(preview)).toBeEnabled();
+
+            const arrived = (await frame.evaluate(() => window.__espresso)).map(at => at - startedAt);
+            expect(arrived.length, 'every frame of the shot').toBe(ESPRESSO_FRAMES.length);
+            const late = arrived.map((at, i) => at - ESPRESSO_FRAMES[i]);
+            expect(Math.min(...late), 'none early').toBeGreaterThanOrEqual(0);
+            expect(Math.max(...late), 'each at the recording\'s own moment, by the page\'s clock').toBeLessThanOrEqual(60);
+            expect(preview.unanswered()).toEqual([]);
         });
-        await expect(pullButton(preview)).toHaveText('Pull a shot');
-        // The clock held, so only the test's steps move it, to the millisecond.
-        await preview.page.clock.pauseAt(await frame.evaluate(() => Date.now()) + 1000);
-        const startedAt = await pull(preview);
-        await expect(pullButton(preview)).toHaveText('Pouring…');
 
-        await until(preview, startedAt, ESPRESSO_FRAMES[0] + 100);
-        await expect(frame.locator('#main-page'), 'the graph goes live at the Preheat\'s start').toHaveClass(/cafe-shot-live/);
-        await until(preview, startedAt, 30_000);
-        await expect(frame.locator('#cafe-live'), 'the live cards').toBeVisible();
-        expect((await chartLines(frame)).labelled.length, 'the lines named').toBeGreaterThan(0);
-        await preview.screenshot('preview-cafe-pour');
+        test('Sleep shows the screensaver and takes the button away; a tap wakes; a second pull works once the first is stored', async ({ preview }) => {
+            test.slow();
+            const frame = await preview.open();
+            await frame.locator('#sleep-button').click();
+            await expect(frame.locator('#screensaver')).toBeVisible();
+            await expect(pullButton(preview), 'not offered while the machine sleeps').toBeDisabled();
+            await frame.locator('#screensaver').click();
+            await expect(frame.locator('#screensaver')).toBeHidden();
+            await expect.poll(() => preview.read('machineState')).toMatchObject({ state: 'idle' });
+            await expect(pullButton(preview)).toBeEnabled();
 
-        await until(preview, startedAt, STORE_AT - 100);
-        expect((await preview.read('newestShot')).id, 'not stored before the recorded moment').toBe(before);
-        await expect(pullButton(preview), 'not offered while the pour runs').toBeDisabled();
-        await until(preview, startedAt, STORE_AT + 1000);
-        const stored = await preview.read('newestShot');
-        expect(stored.id, 'stored at the recorded moment').not.toBe(before);
-        expect(stored.workflow.context.extras.dye.recipeId, 'named for the recipe loaded').toBe(HOUSE.id);
-        await preview.advance(3000);
-        const shown = await legend(frame);
-        expect(shown.label).toBe('Latest');
-        expect(shown.when, 'the new Shot drawn as the latest, with no tap').toMatch(/^Today 02:00 PM/);
-        await expect(frame.locator('#main-page')).not.toHaveClass(/cafe-shot-live/);
-        await expect(pullButton(preview)).toBeEnabled();
-
-        const arrived = (await frame.evaluate(() => window.__espresso)).map(at => at - startedAt);
-        expect(arrived.length, 'every frame of the shot').toBe(ESPRESSO_FRAMES.length);
-        const late = arrived.map((at, i) => at - ESPRESSO_FRAMES[i]);
-        expect(Math.min(...late), 'none early').toBeGreaterThanOrEqual(0);
-        expect(Math.max(...late), 'each at the recording\'s own moment, by the page\'s clock').toBeLessThanOrEqual(60);
-        expect(preview.unanswered()).toEqual([]);
+            const first = await pull(preview);
+            await until(preview, first, STORE_AT + 1000);
+            const one = (await preview.read('newestShot')).id;
+            const second = await pull(preview);
+            await until(preview, second, STORE_AT + 1000);
+            const two = (await preview.read('newestShot')).id;
+            expect(two).not.toBe(one);
+            await expect(pullButton(preview)).toBeEnabled();
+        });
     });
+}
 
-    test('Sleep shows the screensaver and takes the button away; a tap wakes; a second pull works once the first is stored', async ({ preview }) => {
-        test.slow();
-        const frame = await preview.open();
-        await frame.locator('#sleep-button').click();
-        await expect(frame.locator('#screensaver')).toBeVisible();
-        await expect(pullButton(preview), 'not offered while the machine sleeps').toBeDisabled();
-        await frame.locator('#screensaver').click();
-        await expect(frame.locator('#screensaver')).toBeHidden();
-        await expect.poll(() => preview.read('machineState')).toMatchObject({ state: 'idle' });
-        await expect(pullButton(preview)).toBeEnabled();
-
-        const first = await pull(preview);
-        await until(preview, first, STORE_AT + 1000);
-        const one = (await preview.read('newestShot')).id;
-        const second = await pull(preview);
-        await until(preview, second, STORE_AT + 1000);
-        const two = (await preview.read('newestShot')).id;
-        expect(two).not.toBe(one);
-        await expect(pullButton(preview)).toBeEnabled();
-    });
-
+test.describe('the pretend machine, during a pour', { tag: '@preview-cafe' }, () => {
     test('a dialog open closes as a pour starts; a tap on a recipe card, on Sleep, or on the mode switch during a pour leaves the preview in a state it can go on from', async ({ preview }) => {
         test.slow();
         const frame = await preview.open();
@@ -511,6 +519,8 @@ test.describe('on a phone in portrait', { tag: '@preview-cafe' }, () => {
         const box = await preview.page.locator('#preview-skin').boundingBox();
         expect(Math.abs(box.width - 390), `the frame is the window's width (${box.width})`).toBeLessThan(1);
         expect(Math.abs(box.width / box.height - 1.6)).toBeLessThan(0.01);
+        const bar = await preview.bar.boundingBox();
+        expect(Math.abs(box.y - (bar.y + bar.height)), `the frame sits at the top, under the bar (${box.y})`).toBeLessThan(1);
         await expect(preview.bar.locator('#preview-phone')).toBeVisible();
         await preview.advance(3000);
         await expect(frame.locator('#fullscreen-toast-container'), 'no rotate or fullscreen prompt').toBeHidden();
