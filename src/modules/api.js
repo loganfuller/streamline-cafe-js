@@ -1,6 +1,7 @@
 import * as ui from './ui.js';
 import { logger ,setDebug} from './logger.js';
 import { createSocketSlot, RECONNECT_POLICY } from './socket-slot.js';
+import { PLUGIN_MANAGEMENT_PROBE_KEY, pluginManagementProbeTarget } from '../settings/plugin-view.js';
 import { decideResync } from './resync-policy.js';
 import { createScaleSampleBuffer } from './calibrated-steam.js';
 import { clampAutoSteamSettings } from './auto-steam-safety.js';
@@ -1785,8 +1786,13 @@ export function onWorkflowUpdated(listener) {
 export async function setMachineState(newState) {
     const response = await fetch(`${API_BASE_URL}/machine/state/${newState}`, {
         method: 'PUT',
+    }).catch((error) => {
+        ui.showToast('Disconnected', 4000, 'error');
+        throw error;
     });
     if (!response.ok) {
+        const refusal = response.status === 400 ? await response.json().catch(() => null) : null;
+        if (refusal?.type === 'block_no_scale') ui.showToast('No scale connected — shot blocked', 4000, 'error');
         throw new Error(`Failed to set machine state to ${newState}`);
     }
     return response;
@@ -2959,7 +2965,7 @@ export async function getPluginSettings(pluginId, { strict = false } = {}) {
             throw new Error(`Failed to get plugin settings for ${pluginId}: ${response.statusText}`);
         }
         const settings = await response.json();
-        logger.info(`Plugin settings for ${pluginId} retrieved successfully.`, settings);
+        logger.info(`Plugin settings for ${pluginId} retrieved successfully.`);
         return settings;
     } catch (error) {
         logger.error(`Error getting plugin settings for ${pluginId}:`, error);
@@ -2982,12 +2988,30 @@ export async function setPluginSettings(pluginId, settings) {
             const errorBody = await response.text();
             throw new Error(`Failed to set plugin settings for ${pluginId}. Status: ${response.status}, Body: ${errorBody}`);
         }
-        logger.info(`Plugin settings for ${pluginId} updated successfully:`, settings);
+        logger.info(`Plugin settings for ${pluginId} updated successfully.`);
         document.dispatchEvent(new CustomEvent('streamline:plugins-changed', { detail: { pluginId } }));
         return true;
     } catch (error) {
         throw error; // Re-throw to allow calling code to handle
     }
+}
+
+let pluginManagementProbe = null;
+
+export function probePluginManagement() {
+    pluginManagementProbe ??= getPlugins()
+        .then(plugins => {
+            const target = pluginManagementProbeTarget(plugins);
+            if (!target) return null;
+            return fetch(`${API_BASE_URL}/plugins/${encodeURIComponent(target)}/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [PLUGIN_MANAGEMENT_PROBE_KEY]: null }),
+            }).then(response => response.status);
+        })
+        .catch(() => null)
+        .finally(() => { pluginManagementProbe = null; });
+    return pluginManagementProbe;
 }
 
 function pluginEndpointError(pluginId, endpoint, status, errorBody) {
@@ -3534,7 +3558,12 @@ export async function updateSkins() {
         const reason = typeof body?.error === 'string' && body.error.trim()
             ? body.error.trim()
             : `${response.status} ${response.statusText}`;
-        throw new Error(reason);
+        const error = new Error(reason);
+        // The caller phrases 401 and 429 itself: Decaid's own words for those
+        // two are "Missing or malformed bearer token" and a bare retry count,
+        // neither of which tells the user what to do. See updateSkin().
+        error.status = response.status;
+        throw error;
     }
     return body;
 }

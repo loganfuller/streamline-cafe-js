@@ -1,3 +1,5 @@
+import { profileChanges, stepsDiffer } from './profile-version-diff.js';
+import { countLookAlikeTitles, isLookAlike } from './profile-look-alike.js';
 import { init as initProfileManager, unhideProfile,availableProfiles, assignProfile, setActiveProfile, getActiveProfileId, translateProfileTitle, deleteOrHideProfile, loadAssignments, verifyProfileChange, applyWorkflowToMainPageUI, withSavedBrewTemp, duplicateProfileAsDraft, deleteProfileDraft, applySavedSteamSettings } from './profileManager.js';
 import { resolveProfileKeyByTitle } from './active-profile.js';
 import { openDB } from './idb.js';
@@ -102,12 +104,6 @@ async function hideOrDeleteProfile(key, profileRecord) {
     if (profileRecord.isDraft) document.dispatchEvent(new CustomEvent('profiles-updated'));
 }
 
-// Short, human-readable summary of what a Reset to `other` would actually
-// change versus `current` -- shown next to each row's date so picking a
-// version isn't a blind guess from timestamps alone. Execution fields only
-// (steps, shot parameters) -- the same fields REA hashes into the profile
-// id -- so a title-only rename never shows up here, matching the
-// PRESENTATION_FIELDS split profile_editor.js's saveProfile uses.
 const DIFF_FIELD_LABELS = [
     ['target_weight', 'target weight'],
     ['target_volume', 'target volume'],
@@ -125,7 +121,7 @@ function summarizeProfileDiff(current, other) {
     } else {
         let changed = 0;
         for (let i = 0; i < stepsA.length; i++) {
-            if (JSON.stringify(stepsA[i]) !== JSON.stringify(stepsB[i])) changed++;
+            if (stepsDiffer(stepsA[i], stepsB[i])) changed++;
         }
         if (changed) parts.push(`${changed} step${changed === 1 ? '' : 's'} changed`);
     }
@@ -135,74 +131,142 @@ function summarizeProfileDiff(current, other) {
     return parts.length ? parts.join(', ') : 'No changes';
 }
 
-// Version picker for the Reset flow. Returns the chosen ProfileRecord, or
-// null on cancel. Picking a row selects it; Confirm applies it -- a row used
-// to restore on the single tap that selected it, which put an unconfirmed,
-// destructive profile swap one stray tap away. `currentProfile` is what a
-// row's date-and-summary line is diffed against -- the profile Reset would
-// actually replace.
+function appendLookAlikeStamp(leftSide, profileRecord) {
+    const saved = new Date(profileRecord.updatedAt ?? profileRecord.createdAt);
+    if (isNaN(saved.getTime())) return;
+    const stamp = document.createElement('span');
+    stamp.className = 'text-[18px] text-[var(--low-contrast-white)] whitespace-nowrap';
+    stamp.textContent = saved.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    leftSide.appendChild(stamp);
+}
+
+function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+const VERSION_ROW_BASE = 'w-full text-left rounded-[14px] px-[22px] py-[18px] border-2 cursor-pointer flex flex-col gap-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mimoja-blue-v2)]';
+const VERSION_ROW_IDLE = `${VERSION_ROW_BASE} border-transparent bg-[var(--bgmain-color)]`;
+const VERSION_ROW_SELECTED = `${VERSION_ROW_BASE} border-[var(--mimoja-blue-v2)] bg-[var(--button-primary-tint)]`;
+
+const STEP_SEGMENT_BASE = 'flex-1 min-w-[44px] h-[52px] rounded-[10px] flex items-center justify-center text-[20px] font-semibold tabular-nums';
+const STEP_SEGMENT = {
+    unchanged: `${STEP_SEGMENT_BASE} bg-[var(--button-grey)] text-[var(--low-contrast-white)]`,
+    changed: `${STEP_SEGMENT_BASE} bg-[var(--mimoja-blue-v2)] text-white`,
+    added: `${STEP_SEGMENT_BASE} border-2 border-dashed border-[var(--mimoja-blue-v2)] text-[var(--text-primary)]`,
+    removed: `${STEP_SEGMENT_BASE} border-2 border-dashed border-[var(--low-contrast-white)] text-[var(--low-contrast-white)] line-through`,
+};
+
+function formatVersionDate(createdAt) {
+    const when = new Date(createdAt);
+    if (isNaN(when.getTime())) return { day: '', time: '' };
+    return {
+        day: when.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+        time: when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+    };
+}
+
+function renderStepStrip(currentProfile, changes) {
+    const statusByIndex = new Map(changes.steps.map(step => [step.index, step.status]));
+    const count = Math.max(currentProfile?.steps?.length || 0, ...changes.steps.map(step => step.index + 1));
+    const strip = el('div', 'flex gap-[8px] w-full');
+    strip.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < count; i++) {
+        strip.appendChild(el('div', STEP_SEGMENT[statusByIndex.get(i) || 'unchanged'], String(i + 1)));
+    }
+    return strip;
+}
+
+function renderChangeTable(changes) {
+    const table = el('div', 'grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-[20px] gap-y-[10px] items-baseline w-full text-[20px] tabular-nums');
+    const cell = (className, text) => table.appendChild(el('div', className, text));
+    const heading = (text) => cell('col-span-4 pt-[14px] first:pt-0 text-[22px] font-semibold text-[var(--text-primary)]', text);
+    const value = (text) => (text === 'None' ? getTranslation('None') : text);
+    const row = ({ label, from, to }) => {
+        cell('pl-[18px] text-[var(--low-contrast-white)]', getTranslation(label));
+        cell('text-right text-[var(--low-contrast-white)]', value(from));
+        cell('text-[var(--low-contrast-white)]', '→');
+        cell('font-semibold text-[var(--text-primary)]', value(to));
+    };
+
+    for (const step of changes.steps) {
+        heading(`${getTranslation('Step')} ${step.index + 1}${step.name ? `  ${step.name}` : ''}`);
+        if (step.status === 'added') row({ label: 'Name', from: 'None', to: step.name || '—' });
+        else if (step.status === 'removed') row({ label: 'Name', from: step.name || '—', to: 'None' });
+        else step.fields.forEach(row);
+    }
+    if (changes.profile.length) {
+        heading(getTranslation('Profile settings'));
+        changes.profile.forEach(row);
+    }
+    return table;
+}
+
+function renderVersionDetail(host, currentProfile, version) {
+    const changes = profileChanges(currentProfile, version.profile);
+    host.replaceChildren();
+    host.appendChild(renderStepStrip(currentProfile, changes));
+    if (changes.steps.length || changes.profile.length) host.appendChild(renderChangeTable(changes));
+}
+
 function promptVersionRestore(versions, currentProfile) {
     return new Promise((resolve) => {
-        const ROW_BASE     = 'text-left px-[16px] py-[14px] rounded-[10px] border-2 bg-[var(--box-color)] cursor-pointer';
-        const ROW_IDLE     = `${ROW_BASE} border-[var(--border-color)] hover:border-[var(--mimoja-blue-v2)]`;
-        const ROW_SELECTED = `${ROW_BASE} border-[var(--mimoja-blue-v2)]`;
-
-        const dlg = document.createElement('dialog');
-        dlg.className = 'pe-history-dialog rounded-[16px] bg-[var(--box-color)] p-0 border border-[var(--border-color)] max-w-[560px] w-[90vw] shadow-2xl';
-        dlg.style.marginTop = '8vh';
+        const dlg = el('dialog', 'pe-history-dialog rounded-[20px] bg-[var(--box-color)] p-0 border border-[var(--border-color)] w-[min(1180px,94vw)] max-w-none shadow-2xl text-[var(--text-primary)]');
+        dlg.style.marginTop = '4vh';
         dlg.style.marginBottom = 'auto';
 
-        dlg.innerHTML = `
-            <div class="flex flex-col gap-[16px] p-[24px]">
-                <h3 class="text-[24px] font-bold text-[var(--text-primary)]">${getTranslation('Version')}</h3>
-                <div data-rows class="flex flex-col gap-[10px] max-h-[46vh] overflow-y-auto"></div>
-                <div class="flex flex-wrap justify-end gap-[12px] mt-[8px]">
-                    <button type="button" data-act="cancel" class="px-[18px] py-[10px] rounded-[10px] bg-[var(--button-grey)] text-[var(--text-primary)] text-[20px] font-semibold cursor-pointer">${getTranslation('Cancel')}</button>
-                    <button type="button" data-act="ok" class="hidden px-[18px] py-[10px] rounded-[10px] bg-[var(--button-primary-bg)] text-white text-[20px] font-semibold cursor-pointer">${getTranslation('Confirm')}</button>
-                </div>
-            </div>`;
+        const frame = el('div', 'flex flex-col gap-[28px] p-[36px]');
+        const header = el('div', 'flex flex-col gap-[6px]');
+        header.appendChild(el('h3', 'text-[30px] font-semibold leading-[1.2]', getTranslation('Version')));
+        header.appendChild(el('p', 'text-[20px] text-[var(--low-contrast-white)]', translateProfileTitle(currentProfile?.title) || ''));
 
-        const rowsHost  = dlg.querySelector('[data-rows]');
-        const confirmBtn = dlg.querySelector('[data-act="ok"]');
+        const body = el('div', 'grid grid-cols-[360px_minmax(0,1fr)] gap-[28px] h-[min(600px,50vh)]');
+        const list = el('div', 'flex flex-col gap-[10px] overflow-y-auto pr-[6px]');
+        list.setAttribute('role', 'listbox');
+        const detail = el('div', 'flex flex-col gap-[28px] overflow-y-auto rounded-[16px] bg-[var(--bgmain-color)] p-[28px]');
+        body.append(list, detail);
+
+        const footer = el('div', 'flex justify-end gap-[14px]');
+        const cancelBtn = el('button', 'px-[28px] h-[60px] rounded-[30px] bg-[var(--button-grey)] text-[var(--text-primary)] text-[22px] font-semibold cursor-pointer', getTranslation('Cancel'));
+        const restoreBtn = el('button', 'px-[32px] h-[60px] rounded-[30px] bg-[var(--button-primary-bg)] text-white text-[22px] font-semibold cursor-pointer', getTranslation('Confirm'));
+        cancelBtn.type = restoreBtn.type = 'button';
+        footer.append(cancelBtn, restoreBtn);
+
+        frame.append(header, body, footer);
+        dlg.appendChild(frame);
+
         let selected = null;
+        const rows = versions.map((version) => {
+            const { day, time } = formatVersionDate(version.createdAt);
+            const row = el('button', VERSION_ROW_IDLE);
+            row.type = 'button';
+            row.setAttribute('role', 'option');
 
-        // Rows are built as DOM, not interpolated markup: the title is
-        // user-supplied text and this dialog is rendered with innerHTML.
-        const rowBtns = versions.map((v, i) => {
-            const when  = new Date(v.createdAt);
-            const label = isNaN(when.getTime()) ? '' : when.toLocaleString();
-            const summary = summarizeProfileDiff(currentProfile, v.profile);
+            const stamp = el('div', 'flex items-baseline gap-[12px] tabular-nums');
+            stamp.append(el('span', 'text-[24px] font-semibold', day), el('span', 'text-[20px] text-[var(--low-contrast-white)]', time));
+            row.appendChild(stamp);
+            if (version.profile?.title && version.profile.title !== currentProfile?.title) {
+                row.appendChild(el('div', 'text-[20px] text-[var(--text-primary)]', translateProfileTitle(version.profile.title)));
+            }
+            row.appendChild(el('div', 'text-[18px] text-[var(--low-contrast-white)]', summarizeProfileDiff(currentProfile, version.profile)));
 
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = ROW_IDLE;
-            btn.dataset.idx = String(i);
-            btn.setAttribute('aria-pressed', 'false');
-
-            const title = document.createElement('div');
-            title.className = 'text-[20px] font-semibold text-[var(--text-primary)]';
-            title.textContent = v.profile?.title || 'Untitled';
-
-            const stamp = document.createElement('div');
-            stamp.className = 'text-[16px] text-[var(--text-primary)]';
-            stamp.style.opacity = '0.6';
-            stamp.textContent = summary ? `${label} · ${summary}` : label;
-
-            btn.appendChild(title);
-            btn.appendChild(stamp);
-            btn.addEventListener('click', () => {
-                selected = v;
-                rowBtns.forEach((b) => {
-                    const on = b === btn;
-                    b.className = on ? ROW_SELECTED : ROW_IDLE;
-                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-                });
-                confirmBtn.classList.remove('hidden');
-            });
-
-            rowsHost.appendChild(btn);
-            return btn;
+            row.addEventListener('click', () => select(version, row));
+            list.appendChild(row);
+            return row;
         });
+
+        function select(version, row) {
+            selected = version;
+            rows.forEach((r) => {
+                const on = r === row;
+                r.className = on ? VERSION_ROW_SELECTED : VERSION_ROW_IDLE;
+                r.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            renderVersionDetail(detail, currentProfile, version);
+            detail.scrollTop = 0;
+        }
 
         function done(result) {
             try { dlg.close(); } catch (_) {}
@@ -210,10 +274,11 @@ function promptVersionRestore(versions, currentProfile) {
             resolve(result);
         }
 
-        dlg.querySelector('[data-act="cancel"]').addEventListener('click', () => done(null));
-        confirmBtn.addEventListener('click', () => done(selected));
+        cancelBtn.addEventListener('click', () => done(null));
+        restoreBtn.addEventListener('click', () => done(selected));
         dlg.addEventListener('cancel', (e) => { e.preventDefault(); done(null); });
 
+        select(versions[0], rows[0]);
         document.body.appendChild(dlg);
         dlg.showModal();
     });
@@ -357,6 +422,7 @@ async function handleConfirm() {
 }
 
 function handleCancel() {
+    sessionStorage.removeItem('pendingAssignmentIndex');
     loadPage('index.html');
 }
 
@@ -502,6 +568,7 @@ function showProfileContextMenu(key, profileRecord, anchorEl) {
             label: getTranslation('Edit'),
             onSelect: () => {
                 window.__pendingEditProfile = profileRecord;
+                sessionStorage.setItem('lastEditedProfileKey', key);
                 loadPage('src/profiles/profile_editor.html');
             },
         },
@@ -583,9 +650,11 @@ function renderProfiles() {
 
         let visibleProfileCount = 0;
 
+        let sectionHeaderCount = 0;
         const renderSectionHeader = (label) => {
             const h = document.createElement('div');
-            h.className = 'px-3 pt-4 pb-1 text-[16px] uppercase tracking-wider text-[var(--low-contrast-white)] select-none';
+            const spacing = sectionHeaderCount++ === 0 ? 'pt-4' : 'border-t border-[var(--border-primary)] mt-3 pt-5';
+            h.className = `px-3 ${spacing} pb-1 text-[20px] font-semibold uppercase tracking-wider text-[var(--text-primary)] select-none`;
             h.textContent = label;
             frag.appendChild(h);
         };
@@ -602,27 +671,27 @@ function renderProfiles() {
             frag.appendChild(h);
         };
 
-        // Group profiles that share a name family: either a common prefix
-        // before a "/", "•" or ":" separator ("A-Flow / default-dark",
-        // "A-Flow / default-light", ... -> family "A-Flow"), or -- when there
-        // is no separator -- an auto-suffixed duplicate title ("Adaptive v2"
-        // / "Adaptive v2 (2)" -> family "Adaptive v2"). Pure title match,
-        // unrelated to parentId/clone lineage -- the "from X" badge below
-        // still covers that separately.
+        // Group profiles that share a name family: a common prefix before a
+        // "/", "•" or ":" separator ("A-Flow / default-dark", "A-Flow /
+        // default-light", ... -> family "A-Flow"). Pure title match, unrelated
+        // to parentId lineage -- the "from X" badge covers that.
         const isProfileVisible = (rec) => isShowingHidden || rec.visibility !== 'hidden';
         const familyBaseTitle = (title) => {
             const t = title || '';
             const sep = t.match(/^(.*?)\s*[/•:]\s*\S.*$/);
-            if (sep) return sep[1].trim();
-            return t.replace(/\s*\(\d+\)\s*$/, '').trim();
+            return sep ? sep[1].trim() : t.trim();
         };
         const familyGroups = new Map();
+        const visibleTitles = [];
         for (const [key, rec] of sortedProfiles) {
             const title = translateProfileTitle(rec.profile?.title) || rec.profile?.title || '';
             const base = familyBaseTitle(title);
-            if (!familyGroups.has(base)) familyGroups.set(base, []);
-            familyGroups.get(base).push([key, rec, title]);
+            const groupKey = `${rec.isDefault === true}|${base}`;
+            if (!familyGroups.has(groupKey)) familyGroups.set(groupKey, { base, members: [] });
+            familyGroups.get(groupKey).members.push([key, rec, title]);
+            if (isProfileVisible(rec)) visibleTitles.push(title);
         }
+        const titleCounts = countLookAlikeTitles(visibleTitles);
         // Headed family: one member's own title IS the bare base name, so it
         // renders normally at depth 0 and the rest nest under it (existing
         // profile as head). Headless family (no member is titled just the
@@ -630,16 +699,17 @@ function renderProfiles() {
         // label row stands in as the head instead.
         const childrenByFamily = new Map();
         const syntheticFamilies = new Map();
-        for (const [base, members] of familyGroups) {
+        for (const [groupKey, { base, members }] of familyGroups) {
             const visibleMembers = members.filter(([, rec]) => isProfileVisible(rec));
-            if (visibleMembers.length < 2) continue;
+            if (visibleMembers.length < 2 || visibleMembers.every(([, , title]) => title === base)) continue;
             const headIdx = visibleMembers.findIndex(([, , title]) => title === base);
             if (headIdx !== -1) {
                 const [headKey] = visibleMembers[headIdx];
                 const children = visibleMembers.filter((_, i) => i !== headIdx).map(([k, rec]) => [k, rec]);
                 if (children.length > 0) childrenByFamily.set(headKey, children);
             } else {
-                syntheticFamilies.set(base, {
+                syntheticFamilies.set(groupKey, {
+                    base,
                     members: visibleMembers.map(([k, rec]) => [k, rec]),
                     isDefault: visibleMembers[0][1].isDefault === true,
                 });
@@ -706,12 +776,11 @@ function renderProfiles() {
             titleSpan.textContent = displayTitle;
             leftSide.appendChild(titleSpan);
 
-            // Lineage badge only when this row could not be nested under its
-            // parent (parent hidden/filtered out) -- otherwise tree position
-            // already conveys it.
+            if (isLookAlike(titleCounts, displayTitle)) appendLookAlikeStamp(leftSide, profileRecord);
+
             const parentRecord = profileRecord.parentId ? availableProfiles[profileRecord.parentId] : null;
             const parentTitle = parentRecord?.profile?.title;
-            if (parentTitle && !nestedChildKeys.has(key)) {
+            if (parentTitle && (parentRecord.isDefault || parentTitle !== profile.title)) {
                 const badge = document.createElement('span');
                 badge.className = 'text-[16px] px-2 py-0.5 rounded-full bg-white/15 whitespace-nowrap';
                 badge.textContent = `from ${translateProfileTitle(parentTitle)}`;
@@ -866,8 +935,8 @@ function renderProfiles() {
             const title = translateProfileTitle(rec.profile?.title) || rec.profile?.title || '';
             topLevelEntries.push({ type: 'profile', key, rec, sortLabel: title, isDefault: rec.isDefault === true });
         }
-        for (const [base, info] of syntheticFamilies) {
-            topLevelEntries.push({ type: 'family', base, members: info.members, sortLabel: base, isDefault: info.isDefault });
+        for (const info of syntheticFamilies.values()) {
+            topLevelEntries.push({ type: 'family', base: info.base, members: info.members, sortLabel: info.base, isDefault: info.isDefault });
         }
         topLevelEntries.sort((a, b) => a.sortLabel.localeCompare(b.sortLabel));
 
@@ -1450,6 +1519,10 @@ function filterProfiles(searchTerm) {
         return;
     }
 
+    const titleCounts = countLookAlikeTitles(
+        sortedProfiles.map(([, rec]) => translateProfileTitle(rec.profile?.title) || rec.profile?.title || '')
+    );
+
     // Add filtered profiles to the container
     for (const [key, profileRecord] of sortedProfiles) {
         const profile = profileRecord.profile;
@@ -1474,9 +1547,11 @@ function filterProfiles(searchTerm) {
         titleSpan.innerHTML = highlightTitle(displayTitle, searchTerm);
         leftSide.appendChild(titleSpan);
 
+        if (isLookAlike(titleCounts, displayTitle)) appendLookAlikeStamp(leftSide, profileRecord);
+
         const parentRecord = profileRecord.parentId ? availableProfiles[profileRecord.parentId] : null;
         const parentTitle = parentRecord?.profile?.title;
-        if (parentTitle) {
+        if (parentTitle && (parentRecord.isDefault || parentTitle !== profile.title)) {
             const badge = document.createElement('span');
             badge.className = 'text-[16px] px-2 py-0.5 rounded-full bg-white/15 whitespace-nowrap';
             badge.textContent = `from ${translateProfileTitle(parentTitle)}`;
@@ -1710,6 +1785,7 @@ export async function initializeProfileSelector() {
                     ],
                 },
             };
+            if (selectedProfileKey) sessionStorage.setItem('lastEditedProfileKey', selectedProfileKey);
             loadPage('src/profiles/profile_editor.html');
         });
     }
@@ -1764,6 +1840,7 @@ export async function initializeProfileSelector() {
             const profileRecord = availableProfiles[selectedProfileKey];
             if (!profileRecord) return;
             window.__pendingEditProfile = profileRecord;
+            sessionStorage.setItem('lastEditedProfileKey', selectedProfileKey);
             loadPage('src/profiles/profile_editor.html');
         });
     };
@@ -1802,7 +1879,7 @@ export async function initializeProfileSelector() {
             try {
                 lineage = await getProfileLineage(selectedProfileKey);
             } catch (e) {
-                showToast('Could not load version history', 3000, 'error');
+                showToast('Could not load version history.', 3000, 'error');
                 return;
             }
             // /lineage returns the whole chain -- parents AND children -- so

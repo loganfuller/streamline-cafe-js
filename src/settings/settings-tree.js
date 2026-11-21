@@ -5,7 +5,7 @@ export const SETTINGS_TREE = {
     'quickadjustments': {
         name: 'Quick Adjustments',
         subcategories: [
-            { id: 'flowmultiplier', name: 'Flow calibration', settingsCategory: 'flowmultiplier', i18nKey: 'Flow calibration' },
+            { id: 'flowmultiplier', name: 'Shot control', settingsCategory: 'flowmultiplier', i18nKey: 'Shot control' },
             { id: 'steam', name: 'Steam', settingsCategory: 'steam' },
             { id: 'hotwater', name: 'Hot Water', settingsCategory: 'hotwater' },
             { id: 'watertank', name: 'Water Tank', settingsCategory: 'watertank' },
@@ -29,7 +29,6 @@ export const SETTINGS_TREE = {
             { id: 'refillkit',           name: 'Refill Kit',            settingsCategory: 'calib_refillkit' },
             { id: 'voltage',             name: 'Voltage',               settingsCategory: 'calib_voltage' },
             { id: 'fan',                 name: 'Fan',                   settingsCategory: 'calib_fan' },
-            { id: 'steam',               name: 'Steam',                 settingsCategory: 'calib_steam' },
             { id: 'sensors',             name: 'Sensor Calibration',    settingsCategory: 'calib_sensors' },
             { id: 'loadcell',            name: 'Load Cells',            settingsCategory: 'calib_loadcell', i18nKey: 'Load Cells', bengleOnly: true }
         ]
@@ -79,16 +78,16 @@ export const SETTINGS_TREE = {
     'miscellaneous': {
         name: 'Miscellaneous',
         subcategories: [
-            { id: 'reasettings', name: 'Decaid Settings', settingsCategory: 'rea' },
             { id: 'brightness', name: 'Brightness', settingsCategory: 'brightness' },
+            { id: 'fontsize', name: 'Display Size', settingsCategory: 'fontsize' },
+            { id: 'screensaver', name: 'Screen Saver', settingsCategory: 'screensaver' },
+            { id: 'tempunit', name: 'Temperature', settingsCategory: 'tempunit', i18nKey: 'Temperature' },
+            { id: 'sounds', name: 'Enable sounds', settingsCategory: 'sounds' },
             { id: 'wakelock', name: 'Wake Lock', settingsCategory: 'wakelock' },
             { id: 'presence', name: 'Presence Detection', settingsCategory: 'presence' },
-            { id: 'fontsize', name: 'Display Size', settingsCategory: 'fontsize' },
-            { id: 'tempunit', name: 'Temperature', settingsCategory: 'tempunit', i18nKey: 'Temperature' },
-            { id: 'screensaver', name: 'Screen Saver', settingsCategory: 'screensaver' },
             { id: 'keyboard-shortcuts', name: 'Keyboard Shortcuts', settingsCategory: 'keyboard_shortcuts' },
             { id: 'homeassistant', name: 'Home Assistant', settingsCategory: 'homeassistant', i18nKey: 'Home Assistant' },
-            { id: 'sounds', name: 'Enable sounds', settingsCategory: 'sounds' }
+            { id: 'reasettings', name: 'Decaid Settings', settingsCategory: 'rea' }
         ]
     },
     'updates': {

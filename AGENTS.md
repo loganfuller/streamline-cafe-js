@@ -27,10 +27,12 @@ Start with [`docs/AI_REPO_MAP.md`](docs/AI_REPO_MAP.md). Open only the topic not
 
 ## Change Discipline
 
+- Avoid writing code comments. Make code self-explanatory through clear names and structure. When you touch code with an outdated comment, remove it on the spot.
 - Prefer small pure helpers and existing modules over new globals. Add to `window.app` only when injected HTML or an established cross-page bridge requires it.
 - Use the existing logger for production diagnostics and avoid noisy per-frame logging.
 - Follow existing naming and module boundaries. Do not perform broad style modernization during a functional fix.
 - When HTML is injected by the router, translate it and initialize it through its page or category mount function; do not rely on a fresh `DOMContentLoaded`.
+- For new UI text, reuse an existing key from `src/ui/de1 gui translation - Sheet1.csv` before adding a row. Add a new key only when no existing one fits.
 - Source files and generated files belong in the same change when a build input changes.
 - Add or update focused `node:test` coverage for pure policy, parsing, state-transition, queueing, migration, and rendering decisions.
 
