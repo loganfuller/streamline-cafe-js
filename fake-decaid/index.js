@@ -67,11 +67,26 @@ export function OWNED(method, path) {
  * their spacing, so the newest sample Shot was pulled an hour before `now`,
  * whenever they were recorded. Their times were written in UTC, the
  * recorder's zone; a Shot moved is written in `timeZone`.
+ *
+ * "Pulled" is the Shot's first sample, where it is earlier than its
+ * `timestamp`: Decaid stamps a Shot a fraction of a millisecond after its
+ * first frame, which in one recording falls in the same millisecond and in
+ * the next in the one before. Placed by `timestamp`, on the minute, such a
+ * Shot's first sample is in the minute before, and the page names a Shot the
+ * history module draws by that sample. So every sample Shot's two times read
+ * the same minute whatever the recording. Answers that moment as recorded,
+ * in epoch milliseconds: a fake started an hour past it moves nothing.
  */
+export function newestPulled(shots) {
+    const ms = text => Date.parse(/[zZ]$/.test(text) ? text : `${text.slice(0, 23)}Z`);
+    const pulled = shot => Math.min(ms(shot.timestamp), ...[shot.measurements?.[0]?.machine?.timestamp].filter(Boolean).map(ms));
+    return Math.max(...shots.map(pulled));
+}
+
+/** Moves a recorded Shot by what puts `newestPulled` an hour before `now`. */
 function mover(shots, now, timeZone) {
     if (!shots.length) return shot => shot;
-    const ms = text => Date.parse(/[zZ]$/.test(text) ? text : `${text.slice(0, 23)}Z`);
-    const shift = now - 3_600_000 - Math.max(...shots.map(shot => ms(shot.timestamp)));
+    const shift = now - 3_600_000 - newestPulled(shots);
     const moved = text => shiftTime(text, shift, timeZone);
     return shot => ({
         ...shot,
