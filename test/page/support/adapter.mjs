@@ -20,7 +20,7 @@ export function recording(name) {
  * opened, drop, intercept, interceptSocket }`: what had no answer, the
  * requests being answered now ("METHOD url"; a request the page has sent is
  * in it only once its route has it, and the page's `__cafeFetchesOpen()`
- * counts it from the send), the paths of the sockets open,
+ * lists it from the send), the paths of the sockets open,
  * the path of every socket opened in order (a reopened one again), a way to
  * close the sockets open to a path from Decaid's side, and two ways for a test
  * to stand between the page and the fake (support/faults.mjs uses them).
@@ -58,13 +58,19 @@ export async function attach(context, fake) {
     // later, longer under load and longer still for one sent with `keepalive`,
     // as settingsSync's write to Decaid's store is, and `inflight` holds it only
     // from then (#96). The count is the page's own, so it holds it from the send.
+    // `__cafeFetchesOpen()` answers them as "METHOD url", one entry per fetch.
     await context.addInitScript(() => {
         const send = window.fetch;
-        let open = 0;
-        Object.defineProperty(window, '__cafeFetchesOpen', { value: () => open });
+        const open = new Map();
+        let next = 0;
+        Object.defineProperty(window, '__cafeFetchesOpen', { value: () => [...open.values()] });
         window.fetch = function fetch(...args) {
-            open += 1;
-            return send.apply(this, args).finally(() => { open -= 1; });
+            const [input, init] = args;
+            const request = input instanceof Request ? input : null;
+            const method = (init?.method || request?.method || 'GET').toUpperCase();
+            const id = next += 1;
+            open.set(id, `${method} ${request ? request.url : String(input)}`);
+            return send.apply(this, args).finally(() => { open.delete(id); });
         };
     });
 

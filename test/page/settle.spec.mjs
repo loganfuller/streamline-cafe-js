@@ -30,18 +30,25 @@ test('settle waits for a setting\'s write the page has sent but its route has no
         await route.fallback();
     });
 
-    await page.evaluate(key => localStorage.setItem(key, 'false'), DYE2_ENABLED);
-    await atRoute;
-    expect(cafe.routes.inflight.size, 'the adapter has not received the write').toBe(0);
+    try {
+        await page.evaluate(key => localStorage.setItem(key, 'false'), DYE2_ENABLED);
+        await atRoute;
+        // Other requests may be in `inflight` meanwhile, as the page's clock runs on.
+        expect([...cafe.routes.inflight].filter(request => request.includes(DYE2_ENABLED)), 'the adapter has not received the write').toEqual([]);
+        expect(await page.evaluate(() => window.__cafeFetchesOpen()), 'the page lists the write as sent').toContainEqual(expect.stringContaining(`POST http://127.0.0.1:8080/api/v1/store/${SETTINGS}/${DYE2_ENABLED}`));
 
-    let settled = false;
-    const settling = cafe.settle().then(() => { settled = true; });
-    // Before #96, settle returned after one turn of the page with nothing in
-    // `inflight`; these turns are sent after its first, so they come back after it.
-    for (let turn = 0; turn < 3; turn += 1) await page.evaluate(() => 0);
-    expect(settled, 'settle still waits for the write').toBe(false);
+        let settled = false;
+        const settling = cafe.settle().then(() => { settled = true; });
+        // Before #96, settle returned after one turn of the page with nothing in
+        // `inflight`; these turns are sent after its first, so they come back after it.
+        for (let turn = 0; turn < 3; turn += 1) await page.evaluate(() => 0);
+        expect(settled, 'settle still waits for the write').toBe(false);
 
-    pass();
-    await settling;
+        pass();
+        await settling;
+    } finally {
+        // A failed check above leaves the write held into the fixture's own settle otherwise.
+        pass();
+    }
     expect(fake.store.get(SETTINGS, DYE2_ENABLED), 'Decaid\'s store holds the setting off').toBe('false');
 });
