@@ -81,7 +81,7 @@ test('first drip is null for a Shot whose scale never read 1 g, as with no scale
 
 // When coffee first reached the cup, and whether a Shot is Unfinished: Decent
 // Sync's own cases for its rule (loganfuller/decent-sync#609), copied unchanged
-// from its protocol/test/fixtures/first-drip-cases.json (decent-sync b06fe323),
+// from its protocol/test/fixtures/first-drip-cases.json (decent-sync 6b079cc1, PR #612),
 // so a tablet and its server answer the same Shots alike. Each is recorded as
 // Decaid records a Shot, as Decent Sync's test records it: its Preheat in
 // `preparingForShot`, then its profile's samples, in `pouring` from the second
