@@ -427,6 +427,22 @@ test.describe('the barista at the machine', { tag: '@barista' }, () => {
                 expect(writes(cafe.since(mark)).map(({ write }) => write), 'Streamline woke the machine').toContain('PUT /api/v1/machine/state/idle');
                 await expect(shown(cafe.page)).toHaveText('Barista');
             });
+
+            test('a page that outlived the hold on Sleep clears the name when Decaid shows it again', async ({ cafe, fake }) => {
+                nameElsewhere(fake, EXAMPLE);
+                const page = await cafe.open();
+                await expect(shown(page)).toHaveText(EXAMPLE);
+                const mark = fake.log.length;
+                await page.evaluate(() => {
+                    window.localStorage.setItem('sleepExitPending', String(Date.now()));
+                    document.dispatchEvent(new Event('visibilitychange'));
+                    document.dispatchEvent(new Event('visibilitychange'));
+                });
+                await expect.poll(() => named(fake)).toBeNull();
+                await cafe.advance(1000);
+                expect(baristaWrites(cafe.since(mark)), 'cleared in one write, though Decaid showed the page twice').toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { baristaName: null } } }]);
+                await expect(shown(page)).toHaveText('Barista');
+            });
         });
     }
 
