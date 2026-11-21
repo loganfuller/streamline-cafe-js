@@ -21,6 +21,10 @@ export const isRecordWrite = entry => entry.method === 'POST' && entry.path === 
 // reports whatever its settings hold (a flush at 90 °C, where the sample
 // recipes hold 25 °C), written into a recipe's record, so that DYE2 does not
 // call it changed the moment it loads and "not called changed" says something.
+// From Streamline v0.2.29 a load writes the record's flush temperature and flow
+// into the Workflow itself, so a recipe loaded without this is not called
+// changed either; with it, the load leaves the Workflow's steam, hot water and
+// flush as the machine had them.
 // The machine's settings are given the Workflow's flush temperature and flow
 // too: DYE2's `record` reads those two from `GET /machine/settings` over the
 // Workflow's, and the recorded machine says 25 °C there whatever the Workflow
