@@ -138,6 +138,10 @@ export function setFirmwareFlashInFlight(value) {
     firmwareFlashInFlight = !!value;
 }
 
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): leaving the page cancels a flash,
+// so the page declines a reload Decent Sync asks for while one runs.
+export const firmwareFlashInProgress = () => firmwareFlashInFlight;
+
 // Caching for DE1 settings to avoid multiple API calls
 const de1SettingsCache = {
     data: null,
@@ -933,6 +937,24 @@ export function connectPluginMessages(pluginId, endpoint, onMessage, onOpen) {
         socket.onmessage = (event) => { try { onMessage(event?.data); } catch (error) { logger.warn('Plugin message handler failed:', error); } };
         return socket;
     });
+}
+
+// Streamline Cafe: a PUT to a plugin's endpoint at the page's own host,
+// whatever reaHostname says, for a plugin that keeps only what the tablet's
+// own Skin view sends, which reaches Decaid at localhost. Answers whether it
+// was taken, never throws, and logs nothing: a plugin too old to have the
+// endpoint answers 404 on every page load.
+export async function putPluginEndpointHere(pluginId, endpoint, body) {
+    try {
+        const response = await fetch(`http://${window.location.hostname}:${REA_PORT}/api/v1/plugins/${pluginId}/${endpoint}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
 }
 
 export function connectTimeToReadyWebSocket(onData) {

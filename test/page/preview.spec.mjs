@@ -303,6 +303,7 @@ test.describe('the preview', { tag: '@preview' }, () => {
         expect(await frame.evaluate(() => window.localStorage.getItem('reaHostname'))).toBe('decaid-tablet.test');
         await expect(frame.locator('#machine-status')).toHaveText('Ready');
         expect((await preview.read('log')).some(entry => entry.request === 'GET /api/v1/machine/info'), 'the boot read reached the model').toBe(true);
+        expect((await preview.read('log')).some(entry => entry.request === 'PUT /api/v1/plugins/decent-sync.reaplugin/page'), 'and the page\'s report, sent to the page\'s own host').toBe(true);
         // Nothing went to the network: the fixture's check of what left the page.
     });
 

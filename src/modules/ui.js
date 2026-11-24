@@ -2204,6 +2204,12 @@ let sleepExitReturnWired = false;
 // page can clear the barista, so the page clears it when this return wakes the machine.
 let sleepExitReturned = false;
 export const cameBackFromSleepExit = () => sleepExitReturned;
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): a page loaded again while the marker is
+// pending takes the load as the return and wakes the machine, so the page declines a
+// reload Decent Sync asks for then.
+export function sleepExitPending() {
+    try { return localStorage.getItem(SLEEP_EXIT_KEY) !== null; } catch (e) { return false; }
+}
 
 /** Is the long-press sleep-and-exit gesture switched on? */
 function isSleepExitEnabled() {

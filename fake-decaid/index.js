@@ -175,6 +175,7 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
         recording: decentSync,
         decaid: {
             store, shots, timeZone, putShot,
+            now: () => clock,
             workflow: () => copy(workflow),
             dye2Loaded,
             // DYE2's `record`, as the plugin asks it: not in the request log.
@@ -330,6 +331,7 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
             ...decentSyncPlugin.events,
             recipe: decentSyncPlugin.recipe,
             state: decentSyncPlugin.state,
+            page: decentSyncPlugin.page,
             others: decentSyncPlugin.others,
             own: decentSyncPlugin.own,
             machine: decentSyncPlugin.machine,

@@ -172,7 +172,8 @@
 
     // ── Decaid's address ─────────────────────────────────────────────────────
 
-    // As src/modules/api.js finds it: the saved host, or the page's own.
+    // As src/modules/api.js finds it: the saved host, or the page's own; and
+    // the page's own whatever is saved, where api.js reports the page to a plugin.
     function decaidHost() {
         let saved = null;
         try {
@@ -190,7 +191,8 @@
         } catch {
             return null;
         }
-        return protocols.includes(url.protocol) && url.port === DECAID_PORT && url.hostname === decaidHost() ? url : null;
+        const host = url.hostname.toLowerCase();
+        return protocols.includes(url.protocol) && url.port === DECAID_PORT && (host === decaidHost() || host === window.location.hostname.toLowerCase()) ? url : null;
     }
 
     // ── The fake ─────────────────────────────────────────────────────────────

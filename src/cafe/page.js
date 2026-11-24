@@ -14,7 +14,7 @@ import { logger } from '../modules/logger.js';
 import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { decentSyncSaves } from './sync-status.js';
-import { askStatus, onStatus } from './decent-sync.js';
+import { askStatus, onStatus, reportPage } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, formatRoastDay, setText } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
@@ -370,6 +370,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     paintBattery();
     refreshNames();
     onStatus(showStatus);
+    reportPage();
     askStatus();
     // The change of profile waits its turn as a pick does, and keeps the
     // dial-in still while it is written; a recipe load or unload from the strip

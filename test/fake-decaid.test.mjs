@@ -859,3 +859,34 @@ test('Decent Sync save: a fake made without the plugin saves nothing on a Workfl
     fake.flush();
     assert.equal(houseRecord(fake).dashboardVariables.dose, house.dashboardVariables.dose);
 });
+
+test('Decent Sync page: a report is kept and answered 204 in any state; another shape 400 naming what is wrong; another method 405', () => {
+    const fake = served();
+    const page = { skinId: 'streamline-cafe.js', version: '0.2.31-cafe.1', loadedAt: new Date(START - 5000).toISOString() };
+    assert.equal(fake.decentSync.page(), null);
+    assert.deepEqual(send(fake, 'PUT', `${PLUGIN}/page`, page), { status: 204 });
+    assert.deepEqual(fake.decentSync.page(), { ...page, reportedAt: new Date(START).toISOString() });
+
+    fake.decentSync.stopServer();
+    const later = { skinId: 'streamline-cafe.js-dist', loadedAt: '2026-11-18T09:00:00.500-05:00' };
+    assert.equal(send(fake, 'PUT', `${PLUGIN}/page`, later).status, 204, 'unreachable');
+    assert.deepEqual(fake.decentSync.page(), { skinId: 'streamline-cafe.js-dist', loadedAt: '2026-11-18T14:00:00.500Z', reportedAt: new Date(START).toISOString() }, 'no version, and the time in UTC');
+
+    const refused = body => send(fake, 'PUT', `${PLUGIN}/page`, body);
+    for (const [body, wrong] of [
+        [{ ...page, skinId: '' }, /^Give skinId/],
+        [{ ...page, skinId: 'x'.repeat(201) }, /^Give skinId/],
+        [{ ...page, version: 3 }, /^Give version/],
+        [{ ...page, loadedAt: '2026-11-18' }, /^Give loadedAt/],
+        [{ ...page, loadedAt: new Date(START + 61_000).toISOString() }, /^Give loadedAt/],
+        [undefined, /^Give skinId.*\. Give loadedAt.*\.$/],
+    ]) {
+        const answer = refused(body);
+        assert.equal(answer.status, 400, JSON.stringify(body));
+        assert.equal(answer.body.code, 'invalidRequest');
+        assert.match(answer.body.message, wrong);
+    }
+    assert.equal(refused({ ...page, loadedAt: new Date(START + 60_000).toISOString() }).status, 204, 'a minute ahead is still taken');
+    assert.equal(get(fake, `${PLUGIN}/page`).status, 405);
+    assert.equal(createFakeDecaid({ ...recordings, now: START }).request({ method: 'PUT', url: `${PLUGIN}/page`, body: page }).status, 404, 'no plugin: Decaid answers 404');
+});
