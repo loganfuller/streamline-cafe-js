@@ -147,6 +147,7 @@ test('one module speaks to Decent Sync\'s plugin', () => {
     // and its Reference Shot is read and chosen through the seam alone.
     assert.deepEqual(filesWith(/decent-sync\.reaplugin/), ['decent-sync.js']);
     assert.deepEqual(filesWith(/\bconnectPluginMessages\b|\bconnectPluginPush\b|\bWebSocket\b/), ['decent-sync.js'], 'and one socket, through api.js');
+    assert.deepEqual(filesWith(/\bputPluginEndpointHere\b/), ['decent-sync.js'], 'and one report of the page, at its own host');
     assert.deepEqual(filesWith(/from '\.\/decent-sync\.js'/), ['page.js', 'shot-seam.js']);
     assert.deepEqual(filesWith(/\b(readReference|chooseReference|onPush)\b/), ['decent-sync.js', 'plugin-shots.js', 'shot-seam.js']);
 });
@@ -184,6 +185,8 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
     const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
     assert.match(api, /export async function getShot\(id\) \{/);
     assert.match(api, /export function connectPluginMessages\(pluginId, endpoint, onMessage, onOpen\) \{/);
+    assert.match(api, /export async function putPluginEndpointHere\(pluginId, endpoint, body\) \{/);
+    assert.match(api, /fetch\(`http:\/\/\$\{window\.location\.hostname\}:\$\{REA_PORT\}\/api\/v1\/plugins\//, 'and it asks the page\'s own host, never reaHostname');
 });
 
 test('the Grind row\'s hook is still in ui.js', () => {
@@ -296,7 +299,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js']) {
+    for (const name of ['recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js', 'page-report.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

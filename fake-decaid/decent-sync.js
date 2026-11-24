@@ -1,5 +1,5 @@
 // Decent Sync's plugin, as a Skin reads it: its endpoints `status`,
-// `reference`, `shots` and `shot`, its `changes` socket, and the `skin`
+// `reference`, `shots`, `shot` and `page`, its `changes` socket, and the `skin`
 // answer and `changed` socket Streamline reads of every plugin. Behind them,
 // as much of its server as those answers show: the Machine and its Location,
 // the Location's Recipes and their Reference Shots, and the Location's Shots,
@@ -49,6 +49,16 @@
 //   through Decaid's `PUT /shots/<id>` whatever the status, and any other
 //   through the server, refused while it can't be asked. Answers
 //   `{ rating, note }`.
+// - **page:** a PUT `{ skinId, version?, loadedAt }` is kept and answered 204
+//   whatever the status; a body of another shape is `invalidRequest` (400),
+//   naming each field wrong, and any other method 405. `loadedAt` is an ISO
+//   8601 instant at most a minute ahead of the fake's clock. Read from
+//   loganfuller/decent-sync main at bdf23d36 (plugin/src/skin-page.ts, #661),
+//   in no release yet, so no recording backs it: the pinned v1.11.1 answers
+//   404 `{ error: 'Not found' }`, as a test makes it with `fake.refuse`. The
+//   plugin keeps a report only from a `Host` of localhost, 127.0.0.1 or
+//   [::1]; the model keeps every one, as the page tests' page is at
+//   127.0.0.1.
 // - **changes:** `{ what: 'connection', connected }` as the connection comes
 //   and goes, and `{ what: 'reference', recipe }` whenever the tablet's copy of
 //   a slotted Recipe's reference changes or comes: chosen, its Shot rated or
@@ -109,6 +119,9 @@ const MAX_SHOTS_PAGE = 50;
 const MAX_SHOT_RATING = 10;
 const MAX_SKIN_NOTE_LENGTH = 40_000;
 const MAX_ASKED_LENGTH = 2048;
+const MAX_SOFTWARE_NAME_LENGTH = 200;
+const MAX_LOAD_AHEAD_MS = 60_000;
+const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export const REFUSALS = {
     unreachable: { status: 503, message: "The Decent Sync server can't be reached from this tablet right now." },
@@ -217,7 +230,7 @@ function readCursor(text) {
 /**
  * @param {{
  *   recording: object,
- *   decaid: { store: object, shots: object, timeZone: string, putShot: (id: string, body: object) => { status: number, body: any } },
+ *   decaid: { store: object, shots: object, timeZone: string, now: () => number, putShot: (id: string, body: object) => { status: number, body: any } },
  *   announce: (frame: object) => void,
  *   moved?: (record: object) => object,
  * }} options
@@ -372,6 +385,27 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         return code ? refusal(code, statusBody()) : json(statusBody());
     }
 
+    let shownPage = null;
+    function page(method, body) {
+        if (method !== 'PUT') return methodNotAllowed('PUT');
+        const fields = isObject(body) ? body : {};
+        const { skinId, version, loadedAt } = fields;
+        const loadTime = typeof loadedAt === 'string' && INSTANT.test(loadedAt) ? Date.parse(loadedAt) : NaN;
+        const problems = [
+            ...(typeof skinId === 'string' && skinId !== '' && skinId.length <= MAX_SOFTWARE_NAME_LENGTH ? [] : ["Give skinId, the Skin's id as Decaid's Skin list names it"]),
+            ...(version === undefined || version === null || (typeof version === 'string' && version.length <= MAX_SOFTWARE_NAME_LENGTH) ? [] : ['Give version as text, or leave it out']),
+            ...(Number.isFinite(loadTime) && loadTime <= decaid.now() + MAX_LOAD_AHEAD_MS ? [] : ['Give loadedAt, when the page loaded, as an ISO 8601 time such as new Date(performance.timeOrigin).toISOString() gives']),
+        ];
+        if (problems.length) return invalid(`${problems.join('. ')}.`);
+        shownPage = {
+            skinId,
+            ...(typeof version === 'string' && version !== '' ? { version } : {}),
+            loadedAt: new Date(loadTime).toISOString(),
+            reportedAt: new Date(decaid.now()).toISOString(),
+        };
+        return { status: 204 };
+    }
+
     function shots(method, query) {
         if (method !== 'GET') return methodNotAllowed('GET');
         const limit = query.get('limit');
@@ -501,6 +535,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 case 'shot': return shot(method, query, body);
                 case 'reference': return reference(method, query, body);
                 case 'skin': return method === 'GET' ? json(copy(recording.skin)) : null;
+                case 'page': return page(method, body);
                 default: return null;
             }
         },
@@ -622,6 +657,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         /** What the test reads: the Location's Recipes, by their DYE2 record's id, with their Reference Shot. */
         recipe: recordId => copy(recipeOfRecord(recordId)),
         state: () => ({ state, sharing }),
+        page: () => copy(shownPage),
         others: () => [...others.values()].map(other => copy(other)),
         own: () => [...own.keys()],
         machine: () => copy(machine),

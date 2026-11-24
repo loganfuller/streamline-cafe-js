@@ -1,15 +1,18 @@
 // The page's one line to Decent Sync's plugin on this tablet: its Status
 // request, its `reference` request, its list of the Location's Shots, one of
-// them whole, its edit of a Shot and its `changes` socket
-// (docs/cafe/DESIGN.md, "Recipes and the strip" and "Shots and the reference").
+// them whole, its edit of a Shot, its `changes` socket, and the report of the
+// page with the reload it asks for (docs/cafe/DESIGN.md, "Recipes and the
+// strip", "Shots and the reference" and "Builds and installs").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
 //
 // The status has two readers: the dial-in column's label (page.js) and the
 // Shot seam's choice of source (shot-seam.js). Both hear every answer.
-import { getPlugins, callPluginEndpoint, connectPluginMessages } from '../modules/api.js';
+import { getPlugins, callPluginEndpoint, connectPluginMessages, putPluginEndpointHere } from '../modules/api.js';
 import { logger } from '../modules/logger.js';
+import { SKIN_ID, APP_VERSION } from '../version.js';
 import { statusUnknown, statusRetryMs } from './sync-status.js';
+import { pageReport, asksReload, reloadUrl } from './page-report.js';
 
 const PLUGIN_ID = 'decent-sync.reaplugin';
 
@@ -59,7 +62,13 @@ async function readStatus() {
 function listen() {
     if (listening) return;
     listening = true;
-    connectPluginMessages(PLUGIN_ID, 'changes', data => tell(pushListeners, data), () => tell(pushListeners, { what: 'connection' }));
+    connectPluginMessages(PLUGIN_ID, 'changes', data => {
+        if (asksReload(data)) window.location.replace(reloadUrl(window.location.href, Date.now()));
+        else tell(pushListeners, data);
+    }, () => {
+        reportPage();
+        tell(pushListeners, { what: 'connection' });
+    });
 }
 
 async function ask() {
@@ -79,6 +88,10 @@ async function ask() {
     }
     if (answer && (answer.served === true || answer.code !== undefined)) listen();
     tell(statusListeners, answer);
+}
+
+export function reportPage() {
+    putPluginEndpointHere(PLUGIN_ID, 'page', pageReport({ skinId: SKIN_ID, version: APP_VERSION, timeOrigin: performance.timeOrigin }));
 }
 
 /** Ask Decent Sync's status again. Every `onStatus` listener hears the answer, unless a newer ask has begun. */
