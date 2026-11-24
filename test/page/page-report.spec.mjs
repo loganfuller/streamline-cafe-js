@@ -2,10 +2,11 @@
 // (docs/cafe/DESIGN.md, "Builds and installs"): the Skin id and version this
 // build names, and when the page loaded, PUT to the plugin's `page` on load
 // and each time the `changes` socket opens; a `{"what":"reload"}` push on
-// `changes` loads the page again, which reports again, and any other push
-// leaves it; a plugin without the report (v1.11.1, the pinned one, answers 404
-// "Not found"), or none, answered once on load and once a socket open, with
-// no retry and nothing else on the page changed.
+// `changes` loads the page again, the main page from Settings too, which
+// reports again, and any other push leaves it; a plugin without the report
+// (v1.11.1, the pinned one, answers 404 "Not found"), or none, answered once
+// on load and once a socket open, with no retry and nothing else on the page
+// changed.
 //
 // Playwright's clock gives every page load the same `performance.timeOrigin`,
 // so a test can't show a later `loadedAt` after a reload. Each report is
@@ -91,6 +92,30 @@ test.describe('the page reported to Decent Sync\'s plugin', { tag: '@page-report
             const loadedAt = await loadedAtOf(page);
             expect(reports(cafe, mark).map(entry => [entry.status, entry.body]), 'the fresh page reports on load and as its socket opens').toEqual([[204, build(loadedAt)], [204, build(loadedAt)]]);
             expect(fake.decentSync.page()).toMatchObject(build(loadedAt));
+        });
+
+        test('a reload push on Settings loads the main page, which reports', async ({ cafe, fake }) => {
+            const page = await openWithSocket(cafe);
+            await page.locator('#settings-btn').click();
+            await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
+            expect(new URL(page.url()).searchParams.get('page')).toBe('settings');
+            await cafe.settle();
+
+            const mark = fake.log.length;
+            const asked = page.waitForRequest(request => request.isNavigationRequest());
+            const loaded = page.waitForEvent('load');
+            fake.decentSync.push({ what: 'reload' });
+            fake.flush();
+            const navigation = await asked;
+            await loaded;
+            await page.locator('#cafe-strip .cafe-card').first().waitFor();
+            await expect.poll(() => changesOpened(cafe), 'the fresh page opens the changes socket').toBe(2);
+            await cafe.settle();
+
+            expect(new URL(navigation.url()).searchParams.get('page'), 'the main page asked for').toBeNull();
+            await expect(page.locator('#subpage-host #settings-content-area')).toBeHidden();
+            const loadedAt = await loadedAtOf(page);
+            expect(reports(cafe, mark).map(entry => [entry.status, entry.body]), 'the fresh page reports on load and as its socket opens').toEqual([[204, build(loadedAt)], [204, build(loadedAt)]]);
         });
 
         test('a plugin without the report answers 404, which is left at that, and the page goes on as before', async ({ cafe, fake }) => {

@@ -7,7 +7,8 @@
 // page loaded, the same for every report of one load. The page loads again at
 // its own address with `v` changed, so it is asked for again rather than
 // served from the WebView's cache, as Streamline's own reload for a new build
-// does (src/modules/app.js, `checkSkinUpdate`).
+// does (src/modules/app.js, `checkSkinUpdate`). Unlike that reload it comes
+// back to the main page from any sub-page, since only the main page reports.
 
 export function pageReport({ skinId, version, timeOrigin }) {
     return { skinId, version, loadedAt: new Date(timeOrigin).toISOString() };
@@ -24,6 +25,7 @@ export function asksReload(data) {
 
 export function reloadUrl(href, now) {
     const url = new URL(href);
+    url.searchParams.delete('page');
     url.searchParams.set('v', String(now));
     return url.toString();
 }

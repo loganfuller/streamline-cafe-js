@@ -21,7 +21,8 @@ test('only `{"what":"reload"}` asks the page to load again', () => {
     }
 });
 
-test('the reload asks for the page again at its own address, its `v` changed and the rest kept', () => {
+test('the reload asks for the main page again at its own address, its `v` changed, any sub-page dropped and the rest kept', () => {
     assert.equal(reloadUrl('http://localhost:3000/index.html', 1764000000000), 'http://localhost:3000/index.html?v=1764000000000');
-    assert.equal(reloadUrl('http://localhost:3000/index.html?page=settings&v=1#top', 5), 'http://localhost:3000/index.html?page=settings&v=5#top');
+    assert.equal(reloadUrl('http://localhost:3000/index.html?page=settings&v=1#top', 5), 'http://localhost:3000/index.html?v=5#top');
+    assert.equal(reloadUrl('http://localhost:3000/?lang=de&page=profile_editor', 5), 'http://localhost:3000/?lang=de&v=5');
 });
