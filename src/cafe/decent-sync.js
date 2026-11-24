@@ -8,11 +8,12 @@
 //
 // The status has two readers: the dial-in column's label (page.js) and the
 // Shot seam's choice of source (shot-seam.js). Both hear every answer.
-import { getPlugins, callPluginEndpoint, connectPluginMessages, putPluginEndpointHere } from '../modules/api.js';
+import { getPlugins, callPluginEndpoint, connectPluginMessages, putPluginEndpointHere, firmwareFlashInProgress } from '../modules/api.js';
+import { sleepExitPending } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
 import { SKIN_ID, APP_VERSION } from '../version.js';
 import { statusUnknown, statusRetryMs } from './sync-status.js';
-import { pageReport, asksReload, reloadUrl } from './page-report.js';
+import { pageReport, asksReload, reloadDeclined, reloadUrl } from './page-report.js';
 
 const PLUGIN_ID = 'decent-sync.reaplugin';
 
@@ -63,7 +64,7 @@ function listen() {
     if (listening) return;
     listening = true;
     connectPluginMessages(PLUGIN_ID, 'changes', data => {
-        if (asksReload(data)) window.location.replace(reloadUrl(window.location.href, Date.now()));
+        if (asksReload(data)) reload();
         else tell(pushListeners, data);
     }, () => {
         reportPage();
@@ -88,6 +89,12 @@ async function ask() {
     }
     if (answer && (answer.served === true || answer.code !== undefined)) listen();
     tell(statusListeners, answer);
+}
+
+function reload() {
+    const declined = reloadDeclined({ flashing: firmwareFlashInProgress(), sleepExitPending: sleepExitPending() });
+    if (declined) logger.info(`Cafe: Decent Sync asked for a reload, declined as ${declined}`);
+    else window.location.replace(reloadUrl(window.location.href, Date.now()));
 }
 
 export function reportPage() {

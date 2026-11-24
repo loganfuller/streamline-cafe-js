@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pageReport, asksReload, reloadUrl } from '../src/cafe/page-report.js';
+import { pageReport, asksReload, reloadDeclined, reloadUrl } from '../src/cafe/page-report.js';
 
 test('the report names the build and when the page loaded, as an ISO 8601 time', () => {
     const origin = Date.parse('2026-11-24T09:15:30.250Z') + 0.375;
@@ -25,4 +25,11 @@ test('the reload asks for the main page again at its own address, its `v` change
     assert.equal(reloadUrl('http://localhost:3000/index.html', 1764000000000), 'http://localhost:3000/index.html?v=1764000000000');
     assert.equal(reloadUrl('http://localhost:3000/index.html?page=settings&v=1#top', 5), 'http://localhost:3000/index.html?v=5#top');
     assert.equal(reloadUrl('http://localhost:3000/?lang=de&page=profile_editor', 5), 'http://localhost:3000/?lang=de&v=5');
+});
+
+test('the reload is declined while a firmware flash runs, or a hold on Sleep\'s return is pending', () => {
+    assert.equal(reloadDeclined({ flashing: false, sleepExitPending: false }), null);
+    assert.match(reloadDeclined({ flashing: true, sleepExitPending: false }), /firmware flash/);
+    assert.match(reloadDeclined({ flashing: false, sleepExitPending: true }), /hold on Sleep/);
+    assert.match(reloadDeclined({ flashing: true, sleepExitPending: true }), /firmware flash/);
 });

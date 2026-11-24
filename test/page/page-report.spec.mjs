@@ -3,7 +3,8 @@
 // build names, and when the page loaded, PUT to the plugin's `page` on load
 // and each time the `changes` socket opens; a `{"what":"reload"}` push on
 // `changes` loads the page again, the main page from Settings too, which
-// reports again, and any other push leaves it; a plugin without the report
+// reports again, unless a firmware flash runs or a hold on Sleep's return is
+// pending, and any other push leaves it; a plugin without the report
 // (v1.11.1, the pinned one, answers 404 "Not found"), or none, answered once
 // on load and once a socket open, with no retry and nothing else on the page
 // changed.
@@ -116,6 +117,33 @@ test.describe('the page reported to Decent Sync\'s plugin', { tag: '@page-report
             await expect(page.locator('#subpage-host #settings-content-area')).toBeHidden();
             const loadedAt = await loadedAtOf(page);
             expect(reports(cafe, mark).map(entry => [entry.status, entry.body]), 'the fresh page reports on load and as its socket opens').toEqual([[204, build(loadedAt)], [204, build(loadedAt)]]);
+        });
+
+        test('a reload push is declined while a firmware flash runs, or a hold on Sleep\'s return is pending, and heard again after', async ({ cafe, fake }) => {
+            const page = await openWithSocket(cafe);
+            const flashing = value => page.evaluate(async on => (await import(new URL('src/modules/api.js', document.baseURI).href)).setFirmwareFlashInFlight(on), value);
+            const pending = value => page.evaluate(on => on ? window.localStorage.setItem('sleepExitPending', String(Date.now())) : window.localStorage.removeItem('sleepExitPending'), value);
+            const reportsAndWakes = mark => cafe.since(mark, entry => entry.path === PAGE || entry.path.startsWith('/api/v1/machine/state')).map(entry => `${entry.method} ${entry.path}`);
+
+            for (const [why, set] of [['a firmware flash', flashing], ['a hold on Sleep\'s return', pending]]) {
+                await markDocument(page);
+                await set(true);
+                const mark = fake.log.length;
+                fake.decentSync.push({ what: 'reload' });
+                fake.flush();
+                await cafe.settle();
+                await cafe.advance(2000);
+                expect(await sameDocument(page), `${why}: the same page`).toBe(true);
+                expect(reportsAndWakes(mark), `${why}: nothing reported, and the Machine not woken`).toEqual([]);
+                await set(false);
+            }
+
+            const loaded = page.waitForEvent('load');
+            fake.decentSync.push({ what: 'reload' });
+            fake.flush();
+            await loaded;
+            await page.locator('#cafe-strip .cafe-card').first().waitFor();
+            expect(await sameDocument(page), 'with neither, the next reload push loads the page again').toBeNull();
         });
 
         test('a plugin without the report answers 404, which is left at that, and the page goes on as before', async ({ cafe, fake }) => {

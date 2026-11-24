@@ -189,6 +189,15 @@ test('the fork\'s hooks are still in Streamline\'s chart, renderer and api modul
     assert.match(api, /fetch\(`http:\/\/\$\{window\.location\.hostname\}:\$\{REA_PORT\}\/api\/v1\/plugins\//, 'and it asks the page\'s own host, never reaHostname');
 });
 
+test('a reload Decent Sync asks for waits on what only the page knows', () => {
+    const api = readFileSync(new URL('../src/modules/api.js', import.meta.url), 'utf8');
+    assert.match(api, /export const firmwareFlashInProgress = \(\) => firmwareFlashInFlight;/, 'a firmware flash, read from the flag the flash sets');
+    const ui = readFileSync(new URL('../src/modules/ui.js', import.meta.url), 'utf8');
+    assert.match(ui, /export function sleepExitPending\(\) \{\s*try \{ return localStorage\.getItem\(SLEEP_EXIT_KEY\) !== null; \}/, 'and the marker a hold on Sleep leaves');
+    assert.match(SOURCES.find(({ name }) => name === 'decent-sync.js').text,
+        /reloadDeclined\(\{ flashing: firmwareFlashInProgress\(\), sleepExitPending: sleepExitPending\(\) \}\)/, 'both asked before the page loads again');
+});
+
 test('the Grind row\'s hook is still in ui.js', () => {
     // A preset's name shows as it is, a number to the step's places, and − and +
     // step nothing from a row that holds no number (#42).

@@ -138,6 +138,10 @@ export function setFirmwareFlashInFlight(value) {
     firmwareFlashInFlight = !!value;
 }
 
+// Streamline Cafe (docs/cafe/UPSTREAM_EDITS.md): leaving the page cancels a flash,
+// so the page declines a reload Decent Sync asks for while one runs.
+export const firmwareFlashInProgress = () => firmwareFlashInFlight;
+
 // Caching for DE1 settings to avoid multiple API calls
 const de1SettingsCache = {
     data: null,

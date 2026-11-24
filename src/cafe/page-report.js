@@ -9,6 +9,12 @@
 // served from the WebView's cache, as Streamline's own reload for a new build
 // does (src/modules/app.js, `checkSkinUpdate`). Unlike that reload it comes
 // back to the main page from any sub-page, since only the main page reports.
+//
+// The plugin asks only while the Machine runs nothing, asleep included, but two
+// things only the page knows make a reload unsafe then: a firmware flash, which
+// leaving the page cancels, and a hold on Sleep that closed Decaid, whose
+// return a fresh page would take the load for, waking the Machine with no one
+// there. The page then declines, and the plugin hears no fresh report.
 
 export function pageReport({ skinId, version, timeOrigin }) {
     return { skinId, version, loadedAt: new Date(timeOrigin).toISOString() };
@@ -21,6 +27,12 @@ export function asksReload(data) {
     } catch {
         return false;
     }
+}
+
+export function reloadDeclined({ flashing, sleepExitPending }) {
+    if (flashing) return 'a firmware flash is running';
+    if (sleepExitPending) return 'a hold on Sleep closed the app, and its return is pending';
+    return null;
 }
 
 export function reloadUrl(href, now) {
