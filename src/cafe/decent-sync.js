@@ -93,7 +93,7 @@ async function ask() {
 
 function reload() {
     const declined = reloadDeclined({ flashing: firmwareFlashInProgress(), sleepExitPending: sleepExitPending() });
-    if (declined) logger.info(`Cafe: Decent Sync asked for a reload, declined as ${declined}`);
+    if (declined) logger.audit(`Cafe: Decent Sync's reload declined: ${declined}`);
     else window.location.replace(reloadUrl(window.location.href, Date.now()));
 }
 

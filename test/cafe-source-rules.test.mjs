@@ -196,6 +196,7 @@ test('a reload Decent Sync asks for waits on what only the page knows', () => {
     assert.match(ui, /export function sleepExitPending\(\) \{\s*try \{ return localStorage\.getItem\(SLEEP_EXIT_KEY\) !== null; \}/, 'and the marker a hold on Sleep leaves');
     assert.match(SOURCES.find(({ name }) => name === 'decent-sync.js').text,
         /reloadDeclined\(\{ flashing: firmwareFlashInProgress\(\), sleepExitPending: sleepExitPending\(\) \}\)/, 'both asked before the page loads again');
+    assert.match(SOURCES.find(({ name }) => name === 'decent-sync.js').text, /if \(declined\) logger\.audit\(/, 'and a decline logged where a tablet keeps it, as logger.info is off');
 });
 
 test('the Grind row\'s hook is still in ui.js', () => {
