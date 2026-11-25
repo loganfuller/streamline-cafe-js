@@ -212,12 +212,19 @@ function scaleAfterMachine(ms) {
 
 // A moment of the pour, between MID_MS and LATER_MS, that ends on a scale frame
 // sent after the machine's last, weighing a tenth or more over the one before
-// it. Should the chart draw the machine frame before the scale's arrives, no
-// machine frame comes after to draw the Weight card again (issue #92).
+// it, with both in the last of the steps `cafe.pour` plays the pour in from its
+// start. Should the chart draw the machine frame before the scale's arrives, no
+// machine frame comes after to draw the Weight card again (issue #92). The
+// moment is the scale frame's own: which side of a step's end the scale's
+// frames fall on changes from one recording to the next.
+const POUR_STEP_MS = 250;
 const TRAILING_MS = (() => {
-    for (let ms = MID_MS + 250; ms < LATER_MS; ms += 250) {
+    const scaleMoments = POUR.frames.filter(entry => entry.socket === 'scale/snapshot' && entry.ms > MID_MS && entry.ms < LATER_MS).map(entry => entry.ms);
+    for (const ms of scaleMoments) {
+        const stepStart = Math.ceil(ms / POUR_STEP_MS) * POUR_STEP_MS - POUR_STEP_MS;
+        const machineLast = POUR.frames.filter(entry => entry.ms <= ms && inShot(entry)).at(-1);
         const { after, before } = scaleAfterMachine(ms);
-        if (after.length && before !== null && Math.abs(after.at(-1).frame.weight - before) >= 0.15) return ms;
+        if (machineLast?.ms > stepStart && after.length && before !== null && Math.abs(after.at(-1).frame.weight - before) >= 0.15) return ms;
     }
     return null;
 })();
@@ -421,7 +428,7 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
             .toEqual(drawn(restCards({ view: 'reference', shot: shotNumbers(latest), reference: shotNumbers(reference) })));
         // Each pour's first reading of 0.2 g or more in its rise to 1 g (#98).
         expect(cards.cards[1], 'the first drip of each, and the difference').toEqual({
-            key: 'firstDrip', title: 'FIRST DRIP', value: '6.6 s', side: 'Ref 6.3 s', diff: '+0.3 s',
+            key: 'firstDrip', title: 'FIRST DRIP', value: '6.5 s', side: 'Ref 6.2 s', diff: '+0.3 s',
         });
 
         await cafe.screenshot('graph-overlay-light');
