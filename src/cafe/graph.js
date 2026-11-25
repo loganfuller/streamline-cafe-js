@@ -250,8 +250,9 @@ export function showGraphRecipe(next) {
 // ── During a shot ────────────────────────────────────────────────────────────
 
 // Is the profile running, so the chart holds the shot's lines? Streamline
-// starts its shot clock, and the chart, at the profile's first frame, and stops
-// it at the frame after the shot's end: the end is told before that frame is.
+// starts its shot clock, and the chart, at the profile's first frame, again at
+// the next one after Decaid names another shot id, and stops it at the frame
+// after the shot's end: the end is told before that frame is.
 const profileRunning = () => !!window.app?.isShotActive?.();
 
 // The machine went into its `espresso` state: the start of a shot's Preheat.

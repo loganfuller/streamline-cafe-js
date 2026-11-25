@@ -8,7 +8,7 @@
 // shot ends; and the four of them on the Shot Decaid stored once it is drawn in
 // the shot's place.
 //
-// Every shot is the one recorded pour (fake-decaid/recordings/pour.json, 17.6 s
+// Every shot is the one recorded pour (fake-decaid/recordings/pour.json, 17.4 s
 // of the Default profile after a half-second Preheat), played with the page's
 // clock moving with its frames. The pour plays to its end, and the Preheat is
 // held by the machine socket sending the pour's first Preheat frame, stamped
@@ -28,10 +28,9 @@
 // is swapped for the stored Shot's (the stars show), and that the stored Shot's
 // draw names the same four lines, inside the chart. How far each label moved is
 // kept as the test's annotation. Even from the same frames it is not nothing:
-// the page's draw of a stored Shot ends at its last sample in the profile
-// (17.60 s), one frame before the last the live draw had (17.71 s), and its
-// weight line two frames earlier still, so Weight moves about 11 px to the
-// left.
+// the page's draw of a stored Shot ends at its last sample in the profile,
+// which can be a frame before the last the live draw had, and its weight line
+// earlier still, so Weight moves a few pixels to the left.
 
 import { test, expect } from './support/test.mjs';
 import { recording } from './support/adapter.mjs';

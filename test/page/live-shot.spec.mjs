@@ -111,3 +111,54 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
         await cafe.screenshot('graph-no-reference-light');
     });
 });
+
+// Decaid naming another shot id while a shot is open, with no end between
+// (Streamline's `endLiveShot`, from v0.2.32): Streamline's chart ends the shot
+// and starts another at the next frame of the profile, and the cafe graph,
+// which follows only the machine's `espresso` state, stays live through it and
+// shows the stored Shot at rest. The pour's shot-state frames after 12 s (the
+// first at 12.8 s) name another id.
+const SHOT_STATE = '/ws/v1/machine/shotState';
+const SPLIT_MS = 12000;
+
+test.describe('a new shot id while a shot is open', { tag: '@shot' }, () => {
+    test('the chart starts again, the graph stays live, and the stored Shot is drawn at rest', async ({ cafe, fake }) => {
+        let split = false;
+        cafe.routes.interceptSocket(SHOT_STATE, send => cafe.fake.connect(SHOT_STATE, text => {
+            const frame = JSON.parse(text);
+            send(JSON.stringify(split && frame.shotId ? { ...frame, shotId: 'another-shot' } : frame));
+        }));
+        const page = await cafe.open();
+        const pressurePoints = async () => {
+            const lines = await chartLines(page);
+            return lines.points[lines.names.indexOf('Pressure')];
+        };
+        const liveTime = async () => Number.parseFloat((await row(page)).cards[0].value);
+        await load(cafe, house);
+        await cafe.pour(SPLIT_MS);
+        await expect.poll(pressurePoints).toBeGreaterThan(50);
+        const before = await pressurePoints();
+        await expect.poll(liveTime).toBeGreaterThan(10);
+
+        split = true;
+        await cafe.pour(16000);
+        await expect.poll(liveTime, 'the Time card starts again with the new shot').toBeLessThan(5);
+        const after = await pressurePoints();
+        expect(after, 'the chart starts again').toBeLessThan(before);
+        expect(after, 'and draws the new shot').toBeGreaterThan(0);
+        await expect(page.locator('#cafe-live')).toBeVisible();
+        expect((await legend(page)).label).toBe('Live shot');
+        const live = await row(page);
+        expect(live.mode).toBe('live');
+        expect(keys(live)).toBe(LIVE);
+
+        await cafe.pour();
+        await cafe.untilStored();
+        const id = await cafe.storeShot();
+        await cafe.advance(4000);
+        expect((await legend(page)).label, 'the stored Shot, found as a shot that poured').toBe('Latest');
+        const rest = await row(page);
+        expect(rest.mode).toBe('rest');
+        expect(rest.cards[0].value, 'with its own time').toBe(`${shotNumbers(fake.shots.get(id)).time.toFixed(1)} s`);
+    });
+});

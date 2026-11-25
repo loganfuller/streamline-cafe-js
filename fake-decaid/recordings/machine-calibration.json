@@ -2,13 +2,13 @@
  "recordedWith": {
   "decaid": "0.9.2",
   "dye2": "0.1.42",
-  "streamline": "0.2.31"
+  "streamline": "0.2.32"
  },
  "rule": "fake-decaid/machine.js",
  "about": "The simulated machine's calibration, as Streamline's settings page reads it: each target's current and factory values; an unknown target or source refused.",
  "given": {
   "workflow": {
-   "id": "df3c9f2c-8eca-47ba-bfd1-3af52ddd640f",
+   "id": "9556447b-7520-4232-8ffb-923644bcc2ea",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "323c8390-a015-40f3-a217-f18ab8404b81",
+    "grinderId": "2c385c2e-413f-4bf5-8e38-1357232c62ce",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "ee12fbdf-d287-49b7-b15b-6bb51fbcf2bb",
+    "beanBatchId": "0ed90eb7-98de-4324-ad32-3226f1bb7ee7",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
