@@ -49,7 +49,7 @@ const LIVE = 'time weight weightFlow flow pressure temperature';
 // (src/modules/chart.js, `setLiveLineLabels`; test/cafe-live-labels.test.mjs).
 const OWN_LABELLED = ['Pressure', 'Flow', '°C', 'Weight'];
 // Two moments of the pour, each well before the reference's end (the profile
-// starts 0.5 s in and runs 17.6 s): one in its fourth step, one in its fifth.
+// starts 0.5 s in and runs 17.4 s): one in its fourth step, one in its fifth.
 const MID_MS = 9000;
 const LATER_MS = 12000;
 
@@ -78,8 +78,8 @@ async function pullShot(cafe) {
  * sample data's newest Shot, another pour of the same simulated machine on the
  * pinned Decaid, as Decaid would have stored it with the recipe loaded (its
  * Workflow the recipe's, naming it as Streamline's apply does), half an hour
- * earlier. It ran 18.4 s to the recorded pour's 17.6 s, with its own first
- * drip and yield, so the cards beside it differ from the pour's.
+ * earlier. It ran 18.3 s to the recorded pour's 17.4 s, with its own first
+ * drip, so the cards beside it differ from the pour's.
  */
 function seedReference(fake) {
     const [newest] = fake.shots.newest(1);
@@ -89,8 +89,8 @@ function seedReference(fake) {
 }
 
 /**
- * The sample data's other Shot (18.1 s, 182 frames, to the reference's 18.4 s
- * and 185), as the recipe's latest, pulled after the reference and not it: so
+ * The sample data's other Shot (18.2 s, 187 frames, to the reference's 18.3 s
+ * and 188), as the recipe's latest, pulled after the reference and not it: so
  * a page that drew or compared against the latest Shot in the reference's
  * place would show other numbers.
  */
