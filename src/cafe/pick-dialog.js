@@ -69,6 +69,20 @@ function inUseMark() {
     return mark;
 }
 
+// A row's detail. One given in parts (`details`) is written with " · " between
+// them, each part kept to itself: a part in Arabic or Hebrew beside a code or
+// a number in Latin letters would otherwise be drawn out of order.
+function detailLine(row) {
+    if (!Array.isArray(row.details)) return span('cafe-pick-row-detail', row.detail);
+    const line = span('cafe-pick-row-detail');
+    row.details.forEach((part, index) => {
+        const words = document.createElement('bdi');
+        words.textContent = part;
+        line.append(...(index ? [' · ', words] : [words]));
+    });
+    return line;
+}
+
 // A row of the list on the right: a name over a detail, the one in use marked
 // "In use". A tap chooses it, or, where the list is `confirm`ed, highlights
 // it, and `aria-pressed` then says which row is highlighted.
@@ -79,7 +93,7 @@ function rowButton(row, onPick, held = !!row.inUse) {
     button.setAttribute('aria-pressed', String(held));
     button.dataset.id = row.id ?? '';
     const words = span('cafe-pick-row-text');
-    words.append(span('cafe-pick-row-name', row.name), span('cafe-pick-row-detail', row.detail));
+    words.append(span('cafe-pick-row-name', row.name), detailLine(row));
     button.append(words);
     if (row.inUse) button.append(inUseMark());
     button.addEventListener('click', () => onPick(row));
@@ -235,8 +249,10 @@ function closeEntry(parts) {
  * `{ key, vars }`, a key and what fills its places; `label` names the list for
  * a screen reader, already in the page's language, and `heading`, a key, is
  * shown over it where given; `rows` are `{ id, name, detail, inUse }`, in the
- * order shown, and `empty` is the key said where there are none. Resolves the
- * row tapped, or null when the dialog was closed without one.
+ * order shown, and `empty` is the key said where there are none. A row may
+ * give its detail in parts, as `details`, a list of texts, which are then
+ * shown in `detail`'s place with " · " between them. Resolves the row tapped,
+ * or null when the dialog was closed without one.
  *
  * `side`, where given, is the list on the left: `{ heading, rows, show, empty }`,
  * where `heading` is a key, `rows` are `{ id, name, detail, highlighted, inUse }`,
