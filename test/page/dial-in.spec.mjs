@@ -32,9 +32,9 @@ const fontSize = (page, id) => page.locator(`#${id}`).evaluate(e => getComputedS
 const PAST_DYE2_MS = AFTER_CHECK_MS + 500;
 
 /** The page open with the single origin loaded afresh, as stored, and not called changed. */
-async function openLoaded(cafe) {
+async function openLoaded(cafe, options) {
     matchMachine(cafe.fake, single.name);
-    await cafe.open();
+    await cafe.open(options);
     await load(cafe, single);
     await expect(card(cafe.page, single.slot)).toHaveAttribute('aria-pressed', 'true');
     const record = recordOf(cafe.fake, single.name);
@@ -125,6 +125,18 @@ test.describe('stepping the dial-in', { tag: '@dialin' }, () => {
         expect(records(fake), 'no record changed').toEqual(recordsBefore);
         expect(cafe.since(mark).filter(isDye2Write), 'nothing written to DYE2').toEqual([]);
         expect(loadedId(fake), 'the recipe stays loaded').toBe(before.id);
+    });
+
+    test('a tap on the steam flow opens its numpad, with Streamline\'s steam tile in time mode', async ({ cafe }) => {
+        await openLoaded(cafe, { before: () => { window._forceNumpadMobile = true; } });
+        const page = cafe.page;
+        // From Streamline v0.2.33 the tile takes taps off the value its mode
+        // shows small, which in time mode is the flow, the row's only number.
+        await page.evaluate(() => window.app.ui.setSteamTileModeIfSafe('time'));
+        await page.locator('#steam-flow-value').click();
+        await expect(page.locator('#numpad-modal-overlay'), 'a tap on the flow opens the numpad').toBeVisible();
+        await page.locator('#numpad-cancel').click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
     });
 
     test('a change made just before another recipe is tapped does not land on it, and the first comes back with its own numbers', async ({ cafe, fake }) => {
