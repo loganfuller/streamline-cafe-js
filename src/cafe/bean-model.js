@@ -178,7 +178,7 @@ export function weightText(grams) {
 
 /**
  * Text kept left to right wherever it is placed, as a weight's number before
- * its unit inside a phrase in Arabic or Hebrew, between Unicode's isolate
+ * its unit inside a phrase in Arabic or Hebrew, between Unicode's LRI and PDI
  * marks, which show nothing.
  */
 export function leftToRight(words) {
