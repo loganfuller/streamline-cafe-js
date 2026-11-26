@@ -502,27 +502,28 @@ test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '
     test('a look\'s answer, arriving after the push\'s, does not undo it', async ({ cafe, fake }) => {
         archive(fake, house.name);
         const page = await openPage(cafe);
+        await load(cafe, house);
         await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
         const houseBatch = batchNamed(fake, house.name).id;
 
-        // The look reads the batch twice, for the cards and for Dose. Both are
-        // answered as it was, archived, but held, whichever comes first.
+        // Every read of the batch the look makes, for the cards and for Dose,
+        // is answered as it was, archived, but held.
         const path = `/api/v1/bean-batches/${houseBatch}`;
+        let holding = true;
         let taken = 0;
-        let arrived;
         let release;
-        const reached = new Promise(resolve => { arrived = resolve; });
         const released = new Promise(resolve => { release = resolve; });
-        const stop = cafe.routes.intercept(request => taken < 2 && request.method === 'GET' && request.path === path, async ({ forward }) => {
+        const stop = cafe.routes.intercept(request => holding && request.method === 'GET' && request.path === path, async ({ forward }) => {
             taken += 1;
             const answer = forward();
-            if (taken === 2) arrived();
             await released;
             return answer;
         });
         await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
         await page.clock.runFor(1000);
-        await reached;
+        await expect.poll(() => taken, 'the look read the batch for the cards and for Dose').toBeGreaterThanOrEqual(2);
+        holding = false;
         stop();
 
         archive(fake, house.name, false);

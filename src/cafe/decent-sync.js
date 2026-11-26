@@ -118,8 +118,8 @@ export function onStatus(listener) {
 
 /**
  * `listener(push)` hears each message on the plugin's `changes` socket other
- * than `reload` and `batch`, as it was sent, and `{ what: 'connection' }` each
- * time the socket opens.
+ * than `reload` and a `batch` push that names a batch, as it was sent, and
+ * `{ what: 'connection' }` each time the socket opens.
  */
 export function onPush(listener) {
     pushListeners.push(listener);
