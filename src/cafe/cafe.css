@@ -190,6 +190,7 @@
 }
 
 .cafe-card {
+    position: relative;
     height: 100px;
     min-width: 0;
     box-sizing: border-box;
@@ -245,6 +246,50 @@ button.cafe-card {
     border-color: var(--mimoja-blue-v2);
     background: var(--mimoja-blue-v2);
     color: var(--button-primary-text);
+}
+
+/* A recipe whose batch is archived on the tablet (finished-batch.js): the card
+   is red, in the one colour the fork keeps for it, with a value for each
+   theme. Not loaded, the border and the words are red on the card's own
+   background; loaded, the card is filled red and the words take the card's
+   background, so both draw the same pair of colours. The bean's line is not
+   faded, which would take it under the contrast the words need.
+   test/cafe-finished-colour.test.mjs holds the contrast. */
+:root {
+    --cafe-finished: #b3261e;
+}
+
+[data-theme="dark"] {
+    --cafe-finished: #ff8a80;
+}
+
+.cafe-card-finished {
+    border-color: var(--cafe-finished);
+    color: var(--cafe-finished);
+}
+
+.cafe-card-finished .cafe-card-bean {
+    opacity: 1;
+}
+
+.cafe-card-finished[aria-pressed="true"] {
+    border-color: var(--cafe-finished);
+    background: var(--cafe-finished);
+    color: var(--profile-button-background-color);
+}
+
+/* Words for a screen reader alone: what the red says. */
+.cafe-hidden-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 /* An empty slot is an outline: "Slot N", and under it "Hold to add". A tap
@@ -363,6 +408,11 @@ button.cafe-card {
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--data-card-title-text-color);
+}
+
+/* The batch under Dose, archived on the tablet: red, as its recipe's card is. */
+.cafe-row-desc.cafe-batch-finished {
+    color: var(--cafe-finished);
 }
 
 /* A row whose name opens a dialog (the bean's, the basket's, the grinder's): the name and the line under
