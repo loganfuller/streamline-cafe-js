@@ -2,13 +2,13 @@
  "recordedWith": {
   "decaid": "0.9.2",
   "dye2": "0.1.42",
-  "streamline": "0.2.32"
+  "streamline": "0.2.34"
  },
  "rule": "fake-decaid/store.js",
  "about": "Decaid's store: a key never written answers null, a write answers {} and is read back as written, a namespace lists its keys or, with full=1, its values, and a delete answers {}.",
  "given": {
   "workflow": {
-   "id": "9556447b-7520-4232-8ffb-923644bcc2ea",
+   "id": "ad6edda9-ca81-4d05-ad62-9a8eaa8762b1",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "2c385c2e-413f-4bf5-8e38-1357232c62ce",
+    "grinderId": "ddf2ae7c-0255-41d8-b850-71638af6feed",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "0ed90eb7-98de-4324-ad32-3226f1bb7ee7",
+    "beanBatchId": "31ab5170-4fc5-4270-868e-56539108c2f4",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",

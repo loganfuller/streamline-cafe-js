@@ -8,7 +8,7 @@
 // shot ends; and the four of them on the Shot Decaid stored once it is drawn in
 // the shot's place.
 //
-// Every shot is the one recorded pour (fake-decaid/recordings/pour.json, 17.4 s
+// Every shot is the one recorded pour (fake-decaid/recordings/pour.json, 17.3 s
 // of the Default profile after a half-second Preheat), played with the page's
 // clock moving with its frames. The pour plays to its end, and the Preheat is
 // held by the machine socket sending the pour's first Preheat frame, stamped

@@ -20,8 +20,8 @@
     "asset": { "name": "decent-sync.reaplugin-v1.11.1.zip", "sha256": "51122975e2c67a03d978300f93bfde1a1aee345ac58fbe4e86d0771e298c3be8" }
   },
   "streamline": {
-    "version": "0.2.32",
+    "version": "0.2.34",
     "repo": "decentespresso/streamline-js",
-    "commit": "724774a3ca6c9a126cb092fc41e8f5cb1669ae68"
+    "commit": "90c3529b1b5be1862627cddca5dfe23117d8ef1a"
   }
 }
