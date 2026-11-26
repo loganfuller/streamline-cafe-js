@@ -55,6 +55,7 @@ const sideRows = page => page.locator('#cafe-pick-side .cafe-pick-row').evaluate
 })));
 const highlightedBean = async page => (await sideRows(page)).filter(row => row.highlighted).map(row => row.name);
 const sideRow = (page, name) => page.locator('#cafe-pick-side .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+const ltr = words => `\u2066${words}\u2069`;
 const batchRow = (page, n) => page.locator('#cafe-pick-list .cafe-pick-row').nth(n);
 const under = page => page.locator('#cafe-pick-under');
 const dose = page => page.locator('#cafe-dose-desc');
@@ -165,6 +166,51 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await expect(page.locator('#cafe-pick-title')).toHaveText('Bean and batch');
         await cafe.advance(1000);
         expect(cafe.since(mark, isWrite), 'nothing written').toEqual([]);
+    });
+
+    // Each batch's Batch Code and what is left of it, beside its roast date
+    // (#109), read from Decaid's record of the batch as Decent Sync keeps it:
+    // the code in `extras` under `decentSyncBatchCode`, the weight in
+    // `weightRemaining`. The recorded sample data has neither, as Decaid leaves
+    // out a field with no value, so the cases are set on the fake's records.
+    test('a batch row says its Batch Code and what is left, each left out where the record has none, and zero is a weight', async ({ cafe, fake }) => {
+        Object.assign(blendNew(fake), { weightRemaining: 240, extras: { decentSyncId: 'made-up-library-id', decentSyncBatchCode: 'SB-0211' } });
+        Object.assign(blendOld(fake), { weightRemaining: 0 });
+        Object.assign(singleBatch(fake), { extras: { decentSyncBatchCode: 'SO-0042' } });
+        Object.assign(decafBatch(fake), { weightRemaining: 2400, extras: { decentSyncBatchCode: null } });
+        const page = await houseLoaded(cafe, fake);
+        const mark = fake.log.length;
+
+        await openDialog(cafe, DOSE);
+        expect(await pickRows(page), 'a code and a weight, both with the roast date; and a weight of zero').toEqual([
+            { name: 'Roasted Nov 2', detail: `SB-0211 · ${ltr('240 g')} left · 16 days off roast`, inUse: true },
+            { name: 'Roasted Oct 15', detail: `${ltr('0 g')} left · 34 days off roast`, inUse: false },
+        ]);
+        expect(await batchRow(page, 0).locator('.cafe-pick-row-detail bdi').allTextContents(), 'each part kept to itself, for Arabic and Hebrew')
+            .toEqual(['SB-0211', `${ltr('240 g')} left`, '16 days off roast']);
+        await cafe.screenshot('bean-dialog-code-weight-light');
+
+        await batchRow(page, 1).click();
+        await expect.poll(async () => (await batchConfirm(page)).note, 'the note keeps to the bean and the roast date').toBe('Sample Blend · Roasted Oct 15');
+
+        await sideRow(page, 'Sample Single Origin').click();
+        await expect.poll(() => highlightedBean(page)).toEqual(['Sample Single Origin']);
+        expect(await pickRows(page), 'a code and no weight').toEqual([{ name: 'Roasted Oct 28', detail: 'SO-0042 · 21 days off roast', inUse: false }]);
+        await sideRow(page, 'Example Decaf').click();
+        await expect.poll(() => highlightedBean(page)).toEqual(['Example Decaf']);
+        expect(await pickRows(page), 'a weight in kilograms and no code').toEqual([{ name: 'Roasted Oct 20', detail: `${ltr('2.4 kg')} left · 29 days off roast`, inUse: false }]);
+        await cafe.screenshot('bean-dialog-kilograms-light');
+
+        await page.locator(CLOSE).click();
+        await untilPickClosed(cafe);
+        await paint(page, 'dark');
+        await openDialog(cafe, DOSE);
+        await cafe.screenshot('bean-dialog-code-weight-dark');
+        await page.locator(CLOSE).click();
+        await untilPickClosed(cafe);
+        await cafe.advance(1000);
+        expect(cafe.since(mark, isWrite), 'nothing written').toEqual([]);
+        expect(cafe.since(mark, entry => /decent[-_.]?sync/i.test(entry.path)), 'and nothing asked of Decent Sync\'s plugin').toEqual([]);
     });
 
     test('a tap on a batch highlights it and writes nothing, and Close or a tap outside then writes nothing', async ({ cafe, fake }) => {
@@ -495,6 +541,60 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                 if (!fit.whole || !fit.inside || !fit.noteBeside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
                 if (code === 'en') await cafe.screenshot('bean-dialog-highlighted-1340x800-light');
                 if (code === 'de') await cafe.screenshot('bean-dialog-highlighted-1340x800-de-light');
+                await page.locator(CLOSE).click();
+                await untilPickClosed(cafe);
+            }
+            expect(unfit, `every one of ${1 + FINISHED_LANGUAGES.length} languages fits`).toEqual([]);
+        });
+
+        // A row with a Batch Code and a weight says "left" in the page's
+        // language, with the weight's number drawn before its unit in Arabic
+        // and Hebrew too, and stays inside the list at the narrowest width
+        // (#109).
+        test('a batch row with a Batch Code and a weight, translated, fits the list in every finished language', async ({ cafe, fake }) => {
+            Object.assign(blendNew(fake), { weightRemaining: 240, extras: { decentSyncBatchCode: 'SB-0211' } });
+            Object.assign(blendOld(fake), { weightRemaining: 2400, extras: { decentSyncBatchCode: 'SB-0198' } });
+            const page = await openPage(cafe);
+            const unfit = [];
+            for (const code of ['en', ...FINISHED_LANGUAGES]) {
+                if (code !== 'en') {
+                    await page.evaluate(async language => {
+                        const { setLanguage } = await import('/src/modules/i18n.js');
+                        await setLanguage(language);
+                    }, code);
+                    await cafe.settle();
+                }
+                await openDialog(cafe, DOSE);
+                await sideRow(page, 'Sample Blend').click();
+                const fit = await page.evaluate(() => {
+                    const rect = element => element.getBoundingClientRect();
+                    const list = rect(document.getElementById('cafe-pick-list'));
+                    const box = rect(document.querySelector('#cafe-pick-dialog .cafe-pick-box'));
+                    const rows = [...document.querySelectorAll('#cafe-pick-list .cafe-pick-row')];
+                    const numberBeforeUnit = rows.every(row => {
+                        const words = row.querySelectorAll('.cafe-pick-row-detail bdi')[1].firstChild;
+                        const number = words.data.search(/\d/);
+                        const unit = words.data.indexOf('g', number);
+                        const at = (start, end) => {
+                            const range = document.createRange();
+                            range.setStart(words, start);
+                            range.setEnd(words, end);
+                            return range.getBoundingClientRect().left;
+                        };
+                        return number >= 0 && unit > number && at(number, number + 1) < at(unit, unit + 1);
+                    });
+                    return {
+                        numberBeforeUnit,
+                        details: rows.map(row => row.querySelector('.cafe-pick-row-detail').textContent),
+                        inside: rows.every(row => rect(row).left >= list.left - 1 && rect(row).right <= list.right + 1 && row.scrollWidth <= row.clientWidth + 1)
+                            && box.right <= innerWidth && box.bottom <= innerHeight,
+                    };
+                });
+                const left = weight => (code === 'en' ? '{weight} left' : CAFE_TRANSLATIONS['{weight} left'][code]).replace('{weight}', weight);
+                const translated = fit.details[0].startsWith(`SB-0211 · ${left(ltr('240 g'))} · `) && fit.details[1].startsWith(`SB-0198 · ${left(ltr('2.4 kg'))} · `);
+                if (fit.details.length !== 2 || !fit.inside || !fit.numberBeforeUnit || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
+                if (code === 'de') await cafe.screenshot('bean-dialog-code-weight-1340x800-de-light');
+                if (code === 'ar') await cafe.screenshot('bean-dialog-code-weight-1340x800-ar-light');
                 await page.locator(CLOSE).click();
                 await untilPickClosed(cafe);
             }

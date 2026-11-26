@@ -4,6 +4,13 @@
 // is touched: the phrases go through `t`, the roast day through `formatDay`,
 // and Decaid's answers and today's date are handed in.
 //
+// A batch row also says the batch's Batch Code and what is left of it, each
+// read from Decaid's own record of the batch and left out where the record
+// has none. Decent Sync keeps both there: the code under its own key in the
+// record's `extras`, until Decaid's record has a field for it
+// (decentespresso/decaid#1263), and in `weightRemaining` what is left at the
+// tablet's Location.
+//
 // A tap on a batch highlights it, and "Use this batch" under the batches
 // chooses it (`batchUse`). A choice writes the bean's name, its roaster and
 // the batch's id into the Workflow, under Streamline's own bean writer
@@ -26,10 +33,16 @@ export const BEAN_PHRASES = {
     oneDay: '1 day off roast',
     days: '{days} days off roast',
     noRoastDate: 'No roast date',
+    left: '{weight} left',
     unnamed: 'Unnamed',
     otherBean: '{recipe} · changes the recipe\'s bean',
     use: 'Use this batch',
 };
+
+const BATCH_CODE_KEY = 'decentSyncBatchCode';
+const GRAMS_IN_A_KILOGRAM = 1000;
+const LEFT_TO_RIGHT_ISOLATE = '\u2066';
+const POP_DIRECTIONAL_ISOLATE = '\u2069';
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
@@ -144,21 +157,59 @@ export function daysOffRoast(day, today) {
 }
 
 /**
- * The right list's rows, for one bean of `beanList`: "Roasted" and the date
- * over the days off roast, or "No roast date" alone, with the Workflow's own
- * batch `inUse`. `today` is the tablet's calendar day, YYYY-MM-DD, and
- * `formatDay` writes a YYYY-MM-DD day in the page's language.
+ * A batch's Batch Code, from Decaid's record of it, or '' where it has none:
+ * the key absent, null, blank, or anything that is not text.
+ */
+export function batchCode(batch) {
+    return text(batch?.extras?.[BATCH_CODE_KEY]);
+}
+
+/**
+ * A weight in grams as a batch row writes it: whole grams under a kilogram
+ * ("240 g", "0 g"), kilograms to one place from there ("2.4 kg"). '' for what
+ * is no weight: not a number, or under zero.
+ */
+export function weightText(grams) {
+    if (typeof grams !== 'number' || !Number.isFinite(grams) || grams < 0) return '';
+    const whole = Math.round(grams);
+    if (whole < GRAMS_IN_A_KILOGRAM) return `${whole} g`;
+    return `${(Math.round(grams / 100) / 10).toFixed(1)} kg`;
+}
+
+/**
+ * Text kept left to right wherever it is placed, as a weight's number before
+ * its unit inside a phrase in Arabic or Hebrew, between Unicode's LRI and PDI
+ * marks, which show nothing.
+ */
+export function leftToRight(words) {
+    return words ? `${LEFT_TO_RIGHT_ISOLATE}${words}${POP_DIRECTIONAL_ISOLATE}` : '';
+}
+
+/**
+ * The right list's rows, for one bean of `beanList`: "Roasted" and the date,
+ * or "No roast date", over the batch's Batch Code, what is left of it and its
+ * days off roast, each left out where the record has none, with the
+ * Workflow's own batch `inUse`. The weight goes into its phrase kept left to
+ * right (`leftToRight`). The second line is `details`, its parts, and
+ * `detail`, the same joined as the dialog shows them. `today` is the tablet's
+ * calendar day, YYYY-MM-DD, and `formatDay` writes a YYYY-MM-DD day in the
+ * page's language.
  */
 export function batchRows(entry, context, today, formatDay, t) {
     return (entry?.batches || []).map(batch => {
         const day = roastDay(batch.roastDate);
         const days = daysOffRoast(day, today);
+        const weight = weightText(batch.weightRemaining);
+        const left = weight ? t(BEAN_PHRASES.left, { weight: leftToRight(weight) }) : '';
+        const offRoast = days === null ? '' : days === 1 ? t(BEAN_PHRASES.oneDay) : t(BEAN_PHRASES.days, { days });
+        const details = [batchCode(batch), left, offRoast].filter(Boolean);
         return {
             id: String(batch.id),
             bean: entry.bean,
             batch,
             name: day ? t(BEAN_PHRASES.roasted, { date: formatDay(day) }) : t(BEAN_PHRASES.noRoastDate),
-            detail: days === null ? '' : days === 1 ? t(BEAN_PHRASES.oneDay) : t(BEAN_PHRASES.days, { days }),
+            details,
+            detail: details.join(' · '),
             inUse: sameId(batch.id, context?.beanBatchId),
         };
     });

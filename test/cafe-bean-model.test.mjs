@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchRows, batchUse, batchPick, beanSubtitle,
+    BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, daysOffRoast, batchCode, weightText, leftToRight, batchRows, batchUse, batchPick, beanSubtitle,
 } from '../src/cafe/bean-model.js';
 import { assertDeclaredFields } from '../src/modules/workflow-fields.js';
 
@@ -73,6 +73,57 @@ test('the right list: "Roasted" and the date over the days off roast, the Workfl
     ]);
     assert.equal(batchRows(LIST[1], {}, TODAY, day, t)[0].detail, '1 day off roast');
     assert.deepEqual(batchRows(undefined, {}, TODAY, day, t), [], 'a bean not listed has no batches to show');
+});
+
+const ltr = words => `\u2066${words}\u2069`;
+
+test('a batch row says its Batch Code and what is left beside its roast date, and one with neither reads as before', () => {
+    const coded = batch('b-coded', 'bean-house', '2026-11-10T00:00:00.000Z', { weightRemaining: 240, extras: { decentSyncId: 'x', decentSyncBatchCode: 'SB-0211' } });
+    const codeOnly = batch('b-code-only', 'bean-house', '2026-11-05T00:00:00.000Z', { extras: { decentSyncBatchCode: 'SB-0198' } });
+    const weightOnly = batch('b-weight-only', 'bean-house', '2026-11-01T00:00:00.000Z', { weightRemaining: 2400 });
+    const empty = batch('b-empty', 'bean-house', '2026-10-28T00:00:00.000Z', { weightRemaining: 0 });
+    const plain = batch('b-plain', 'bean-house', '2026-10-20T00:00:00.000Z', { weightRemaining: null, extras: { decentSyncId: 'y' } });
+    const undatedCoded = batch('b-undated-coded', 'bean-house', null, { weightRemaining: 80, extras: { decentSyncBatchCode: 'SB-0150' } });
+    const [entry] = beanList([house], [coded, codeOnly, weightOnly, empty, plain, undatedCoded]);
+    const rows = batchRows(entry, { beanBatchId: 'b-coded' }, TODAY, day, t);
+    assert.deepEqual(rows.map(({ id, name, detail, inUse }) => ({ id, name, detail, inUse })), [
+        { id: 'b-coded', name: 'Roasted day 2026-11-10', detail: `SB-0211 · ${ltr('240 g')} left · 7 days off roast`, inUse: true },
+        { id: 'b-code-only', name: 'Roasted day 2026-11-05', detail: 'SB-0198 · 12 days off roast', inUse: false },
+        { id: 'b-weight-only', name: 'Roasted day 2026-11-01', detail: `${ltr('2.4 kg')} left · 16 days off roast`, inUse: false },
+        { id: 'b-empty', name: 'Roasted day 2026-10-28', detail: `${ltr('0 g')} left · 20 days off roast`, inUse: false },
+        { id: 'b-plain', name: 'Roasted day 2026-10-20', detail: '28 days off roast', inUse: false },
+        { id: 'b-undated-coded', name: 'No roast date', detail: `SB-0150 · ${ltr('80 g')} left`, inUse: false },
+    ]);
+    assert.deepEqual(rows.map(row => row.details), [
+        ['SB-0211', `${ltr('240 g')} left`, '7 days off roast'], ['SB-0198', '12 days off roast'], [`${ltr('2.4 kg')} left`, '16 days off roast'],
+        [`${ltr('0 g')} left`, '20 days off roast'], ['28 days off roast'], ['SB-0150', `${ltr('80 g')} left`],
+    ], 'the parts of the second line, for the dialog to keep each to itself');
+    assert.deepEqual(batchRows(beanList([house], [batch('b-bare', 'bean-house', null)])[0], {}, TODAY, day, t).map(row => [row.detail, row.details]), [['', []]],
+        'no roast date, code or weight: no second line');
+    assert.equal(batchUse(rows[1], null, null, t).note, 'Sample House Blend · Roasted day 2026-11-05', 'the note beside "Use this batch" keeps to the bean and the roast date');
+    const translated = batchRows(entry, {}, TODAY, day, (phrase, vars) => `<${t(phrase, vars)}>`);
+    assert.equal(translated[0].detail, `SB-0211 · <${ltr('240 g')} left> · <7 days off roast>`, 'the weight goes through the phrase, and the code is not translated');
+});
+
+test('a Batch Code is the text under Decent Sync\'s key in the record\'s extras, and anything else is none', () => {
+    assert.equal(batchCode({ extras: { decentSyncBatchCode: 'PR-0470' } }), 'PR-0470');
+    assert.equal(batchCode({ extras: { decentSyncBatchCode: '  PR-0470 ' } }), 'PR-0470', 'the spaces around it are dropped');
+    for (const none of [undefined, null, {}, { extras: null }, { extras: {} }, { extras: { decentSyncBatchCode: null } }, { extras: { decentSyncBatchCode: '   ' } },
+        { extras: { decentSyncBatchCode: 470 } }, { extras: { decentSyncBatchCode: ['PR-0470'] } }, { extras: 'PR-0470' }, { decentSyncBatchCode: 'PR-0470' }]) {
+        assert.equal(batchCode(none), '', JSON.stringify(none));
+    }
+});
+
+test('a weight reads in whole grams under a kilogram and in kilograms from there, zero is a weight, and no number is none', () => {
+    assert.deepEqual([0, 0.4, 7.5, 240, 999.4].map(weightText), ['0 g', '0 g', '8 g', '240 g', '999 g']);
+    assert.deepEqual([999.5, 1000, 1049, 1050, 1250, 2400, 12000].map(weightText), ['1.0 kg', '1.0 kg', '1.0 kg', '1.1 kg', '1.3 kg', '2.4 kg', '12.0 kg']);
+    assert.deepEqual([1049.6, 1249.8, 1949.9].map(weightText), ['1.0 kg', '1.2 kg', '1.9 kg'], 'kilograms are rounded from the weight itself, not from its whole grams');
+    for (const none of [undefined, null, '', '240', NaN, Infinity, -1, {}, true]) assert.equal(weightText(none), '', String(none));
+});
+
+test('text kept left to right sits between the isolate marks, and none stays none', () => {
+    assert.equal(leftToRight('240 g'), '\u2066240 g\u2069');
+    assert.equal(leftToRight(''), '');
 });
 
 test('days off roast count calendar days, and a roast dated after today counts as none', () => {
