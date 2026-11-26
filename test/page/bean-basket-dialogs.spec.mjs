@@ -55,6 +55,7 @@ const sideRows = page => page.locator('#cafe-pick-side .cafe-pick-row').evaluate
 })));
 const highlightedBean = async page => (await sideRows(page)).filter(row => row.highlighted).map(row => row.name);
 const sideRow = (page, name) => page.locator('#cafe-pick-side .cafe-pick-row').filter({ has: page.locator('.cafe-pick-row-name', { hasText: name }) });
+const ltr = words => `\u2066${words}\u2069`;
 const batchRow = (page, n) => page.locator('#cafe-pick-list .cafe-pick-row').nth(n);
 const under = page => page.locator('#cafe-pick-under');
 const dose = page => page.locator('#cafe-dose-desc');
@@ -182,11 +183,11 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await openDialog(cafe, DOSE);
         expect(await pickRows(page), 'a code and a weight, both with the roast date; and a weight of zero').toEqual([
-            { name: 'Roasted Nov 2', detail: 'SB-0211 · 240 g left · 16 days off roast', inUse: true },
-            { name: 'Roasted Oct 15', detail: '0 g left · 34 days off roast', inUse: false },
+            { name: 'Roasted Nov 2', detail: `SB-0211 · ${ltr('240 g')} left · 16 days off roast`, inUse: true },
+            { name: 'Roasted Oct 15', detail: `${ltr('0 g')} left · 34 days off roast`, inUse: false },
         ]);
         expect(await batchRow(page, 0).locator('.cafe-pick-row-detail bdi').allTextContents(), 'each part kept to itself, for Arabic and Hebrew')
-            .toEqual(['SB-0211', '240 g left', '16 days off roast']);
+            .toEqual(['SB-0211', `${ltr('240 g')} left`, '16 days off roast']);
         await cafe.screenshot('bean-dialog-code-weight-light');
 
         await batchRow(page, 1).click();
@@ -197,7 +198,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         expect(await pickRows(page), 'a code and no weight').toEqual([{ name: 'Roasted Oct 28', detail: 'SO-0042 · 21 days off roast', inUse: false }]);
         await sideRow(page, 'Example Decaf').click();
         await expect.poll(() => highlightedBean(page)).toEqual(['Example Decaf']);
-        expect(await pickRows(page), 'a weight in kilograms and no code').toEqual([{ name: 'Roasted Oct 20', detail: '2.4 kg left · 29 days off roast', inUse: false }]);
+        expect(await pickRows(page), 'a weight in kilograms and no code').toEqual([{ name: 'Roasted Oct 20', detail: `${ltr('2.4 kg')} left · 29 days off roast`, inUse: false }]);
         await cafe.screenshot('bean-dialog-kilograms-light');
 
         await page.locator(CLOSE).click();
@@ -547,7 +548,9 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         });
 
         // A row with a Batch Code and a weight says "left" in the page's
-        // language, and stays inside the list at the narrowest width (#109).
+        // language, with the weight's number drawn before its unit in Arabic
+        // and Hebrew too, and stays inside the list at the narrowest width
+        // (#109).
         test('a batch row with a Batch Code and a weight, translated, fits the list in every finished language', async ({ cafe, fake }) => {
             Object.assign(blendNew(fake), { weightRemaining: 240, extras: { decentSyncBatchCode: 'SB-0211' } });
             Object.assign(blendOld(fake), { weightRemaining: 2400, extras: { decentSyncBatchCode: 'SB-0198' } });
@@ -568,15 +571,28 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                     const list = rect(document.getElementById('cafe-pick-list'));
                     const box = rect(document.querySelector('#cafe-pick-dialog .cafe-pick-box'));
                     const rows = [...document.querySelectorAll('#cafe-pick-list .cafe-pick-row')];
+                    const numberBeforeUnit = rows.every(row => {
+                        const words = row.querySelectorAll('.cafe-pick-row-detail bdi')[1].firstChild;
+                        const number = words.data.search(/\d/);
+                        const unit = words.data.indexOf('g', number);
+                        const at = (start, end) => {
+                            const range = document.createRange();
+                            range.setStart(words, start);
+                            range.setEnd(words, end);
+                            return range.getBoundingClientRect().left;
+                        };
+                        return number >= 0 && unit > number && at(number, number + 1) < at(unit, unit + 1);
+                    });
                     return {
+                        numberBeforeUnit,
                         details: rows.map(row => row.querySelector('.cafe-pick-row-detail').textContent),
                         inside: rows.every(row => rect(row).left >= list.left - 1 && rect(row).right <= list.right + 1 && row.scrollWidth <= row.clientWidth + 1)
                             && box.right <= innerWidth && box.bottom <= innerHeight,
                     };
                 });
                 const left = weight => (code === 'en' ? '{weight} left' : CAFE_TRANSLATIONS['{weight} left'][code]).replace('{weight}', weight);
-                const translated = fit.details[0].startsWith(`SB-0211 · ${left('240 g')} · `) && fit.details[1].startsWith(`SB-0198 · ${left('2.4 kg')} · `);
-                if (fit.details.length !== 2 || !fit.inside || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
+                const translated = fit.details[0].startsWith(`SB-0211 · ${left(ltr('240 g'))} · `) && fit.details[1].startsWith(`SB-0198 · ${left(ltr('2.4 kg'))} · `);
+                if (fit.details.length !== 2 || !fit.inside || !fit.numberBeforeUnit || !translated) unfit.push(`${code}: ${JSON.stringify(fit)}`);
                 if (code === 'de') await cafe.screenshot('bean-dialog-code-weight-1340x800-de-light');
                 if (code === 'ar') await cafe.screenshot('bean-dialog-code-weight-1340x800-ar-light');
                 await page.locator(CLOSE).click();

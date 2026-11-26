@@ -41,6 +41,8 @@ export const BEAN_PHRASES = {
 
 const BATCH_CODE_KEY = 'decentSyncBatchCode';
 const GRAMS_IN_A_KILOGRAM = 1000;
+const LEFT_TO_RIGHT_ISOLATE = '\u2066';
+const POP_DIRECTIONAL_ISOLATE = '\u2069';
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
@@ -171,23 +173,34 @@ export function weightText(grams) {
     if (typeof grams !== 'number' || !Number.isFinite(grams) || grams < 0) return '';
     const whole = Math.round(grams);
     if (whole < GRAMS_IN_A_KILOGRAM) return `${whole} g`;
-    return `${(Math.round(whole / 100) / 10).toFixed(1)} kg`;
+    return `${(Math.round(grams / 100) / 10).toFixed(1)} kg`;
+}
+
+/**
+ * Text kept left to right wherever it is placed, as a weight's number before
+ * its unit inside a phrase in Arabic or Hebrew, between Unicode's isolate
+ * marks, which show nothing.
+ */
+export function leftToRight(words) {
+    return words ? `${LEFT_TO_RIGHT_ISOLATE}${words}${POP_DIRECTIONAL_ISOLATE}` : '';
 }
 
 /**
  * The right list's rows, for one bean of `beanList`: "Roasted" and the date,
  * or "No roast date", over the batch's Batch Code, what is left of it and its
  * days off roast, each left out where the record has none, with the
- * Workflow's own batch `inUse`. The second line is `details`, its parts, and
- * `detail`, the same joined as the dialog shows them. `today` is the tablet's calendar day,
- * YYYY-MM-DD, and `formatDay` writes a YYYY-MM-DD day in the page's language.
+ * Workflow's own batch `inUse`. The weight goes into its phrase kept left to
+ * right (`leftToRight`). The second line is `details`, its parts, and
+ * `detail`, the same joined as the dialog shows them. `today` is the tablet's
+ * calendar day, YYYY-MM-DD, and `formatDay` writes a YYYY-MM-DD day in the
+ * page's language.
  */
 export function batchRows(entry, context, today, formatDay, t) {
     return (entry?.batches || []).map(batch => {
         const day = roastDay(batch.roastDate);
         const days = daysOffRoast(day, today);
         const weight = weightText(batch.weightRemaining);
-        const left = weight ? t(BEAN_PHRASES.left, { weight }) : '';
+        const left = weight ? t(BEAN_PHRASES.left, { weight: leftToRight(weight) }) : '';
         const offRoast = days === null ? '' : days === 1 ? t(BEAN_PHRASES.oneDay) : t(BEAN_PHRASES.days, { days });
         const details = [batchCode(batch), left, offRoast].filter(Boolean);
         return {
