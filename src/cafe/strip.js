@@ -9,7 +9,7 @@
 // taps count and keeps loads and unloads in order. A long-press never loads,
 // and never leaves the page: it opens a menu on the card (slot-menu.js), whose
 // actions are in arrange.js.
-import { getDye2KvArray, callPluginEndpoint, getEspressoEndedAt } from '../modules/api.js';
+import { getDye2KvArray, callPluginEndpoint, getEspressoEndedAt, getBeanBatch } from '../modules/api.js';
 import { applyRecipe } from '../modules/dyeStrip.js';
 import { isSubPage } from '../modules/router.js';
 import { showToast, setupPressAndHold } from '../modules/ui.js';
@@ -17,6 +17,7 @@ import { openContextMenu } from '../modules/context-menu.js';
 import { logger } from '../modules/logger.js';
 import { DYE2_PLUGIN_ID } from './dye2-gate.js';
 import { stripCards, recipeName } from './strip-model.js';
+import { cardBatchIds, recordsAfterRead, finishedSlots } from './finished-batch.js';
 import { createRecipeLoader } from './recipe-loader.js';
 import { slotMenu } from './slot-menu.js';
 import { makeRecipeIn, chooseRecipeFor, removeRecipe, clearSelection } from './arrange.js';
@@ -29,6 +30,9 @@ const REFRESH_GAP_MS = 300; // focus, visibilitychange and pageshow arrive toget
 const SETTLE_MAX_MS = 5000; // the longest a tap waits on earlier edits before its load is called off
 
 let cards = stripCards([], null); // as last drawn
+let batchRecords = new Map();     // Decaid's record of each batch a card names, as last read
+let finished = [];                // the slots drawn red, as last drawn
+let batchSeq = 0;
 let loader = null;
 let refreshTimer = null;
 let settleEdits = async () => {};
@@ -146,9 +150,33 @@ function render() {
         button.className = 'cafe-card no-select has-context-menu';
         button.setAttribute('aria-pressed', String(card.loaded));
         button.append(line('cafe-card-name', card.name), line('cafe-card-bean', card.bean));
+        if (finished.includes(String(card.slot))) {
+            button.classList.add('cafe-card-finished');
+            button.append(line('cafe-hidden-text', cafeText('Batch finished')));
+        }
         setupPressAndHold(button, () => { if (!arranging) loader.tap(card.recipe); }, () => openMenu(button, card));
         return button;
     }));
+}
+
+// The cards whose recipe names a batch archived on the tablet are red
+// (finished-batch.js). Each batch a card names is read from Decaid with the
+// records, so a batch archived or brought back since shows whenever the strip
+// is read. The cards are drawn again only when a mark changed.
+function markFinished() {
+    const next = finishedSlots(cards, batchRecords);
+    if (next.join() === finished.join()) return false;
+    finished = next;
+    return true;
+}
+
+async function readBatches() {
+    const seq = ++batchSeq;
+    const ids = cardBatchIds(cards);
+    const reads = await Promise.all(ids.map(id => getBeanBatch(id).then(record => ({ id, record }), () => null)));
+    if (seq !== batchSeq) return;
+    batchRecords = recordsAfterRead(batchRecords, ids, reads);
+    if (markFinished()) render();
 }
 
 /** Read DYE2 again, a moment later, so a burst of reasons to look costs one read. */
@@ -188,8 +216,10 @@ export function initStrip({ onChange = () => {}, onBeforeLoad = async () => {}, 
         shotRunning: () => shotRunning(),
         show(recipes, loaded) {
             cards = stripCards(recipes, loaded);
+            markFinished();
             render();
             onChange(loaded);
+            readBatches();
         },
         onLoading,
         onApplied: onApply,

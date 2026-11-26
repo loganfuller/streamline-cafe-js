@@ -13,6 +13,7 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { workflowFinished } from './finished-batch.js';
 import { decentSyncSaves } from './sync-status.js';
 import { askStatus, onStatus, reportPage } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
@@ -40,6 +41,7 @@ let saved = false;      // Decent Sync saves this Machine's dial-in onto its loa
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
+let finished = false;   // that batch is archived on the tablet (finished-batch.js)
 let namesSeq = 0;
 let namesTimer = null;
 let liveTimer = null;
@@ -116,6 +118,9 @@ function showStatus(answer) {
 function renderNames() {
     const roasted = names.roastDay ? cafeText('roasted {date}', { date: formatRoastDay(names.roastDay) }) : '';
     setText(el('cafe-dose-desc'), [names.bean, roasted].filter(Boolean).join(' · '));
+    el('cafe-dose-desc')?.classList.toggle('cafe-batch-finished', finished);
+    const said = el('cafe-dose-finished');
+    if (said) said.hidden = !finished;
     setText(el('cafe-yield-desc'), names.basket);
     setText(el('cafe-grind-desc'), names.grinder);
 }
@@ -134,22 +139,28 @@ export async function refreshNames() {
     paintBarista(baristaName(workflow?.context));
     const batchId = workflow?.context?.beanBatchId || null;
     if (!batchId) batch = null;
-    else if (!batch || batch.id !== batchId) {
-        // The row shows the bean at once and gains the roast date when it arrives.
-        batch = null;
-        names = dialInNames(workflow, null);
-        renderNames();
-        let read = null;
+    else {
+        if (!batch || batch.id !== batchId) {
+            // The row shows the bean at once and gains the roast date when it arrives.
+            batch = null;
+            finished = false;
+            names = dialInNames(workflow, null);
+            renderNames();
+        }
+        // The batch is read each time, so one archived or brought back since
+        // shows. A read that fails keeps the record of the same batch.
+        let read = batch;
         try {
             read = await getBeanBatch(batchId);
         } catch (error) {
-            logger.info(`Cafe: no roast date for batch ${batchId}: ${error.message}`);
+            logger.info(`Cafe: no record of batch ${batchId}: ${error.message}`);
         }
         // A newer read has begun, whether this one's batch arrived or failed:
         // its names are the ones to show.
         if (seq !== namesSeq) return;
         batch = read;
     }
+    finished = workflowFinished(workflow, batch);
     names = dialInNames(workflow, batch);
     renderNames();
 }
