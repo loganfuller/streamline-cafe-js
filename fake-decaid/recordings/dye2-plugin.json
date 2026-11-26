@@ -2,13 +2,13 @@
  "recordedWith": {
   "decaid": "0.9.2",
   "dye2": "0.1.42",
-  "streamline": "0.2.32"
+  "streamline": "0.2.34"
  },
  "rule": "fake-decaid/index.js",
  "about": "DYE2 disabled in Decaid: listed as not loaded, its routes answered 404; enabled again: listed as loaded, its routes answered as before.",
  "given": {
   "workflow": {
-   "id": "9556447b-7520-4232-8ffb-923644bcc2ea",
+   "id": "ad6edda9-ca81-4d05-ad62-9a8eaa8762b1",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "2c385c2e-413f-4bf5-8e38-1357232c62ce",
+    "grinderId": "ddf2ae7c-0255-41d8-b850-71638af6feed",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "0ed90eb7-98de-4324-ad32-3226f1bb7ee7",
+    "beanBatchId": "31ab5170-4fc5-4270-868e-56539108c2f4",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -2016,7 +2016,7 @@
     "status": 200,
     "body": {
      "kind": "favourite",
-     "id": "recent:ce84d81a-7f31-44ad-8d67-a908669a2c68",
+     "id": "recent:6d0c052d-025b-46c5-aa91-65584a44ea6b",
      "modified": false,
      "auto": true
     }

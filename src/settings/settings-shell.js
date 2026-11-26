@@ -13,6 +13,7 @@ import { SETTINGS_TREE as CANONICAL_SETTINGS_TREE } from './settings-tree.js';
 import { timeNav } from '../modules/perf-probe.js';
 import { observeSelects } from '../modules/custom-select.js';
 import { observeCelsiusLabels } from './celsius-label.js';
+import { getTempUnit } from '../modules/units.js';
 
 // [name, category, bengleOnly?] tuples for the pre-legacy-load nav and search,
 // derived from the canonical tree (settings-tree.js) so the two can't drift —
@@ -373,7 +374,7 @@ export async function initializeSettingsShell() {
     selectCleanup?.();
     selectCleanup = observeSelects(document.getElementById('settings-content-area'));
     celsiusCleanup?.();
-    celsiusCleanup = observeCelsiusLabels(root);
+    celsiusCleanup = observeCelsiusLabels(root, { unit: getTempUnit });
     initResizableSeparators();
     const saved = readSettingsLocation();
     const first = document.getElementById(`${saved?.mainCategory || 'quickadjustments'}-btn`)

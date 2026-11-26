@@ -117,7 +117,7 @@ test.describe('a live shot and the graph at rest', { tag: '@shot' }, () => {
 // and starts another at the next frame of the profile, and the cafe graph,
 // which follows only the machine's `espresso` state, stays live through it and
 // shows the stored Shot at rest. The pour's shot-state frames after 12 s (the
-// first at 12.8 s) name another id.
+// first at 12.9 s) name another id.
 const SHOT_STATE = '/ws/v1/machine/shotState';
 const SPLIT_MS = 12000;
 

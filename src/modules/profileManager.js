@@ -15,6 +15,7 @@ import { recipeIdPatch } from './dye-selection.js';
 import { profileSendBlocked, setPendingProfileSend, clearPendingProfileSend } from './profile-send-gate.js';
 import { profileAtBrewTemp } from './brew-temp.js';
 import { profileFingerprint } from './dye-selection.js';
+import { workflowHoldsProfile } from './wake-profile.js';
 
 /**
  * Rename a profile by ID
@@ -853,7 +854,7 @@ export async function loadProfileForWake(profileId) {
             const resolvedKey = staleTitle && resolveProfileKeyByTitle(availableProfiles, staleTitle, translateProfileTitle);
             if (resolvedKey && resolvedKey !== profileId) {
                 profile = availableProfiles[resolvedKey].profile;
-                logger.info(`Wake profile ${profileId} was superseded by an edit; resolved by title to ${resolvedKey}.`);
+                logger.audit(`wake-profile: ${profileId} superseded, resolved by title to ${resolvedKey}`);
                 profileId = resolvedKey;
                 localStorage.setItem('wakeProfileId', profileId);
             }
@@ -868,7 +869,7 @@ export async function loadProfileForWake(profileId) {
     }
     if (await recipeHoldsDial(profile)) {
         setActiveProfile(profileId);
-        logger.info(`Wake profile ${profileId} already loaded under a selected recipe; dial left alone.`);
+        logger.audit(`wake-profile: ${profileId} already loaded under a DYE2 recipe, dial left alone`);
         return true;
     }
     // Waking onto a profile is a profile switch, so it owes the same saved
@@ -883,7 +884,22 @@ export async function loadProfileForWake(profileId) {
     const profileToSend = withSavedBrewTemp(
         targetYield > 0 ? { ...profile, target_weight: targetYield } : profile, meta);
     try {
-        await updateWorkflow({ profile: profileToSend, context: { ...dial, ...recipeIdPatch(null) } }, 'profile.wake');
+        const wakePatch = { profile: profileToSend, context: { ...dial, ...recipeIdPatch(null) } };
+        let held = false;
+        for (let attempt = 0; attempt < 2 && !held; attempt++) {
+            if (attempt) logger.warn(`Wake profile ${profileId} did not stick; retrying once.`);
+            try {
+                const written = await updateWorkflow(wakePatch, 'profile.wake');
+                held = workflowHoldsProfile(await getWorkflow(), written?.profile);
+            } catch (error) {
+                logger.warn(`Wake profile ${profileId} write failed:`, error);
+            }
+        }
+        if (!held) {
+            logger.error(`Wake profile ${profileId} still not on the machine after retry.`);
+            return false;
+        }
+        logger.audit(`wake-profile: ${profileId} verified on /workflow`);
         setActiveProfile(profileId);
         // Steam rides its own setters, not the workflow context.
         await applySavedSteamSettings(meta);

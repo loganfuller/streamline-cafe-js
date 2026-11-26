@@ -589,6 +589,13 @@ button.cafe-card {
     flex-direction: column !important;
 }
 
+/* From Streamline v0.2.33 the tile also takes taps off the value its mode shows
+   small. The flow is the row's only number, so it keeps its numpad, and takes
+   the row's taps, which Streamline takes off the row while the machine is busy. */
+#steam-flow-value {
+    pointer-events: inherit !important;
+}
+
 /* Settings, Shots and Sleep: at the bottom of the column, side by side. */
 #shot-settings > #cafe-system {
     margin-top: auto;

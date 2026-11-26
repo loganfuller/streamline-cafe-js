@@ -32,9 +32,9 @@ const fontSize = (page, id) => page.locator(`#${id}`).evaluate(e => getComputedS
 const PAST_DYE2_MS = AFTER_CHECK_MS + 500;
 
 /** The page open with the single origin loaded afresh, as stored, and not called changed. */
-async function openLoaded(cafe) {
+async function openLoaded(cafe, options) {
     matchMachine(cafe.fake, single.name);
-    await cafe.open();
+    await cafe.open(options);
     await load(cafe, single);
     await expect(card(cafe.page, single.slot)).toHaveAttribute('aria-pressed', 'true');
     const record = recordOf(cafe.fake, single.name);
@@ -126,6 +126,38 @@ test.describe('stepping the dial-in', { tag: '@dialin' }, () => {
         expect(cafe.since(mark).filter(isDye2Write), 'nothing written to DYE2').toEqual([]);
         expect(loadedId(fake), 'the recipe stays loaded').toBe(before.id);
     });
+
+    test('a tap on the steam flow opens its numpad, with Streamline\'s steam tile in time mode', async ({ cafe }) => {
+        await openLoaded(cafe, { before: () => { window._forceNumpadMobile = true; } });
+        const page = cafe.page;
+        // From Streamline v0.2.33 the tile takes taps off the value its mode
+        // shows small, which in time mode is the flow, the row's only number.
+        await page.evaluate(() => window.app.ui.setSteamTileModeIfSafe('time'));
+        expect(await page.locator('#steam-flow-value').evaluate(e => e.style.pointerEvents), 'the tile took the flow\'s taps').toBe('none');
+        await page.locator('#steam-flow-value').click();
+        await expect(page.locator('#numpad-modal-overlay'), 'a tap on the flow opens the numpad').toBeVisible();
+        await page.locator('#numpad-cancel').click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+    });
+
+    for (const mode of ['flow', 'time']) {
+        test(`during a shot, a tap on the steam flow opens nothing, with Streamline's steam tile in ${mode} mode`, async ({ cafe, fake }) => {
+            await openLoaded(cafe, { before: () => { window._forceNumpadMobile = true; } });
+            const page = cafe.page;
+            await page.evaluate(m => window.app.ui.setSteamTileModeIfSafe(m), mode);
+            const mark = fake.log.length;
+            await cafe.pour(fake.machine.pourMoment((frame, socket) => socket === 'machine/snapshot' && frame.state?.state === 'espresso') + 1000);
+            await expect(page.locator('#steam-section'), 'Streamline dims the steam row').toHaveCSS('pointer-events', 'none');
+            const box = await page.locator('#steam-flow-value').boundingBox();
+            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+            await cafe.pour(3000);
+            await expect(page.locator('#numpad-modal-overlay'), 'no numpad over the shot').toBeHidden();
+            expect(cafe.since(mark).filter(isWorkflowWrite), 'no Workflow write during the shot').toEqual([]);
+            await cafe.pour();
+            await cafe.untilStored();
+            await cafe.storeShot();
+        });
+    }
 
     test('a change made just before another recipe is tapped does not land on it, and the first comes back with its own numbers', async ({ cafe, fake }) => {
         const first = await openLoaded(cafe);
