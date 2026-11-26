@@ -168,6 +168,39 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         restore();
     });
 
+    test('an answer from an earlier look, arriving late, does not undo a later look', async ({ cafe, fake }) => {
+        archive(fake, house.name);
+        const page = await openPage(cafe);
+        await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
+
+        // The first read of the batch is answered as it was, archived, but held.
+        const path = `/api/v1/bean-batches/${batchNamed(fake, house.name).id}`;
+        let taken = false;
+        let arrived;
+        let release;
+        const reached = new Promise(resolve => { arrived = resolve; });
+        const released = new Promise(resolve => { release = resolve; });
+        const stop = cafe.routes.intercept(request => !taken && request.method === 'GET' && request.path === path, async ({ forward }) => {
+            taken = true;
+            const answer = forward();
+            arrived();
+            await released;
+            return answer;
+        });
+        await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+        await page.clock.runFor(1000);
+        await reached;
+        stop();
+
+        archive(fake, house.name, false);
+        await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+        await page.clock.runFor(1000);
+        await expect.poll(() => redSlots(page), 'the later look, the batch brought back').toEqual([]);
+        release();
+        await cafe.advance(1000);
+        expect(await redSlots(page), 'the earlier look\'s answer, archived, arrived after').toEqual([]);
+    });
+
     test('a slow read of one batch holds up the red of no other card', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         await load(cafe, house);
@@ -314,6 +347,10 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
             await paint(page, theme);
             await expect.poll(() => redSlots(page)).toEqual([house.slot, single.slot, longBlack.slot, guest.slot, filter.slot]);
             await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+            const finished = await red(page);
+            const background = await card(page, decaf.slot).evaluate(el => getComputedStyle(el).backgroundColor);
+            expect(await colours(card(page, house.slot)), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
+            expect((await colours(dose(page))).text, 'the batch under Dose').toBe(finished);
             await cafe.screenshot(`finished-batch-no-recipe-${theme}`);
 
             archive(fake, single.name, false);
@@ -321,6 +358,9 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
             await paint(page, theme);
             await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
             await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+            expect(await colours(card(page, house.slot)), 'a red card, loaded').toEqual({ text: background, border: finished, fill: finished });
+            expect(await colours(card(page, longBlack.slot)), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
+            expect((await colours(dose(page))).text).toBe(finished);
             await cafe.screenshot(`finished-batch-recipe-${theme}`);
         });
     }
