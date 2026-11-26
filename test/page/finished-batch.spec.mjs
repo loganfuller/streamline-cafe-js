@@ -42,6 +42,16 @@ const colours = locator => locator.evaluate(el => {
     const style = getComputedStyle(el);
     return { text: style.color, border: style.borderTopColor, fill: style.backgroundColor };
 });
+/** A card's colours and its bean line's opacity, found and read in one turn: the strip may draw its cards again between two steps. */
+const cardLook = (page, slot) => page.evaluate(n => {
+    const el = document.querySelectorAll('#cafe-strip .cafe-card')[n - 1];
+    const style = getComputedStyle(el);
+    return { text: style.color, border: style.borderTopColor, fill: style.backgroundColor, bean: getComputedStyle(el.querySelector('.cafe-card-bean')).opacity };
+}, slot);
+const cardColours = async (page, slot) => {
+    const { bean, ...look } = await cardLook(page, slot);
+    return look;
+};
 const red = page => page.evaluate(() => {
     const probe = document.createElement('span');
     probe.style.color = 'var(--cafe-finished)';
@@ -59,7 +69,8 @@ async function lookAgain(cafe, event = 'streamline:mainpagevisible') {
 test.describe('a finished batch', { tag: '@finished' }, () => {
     test('a card whose recipe names an archived batch is red, loaded and not, and the others are as they were', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
-        const plain = { card: await colours(card(page, house.slot)), bean: await card(page, house.slot).locator('.cafe-card-bean').evaluate(el => getComputedStyle(el).opacity) };
+        const { bean, ...look } = await cardLook(page, house.slot);
+        const plain = { card: look, bean };
         await expect.poll(() => redSlots(page), 'no batch is archived').toEqual([]);
         await expect(card(page, house.slot)).toHaveAccessibleName('House espresso Sample Blend');
 
@@ -69,20 +80,20 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         const finished = await red(page);
         expect(finished).not.toBe(plain.card.text);
         for (const recipe of [house, longBlack]) {
-            expect(await colours(card(page, recipe.slot)), `${recipe.name}, not loaded`).toEqual({ text: finished, border: finished, fill: plain.card.fill });
+            expect(await cardColours(page, recipe.slot), `${recipe.name}, not loaded`).toEqual({ text: finished, border: finished, fill: plain.card.fill });
             await expect(card(page, recipe.slot)).toHaveAccessibleName(`${recipe.name} ${recipe.bean} Batch finished`);
             await expect(card(page, recipe.slot).locator('.cafe-hidden-text'), 'no new text is shown').toHaveCSS('width', '1px');
         }
-        expect(await colours(card(page, single.slot)), 'a card whose batch is not archived').toEqual(plain.card);
-        expect(await card(page, single.slot).locator('.cafe-card-bean').evaluate(el => getComputedStyle(el).opacity)).toBe(plain.bean);
+        expect(await cardColours(page, single.slot), 'a card whose batch is not archived').toEqual(plain.card);
+        expect((await cardLook(page, single.slot)).bean).toBe(plain.bean);
         await expect(card(page, single.slot)).toHaveAccessibleName('Single origin Sample Single Origin');
 
         await load(cafe, house);
         await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
         await expect(card(page, house.slot)).toHaveAttribute('aria-pressed', 'true');
-        expect(await colours(card(page, house.slot)), 'loaded: filled red, its words the card\'s own background').toEqual({ text: plain.card.fill, border: finished, fill: finished });
+        expect(await cardColours(page, house.slot), 'loaded: filled red, its words the card\'s own background').toEqual({ text: plain.card.fill, border: finished, fill: finished });
         await expect(card(page, house.slot)).toHaveAccessibleName('House espresso Sample Blend Batch finished');
-        expect(await colours(card(page, longBlack.slot)), 'the other stays as it was').toEqual({ text: finished, border: finished, fill: plain.card.fill });
+        expect(await cardColours(page, longBlack.slot), 'the other stays as it was').toEqual({ text: finished, border: finished, fill: plain.card.fill });
     });
 
     test('the batch under Dose is red while the Workflow names an archived batch, with no recipe loaded and with one', async ({ cafe, fake }) => {
@@ -348,8 +359,9 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
             await expect.poll(() => redSlots(page)).toEqual([house.slot, single.slot, longBlack.slot, guest.slot, filter.slot]);
             await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
             const finished = await red(page);
-            const background = await card(page, decaf.slot).evaluate(el => getComputedStyle(el).backgroundColor);
-            expect(await colours(card(page, house.slot)), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
+            expect(finished, `the ${theme} theme's red`).toBe(theme === 'dark' ? 'rgb(255, 138, 128)' : 'rgb(179, 38, 30)');
+            const background = (await cardColours(page, decaf.slot)).fill;
+            expect(await cardColours(page, house.slot), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
             expect((await colours(dose(page))).text, 'the batch under Dose').toBe(finished);
             await cafe.screenshot(`finished-batch-no-recipe-${theme}`);
 
@@ -358,8 +370,8 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
             await paint(page, theme);
             await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
             await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
-            expect(await colours(card(page, house.slot)), 'a red card, loaded').toEqual({ text: background, border: finished, fill: finished });
-            expect(await colours(card(page, longBlack.slot)), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
+            expect(await cardColours(page, house.slot), 'a red card, loaded').toEqual({ text: background, border: finished, fill: finished });
+            expect(await cardColours(page, longBlack.slot), 'a red card, not loaded').toEqual({ text: finished, border: finished, fill: background });
             expect((await colours(dose(page))).text).toBe(finished);
             await cafe.screenshot(`finished-batch-recipe-${theme}`);
         });
