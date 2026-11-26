@@ -1,8 +1,9 @@
 // The page's one line to Decent Sync's plugin on this tablet: its Status
 // request, its `reference` request, its list of the Location's Shots, one of
-// them whole, its edit of a Shot, its `changes` socket, and the report of the
-// page with the reload it asks for (docs/cafe/DESIGN.md, "Recipes and the
-// strip", "Shots and the reference" and "Builds and installs").
+// them whole, its edit of a Shot, its `changes` socket with the batches it says
+// it archived or brought back, and the report of the page with the reload it
+// asks for (docs/cafe/DESIGN.md, "Recipes and the strip", "Shots and the
+// reference", "A finished batch" and "Builds and installs").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
 //
@@ -14,11 +15,13 @@ import { logger } from '../modules/logger.js';
 import { SKIN_ID, APP_VERSION } from '../version.js';
 import { statusUnknown, statusRetryMs } from './sync-status.js';
 import { pageReport, asksReload, reloadDeclined, reloadUrl } from './page-report.js';
+import { pushedBatchId } from './finished-batch.js';
 
 const PLUGIN_ID = 'decent-sync.reaplugin';
 
 const statusListeners = [];
 const pushListeners = [];
+const batchListeners = [];
 let seq = 0;
 let retry = null;       // the timer to ask again, while no answer has come either way
 let tries = 0;
@@ -64,7 +67,9 @@ function listen() {
     if (listening) return;
     listening = true;
     connectPluginMessages(PLUGIN_ID, 'changes', data => {
+        const batchId = pushedBatchId(data);
         if (asksReload(data)) reload();
+        else if (batchId) tell(batchListeners, batchId);
         else tell(pushListeners, data);
     }, () => {
         reportPage();
@@ -112,11 +117,20 @@ export function onStatus(listener) {
 }
 
 /**
- * `listener(push)` hears each message on the plugin's `changes` socket, as it
- * was sent, and `{ what: 'connection' }` each time the socket opens.
+ * `listener(push)` hears each message on the plugin's `changes` socket other
+ * than `reload` and a `batch` push that names a batch, as it was sent, and
+ * `{ what: 'connection' }` each time the socket opens.
  */
 export function onPush(listener) {
     pushListeners.push(listener);
+}
+
+/**
+ * `listener(batchId)` hears the batch each `batch` push names: the plugin
+ * archived Decaid's record of it on the tablet, or brought it back.
+ */
+export function onBatchPush(listener) {
+    batchListeners.push(listener);
 }
 
 const reference = recipeId => `reference?recipe=${encodeURIComponent(recipeId)}`;

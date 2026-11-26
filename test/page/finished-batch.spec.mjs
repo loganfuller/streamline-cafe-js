@@ -8,6 +8,9 @@
 // starts, when it comes back into view, after a recipe loads or unloads and
 // after a choice in the bean and batch dialog (src/cafe/finished-batch.js,
 // `readBatches` in src/cafe/strip.js, `refreshNames` in src/cafe/page.js).
+// With Decent Sync serving, its plugin's `batch` push reads again the batch it
+// names, where the page shows it (#113; `readBatchAgain` in src/cafe/strip.js,
+// `batchPushed` in src/cafe/page.js).
 //
 // The sample data (fake-decaid/recordings/sample-data.json) holds no recipe
 // whose batch is archived; a test archives the batch it needs, in the fake.
@@ -376,4 +379,161 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
             await cafe.screenshot(`finished-batch-recipe-${theme}`);
         });
     }
+});
+
+// From Decent Sync's next release (loganfuller/decent-sync#717), the plugin
+// pushes `{ what: 'batch', batch }` on its `changes` socket each time it
+// archives a batch's record on the tablet or brings it back. The pinned
+// plugin (1.11.1) sends no such push, so the model makes none: the test
+// changes the batch in the fake, as the plugin would, and sends the push
+// itself with `fake.decentSync.push(frame)`.
+test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '@finished' }, () => {
+    test.use({ decentSync: true });
+
+    const BATCH_READ = /^GET \/api\/v1\/bean-batches\//;
+    const batchReadsSince = (cafe, mark) => cafe.since(mark).map(entry => `${entry.method} ${entry.path}`).filter(line => BATCH_READ.test(line));
+    /** The plugin says it archived the batch, or brought it back, and the page has read what it reads. */
+    async function pushed(cafe, batch) {
+        cafe.fake.decentSync.push({ what: 'batch', batch });
+        await cafe.settle();
+        await cafe.advance(500);
+    }
+
+    test('a push naming a batch the page shows reads that batch again and redraws its cards and the Dose row', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        await expect.poll(() => redSlots(page)).toEqual([]);
+        const houseBatch = batchNamed(fake, house.name).id;
+
+        archive(fake, house.name);
+        await cafe.advance(3000);
+        await expect.poll(() => redSlots(page), 'nothing said yet').toEqual([]);
+        let mark = fake.log.length;
+        await pushed(cafe, houseBatch);
+        await expect.poll(() => redSlots(page), 'the cards of its two recipes').toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page), 'and the batch under Dose').toHaveClass(/cafe-batch-finished/);
+        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Blend · roasted Nov 2 Batch finished');
+        expect(new Set(batchReadsSince(cafe, mark)), 'only that batch is read').toEqual(new Set([`GET /api/v1/bean-batches/${houseBatch}`]));
+
+        archive(fake, house.name, false);
+        await pushed(cafe, houseBatch);
+        await expect.poll(() => redSlots(page), 'brought back').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
+
+        // A batch the cards name and Dose does not.
+        archive(fake, single.name);
+        mark = fake.log.length;
+        await pushed(cafe, batchNamed(fake, single.name).id);
+        await expect.poll(() => redSlots(page), 'the single origin\'s cards').toEqual([single.slot, guest.slot, filter.slot]);
+        await expect(dose(page), 'Dose names the blend').not.toHaveClass(/cafe-batch-finished/);
+        expect(batchReadsSince(cafe, mark), 'read once, for the cards').toEqual([`GET /api/v1/bean-batches/${batchNamed(fake, single.name).id}`]);
+    });
+
+    test('a push naming a batch the page doesn\'t show reads nothing', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        await cafe.advance(1000);
+        const named = new Set([...records(fake).map(row => row && row.beanBatchId), fake.workflow().context.beanBatchId]);
+        const unshown = fake.library.state.batches.find(batch => !named.has(batch.id));
+        expect(unshown, 'the sample data holds a batch no card and no Workflow names').toBeTruthy();
+
+        unshown.archived = true;
+        const mark = fake.log.length;
+        await pushed(cafe, unshown.id);
+        await pushed(cafe, 'no-such-batch');
+        await cafe.advance(2000);
+        expect(batchReadsSince(cafe, mark), 'no batch read').toEqual([]);
+        expect(cafe.since(mark).filter(entry => entry.method === 'GET' && entry.path === '/api/v1/workflow'), 'nor the Workflow').toEqual([]);
+        await expect.poll(() => redSlots(page)).toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
+    });
+
+    test('a push while Settings is open reads nothing, and the page looks when it comes back', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        archive(fake, house.name);
+        await page.locator('#settings-btn').click();
+        await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
+        await cafe.settle();
+        const mark = fake.log.length;
+        await pushed(cafe, batchNamed(fake, house.name).id);
+        await cafe.advance(1000);
+        expect(batchReadsSince(cafe, mark), 'behind Settings, nothing read').toEqual([]);
+
+        await page.goBack();
+        await expect(page.locator('#cafe-header')).toBeVisible();
+        await cafe.advance(1000);
+        await expect.poll(() => redSlots(page), 'back from Settings').toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+    });
+
+    test('a push while the page is hidden reads nothing, and the page looks when it comes back', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        archive(fake, house.name);
+        await page.evaluate(() => {
+            Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        });
+        const mark = fake.log.length;
+        await pushed(cafe, batchNamed(fake, house.name).id);
+        await cafe.advance(1000);
+        expect(batchReadsSince(cafe, mark), 'hidden, nothing read').toEqual([]);
+        await expect.poll(() => redSlots(page)).toEqual([]);
+
+        await page.evaluate(() => { delete document.hidden; });
+        await lookAgain(cafe, 'visibilitychange');
+        await expect.poll(() => redSlots(page), 'back into view').toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+    });
+
+    test('with no push, as from an older plugin, the page at rest learns of the batch at its next look, as before', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        archive(fake, house.name);
+        await cafe.advance(3000);
+        await expect.poll(() => redSlots(page), 'the page at rest is told nothing').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
+
+        await lookAgain(cafe);
+        await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+    });
+
+    test('a look\'s answer, arriving after the push\'s, does not undo it', async ({ cafe, fake }) => {
+        archive(fake, house.name);
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+        const houseBatch = batchNamed(fake, house.name).id;
+
+        // Every read of the batch the look makes, for the cards and for Dose,
+        // is answered as it was, archived, but held.
+        const path = `/api/v1/bean-batches/${houseBatch}`;
+        let holding = true;
+        let taken = 0;
+        let release;
+        const released = new Promise(resolve => { release = resolve; });
+        const stop = cafe.routes.intercept(request => holding && request.method === 'GET' && request.path === path, async ({ forward }) => {
+            taken += 1;
+            const answer = forward();
+            await released;
+            return answer;
+        });
+        await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+        await page.clock.runFor(1000);
+        await expect.poll(() => taken, 'the look read the batch for the cards and for Dose').toBeGreaterThanOrEqual(2);
+        holding = false;
+        stop();
+
+        archive(fake, house.name, false);
+        fake.decentSync.push({ what: 'batch', batch: houseBatch });
+        await page.clock.runFor(1000);
+        await expect.poll(() => redSlots(page), 'the push, the batch brought back').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
+        release();
+        await cafe.advance(1000);
+        expect(await redSlots(page), 'the look\'s answers, archived, arrived after').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
+    });
 });

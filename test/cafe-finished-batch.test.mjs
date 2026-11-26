@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { recipeBatchId, workflowBatchId, batchFinished, cardBatchIds, recordsAfterRead, finishedSlots, workflowFinished } from '../src/cafe/finished-batch.js';
+import { recipeBatchId, workflowBatchId, batchFinished, cardBatchIds, recordsAfterRead, finishedSlots, workflowFinished, pushedBatchId } from '../src/cafe/finished-batch.js';
 
 const OPEN = { id: 'open', beanId: 'blend', archived: false };
 const GONE = { id: 'gone', beanId: 'blend', archived: true };
@@ -78,4 +78,19 @@ test('the Workflow\'s batch is finished by the record of the batch it names', ()
     assert.equal(workflowFinished(workflow, { id: 'other', archived: true }), false, 'the record of the batch named before');
     assert.equal(workflowFinished({ context: { coffeeName: 'Sample Blend' } }, GONE), false, 'no batch');
     assert.equal(workflowFinished(null, GONE), false);
+});
+
+test('a `batch` push from Decent Sync\'s plugin names the batch it archived or brought back, as sent or parsed', () => {
+    assert.equal(pushedBatchId('{"what":"batch","batch":"gone"}'), 'gone');
+    assert.equal(pushedBatchId({ what: 'batch', batch: 'open' }), 'open');
+});
+
+test('any other push, and a `batch` push naming no batch, names none', () => {
+    for (const push of [
+        { what: 'reference', recipe: { recordId: 'r1' } }, { what: 'connection' }, { what: 'reload' }, '{"what":"reload"}',
+        { what: 'batch' }, { what: 'batch', batch: '' }, { what: 'batch', batch: null }, { what: 'batch', batch: 7 }, { batch: 'gone' },
+        'not a push', '"batch"', null, undefined, 7,
+    ]) {
+        assert.equal(pushedBatchId(push), null, JSON.stringify(push));
+    }
 });
