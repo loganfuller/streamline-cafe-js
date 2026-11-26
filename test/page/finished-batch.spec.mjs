@@ -168,6 +168,33 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         restore();
     });
 
+    test('a slow read of one batch holds up the red of no other card', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        await expect.poll(() => redSlots(page)).toEqual([]);
+
+        archive(fake, house.name);
+        // Every read of the single origin's batch is held, not only the first.
+        const other = `/api/v1/bean-batches/${batchNamed(fake, single.name).id}`;
+        let arrived;
+        let release;
+        const reached = new Promise(resolve => { arrived = resolve; });
+        const released = new Promise(resolve => { release = resolve; });
+        const stop = cafe.routes.intercept(request => request.method === 'GET' && request.path === other, async ({ forward }) => {
+            arrived();
+            await released;
+            return forward();
+        });
+        await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
+        await page.clock.runFor(1000);
+        await reached;
+        await expect.poll(() => redSlots(page), 'the archived batch\'s cards while the other batch is still read').toEqual([house.slot, longBlack.slot]);
+        stop();
+        release();
+        await cafe.advance(1000);
+        await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
+    });
+
     test('a slow read of the batch holds up no other name under the rows', async ({ cafe, fake }) => {
         archive(fake, house.name);
         const page = await openPage(cafe);

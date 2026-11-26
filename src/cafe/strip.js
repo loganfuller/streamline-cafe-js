@@ -162,7 +162,8 @@ function render() {
 // The cards whose recipe names a batch archived on the tablet are red
 // (finished-batch.js). Each batch a card names is read from Decaid with the
 // records, so a batch archived or brought back since shows whenever the strip
-// is read. The cards are drawn again only when a mark changed.
+// is read, each as its answer arrives. The cards are drawn again only when a
+// mark changed.
 function markFinished() {
     const next = finishedSlots(cards, batchRecords);
     if (next.join() === finished.join()) return false;
@@ -170,13 +171,17 @@ function markFinished() {
     return true;
 }
 
-async function readBatches() {
+function readBatches() {
     const seq = ++batchSeq;
     const ids = cardBatchIds(cards);
-    const reads = await Promise.all(ids.map(id => getBeanBatch(id).then(record => ({ id, record }), () => null)));
-    if (seq !== batchSeq) return;
-    batchRecords = recordsAfterRead(batchRecords, ids, reads);
-    if (markFinished()) render();
+    batchRecords = recordsAfterRead(batchRecords, ids, []);
+    for (const id of ids) {
+        getBeanBatch(id).then(record => {
+            if (seq !== batchSeq) return;
+            batchRecords = recordsAfterRead(batchRecords, ids, [{ id, record }]);
+            if (markFinished()) render();
+        }, () => {});
+    }
 }
 
 /** Read DYE2 again, a moment later, so a burst of reasons to look costs one read. */
