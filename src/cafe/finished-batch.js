@@ -5,7 +5,8 @@
 // The recipe's batch is read from DYE2's record and whether a batch is archived
 // from Decaid's own record of it. A batch is finished only when Decaid's record
 // of that batch says so: a recipe or Workflow that names no batch, and a batch
-// the tablet holds no record of, are not.
+// the tablet holds no record of, are not. Decent Sync's plugin pushes the batch
+// whose record it archived or brought back, which the page then reads again.
 
 const idOf = value => (typeof value === 'string' && value ? value : null);
 
@@ -64,4 +65,18 @@ export function finishedSlots(cards, records) {
  */
 export function workflowFinished(workflow, batch) {
     return batchFinished(workflowBatchId(workflow), batch);
+}
+
+/**
+ * The batch a push on Decent Sync's `changes` socket names, from
+ * `{ what: 'batch', batch }`: the plugin archived Decaid's record of it on the
+ * tablet, or brought it back. Null for any other push, and for anything that is
+ * not a push at all.
+ */
+export function pushedBatchId(data) {
+    let push = data;
+    if (typeof data === 'string') {
+        try { push = JSON.parse(data); } catch (error) { return null; }
+    }
+    return push && typeof push === 'object' && push.what === 'batch' ? idOf(push.batch) : null;
 }

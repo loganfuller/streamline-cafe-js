@@ -12,7 +12,7 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { dye2Gate } from './dye2-gate.js';
 import { showGate, hideGate, checkAgain } from './gate-screen.js';
-import { initStrip, refreshStripSoon } from './strip.js';
+import { initStrip, refreshStripSoon, readBatchAgain } from './strip.js';
 import { initPage, showRecipe, afterRecipeLoad, settleDialIn, showLoading, shotRunning } from './page.js';
 import { initGraph, showGraphRecipe } from './graph.js';
 import { initShotsList } from './shots-dialog.js';
@@ -61,7 +61,7 @@ function startPage() {
     // which recipe is loaded, restores the selection after a trip to DYE2's
     // editor, and re-reads DYE2's records when the page regains focus.
     initDyeStrip().catch(error => logger.warn('Cafe: Streamline\'s strip module failed to start', error));
-    initPage({ onProfileChange: refreshStripSoon });
+    initPage({ onProfileChange: refreshStripSoon, onBatchPush: readBatchAgain });
     initGraph();
     initShotsList({ isShotRunning: shotRunning });
     initStrip({ onChange: recipe => { showRecipe(recipe); showGraphRecipe(recipe); }, onBeforeLoad: settleDialIn, onLoading: showLoading, onApply: afterRecipeLoad, isShotRunning: shotRunning })

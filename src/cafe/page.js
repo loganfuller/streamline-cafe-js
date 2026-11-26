@@ -15,7 +15,7 @@ import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { workflowFinished } from './finished-batch.js';
 import { decentSyncSaves } from './sync-status.js';
-import { askStatus, onStatus, reportPage } from './decent-sync.js';
+import { askStatus, onStatus, onBatchPush, reportPage } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, formatRoastDay, setText } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
@@ -41,6 +41,7 @@ let saved = false;      // Decent Sync saves this Machine's dial-in onto its loa
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
+let batchId = null;     // the batch the Workflow named, as last read
 let finished = false;   // that batch is archived on the tablet (finished-batch.js)
 let namesSeq = 0;
 let namesTimer = null;
@@ -137,7 +138,7 @@ export async function refreshNames() {
     }
     if (seq !== namesSeq) return;
     paintBarista(baristaName(workflow?.context));
-    const batchId = workflow?.context?.beanBatchId || null;
+    batchId = workflow?.context?.beanBatchId || null;
     if (!batchId) batch = null;
     else {
         // The rows show the Workflow's names at once, with the batch last read
@@ -173,6 +174,13 @@ function refreshSoon() {
         refreshNames();
         askStatus();
     }, NAMES_GAP_MS);
+}
+
+// Decent Sync's plugin archived a batch's record, or brought it back. The
+// names are read again, as at a look, only while Dose shows that batch.
+function batchPushed(pushed) {
+    if (pushed !== batchId || document.hidden || isSubPage()) return;
+    refreshNames();
 }
 
 /**
@@ -370,9 +378,10 @@ function placeSystemButtons() {
 /**
  * Called once, when the page starts. `onProfileChange` runs when Streamline
  * writes another profile's name: a profile changed elsewhere can unload the
- * recipe, so the caller asks DYE2 again.
+ * recipe, so the caller asks DYE2 again. `onBatchPush` is told each batch
+ * Decent Sync's plugin says it archived or brought back.
  */
-export function initPage({ onProfileChange = () => {} } = {}) {
+export function initPage({ onProfileChange = () => {}, onBatchPush: batchChanged = () => {} } = {}) {
     renderHeading();
     renderBarista();
     renderNames();
@@ -380,6 +389,7 @@ export function initPage({ onProfileChange = () => {} } = {}) {
     paintBattery();
     refreshNames();
     onStatus(showStatus);
+    onBatchPush(pushed => { batchPushed(pushed); batchChanged(pushed); });
     reportPage();
     askStatus();
     // The change of profile waits its turn as a pick does, and keeps the

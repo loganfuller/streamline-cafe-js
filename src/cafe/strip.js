@@ -33,6 +33,7 @@ let cards = stripCards([], null); // as last drawn
 let batchRecords = new Map();     // Decaid's record of each batch a card names, as last read
 let finished = [];                // the slots drawn red, as last drawn
 let batchSeq = 0;
+const batchReads = new Map();     // the latest read asked of each batch
 let loader = null;
 let refreshTimer = null;
 let settleEdits = async () => {};
@@ -162,8 +163,10 @@ function render() {
 // The cards whose recipe names a batch archived on the tablet are red
 // (finished-batch.js). Each batch a card names is read from Decaid with the
 // records, so a batch archived or brought back since shows whenever the strip
-// is read, each as its answer arrives. The cards are drawn again only when a
-// mark changed.
+// is read, each as its answer arrives, and one Decent Sync's plugin says it
+// archived or brought back is read again alone. An answer counts only while it
+// is the latest asked of its batch and the cards are the ones it was asked for.
+// The cards are drawn again only when a mark changed.
 function markFinished() {
     const next = finishedSlots(cards, batchRecords);
     if (next.join() === finished.join()) return false;
@@ -171,17 +174,28 @@ function markFinished() {
     return true;
 }
 
+function readBatch(id) {
+    const seq = batchSeq;
+    const asked = (batchReads.get(id) || 0) + 1;
+    batchReads.set(id, asked);
+    getBeanBatch(id).then(record => {
+        if (seq !== batchSeq || batchReads.get(id) !== asked) return;
+        batchRecords = recordsAfterRead(batchRecords, cardBatchIds(cards), [{ id, record }]);
+        if (markFinished()) render();
+    }, () => {});
+}
+
 function readBatches() {
-    const seq = ++batchSeq;
+    batchSeq += 1;
     const ids = cardBatchIds(cards);
     batchRecords = recordsAfterRead(batchRecords, ids, []);
-    for (const id of ids) {
-        getBeanBatch(id).then(record => {
-            if (seq !== batchSeq) return;
-            batchRecords = recordsAfterRead(batchRecords, ids, [{ id, record }]);
-            if (markFinished()) render();
-        }, () => {});
-    }
+    for (const id of ids) readBatch(id);
+}
+
+/** Read a batch again, where a card names it: Decent Sync's plugin archived its record, or brought it back. */
+export function readBatchAgain(batchId) {
+    if (!loader || document.hidden || isSubPage() || !cardBatchIds(cards).includes(batchId)) return;
+    readBatch(batchId);
 }
 
 /** Read DYE2 again, a moment later, so a burst of reasons to look costs one read. */
