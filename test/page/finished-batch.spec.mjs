@@ -448,7 +448,26 @@ test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '
         await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
     });
 
-    test('a push while the page is behind another reads nothing, and the page looks when it comes back', async ({ cafe, fake }) => {
+    test('a push while Settings is open reads nothing, and the page looks when it comes back', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        archive(fake, house.name);
+        await page.locator('#settings-btn').click();
+        await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
+        await cafe.settle();
+        const mark = fake.log.length;
+        await pushed(cafe, batchNamed(fake, house.name).id);
+        await cafe.advance(1000);
+        expect(batchReadsSince(cafe, mark), 'behind Settings, nothing read').toEqual([]);
+
+        await page.goBack();
+        await expect(page.locator('#cafe-header')).toBeVisible();
+        await cafe.advance(1000);
+        await expect.poll(() => redSlots(page), 'back from Settings').toEqual([house.slot, longBlack.slot]);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+    });
+
+    test('a push while the page is hidden reads nothing, and the page looks when it comes back', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         await load(cafe, house);
         archive(fake, house.name);
@@ -486,17 +505,18 @@ test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '
         await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
         const houseBatch = batchNamed(fake, house.name).id;
 
-        // The look's read of the batch is answered as it was, archived, but held.
+        // The look reads the batch twice, for the cards and for Dose. Both are
+        // answered as it was, archived, but held, whichever comes first.
         const path = `/api/v1/bean-batches/${houseBatch}`;
-        let taken = false;
+        let taken = 0;
         let arrived;
         let release;
         const reached = new Promise(resolve => { arrived = resolve; });
         const released = new Promise(resolve => { release = resolve; });
-        const stop = cafe.routes.intercept(request => !taken && request.method === 'GET' && request.path === path, async ({ forward }) => {
-            taken = true;
+        const stop = cafe.routes.intercept(request => taken < 2 && request.method === 'GET' && request.path === path, async ({ forward }) => {
+            taken += 1;
             const answer = forward();
-            arrived();
+            if (taken === 2) arrived();
             await released;
             return answer;
         });
@@ -509,8 +529,10 @@ test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '
         fake.decentSync.push({ what: 'batch', batch: houseBatch });
         await page.clock.runFor(1000);
         await expect.poll(() => redSlots(page), 'the push, the batch brought back').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
         release();
         await cafe.advance(1000);
-        expect(await redSlots(page), 'the look\'s answer, archived, arrived after').toEqual([]);
+        expect(await redSlots(page), 'the look\'s answers, archived, arrived after').toEqual([]);
+        await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
     });
 });

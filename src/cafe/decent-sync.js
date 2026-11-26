@@ -2,9 +2,8 @@
 // request, its `reference` request, its list of the Location's Shots, one of
 // them whole, its edit of a Shot, its `changes` socket with the batches it says
 // it archived or brought back, and the report of the page with the reload it
-// asks for (docs/cafe/DESIGN.md, "Recipes and the
-// strip", "Shots and the reference", "A finished batch" and "Builds and
-// installs").
+// asks for (docs/cafe/DESIGN.md, "Recipes and the strip", "Shots and the
+// reference", "A finished batch" and "Builds and installs").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
 //
@@ -118,9 +117,9 @@ export function onStatus(listener) {
 }
 
 /**
- * `listener(push)` hears each message on the plugin's `changes` socket, as it
- * was sent, but `reload` and `batch`, and `{ what: 'connection' }` each time the
- * socket opens.
+ * `listener(push)` hears each message on the plugin's `changes` socket other
+ * than `reload` and `batch`, as it was sent, and `{ what: 'connection' }` each
+ * time the socket opens.
  */
 export function onPush(listener) {
     pushListeners.push(listener);
