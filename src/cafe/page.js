@@ -140,15 +140,14 @@ export async function refreshNames() {
     const batchId = workflow?.context?.beanBatchId || null;
     if (!batchId) batch = null;
     else {
-        if (!batch || batch.id !== batchId) {
-            // The row shows the bean at once and gains the roast date when it arrives.
-            batch = null;
-            finished = false;
-            names = dialInNames(workflow, null);
-            renderNames();
-        }
-        // The batch is read each time, so one archived or brought back since
-        // shows. A read that fails keeps the record of the same batch.
+        // The rows show the Workflow's names at once, with the batch last read
+        // while it is still the one named, and the batch is read again each
+        // time, so one archived or brought back since shows. A read that fails
+        // keeps the record of the same batch.
+        if (batch && batch.id !== batchId) batch = null;
+        finished = workflowFinished(workflow, batch);
+        names = dialInNames(workflow, batch);
+        renderNames();
         let read = batch;
         try {
             read = await getBeanBatch(batchId);

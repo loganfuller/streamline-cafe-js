@@ -17,6 +17,7 @@
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickRows, tapAt, isWrite, paint, openPage, card, load, untilPickClosed } from './support/page-reads.mjs';
 import { records, recordOf, loadedId } from './support/fake-reads.mjs';
+import { hold } from './support/faults.mjs';
 import { RECIPES } from './support/sample-data.mjs';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
@@ -165,6 +166,27 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
         await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
         restore();
+    });
+
+    test('a slow read of the batch holds up no other name under the rows', async ({ cafe, fake }) => {
+        archive(fake, house.name);
+        const page = await openPage(cafe);
+        await load(cafe, house);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
+        const grinder = page.locator('#cafe-grind-desc');
+        await expect(grinder).not.toHaveText('Sample Burr Two');
+
+        const slow = hold(cafe, { method: 'GET', path: /^\/api\/v1\/bean-batches\// });
+        fake.request({ method: 'PUT', url: '/api/v1/workflow', body: { context: { grinderModel: 'Sample Burr Two' } } });
+        await page.evaluate(() => document.dispatchEvent(new Event('streamline:workflow-refresh')));
+        await page.clock.runFor(1000);
+        await slow.reached;
+        await expect(grinder, 'the grinder named while the batch is still read').toHaveText('Sample Burr Two');
+        await expect(dose(page), 'the red stays meanwhile').toHaveClass(/cafe-batch-finished/);
+        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        slow.release();
+        await cafe.advance(1000);
+        await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
     });
 
     test('a batch that is not archived, chosen in the dialog, ends the red under Dose, and on the card where the recipe takes it', async ({ cafe, fake }) => {
