@@ -667,16 +667,22 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         await openCategory(cafe);
     }
 
-    /** A weight entered on the setting's numpad, as on a tablet. */
-    async function set(cafe, grams) {
-        const { page } = cafe;
+    /** A weight entered on the setting's numpad, without waiting for every answer, as while a write is held. */
+    async function enterSetting(page, grams) {
         await setting(page).click();
         await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
         for (const digit of String(grams)) await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
         await page.locator('#numpad-confirm').click();
         await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+    }
+
+    /** A weight entered on the setting's numpad, as on a tablet. */
+    async function set(cafe, grams) {
+        await enterSetting(cafe.page, grams);
         await cafe.settle();
     }
+
+    const STORE_WRITE = { method: 'POST', path: /\/store\/streamlineCafe\/batchContainerWeight/ };
 
     /** The page's Save or Cancel, and the main page back. */
     async function leaveBy(cafe, button) {
@@ -775,21 +781,61 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         const page = await openPage(cafe);
         await openCafeSettings(cafe);
         await set(cafe, 350);
-        const writing = hold(cafe, { method: 'POST', path: /\/store\/streamlineCafe\/batchContainerWeight/ });
+        const writing = hold(cafe, STORE_WRITE);
         await page.locator('#save-settings-btn').click();
         await writing.reached;
-        // Entered on the numpad while the write is held, without waiting for every answer.
-        await setting(page).click();
-        await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
-        for (const digit of '425') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
-        await page.locator('#numpad-confirm').click();
-        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+        await enterSetting(page, 425);
         writing.release();
         await cafe.settle();
         expect(kept(fake), 'the first Save wrote what it was given').toBe(350);
         await expect(page.locator('#subpage-host #settings-content-area'), 'Settings stays').toBeVisible();
         await expect(setting(page), 'with the later change').toHaveValue('425');
         await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(425);
+    });
+
+    test('a weight changed back to the one kept while Save writes another is a change, and the next Save writes it', async ({ cafe, fake }) => {
+        setContainer(fake, 350);
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 400);
+        const writing = hold(cafe, STORE_WRITE);
+        await page.locator('#save-settings-btn').click();
+        await writing.reached;
+        await enterSetting(page, 350);
+        writing.release();
+        await cafe.settle();
+        expect(kept(fake)).toBe(400);
+        await expect(page.locator('#subpage-host #settings-content-area'), 'Settings stays').toBeVisible();
+        await expect(setting(page)).toHaveValue('350');
+        // Changed to what was just written, it is no change any more.
+        await set(cafe, 400);
+        const mark = fake.log.length;
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(containerWrites(cafe, mark), 'nothing more to write').toEqual([]);
+        expect(kept(fake)).toBe(400);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(350);
+    });
+
+    test('a second Save while the first is writing waits for it, so the later weight is the one kept', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        const mark = fake.log.length;
+        const writing = hold(cafe, STORE_WRITE);
+        await page.locator('#save-settings-btn').click();
+        await writing.reached;
+        await enterSetting(page, 425);
+        await page.locator('#save-settings-btn').click();
+        const storeWritesOpen = () => page.evaluate(() => window.__cafeFetchesOpen().filter(open => open.startsWith('POST ') && open.includes('/store/streamlineCafe/batchContainerWeight')).length);
+        expect(await storeWritesOpen(), 'the second write is not sent while the first is on its way').toBe(1);
+        writing.release();
+        await expect(page.locator('#subpage-host #settings-content-area')).toHaveCount(0);
+        await cafe.settle();
+        expect(containerWrites(cafe, mark), 'written in the order saved').toEqual([350, 425]);
         expect(kept(fake)).toBe(425);
     });
 

@@ -7,31 +7,57 @@
 import { writeCafe, CONTAINER_KEY } from './cafe-store.js';
 
 let container = null;
+let writing = null;
+let written = null;
+let queue = Promise.resolve();
 
 /** The container's weight changed and not yet saved, in whole grams, or null. */
 export function draftContainer() {
     return container;
 }
 
-/** Keep a changed weight until Save; one changed back to what is kept is no change. */
+/**
+ * Keep a changed weight until Save. One changed back to what Decaid will hold
+ * is no change: the weight on its way there, or else the one last written
+ * from this page, or else `kept`, what the page read when it opened.
+ */
 export function stageContainer(grams, kept) {
-    container = grams === kept ? null : grams;
+    container = grams === (writing ?? written ?? kept) ? null : grams;
 }
 
-/**
- * Write what was changed. Answers whether nothing is left unsaved: false where
- * the setting was changed again while it was being written, so Settings stays
- * open with that change, as Streamline's Save does for its own. Rejects where
- * Decaid did not take it, and keeps the change.
- */
-export async function saveCafeSettings() {
+async function write() {
     if (container == null) return true;
     const grams = container;
-    await writeCafe(CONTAINER_KEY, grams);
+    writing = grams;
+    try {
+        await writeCafe(CONTAINER_KEY, grams);
+    } catch (error) {
+        if (container == null) container = grams;
+        throw error;
+    } finally {
+        writing = null;
+    }
+    written = grams;
     if (container === grams) container = null;
     return container == null;
 }
 
+/**
+ * Write what was changed, after any Save still writing. Answers whether
+ * nothing is left unsaved: false where the setting was changed again while it
+ * was being written, so Settings stays open with that change, as Streamline's
+ * Save does for its own. Rejects where Decaid did not take it, and keeps the
+ * change.
+ */
+export function saveCafeSettings() {
+    const run = queue.then(write);
+    queue = run.catch(() => {});
+    return run;
+}
+
 if (typeof document !== 'undefined') {
-    document.addEventListener('streamline:mainpagevisible', () => { container = null; });
+    document.addEventListener('streamline:mainpagevisible', () => {
+        container = null;
+        written = null;
+    });
 }

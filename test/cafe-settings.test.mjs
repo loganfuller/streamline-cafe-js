@@ -47,7 +47,7 @@ test('the page\'s Save writes a changed setting, from the shell and from the leg
     const legacy = read('src/settings/settings.js');
     assert.match(legacy, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
     assert.match(legacy, /await flushPendingChanges\(\);\n\s*if \(!await saveCafeSettings\(\)\) return;\n\s*\} catch \(error\) \{/);
-    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{ container = null; \}\);/);
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{\n\s*container = null;\n\s*written = null;\n\s*\}\);/);
 });
 
 test('the category\'s module keeps the setting through the fork\'s one store module, and off the main page\'s first load', () => {
