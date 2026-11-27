@@ -8,7 +8,7 @@
  "about": "Decaid's grinders: the archived left out unless asked for, the most recently changed first; one by its id, or 404; a bean batch by its id.",
  "given": {
   "workflow": {
-   "id": "ad6edda9-ca81-4d05-ad62-9a8eaa8762b1",
+   "id": "3958a609-22ea-44f1-a5a6-3b7ad7409daa",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+    "grinderId": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "31ab5170-4fc5-4270-868e-56539108c2f4",
+    "beanBatchId": "08a5aa8a-014c-439a-a1d9-bf4fe615d8b5",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -165,23 +165,23 @@
     "status": 200,
     "body": [
      {
-      "id": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+      "id": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
       "model": "Sample Grinder 38",
       "burrType": "conical",
       "archived": false,
       "settingType": "numeric",
       "settingSmallStep": 0.5,
       "settingBigStep": 2,
-      "createdAt": "2026-11-26T17:06:57.795997",
-      "updatedAt": "2026-11-26T17:06:57.795997"
+      "createdAt": "2026-11-27T01:28:20.774763",
+      "updatedAt": "2026-11-27T01:28:20.774763"
      },
      {
-      "id": "dd59abb5-4c25-4a41-9aa1-95afd0a1a04a",
+      "id": "189936b3-a040-4fea-a788-5e7e589607ef",
       "model": "Sample Grinder 64",
       "archived": false,
       "settingType": "numeric",
-      "createdAt": "2026-11-26T17:06:57.789998",
-      "updatedAt": "2026-11-26T17:06:57.789998"
+      "createdAt": "2026-11-27T01:28:20.769249",
+      "updatedAt": "2026-11-27T01:28:20.769249"
      }
     ]
    }
@@ -195,23 +195,23 @@
     "status": 200,
     "body": [
      {
-      "id": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+      "id": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
       "model": "Sample Grinder 38",
       "burrType": "conical",
       "archived": false,
       "settingType": "numeric",
       "settingSmallStep": 0.5,
       "settingBigStep": 2,
-      "createdAt": "2026-11-26T17:06:57.795997",
-      "updatedAt": "2026-11-26T17:06:57.795997"
+      "createdAt": "2026-11-27T01:28:20.774763",
+      "updatedAt": "2026-11-27T01:28:20.774763"
      },
      {
-      "id": "dd59abb5-4c25-4a41-9aa1-95afd0a1a04a",
+      "id": "189936b3-a040-4fea-a788-5e7e589607ef",
       "model": "Sample Grinder 64",
       "archived": false,
       "settingType": "numeric",
-      "createdAt": "2026-11-26T17:06:57.789998",
-      "updatedAt": "2026-11-26T17:06:57.789998"
+      "createdAt": "2026-11-27T01:28:20.769249",
+      "updatedAt": "2026-11-27T01:28:20.769249"
      }
     ]
    }
@@ -225,17 +225,17 @@
     "status": 200,
     "body": [
      {
-      "id": "156f5f6e-ea3d-4c12-b930-aa40685bfb10",
+      "id": "2e5eda82-fe36-46d2-a705-35058384ed99",
       "model": "Sample Grinder 0.25",
       "archived": true,
       "settingType": "numeric",
       "settingSmallStep": 0.25,
       "settingBigStep": 1,
-      "createdAt": "2026-11-26T17:06:57.824928",
-      "updatedAt": "2026-11-26T17:06:57.831599"
+      "createdAt": "2026-11-27T01:28:20.807384",
+      "updatedAt": "2026-11-27T01:28:20.814556"
      },
      {
-      "id": "c3f529be-1cca-466b-a85d-f6558b1e757b",
+      "id": "c30d95ed-3f61-4741-98e3-4628964d920c",
       "model": "Sample Preset Grinder",
       "archived": true,
       "settingType": "preset",
@@ -244,35 +244,35 @@
        "Medium",
        "Coarse"
       ],
-      "createdAt": "2026-11-26T17:06:57.811294",
-      "updatedAt": "2026-11-26T17:06:57.818741"
+      "createdAt": "2026-11-27T01:28:20.789444",
+      "updatedAt": "2026-11-27T01:28:20.795240"
      },
      {
-      "id": "6779b00c-65e8-4b0a-9faa-e0cc4ec2caed",
+      "id": "b9f0985a-5d97-4298-b881-c4e6521f4a68",
       "model": "Sample Retired Grinder",
       "archived": true,
       "settingType": "numeric",
-      "createdAt": "2026-11-26T17:06:57.800601",
-      "updatedAt": "2026-11-26T17:06:57.806713"
+      "createdAt": "2026-11-27T01:28:20.778773",
+      "updatedAt": "2026-11-27T01:28:20.784753"
      },
      {
-      "id": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+      "id": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
       "model": "Sample Grinder 38",
       "burrType": "conical",
       "archived": false,
       "settingType": "numeric",
       "settingSmallStep": 0.5,
       "settingBigStep": 2,
-      "createdAt": "2026-11-26T17:06:57.795997",
-      "updatedAt": "2026-11-26T17:06:57.795997"
+      "createdAt": "2026-11-27T01:28:20.774763",
+      "updatedAt": "2026-11-27T01:28:20.774763"
      },
      {
-      "id": "dd59abb5-4c25-4a41-9aa1-95afd0a1a04a",
+      "id": "189936b3-a040-4fea-a788-5e7e589607ef",
       "model": "Sample Grinder 64",
       "archived": false,
       "settingType": "numeric",
-      "createdAt": "2026-11-26T17:06:57.789998",
-      "updatedAt": "2026-11-26T17:06:57.789998"
+      "createdAt": "2026-11-27T01:28:20.769249",
+      "updatedAt": "2026-11-27T01:28:20.769249"
      }
     ]
    }
@@ -280,20 +280,20 @@
   {
    "request": {
     "method": "GET",
-    "path": "/grinders/ddf2ae7c-0255-41d8-b850-71638af6feed"
+    "path": "/grinders/a5d67665-ae05-4a27-94d8-6c7ccfa32240"
    },
    "answer": {
     "status": 200,
     "body": {
-     "id": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+     "id": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
      "model": "Sample Grinder 38",
      "burrType": "conical",
      "archived": false,
      "settingType": "numeric",
      "settingSmallStep": 0.5,
      "settingBigStep": 2,
-     "createdAt": "2026-11-26T17:06:57.795997",
-     "updatedAt": "2026-11-26T17:06:57.795997"
+     "createdAt": "2026-11-27T01:28:20.774763",
+     "updatedAt": "2026-11-27T01:28:20.774763"
     }
    }
   },
@@ -312,18 +312,18 @@
   {
    "request": {
     "method": "GET",
-    "path": "/bean-batches/31ab5170-4fc5-4270-868e-56539108c2f4"
+    "path": "/bean-batches/08a5aa8a-014c-439a-a1d9-bf4fe615d8b5"
    },
    "answer": {
     "status": 200,
     "body": {
-     "id": "31ab5170-4fc5-4270-868e-56539108c2f4",
-     "beanId": "1f3baf20-b976-41f4-9ce3-232225fa45fd",
+     "id": "08a5aa8a-014c-439a-a1d9-bf4fe615d8b5",
+     "beanId": "711f7c71-82c8-49ec-b6e8-95e6076963df",
      "roastDate": "2026-10-28T00:00:00.000Z",
      "frozen": false,
      "archived": false,
-     "createdAt": "2026-11-26T17:06:57.750655",
-     "updatedAt": "2026-11-26T17:06:57.750655"
+     "createdAt": "2026-11-27T01:28:20.736339",
+     "updatedAt": "2026-11-27T01:28:20.736339"
     }
    }
   }

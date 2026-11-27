@@ -90,6 +90,16 @@ export const SETTINGS_TREE = {
             { id: 'reasettings', name: 'Decaid Settings', settingsCategory: 'rea' }
         ]
     },
+    // Streamline Cafe: the fork's own category, the first setting of its own
+    // (the weight of a batch's container). Its page is mounted by
+    // src/cafe/cafe-settings.js, and its labels are translated from the fork's
+    // table (docs/cafe/UPSTREAM_EDITS.md).
+    'cafe': {
+        name: 'Cafe',
+        subcategories: [
+            { id: 'cafebatches', name: 'Batches', settingsCategory: 'cafe_batches' }
+        ]
+    },
     'updates': {
         name: 'Updates',
         subcategories: [

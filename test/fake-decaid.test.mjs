@@ -206,6 +206,32 @@ test('beans: the archived only when asked for, the most recently changed first; 
     assert.equal(library.answer('POST', '/beans', new URLSearchParams()), null, 'a write has no answer');
 });
 
+test('a batch: a write lays the fields given over the record and keeps the rest; nulls and types are checked as Decaid checks them', () => {
+    const record = { id: 'b1', beanId: 'n1', roastDate: '2026-11-02T00:00:00.000Z', weight: 6000, frozen: false, archived: false, extras: { decentSyncId: 'srv-1', decentSyncBatchCode: 'SR-0412' }, createdAt: '2026-11-01T10:00:00.000000', updatedAt: '2026-11-20T10:00:00.000000' };
+    const library = createLibrary({ batches: { n1: [record, { id: 'b2', beanId: 'n1', frozen: false, archived: false, createdAt: '2026-11-01T10:00:00.000000', updatedAt: '2026-11-21T10:00:00.000000' }] } }, () => '2026-11-18T14:00:00.000Z');
+    const none = new URLSearchParams();
+    const put = (id, body) => library.answer('PUT', `/bean-batches/${id}`, none, body);
+    const weighed = put('b1', { weightRemaining: 2890 });
+    assert.equal(weighed.status, 200);
+    const { updatedAt, ...rest } = weighed.body;
+    assert.deepEqual(rest, { id: 'b1', beanId: 'n1', roastDate: record.roastDate, weight: 6000, frozen: false, archived: false, extras: record.extras, createdAt: record.createdAt, weightRemaining: 2890 }, 'every other field as it was');
+    assert.ok(updatedAt > '2026-11-21T10:00:00.000000', 'changed after every record, though the fake\'s clock is behind the sample data\'s');
+    assert.deepEqual(library.answer('GET', '/beans/n1/batches', none).body.map(row => row.id), ['b1', 'b2'], 'the most recently changed first');
+    assert.deepEqual(library.answer('GET', '/bean-batches/b1', none).body, weighed.body, 'a read gives it back');
+    assert.deepEqual(put('b1', { id: 'other', beanId: 'other', createdAt: 'never' }).body.id, 'b1', 'its id, bean and creation are never changed');
+    assert.equal(library.state.batches[0].beanId, 'n1');
+    assert.equal(library.state.batches[0].createdAt, record.createdAt);
+    assert.deepEqual(put('b1', { weightRemaining: 'heavy' }), { status: 400, body: { error: 'FormatException: Field "weightRemaining" must be a number or null' } });
+    assert.deepEqual(put('b1', { archived: null }), { status: 400, body: { error: 'FormatException: Field "archived" cannot be null' } });
+    assert.equal(library.state.batches[0].weightRemaining, 2890, 'a refused write changes nothing');
+    assert.equal('weightRemaining' in put('b1', { weightRemaining: null }).body, false, 'a null clears the weight');
+    assert.deepEqual(put('none', { weightRemaining: 1 }), { status: 404, body: { error: 'Batch not found' } });
+    assert.equal(put('b1', { archived: true }).body.archived, true);
+    assert.deepEqual(library.answer('GET', '/beans/n1/batches', none).body.map(row => row.id), ['b2'], 'an archived batch leaves its bean\'s list');
+    assert.deepEqual(library.state.batches[0].extras, record.extras, 'and its extras are as they were');
+    assert.equal(library.answer('PUT', '/beans/n1', none, { name: 'x' }), null, 'a bean\'s write has no answer');
+});
+
 test('DYE2: save-recipe names a recipe from its profile\'s first word and its bean, puts it in the slot asked for, and loads it', () => {
     assert.equal(proposeRecipeName({ profile: { title: 'Adaptive v3' }, context: { coffeeName: 'Sample Blend' } }), 'Adaptive Sample Blend');
     assert.equal(proposeRecipeName({ profile: { title: 'Default' }, context: { coffeeName: 'Bean' } }, ['bean']), 'Bean 2', 'a word that says nothing is left out, a name taken counts');

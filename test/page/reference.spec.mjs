@@ -428,7 +428,7 @@ test.describe('the reference on the graph', { tag: '@reference' }, () => {
             .toEqual(drawn(restCards({ view: 'reference', shot: shotNumbers(latest), reference: shotNumbers(reference) })));
         // Each pour's first reading of 0.2 g or more in its rise to 1 g (#98).
         expect(cards.cards[1], 'the first drip of each, and the difference').toEqual({
-            key: 'firstDrip', title: 'FIRST DRIP', value: '6.6 s', side: 'Ref 6.2 s', diff: '+0.4 s',
+            key: 'firstDrip', title: 'FIRST DRIP', value: '6.5 s', side: 'Ref 6.2 s', diff: '+0.3 s',
         });
 
         await cafe.screenshot('graph-overlay-light');

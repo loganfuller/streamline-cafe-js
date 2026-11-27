@@ -15,6 +15,13 @@
 // and the lists are read again from Decaid with that batch highlighted, as if
 // tapped. The scan writes nothing to the Workflow: "Use this batch" does.
 //
+// On every tablet, "Enter weight" beside it puts the highlighted batch's
+// weight view in the lists' place (weight-view.js, "Entering a batch's
+// weight"): what is left is written to Decaid's record of the batch, or the
+// record is archived where nothing is left, through batch-writer.js, and the
+// lists are read again. It writes nothing to the Workflow or a recipe, and
+// asks nothing of Decent Sync's plugin.
+//
 // With a recipe loaded, a batch of another bean than the recipe's own becomes
 // the recipe's bean, on every tablet: its DYE2 record first, then the Workflow.
 // A batch of the recipe's own bean, and any batch with no recipe loaded, is
@@ -24,9 +31,13 @@ import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
-import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle } from './bean-model.js';
+import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchNote, batchPick, beanSubtitle } from './bean-model.js';
 import { SCAN_PHRASES } from './scan-model.js';
 import { startScan } from './scan-view.js';
+import { WEIGHT_PHRASES, containerWeight } from './weight-model.js';
+import { startWeigh } from './weight-view.js';
+import { saveBatchWeight, finishBatch } from './batch-writer.js';
+import { readCafe, CONTAINER_KEY } from './cafe-store.js';
 import { writesRecord } from './bean-change.js';
 import { changeBean } from './bean-changer.js';
 import { choose } from './pick-dialog.js';
@@ -124,20 +135,39 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved, scan = () 
         // and the batch highlighted where one matched. Null where they can't
         // be read, do not hold that batch, or a later read was asked for.
         let reading = 0;
-        const reread = async match => {
+        const readAgain = async () => {
             const mine = reading += 1;
             let fresh;
             try {
                 fresh = await Promise.all([readBeans(loaded), getWorkflow()]);
             } catch (error) {
-                logger.warn('Cafe: could not read the beans again after a scan', error);
-                return null;
+                logger.warn('Cafe: could not read the beans again', error);
+                return false;
             }
-            if (mine !== reading) return null;
+            if (mine !== reading) return false;
             take(...fresh);
+            return true;
+        };
+        const reread = async match => {
+            if (!await readAgain()) return null;
             if (!match) return lists(openingBean(list, context, read.batches));
             const next = lists(match.beanId);
             return next.rows.some(shown => shown.id === String(match.batchId)) ? { ...next, held: match.batchId } : null;
+        };
+        // The lists read again after a batch's weight was saved, or the batch
+        // finished: its bean shown where it still has a batch, and the batch
+        // highlighted where `held` and it is still listed.
+        const relist = async (weighed, held) => {
+            if (!await readAgain()) return null;
+            const listed = list.some(entry => sameId(entry.bean.id, weighed.bean?.id));
+            const next = lists(listed ? String(weighed.bean.id) : openingBean(list, context, read.batches));
+            return held && next.rows.some(shown => shown.id === weighed.id) ? { ...next, held: weighed.id } : next;
+        };
+        const finish = async weighed => {
+            await finishBatch(weighed.batch.id);
+            // A card or the Dose row that names the batch turns red: the page
+            // looks again after its own write, as nothing pushes it one.
+            document.dispatchEvent(new Event('streamline:workflow-refresh'));
         };
         const ask = scan();
         const row = await choose({
@@ -152,6 +182,18 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved, scan = () 
                 name: SCAN_PHRASES.open,
                 open: stage => startScan(stage, { ask, reread, inUse: () => read.batches.find(batch => sameId(batch?.id, context.beanBatchId)) || null }),
             } : null,
+            // The highlighted batch's weight, entered and saved to its record.
+            weigh: {
+                label: WEIGHT_PHRASES.open,
+                open: (stage, weighed) => startWeigh(stage, {
+                    row: weighed,
+                    note: batchNote(weighed, cafeText),
+                    container: async () => containerWeight(await readCafe(CONTAINER_KEY)),
+                    save: left => saveBatchWeight(weighed.batch.id, left),
+                    finish: () => finish(weighed),
+                    relist: held => relist(weighed, held),
+                }),
+            },
         });
         if (!row) return; // closed
         // A recipe loaded, or its bean changed elsewhere, while the dialog was

@@ -1,4 +1,6 @@
 import { isEcoSteamEnabled, setEcoSteamEnabled } from '../modules/eco-steam.js';
+// Streamline Cafe: the page's Save also writes the fork's own settings.
+import { saveCafeSettings } from '../cafe/cafe-settings-draft.js';
 import {  getReaSettings, getDe1Settings, getDe1AdvancedSettings, setReaSettings, setDe1Settings, setDe1AdvancedSettings, resetDe1Settings, setMachineState, connectScaleDevice, connectDeviceWebSocket, sendDeviceCommand, awaitDeviceConnectResult, dimDisplay, restoreDisplay, isBlackScreenSaver, setBlackScreenSaver as apiSetBlackScreenSaver, rememberBrightness, getLastDisplayState, currentMachineState, signalHeartbeat, MachineState, getDeviceWebSocket, initDeviceWebSocketWithCallback, saveScaleDeviceId, getScaleDeviceId, connectDisplayWebSocket, sendDisplayCommand, connectUpdateWebSocket, sendUpdateCommand, enableWakeLock, disableWakeLock, isWakeLockEnabled, isWakeProfileEnabled, getWakeProfileId, getPresenceSettings, setPresenceSettings, getPresenceSchedules, createPresenceSchedule, updatePresenceSchedule, deletePresenceSchedule, getAppInfo, getMachineInfo, getWorkflow, updateWorkflow, getAllSkins, getDefaultSkin, setDefaultSkin, updateSkins, stopWebuiServer, startWebuiServer, getWebuiServerStatus, uploadFirmware, applyFirmware, cancelFirmwareUpdate, getFirmwareCatalog, setWaterLevels, API_BASE_URL, listWifiScales, addWifiScale, removeWifiScale, forgetDevice, getLedStrip, setLedStrip, commitLedStrip, previewLedStrip, clearLedStripPreview, getCupWarmer, setCupWarmer, setCupWarmerPrewarm, calibrateScale, tareScale, getSensorCalibration, setSensorCalibration, getMachineCalibration, setMachineCalibration, getLastMachineSnapshot, ensureMachineSnapshotSocket, connectScaleWebSocket, setFirmwareFlashInFlight, persistSharedValue, readSharedValue, MILK_STOP_LAST_VALUE_KEY, STEAM_DURATION_LAST_VALUE_KEY, STEAM_FLOW_LAST_VALUE_KEY, STEAM_TEMP_LAST_VALUE_KEY, HOT_WATER_VOLUME_LAST_VALUE_KEY, HOT_WATER_TEMP_LAST_VALUE_KEY, getPlugins, getDecentAccountStatus, getPluginSettings, setPluginSettings, callPluginEndpoint, enablePlugin, getScaleInfo, getDevices } from '../modules/api.js';
 import { isCustomSaverBrightness, setCustomSaverBrightnessEnabled, getSaverBrightness, setSaverBrightness, SAVER_BRIGHTNESS_DEFAULT } from '../modules/api.js';
 import { disablePlugin, getMachineState, probePluginManagement } from '../modules/api.js';
@@ -518,7 +520,11 @@ let maintenanceSequence = 0;
 async function mountMaintenanceCategory(category, container) {
     const sequence = ++maintenanceSequence;
     try {
-        const module = category === 'ble_grinder'
+        // Streamline Cafe: the fork's own category mounts from its own module,
+        // here as from the shell, once this module owns the nav clicks.
+        const module = category === 'cafe_batches'
+            ? await import('../cafe/cafe-settings.js')
+            : category === 'ble_grinder'
             ? await import('./categories/connections.js')
             : await import('./categories/maintenance.js');
         // Guard a fast switch away: a late import must not paint over the page
@@ -641,7 +647,7 @@ function updateSettingsContentArea(category, nav = null) {
         if (category === 'ledstrip') {
             setTimeout(initLedPicker, 0);
         }
-        if (MAINTENANCE_CATEGORIES.has(category) || category === 'ble_grinder') {
+        if (MAINTENANCE_CATEGORIES.has(category) || category === 'ble_grinder' || category === 'cafe_batches') {
             mountMaintenanceCategory(category, contentArea);
         }
         if (category === 'calib_sensors') {
@@ -1017,6 +1023,7 @@ export function renderSettingsContent(category) {
         case 'maint_descaling':
         case 'maint_airpurge':
         case 'ble_grinder':
+        case 'cafe_batches':
             // Mounted by the extracted category module, not rendered here.
             return '';
         case 'theme':
@@ -7853,6 +7860,7 @@ export async function initializeSettings({ initialMainCategory = null, initialCa
         saveBtn.addEventListener('click', async () => {
             try {
                 await flushPendingChanges();
+                await saveCafeSettings();
             } catch (error) {
                 console.error('Error saving settings:', error);
                 ui.showToast(`Failed to save settings: ${error.message}`, 5000, 'error');

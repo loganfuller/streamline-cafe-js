@@ -2069,6 +2069,302 @@ button.cafe-card {
     cursor: default;
 }
 
+/* ── A batch's weight, entered in the bean and batch dialog ──────────────── */
+
+/* "Enter weight", to the left of "Use this batch" and of "In use". */
+#cafe-pick-weigh {
+    flex: none;
+    min-width: 140px;
+    padding: 0 20px;
+    margin-right: -6px;
+}
+
+#cafe-pick-weigh[hidden],
+.cafe-pick-weight[hidden],
+.cafe-weight-working[hidden],
+.cafe-weight-working [hidden],
+.cafe-weight-message[hidden],
+#cafe-weight-code[hidden] {
+    display: none;
+}
+
+/* In the lists' place: the batch on the left, as wide as the beans were, and
+   the field on the right. */
+.cafe-pick-weight {
+    flex: 1;
+    min-height: 460px;
+    display: flex;
+    gap: 28px;
+}
+
+.cafe-weight-batch-column {
+    flex: none;
+    width: 400px;
+}
+
+.cafe-weight-batch {
+    flex: none;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-primary);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.cafe-weight-batch-names {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-weight-facts {
+    margin: 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cafe-weight-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.cafe-weight-fact dt {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-weight-fact dd {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cafe-weight-entry {
+    flex: 1;
+    min-width: 0;
+}
+
+/* What the scale reads, large, with its unit beside it. */
+.cafe-weight-field {
+    flex: none;
+    height: 132px;
+    padding: 0 28px;
+    box-sizing: border-box;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 14px;
+}
+
+/* Typed: the field is as wide as its digits, so the unit sits beside them. */
+.cafe-weight-field.cafe-weight-typed #cafe-weight-field {
+    flex: none;
+    max-width: 100%;
+}
+
+.cafe-weight-field:not(.cafe-weight-typed) .cafe-weight-unit {
+    display: none;
+}
+
+#cafe-weight-field {
+    flex: 1;
+    min-width: 0;
+    height: 128px;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 72px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+#cafe-weight-field[readonly] {
+    cursor: pointer;
+}
+
+#cafe-weight-field::placeholder {
+    color: var(--data-card-title-text-color);
+    font-size: 32px;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.cafe-weight-unit {
+    flex: none;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+/* "3240 g − 350 g container = 2890 g left". */
+.cafe-weight-working {
+    flex: none;
+    margin: 0;
+    padding: 18px 22px;
+    box-sizing: border-box;
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px 14px;
+    font-size: 22px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-weight-working-left {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+/* Nothing left, less than the container, a write that failed (`stop`), or
+   more than the batch was roasted at (`warn`). The red is the page's one
+   colour for a finished batch. */
+.cafe-weight-message {
+    --cafe-weight-tone: var(--cafe-finished);
+    flex: none;
+    padding: 18px 22px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--cafe-weight-tone);
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cafe-weight-message[data-tone="warn"] {
+    --cafe-weight-tone: #7a4a00;
+}
+
+[data-theme="dark"] .cafe-weight-message[data-tone="warn"] {
+    --cafe-weight-tone: #ffd27a;
+}
+
+.cafe-weight-message-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--cafe-weight-tone);
+}
+
+.cafe-weight-message-body {
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.cafe-weight-actions {
+    margin-top: auto;
+    padding-top: 6px;
+    gap: 12px;
+}
+
+.cafe-weight-actions .cafe-btn {
+    flex: none;
+    min-width: 160px;
+    padding: 0 30px;
+}
+
+/* "Finish batch": filled red, its words in the card's background, as a loaded
+   card that names a finished batch is. */
+.cafe-weight-actions .cafe-btn.cafe-weight-finish,
+[data-theme="dark"] .cafe-weight-actions .cafe-btn.cafe-weight-finish {
+    border-color: var(--cafe-finished);
+    background: var(--cafe-finished);
+    color: var(--profile-button-background-color);
+}
+
+/* ── The Cafe category of the Settings page ───────────────────────────────── */
+
+.cafe-setting {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    color: var(--text-primary);
+}
+
+.cafe-setting-heading {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--mimoja-blue-v2);
+}
+
+.cafe-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-setting-row label {
+    min-width: 0;
+    font-size: 24px;
+    line-height: 1.4;
+}
+
+.cafe-setting-value {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-container-weight {
+    width: 150px;
+    height: 62px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 12px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+#cafe-container-weight[readonly] {
+    cursor: pointer;
+}
+
+.cafe-setting-help {
+    margin: 0;
+    max-width: 760px;
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--data-card-title-text-color);
+}
+
 /* ── The Shots list ───────────────────────────────────────────────────────── */
 
 .cafe-dialog.cafe-shots-box {

@@ -225,8 +225,13 @@ export function batchRows(entry, context, today, formatDay, t) {
 export function batchUse(row, recipe, ownBeanId, t) {
     if (!row) return null;
     if (row.inUse && !writesRecord(recipe, ownBeanId, row.bean?.id)) return null;
-    const bean = text(row.bean?.name) || t(BEAN_PHRASES.unnamed);
-    return { label: t(BEAN_PHRASES.use), note: `${bean} · ${row.name}` };
+    return { label: t(BEAN_PHRASES.use), note: batchNote(row, t) };
+}
+
+/** A batch row's bean and its "Roasted" date, as beside "Use this batch". */
+export function batchNote(row, t) {
+    const bean = text(row?.bean?.name) || t(BEAN_PHRASES.unnamed);
+    return `${bean} · ${row?.name || ''}`;
 }
 
 /**

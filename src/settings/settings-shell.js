@@ -14,6 +14,8 @@ import { timeNav } from '../modules/perf-probe.js';
 import { observeSelects } from '../modules/custom-select.js';
 import { observeCelsiusLabels } from './celsius-label.js';
 import { getTempUnit } from '../modules/units.js';
+// Streamline Cafe: the page's Save also writes the fork's own settings.
+import { saveCafeSettings } from '../cafe/cafe-settings-draft.js';
 
 // [name, category, bengleOnly?] tuples for the pre-legacy-load nav and search,
 // derived from the canonical tree (settings-tree.js) so the two can't drift —
@@ -40,6 +42,8 @@ const CATEGORY_LOADERS = Object.freeze({
     language: () => import('./categories/legacy-category.js'),
     extensions: () => import('./categories/legacy-category.js'),
     miscellaneous: () => import('./categories/legacy-category.js'),
+    // Streamline Cafe: the fork's own category mounts from its own module.
+    cafe: () => import('../cafe/cafe-settings.js'),
     updates: () => import('./categories/legacy-category.js'),
     usermanual: () => import('./categories/legacy-category.js')
 });
@@ -276,6 +280,7 @@ function bindShell(root) {
         try {
             await saveSettingsData();
             if (getSnapshot().dirty) return;
+            await saveCafeSettings();
             ui.showToast('Settings updated', 3000, 'success');
             loadPage('index.html');
         } catch (error) {

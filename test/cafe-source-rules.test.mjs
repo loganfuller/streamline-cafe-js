@@ -327,6 +327,33 @@ test('the profile dialog changes the profile through changeProfile alone', () =>
     }
 });
 
+test('one module writes a batch\'s record: its weight alone, or its archive alone', () => {
+    // The whole record is never sent: its `extras` hold Decent Sync's id and Batch Code.
+    assert.deepEqual(filesWith(/\b(updateBeanBatch|createBeanBatch|deleteBeanBatch|updateBean|createBean|deleteBean)\b/), ['batch-writer.js']);
+    const writer = SOURCES.find(({ name }) => name === 'batch-writer.js').text;
+    assert.deepEqual([...writer.matchAll(/\bupdateBeanBatch\(([^;]*)\);/g)].map(match => match[1]), ['encodeURIComponent(String(batchId)), patch']);
+    assert.deepEqual([...writer.matchAll(/\bwrite\(batchId, ([^)]*\))\)/g)].map(match => match[1]), ['weightWrite(left)', 'finishWrite()']);
+    const model = SOURCES.find(({ name }) => name === 'weight-model.js').text;
+    assert.match(model, /\? \{ weightRemaining: left \} : null;/);
+    assert.match(model, /return \{ archived: true \};/);
+    assert.deepEqual(filesWith(/from '\.\/batch-writer\.js'/), ['bean-dialog.js']);
+});
+
+test('the bean dialog alone enters a batch\'s weight, which writes no Workflow or recipe and asks the plugin nothing', () => {
+    assert.deepEqual(filesWith(/^\s*weigh: \{/m), ['bean-dialog.js']);
+    assert.deepEqual(filesWith(/from '\.\/weight-view\.js'/), ['bean-dialog.js']);
+    for (const name of ['grinder-dialog.js', 'basket-dialog.js', 'barista-dialog.js', 'profile-dialog.js']) {
+        assert.doesNotMatch(SOURCES.find(source => source.name === name).text, /\bweigh\b/, `${name} has no weight to enter`);
+    }
+    for (const name of ['weight-view.js', 'weight-model.js', 'batch-writer.js', 'cafe-settings.js', 'cafe-settings-draft.js']) {
+        const { text } = SOURCES.find(source => source.name === name);
+        assert.doesNotMatch(text, /\b(updateWorkflow|putWorkflow|changeBean|setRecipeFields|callPluginEndpoint|putPluginEndpointHere)\b|from '\.\/(decent-sync|sync-status|recipe-writer)\.js'/, name);
+    }
+    // The container's weight is the skin's own, kept through its one store module.
+    assert.deepEqual(filesWith(/\bCONTAINER_KEY\b/), ['bean-dialog.js', 'cafe-settings-draft.js', 'cafe-settings.js', 'cafe-store.js']);
+    assert.match(SOURCES.find(({ name }) => name === 'cafe-store.js').text, /export const CONTAINER_KEY = 'batchContainerWeight';/);
+});
+
 test('no module writes Streamline\'s strip mode', () => {
     assert.deepEqual(filesWith(/\bsetStripMode\b|dyeStripMode/), []);
 });
@@ -334,7 +361,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['finished-batch.js', 'recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js', 'page-report.js', 'scan-model.js']) {
+    for (const name of ['finished-batch.js', 'recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js', 'page-report.js', 'scan-model.js', 'weight-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });
