@@ -253,7 +253,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
         if (alive) stage.back(next || undefined);
     }
 
-    const hidden = () => { if (document.visibilityState === 'hidden') stage.back(); };
+    const hidden = () => { if (document.visibilityState === 'hidden' && !ending) cancel(); };
 
     parts.cancel.onclick = cancel;
     parts.again.onclick = () => begin();

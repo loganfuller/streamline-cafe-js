@@ -405,6 +405,26 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         expect(rows).toContain('Roasted Nov 12');
     });
 
+    test('the page going out of view while a match\'s lists are read goes back to lists read again, with the batch that came', async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
+        await scanOpen(cafe);
+        const lists = hold(cafe, { method: 'GET', path: /\/api\/v1\/beans\?/ });
+        await page.clock.runFor(500);
+        await lists.reached;
+        await page.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await expect(scanPart(page)).toBeHidden();
+        expect(await tracks(page)).toEqual(['video ended']);
+        lists.release();
+        await cafe.settle();
+        const blend = page.locator('#cafe-pick-side .cafe-pick-row').filter({ hasText: 'Sample Blend' });
+        await expect(blend.locator('.cafe-pick-row-detail'), 'the lists shown are the ones read after the batch came').toHaveText('Sample Roasters · 3 batches');
+        await blend.click();
+        expect(await page.locator('#cafe-pick-list .cafe-pick-row .cafe-pick-row-name').allTextContents()).toContain('Roasted Nov 12');
+    });
+
     test('closing the dialog after a scan leaves the batch at the Location and writes nothing', async ({ cafe, fake }) => {
         const page = await scanned(cafe, [arriving(fake, 'one')]);
         const workflow = JSON.stringify(fake.workflow());
