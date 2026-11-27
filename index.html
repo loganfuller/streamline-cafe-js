@@ -461,9 +461,17 @@
                         <!-- The recipe's name and whether a choice is saved to it. -->
                         <p id="cafe-pick-under"></p>
                     </div>
-                    <form method="dialog">
-                        <button class="cafe-btn" data-cafe-text="Close">Close</button>
-                    </form>
+                    <div class="cafe-pick-head-actions">
+                        <!-- The bean dialog's scan of a batch's QR code, on a Machine Decent Sync serves: it puts
+                             the camera's picture in the lists' place (src/cafe/scan-view.js). -->
+                        <button id="cafe-pick-scan-open" type="button" class="cafe-pick-scan-open" hidden>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M21 14v1"/><path d="M17.5 21H21v-3"/><path d="M14 20.5v.5"/></svg>
+                            <span id="cafe-pick-scan-name" class="cafe-spoken"></span>
+                        </button>
+                        <form method="dialog">
+                            <button class="cafe-btn" data-cafe-text="Close">Close</button>
+                        </form>
+                    </div>
                 </div>
                 <div class="cafe-pick-lists">
                     <!-- The bean dialog's beans: a tap shows that bean's batches on the right. The profile
@@ -503,6 +511,41 @@
                             <span id="cafe-pick-pane-note" hidden></span>
                             <button id="cafe-pick-pane-use" type="button" class="cafe-btn cafe-btn-primary" hidden></button>
                         </div>
+                    </div>
+                </div>
+                <!-- The scan of a batch's QR code, in the lists' place: the camera's picture, with what was read
+                     said over it; or a message in the picture's place; or the batches a label matched. -->
+                <div id="cafe-pick-scan" class="cafe-pick-scan" hidden>
+                    <div id="cafe-scan-camera" class="cafe-scan-camera">
+                        <video id="cafe-scan-video" class="cafe-scan-video" playsinline muted></video>
+                        <span class="cafe-scan-frame" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                        <span id="cafe-scan-facing" class="cafe-scan-facing" hidden></span>
+                        <button id="cafe-scan-switch" type="button" class="cafe-scan-switch" hidden>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14-3l2 2"/><path d="M20 4v4h-4"/><path d="M20 15a8 8 0 0 1-14 3l-2-2"/><path d="M4 20v-4h4"/></svg>
+                            <span class="cafe-spoken" data-cafe-text="Switch camera">Switch camera</span>
+                        </button>
+                        <div id="cafe-scan-message" class="cafe-scan-message" role="status" hidden>
+                            <span id="cafe-scan-message-title" class="cafe-scan-message-title"></span>
+                            <span id="cafe-scan-message-body" class="cafe-scan-message-body"></span>
+                        </div>
+                    </div>
+                    <div id="cafe-scan-panel" class="cafe-scan-panel" role="status" hidden>
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.2v.3"/></svg>
+                        <span id="cafe-scan-panel-title" class="cafe-scan-panel-title"></span>
+                        <span id="cafe-scan-panel-body" class="cafe-scan-panel-body"></span>
+                    </div>
+                    <div id="cafe-scan-matches" class="cafe-scan-matches" hidden>
+                        <p class="cafe-scan-read">
+                            <span class="cafe-pick-heading" data-cafe-text="Read from the label">Read from the label</span>
+                            <bdi id="cafe-scan-read"></bdi>
+                        </p>
+                        <p id="cafe-scan-match-heading" class="cafe-pick-heading" data-cafe-text="Batches">Batches</p>
+                        <div id="cafe-scan-match-list" class="cafe-pick-rows" role="group" aria-labelledby="cafe-scan-match-heading"></div>
+                    </div>
+                    <div class="cafe-pick-pane-actions cafe-scan-actions">
+                        <span id="cafe-scan-note" class="cafe-scan-note"></span>
+                        <button id="cafe-scan-again" type="button" class="cafe-btn" hidden></button>
+                        <button id="cafe-scan-cancel" type="button" class="cafe-btn"></button>
                     </div>
                 </div>
                 <!-- A barista's name, typed: in the list's place once "New barista" is tapped. -->

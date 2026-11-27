@@ -12,7 +12,9 @@
 // set apart under the list that turns the dialog into a text field, for a name
 // to type. The markup is in index.html; this module fills it in, shows it and
 // answers with the row that was tapped or confirmed, or the text typed. What a
-// row and a description say, and what a choice does, are the caller's.
+// row and a description say, and what a choice does, are the caller's. The
+// bean's alone has a button to the left of Close that puts a scan of a batch's
+// QR code in the lists' place (`scan`): what shows there is the caller's too.
 import { cafeText, setText } from './text.js';
 
 let wired = false;
@@ -244,6 +246,27 @@ function closeEntry(parts) {
     parts.field.oninput = null;
 }
 
+// The parts `scan` adds: the button to the left of Close and the part of the
+// box shown in the lists' place, or null where the page lacks one.
+function scanParts() {
+    const parts = {
+        open: el('cafe-pick-scan-open'),
+        name: el('cafe-pick-scan-name'),
+        part: el('cafe-pick-scan'),
+        lists: document.querySelector('#cafe-pick-dialog .cafe-pick-lists'),
+    };
+    return Object.values(parts).every(Boolean) ? parts : null;
+}
+
+// The lists again, with no button to the left of Close and no handler.
+function closeScan(parts) {
+    if (!parts) return;
+    parts.open.hidden = true;
+    parts.open.onclick = null;
+    parts.part.hidden = true;
+    parts.lists.hidden = false;
+}
+
 /**
  * Show a list to choose from. `title` is a translation key; `subtitle` is
  * `{ key, vars }`, a key and what fills its places; `label` names the list for
@@ -282,8 +305,20 @@ function closeEntry(parts) {
  * for the row, the title while the field shows, the field's label and its two
  * buttons. "Back" shows the list again; the other resolves `{ entered }`, the
  * text as it was typed, once it holds more than spaces.
+ *
+ * `scan`, where given with `confirm`, puts a button to the left of Close:
+ * `{ name, open }`, where `name` is a key, the button's accessible name. A tap
+ * hides the button and the lists, shows the dialog's scan part in their place
+ * and calls `open(stage)`, which fills that part and answers `leave`, a
+ * function called once when the part is left, by `back` or by the dialog
+ * closing: the place to stop a camera. `stage` is `{ title, under, back }`:
+ * `title(key)` and `under(line)` write the dialog's title and the line under
+ * it while the part shows, and `back(next)` shows the lists again under the
+ * dialog's own title. `next`, where given, is `{ side, heading, subtitle,
+ * rows, held }`, as this function takes them: the lists filled anew, and the
+ * right-hand row whose id is `held` highlighted as if tapped.
  */
-export function choose({ title, subtitle, label, heading: listHeading = null, rows = [], empty = null, side = null, pane = null, confirm = null, entry = null }) {
+export function choose({ title, subtitle, label, heading: listHeading = null, rows = [], empty = null, side = null, pane = null, confirm = null, entry = null, scan = null }) {
     const dialog = document.getElementById('cafe-pick-dialog');
     const list = document.getElementById('cafe-pick-list');
     const sideColumn = document.getElementById('cafe-pick-side-column');
@@ -293,9 +328,11 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
     const described = pane ? paneEls : null;
     const confirmEls = confirmParts();
     const confirmed = confirm && !pane ? confirmEls : null;
+    const scanEls = scanParts();
     if (!dialog || !list || typeof dialog.showModal !== 'function' || dialog.open) return Promise.resolve(null);
     if (active || (side && (!sideColumn || !sideList)) || (entry && !parts) || (pane && (!side || !described))) return Promise.resolve(null);
     if (confirm && (pane || entry || !confirmed)) return Promise.resolve(null);
+    if (scan && (!confirmed || !scanEls)) return Promise.resolve(null);
     wire(dialog);
     active = true;
     return new Promise(resolve => {
@@ -304,7 +341,10 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         const under = document.getElementById('cafe-pick-under');
         const titled = document.getElementById('cafe-pick-title');
         const listColumn = list.closest('.cafe-pick-column');
-        const say = line => setText(under, line.key, { translate: true, vars: line.vars });
+        const write = line => setText(under, line.key, { translate: true, vars: line.vars });
+        // The line under the title over the lists, which a scan writes over.
+        let listLine = subtitle;
+        const say = line => { listLine = line; write(line); };
         // The row highlighted in a `confirm`ed list, which its button chooses.
         let heldRow = null;
         const hold = row => {
@@ -329,14 +369,19 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         heading(document.getElementById('cafe-pick-heading'), listHeading);
         list.setAttribute('aria-label', label);
         const box = dialog.querySelector('.cafe-pick-box');
-        box?.classList.toggle('cafe-pick-wide', !!side && !pane);
         box?.classList.toggle('cafe-pick-described', !!pane);
-        if (sideColumn) sideColumn.hidden = !side;
-        if (side) {
-            heading(document.getElementById('cafe-pick-side-heading'), side.heading);
+        // The list on the left, or none: the dialog's own, or the one a scan came back with.
+        const fillSide = shown => {
+            box?.classList.toggle('cafe-pick-wide', !!shown && !pane);
+            if (sideColumn) sideColumn.hidden = !shown;
+            if (!shown) {
+                sideList?.replaceChildren();
+                return;
+            }
+            heading(document.getElementById('cafe-pick-side-heading'), shown.heading);
             const show = row => {
                 for (const button of sideList.children) button.setAttribute('aria-pressed', String(button.dataset.id === row.id));
-                const next = side.show(row);
+                const next = shown.show(row);
                 if (pane) {
                     if (next.subtitle) say(next.subtitle);
                     describedRow = row;
@@ -346,9 +391,14 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
                 fill(next.rows, next.subtitle);
                 list.scrollTop = 0;
             };
-            const sideRows = side.rows.map(row => sideButton(row, show));
-            sideList.replaceChildren(...(sideRows.length || !side.empty ? sideRows : [emptyLine(side.empty)]));
-        }
+            const sideRows = shown.rows.map(row => sideButton(row, show));
+            sideList.replaceChildren(...(sideRows.length || !shown.empty ? sideRows : [emptyLine(shown.empty)]));
+        };
+        const intoView = () => {
+            sideList?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+            list.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+        };
+        fillSide(side);
         closePane(paneEls, listColumn);
         closeConfirm(confirmEls, list);
         if (confirmed) {
@@ -395,7 +445,53 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
                 pick({ entered: parts.field.value });
             };
         }
+        // The scan's part showing in the lists' place, and what its caller
+        // answered to be called with when it is left.
+        let scanning = false;
+        let leaveScan = null;
+        const endScan = () => {
+            if (!scanning) return false;
+            scanning = false;
+            const leave = leaveScan;
+            leaveScan = null;
+            if (leave) leave();
+            scanEls.part.hidden = true;
+            scanEls.lists.hidden = false;
+            scanEls.open.hidden = false;
+            setText(titled, title, { translate: true });
+            return true;
+        };
+        closeScan(scanEls);
+        if (scan) {
+            const back = next => {
+                if (!endScan()) return;
+                if (!next) {
+                    write(listLine);
+                    return;
+                }
+                fillSide(next.side);
+                heading(document.getElementById('cafe-pick-heading'), next.heading);
+                fill(next.rows, next.subtitle);
+                const held = next.held == null ? null : next.rows.find(row => String(row.id) === String(next.held));
+                if (held) hold(held);
+                intoView();
+            };
+            setText(scanEls.name, scan.name, { translate: true });
+            scanEls.open.hidden = false;
+            scanEls.open.onclick = () => {
+                if (scanning) return;
+                scanning = true;
+                scanEls.open.hidden = true;
+                scanEls.lists.hidden = true;
+                scanEls.part.hidden = false;
+                const leave = scan.open({ title: key => setText(titled, key, { translate: true }), under: write, back });
+                if (scanning) leaveScan = leave;
+                else if (leave) leave();
+            };
+        }
         dialog.addEventListener('close', () => {
+            endScan();
+            closeScan(scanEls);
             list.replaceChildren();
             sideList?.replaceChildren();
             closePane(paneEls, listColumn);
@@ -407,7 +503,6 @@ export function choose({ title, subtitle, label, heading: listHeading = null, ro
         }, { once: true });
         dialog.showModal();
         // Opened on the row in use, where a long list puts it out of view.
-        sideList?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
-        list.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+        intoView();
     });
 }

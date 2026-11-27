@@ -114,7 +114,8 @@ jobs:
           node-version: 26.x
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npx playwright install --with-deps --only-shell chromium
+      # Both browsers: the scan's journey needs a camera, which the headless shell has none of.
+      - run: npx playwright install --with-deps chromium
       - name: The newest stable releases
         if: env.LATEST == 'true'
         env:

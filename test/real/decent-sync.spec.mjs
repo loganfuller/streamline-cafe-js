@@ -19,8 +19,9 @@ import {
     HOUSE, LOCATION, MACHINE, MACHINE_TWO, SAVED_LABEL, BADGE, POLL_MS,
     houseId, recipeOn, referenceOn, setReference, loadedOn, shotOn, recordFor, selectedOn, annotationsOn,
     recordGrinder, recordBatch, grinderOn, batchesOn, profileOn, ownTemperature, nothingLoaded, houseShot, loadsOf, loadHouse, sampleContent,
-    chooseGrinder, chooseBatch, chooseProfile, brewRow, grindRow, openList, closeList, listRows, maybe,
+    chooseGrinder, chooseBatch, chooseProfile, brewRow, grindRow, openList, closeList, listRows, maybe, openPick, pickClosed,
 } from './support/sync-helpers.mjs';
+import { LABEL_TEXT } from '../page/camera/make-label.mjs';
 import { RECIPES, GRINDER, SECOND_GRINDER, GRINDER_USE } from '../page/support/sample-data.mjs';
 
 const PLUGIN_STATUS = '/plugins/decent-sync.reaplugin/status';
@@ -496,6 +497,105 @@ test.describe('Decent Sync\'s server out of reach', { tag: '@real-sync-outage' }
             }
             await putBack(sync, id, content);
             await setReference(sync, id, null);
+        }
+    });
+});
+
+// ── A batch's QR code scanned (#110, loganfuller/decent-sync#708).
+
+const ROASTERY = 'Sample Roastery';
+const SCANNED_BEAN = 'Sample Blend';
+const ROASTED = '2026-11-12';
+const AT_THE_ROASTERY = 5000;
+const batchCodeOf = batch => batch?.extras?.decentSyncBatchCode ?? null;
+const named = (list, name) => list.find(row => row && (row.name ?? row.content?.name) === name);
+
+/** The server's Location by name, made where there is none: another than the Machines' own. */
+async function locationNamed(sync, name) {
+    const { locations } = await sync.server('GET', '/locations');
+    return named(locations, name) || (await sync.server('POST', '/locations', { name, timeZone: 'UTC' })).location;
+}
+
+/** The server's batches not Archived that hold the label's code. */
+const labelled = async sync => (await sync.server('GET', `/bean-batches?batchCode=${encodeURIComponent(LABEL_TEXT)}`)).batches.filter(batch => !batch.archived);
+
+/** The scan showing on a tablet whose dialog is open, and the lists back with a batch highlighted. */
+async function scanLabel(page) {
+    await page.locator('#cafe-pick-scan-open').click();
+    const held = page.locator('#cafe-pick-list .cafe-pick-row[aria-pressed="true"]');
+    await expect(held.locator('.cafe-pick-row-detail'), 'the lists back, the label\'s batch highlighted').toContainText(LABEL_TEXT, { timeout: 60_000 });
+    await expect(page.locator('#cafe-pick-scan')).toBeHidden();
+    return held;
+}
+
+test.describe('a batch\'s QR code scanned with Decent Sync', { tag: '@real-sync-scan' }, () => {
+    test('a label scanned brings its batch from the one other Location with its weight, to the server and the second tablet, and writes nothing until it is used', async ({ stacks, tablet }) => {
+        const sync = stacks.sync;
+        const status = await maybe(() => sync.decaid('GET', PLUGIN_STATUS));
+        // The pinned plugin is from before the request: its status says nothing of `scan`, and the page shows no button.
+        test.skip(status?.scan !== true, 'this stack\'s Decent Sync plugin can\'t match scanned text (loganfuller/decent-sync#708 is in no release the pins reach)');
+        expect(status.served, 'the Machine is served').toBe(true);
+
+        // A bucket at the roastery, with the label's code, which the cafe's tablets have never held.
+        for (const left of await labelled(sync)) await sync.server('PUT', `/bean-batches/${left.id}/archived`, { archived: true });
+        const roastery = await locationNamed(sync, ROASTERY);
+        const bean = named((await sync.server('GET', '/beans')).beans, SCANNED_BEAN);
+        const { batch } = await sync.server('POST', '/bean-batches', {
+            beanId: bean.id,
+            content: { roastDate: ROASTED, batchCode: LABEL_TEXT, weight: 6000 },
+            locations: [{ locationId: roastery.id, remainingWeight: AT_THE_ROASTERY }],
+        });
+        const places = async () => {
+            const now = (await sync.server('GET', `/bean-batches/${batch.id}`)).batch;
+            return { at: now.locations.map(place => [place.location?.name ?? place.name, place.remainingWeight]), finished: now.finished.map(place => place.location.name) };
+        };
+        expect(await places()).toEqual({ at: [[ROASTERY, AT_THE_ROASTERY]], finished: [] });
+        const onTablet = async side => (await batchesOn(side, SCANNED_BEAN)).find(row => batchCodeOf(row) === LABEL_TEXT) || null;
+        expect(await onTablet(sync), 'the tablet holds no such batch yet').toBeNull();
+        const before = (await sync.decaid('GET', '/workflow')).context;
+
+        try {
+            const page = await tablet(sync, { camera: true });
+            await openPick(page, '#dose-section');
+            await expect(page.locator('#cafe-pick-scan-open'), 'the plugin\'s status offers the scan').toBeVisible();
+            const held = await scanLabel(page);
+            await expect(page.locator('#cafe-pick-side .cafe-pick-row[aria-pressed="true"] .cafe-pick-row-name')).toHaveText(SCANNED_BEAN);
+            await expect(held.locator('.cafe-pick-row-name')).toHaveText('Roasted Nov 12');
+            await expect(held.locator('.cafe-pick-row-detail'), 'its weight came with it').toContainText('5.0 kg');
+            await expect(page.locator('#cafe-pick-confirm-use')).toBeEnabled();
+            await shoot(page, 'real-scan-matched');
+
+            // The server moved all of it, and finished it where it was.
+            expect(await places()).toEqual({ at: [[LOCATION, AT_THE_ROASTERY]], finished: [ROASTERY] });
+            const history = JSON.stringify(await sync.server('GET', `/bean-batches/${batch.id}/history`));
+            expect(history, 'the move is credited to the Machine it was scanned on').toContain(MACHINE);
+            // The tablet's Decaid holds it, by the id the plugin answered, and the second tablet at the Location gets it too.
+            const mine = await onTablet(sync);
+            expect(mine, 'Decaid holds the batch, not archived').toMatchObject({ archived: false, weightRemaining: AT_THE_ROASTERY });
+            expect(await held.getAttribute('data-id'), 'highlighted by the tablet\'s own id').toBe(String(mine.id));
+            await expect.poll(async () => !!(await onTablet(sync.second)), { timeout: 60_000, message: 'the second tablet holds it' }).toBe(true);
+
+            // Closed without a choice: the batch stays at the Location, and the Workflow is as it was.
+            await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+            await pickClosed(page);
+            await quiet(POLL_MS, 'Decent Sync\'s poll, for a Workflow write that must not come');
+            expect((await sync.decaid('GET', '/workflow')).context.beanBatchId, 'the scan wrote nothing to the Workflow').toBe(before.beanBatchId);
+
+            // Scanned again, it is there already: highlighted the same way, and nothing moves.
+            await openPick(page, '#dose-section');
+            await scanLabel(page);
+            expect(await places()).toEqual({ at: [[LOCATION, AT_THE_ROASTERY]], finished: [ROASTERY] });
+
+            // "Use this batch" then writes the Workflow, as for a batch that was tapped.
+            await page.locator('#cafe-pick-confirm-use').click();
+            await pickClosed(page);
+            await expect.poll(async () => (await sync.decaid('GET', '/workflow')).context.beanBatchId).toBe(mine.id);
+            await expect(page.locator('#cafe-dose-desc')).toHaveText(`${SCANNED_BEAN} · roasted Nov 12`);
+            await shoot(page, 'real-scan-used');
+        } finally {
+            await sync.decaid('PUT', '/workflow', { context: { beanBatchId: before.beanBatchId ?? null, coffeeName: before.coffeeName ?? null, coffeeRoaster: before.coffeeRoaster ?? null } });
+            await sync.server('PUT', `/bean-batches/${batch.id}/archived`, { archived: true });
+            await expect.poll(async () => (await onTablet(sync)) === null && (await onTablet(sync.second)) === null, { timeout: 60_000, message: 'the batch archived on both tablets again' }).toBe(true);
         }
     });
 });

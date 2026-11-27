@@ -12,6 +12,8 @@ const NAMESPACE = 'streamlineCafe';
 export const REFERENCES_KEY = 'references';
 /** The graph's view, `reference` or `targets`. */
 export const VIEW_KEY = 'graphView';
+/** The camera a scan of a batch's QR code opens on: `user`, the front one, or `environment`. */
+export const CAMERA_KEY = 'scanCamera';
 
 /**
  * A value the page kept, or null when it has kept none under that key, which is

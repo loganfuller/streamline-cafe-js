@@ -1,9 +1,10 @@
 // The page's one line to Decent Sync's plugin on this tablet: its Status
 // request, its `reference` request, its list of the Location's Shots, one of
 // them whole, its edit of a Shot, its `changes` socket with the batches it says
-// it archived or brought back, and the report of the page with the reload it
-// asks for (docs/cafe/DESIGN.md, "Recipes and the strip", "Shots and the
-// reference", "A finished batch" and "Builds and installs").
+// it archived or brought back, its `scan` request for the batch of a QR code
+// the page read, and the report of the page with the reload it asks for
+// (docs/cafe/DESIGN.md, "Recipes and the strip", "Shots and the reference",
+// "A finished batch", "Scanning a batch's QR code" and "Builds and installs").
 // The contract is "For a Skin's author" in Decent Sync's docs/PLUGIN.md. No
 // other module under src/cafe/ names the plugin, and a test fails if one does.
 //
@@ -18,6 +19,9 @@ import { pageReport, asksReload, reloadDeclined, reloadUrl } from './page-report
 import { pushedBatchId } from './finished-batch.js';
 
 const PLUGIN_ID = 'decent-sync.reaplugin';
+// The plugin gives a scan ten seconds and then refuses it. The page waits a
+// little longer than that for either, and no longer.
+const SCAN_ANSWER_MS = 15_000;
 
 const statusListeners = [];
 const pushListeners = [];
@@ -163,4 +167,26 @@ export function readShot(shotId) {
 /** Asks the plugin to set a Shot's rating, its note or both, as `{ rating?, note? }`. Answers the two as they now are. Rejects with the refusal. */
 export function editShot(shotId, edit) {
     return callPluginEndpoint(PLUGIN_ID, `shot?id=${encodeURIComponent(shotId)}`, edit, 'PUT');
+}
+
+/**
+ * Asks the plugin which Bean Batch a scanned QR code is, and to bring it to
+ * the Machine's Location: `asking` is `{ text }`, the text the code held as it
+ * was read, or `{ match }`, the id of one batch from an earlier answer's
+ * matches. Answers `{ outcome }`, with the tablet's own `batchId` and `beanId`
+ * for one batch, or `matches` and `more` for several. Rejects with the
+ * refusal, or, where no answer came in the page's own time, with an error
+ * whose `timedOut` is true. A refusal may say the Machine is no longer served,
+ * so the status is asked again.
+ */
+export function scanBatch(asking) {
+    let timer;
+    const late = new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error('Decent Sync did not answer the scan in time'), { timedOut: true })), SCAN_ANSWER_MS);
+    });
+    const asked = callPluginEndpoint(PLUGIN_ID, 'scan', asking, 'PUT').catch(error => {
+        if (error.code !== undefined && error.code !== 'invalidRequest') askStatus();
+        throw error;
+    });
+    return Promise.race([asked, late]).finally(() => clearTimeout(timer));
 }

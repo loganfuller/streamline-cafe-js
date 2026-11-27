@@ -130,6 +130,27 @@ test('the bean dialog alone confirms its choice with a button; the grinder, bask
     assert.match(pick, /confirmed\.use\.onclick = \(\) => \{ if \(heldRow && confirm\.use\(heldRow\)\) pick\(heldRow\); \};/);
 });
 
+test('the bean dialog alone scans a batch\'s QR code, and the scan writes nothing', () => {
+    // The button is an option of the shared dialog that one caller takes.
+    assert.deepEqual(filesWith(/^\s*scan: (ask|\{)/m), ['bean-dialog.js']);
+    assert.deepEqual(filesWith(/from '\.\/scan-view\.js'/), ['bean-dialog.js']);
+    for (const name of ['grinder-dialog.js', 'basket-dialog.js', 'barista-dialog.js', 'profile-dialog.js']) {
+        assert.doesNotMatch(SOURCES.find(source => source.name === name).text, /\bscan\b/, `${name} has no scan`);
+    }
+    // The camera, the decoder and the choice of camera are the scan's own modules'.
+    assert.deepEqual(filesWith(/\bgetUserMedia\b|\benumerateDevices\b/), ['scan-camera.js']);
+    assert.deepEqual(filesWith(/\bloadQrDecoder\b/), ['scan-camera.js']);
+    assert.deepEqual(filesWith(/\bBarcodeDetector\b/), [], 'the browser\'s own detector is not used');
+    assert.deepEqual(filesWith(/\bCAMERA_KEY\b/), ['cafe-store.js', 'scan-view.js']);
+    // A scan brings a batch to the Location; only "Use this batch" writes the Workflow.
+    for (const name of ['scan-view.js', 'scan-camera.js', 'scan-model.js']) {
+        assert.doesNotMatch(SOURCES.find(source => source.name === name).text, /\b(updateWorkflow|putWorkflow|changeBean|setRecipeFields|callPluginEndpoint)\b/, name);
+    }
+    // The decoder is the fork's one vendor, named in Streamline's loader.
+    const loader = readFileSync(new URL('../src/modules/vendor-loader.js', import.meta.url), 'utf8');
+    assert.match(loader, /export function loadQrDecoder\(\) \{\s*return loadScript\('src\/vendor\/jsQR\.js', 'jsQR'\);/, 'the hook is still in vendor-loader.js after a merge of Streamline');
+});
+
 test('the Shot seam\'s edit is the page\'s only way to change a Shot', () => {
     // Decaid's own Shot edit, and its delete, are named by the seam alone.
     assert.deepEqual(filesWith(/\b(updateShot|deleteShot)\b/), ['shot-seam.js', 'tablet-shots.js']);
@@ -149,6 +170,10 @@ test('one module speaks to Decent Sync\'s plugin', () => {
     assert.deepEqual(filesWith(/\bconnectPluginMessages\b|\bconnectPluginPush\b|\bWebSocket\b/), ['decent-sync.js'], 'and one socket, through api.js');
     assert.deepEqual(filesWith(/\bputPluginEndpointHere\b/), ['decent-sync.js'], 'and one report of the page, at its own host');
     assert.deepEqual(filesWith(/from '\.\/decent-sync\.js'/), ['page.js', 'shot-seam.js']);
+    // Its scan is named there alone, and handed to the bean dialog by the page.
+    assert.deepEqual(filesWith(/'scan'/), ['decent-sync.js']);
+    assert.deepEqual(filesWith(/\bscanBatch\b/), ['decent-sync.js', 'page.js']);
+    assert.match(SOURCES.find(({ name }) => name === 'page.js').text, /scan: \(\) => \(scans \? scanBatch : null\)/, 'only where the status says it can be asked');
     assert.deepEqual(filesWith(/\b(readReference|chooseReference|onPush)\b/), ['decent-sync.js', 'plugin-shots.js', 'shot-seam.js']);
 });
 
@@ -309,7 +334,7 @@ test('no module writes Streamline\'s strip mode', () => {
 test('the modules the page\'s decisions live in touch no browser global at load', async () => {
     assert.equal(typeof globalThis.window, 'undefined');
     assert.equal(typeof globalThis.document, 'undefined');
-    for (const name of ['finished-batch.js', 'recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js', 'page-report.js']) {
+    for (const name of ['finished-batch.js', 'recipe-write.js', 'slot-menu.js', 'translations.js', 'shot-model.js', 'shot-list.js', 'tablet-shots.js', 'plugin-shots.js', 'shot-sources.js', 'sync-status.js', 'reference-overlay.js', 'comparison.js', 'stage-names.js', 'remarks.js', 'graph-state.js', 'grinder-model.js', 'bean-model.js', 'basket-model.js', 'barista-model.js', 'page-model.js', 'recipe-name.js', 'profile-change.js', 'profile-model.js', 'bean-change.js', 'page-report.js', 'scan-model.js']) {
         await assert.doesNotReject(import(new URL(name, CAFE_DIR)), name);
     }
 });

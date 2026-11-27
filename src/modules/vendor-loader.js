@@ -54,3 +54,10 @@ export function loadIro() {
 export function loadQrCodeGen() {
     return loadScript('src/vendor/qrcodegen.js', 'qrcodegen');
 }
+
+// Streamline Cafe: the QR decoder the bean and batch dialog's scan reads the
+// camera's picture with (src/cafe/scan-camera.js), loaded when a scan first
+// opens. `loadScript` is not exported, so the fork's one vendor is named here.
+export function loadQrDecoder() {
+    return loadScript('src/vendor/jsQR.js', 'jsQR');
+}

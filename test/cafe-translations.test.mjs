@@ -10,6 +10,7 @@ import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
 import { pageHeading, pickSubtitle } from '../src/cafe/page-model.js';
 import { GRINDER_PHRASES } from '../src/cafe/grinder-model.js';
 import { BEAN_PHRASES } from '../src/cafe/bean-model.js';
+import { SCAN_PHRASES } from '../src/cafe/scan-model.js';
 import { BASKET_PHRASES } from '../src/cafe/basket-model.js';
 import { BARISTA_PHRASES } from '../src/cafe/barista-model.js';
 import { PROFILE_PHRASES } from '../src/cafe/profile-model.js';
@@ -118,6 +119,8 @@ function usedKeys() {
     for (const phrase of Object.values(GRINDER_PHRASES)) keys.add(phrase);
     // And what the bean and batch dialog's rows, and the basket dialog's, say.
     for (const phrase of Object.values(BEAN_PHRASES)) keys.add(phrase);
+    // And the scan of a batch's QR code, in the bean and batch dialog.
+    for (const phrase of Object.values(SCAN_PHRASES)) keys.add(phrase);
     for (const phrase of Object.values(BASKET_PHRASES)) keys.add(phrase);
     // And the barista's button, its dialog and its name field.
     for (const phrase of Object.values(BARISTA_PHRASES)) keys.add(phrase);

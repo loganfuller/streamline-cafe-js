@@ -14,8 +14,8 @@ import { logger } from '../modules/logger.js';
 import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
 import { workflowFinished } from './finished-batch.js';
-import { decentSyncSaves } from './sync-status.js';
-import { askStatus, onStatus, onBatchPush, reportPage } from './decent-sync.js';
+import { decentSyncSaves, scanOffered } from './sync-status.js';
+import { askStatus, onStatus, onBatchPush, reportPage, scanBatch } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
 import { cafeText, formatRoastDay, setText } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
@@ -38,6 +38,7 @@ const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier ed
 
 let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
+let scans = false;      // Decent Sync's plugin can be asked which batch a scanned QR code is
 let names = { bean: '', roastDay: null, basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
@@ -108,6 +109,7 @@ const clearAsleep = () => clearOnSleep({ write: writePick, written: seeBarista }
 // "Who saves it"). Its Status request says which (decent-sync.js), and is asked at
 // start-up, when the page comes back into view and after each recipe load.
 function showStatus(answer) {
+    scans = scanOffered(scans, answer);
     const next = decentSyncSaves(saved, answer);
     if (next === saved) return;
     saved = next;
@@ -300,7 +302,7 @@ function openGrinder() {
 }
 
 function openBean() {
-    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved });
+    openBeanDialog({ mayOpen: mayPick, epoch: () => loads, recipe: () => recipe, saved: () => saved, scan: () => (scans ? scanBatch : null) });
 }
 
 function openBasket() {
