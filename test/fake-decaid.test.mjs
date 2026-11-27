@@ -577,7 +577,7 @@ test('Decent Sync: a scan matching one batch brings it to the Machine\'s Locatio
     fake.decentSync.canScan(scanBatches(fake));
     const held = id => fake.library.state.batches.find(batch => batch.id === id);
     assert.deepEqual(scan(fake, { text: '  sr-0412 ' }), { status: 200, body: { outcome: 'moved', batchId: 'tablet-batch-1', beanId: blend(fake).id } });
-    assert.deepEqual({ ...held('tablet-batch-1'), createdAt: 0, updatedAt: 0 }, { id: 'tablet-batch-1', beanId: blend(fake).id, frozen: false, createdAt: 0, roastDate: '2026-11-12T00:00:00.000Z', archived: false, extras: { decentSyncBatchCode: 'SR-0412' }, updatedAt: 0, weightRemaining: 5000 });
+    assert.deepEqual({ ...held('tablet-batch-1'), createdAt: 0, updatedAt: 0 }, { id: 'tablet-batch-1', beanId: blend(fake).id, frozen: false, createdAt: 0, roastDate: '2026-11-12T00:00:00.000Z', archived: false, extras: { decentSyncId: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d90', decentSyncBatchCode: 'SR-0412' }, updatedAt: 0, weightRemaining: 5000 });
     assert.deepEqual(scan(fake, { text: 'SR-0412' }).body, { outcome: 'alreadyThere', batchId: 'tablet-batch-1', beanId: blend(fake).id }, 'asked again, it is there already');
     assert.equal(scan(fake, { text: 'SR-0398' }).body.outcome, 'added', 'at several other Locations');
     assert.equal('weightRemaining' in held('tablet-batch-2'), false, 'no weight moves with a batch added');

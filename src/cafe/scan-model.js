@@ -9,7 +9,7 @@
 // was not there. The three answers of one batch (`moved`, `added` and
 // `alreadyThere`) are read alike. The contract is "Scanning a Bean Batch's QR
 // code" in Decent Sync's page for a Skin's author.
-import { BEAN_PHRASES } from './bean-model.js';
+import { BEAN_PHRASES, batchCode } from './bean-model.js';
 
 /** The phrases the scan may say, for the translations test. */
 export const SCAN_PHRASES = {
@@ -173,12 +173,16 @@ export function matchesLine(count, more) {
 /**
  * The rows of several matches, in the plugin's order, newest roast first: the
  * Bean's name and the batch's roast date over the roaster and the Batch Code,
- * each left out where the match has none. `inUseCode` is the Batch Code of the
- * batch the Workflow names, whose row is marked `inUse`; `formatDay` writes a
- * YYYY-MM-DD day in the page's language.
+ * each left out where the match has none. `inUse` is Decaid's record of the
+ * batch the Workflow names: the match it is is marked `inUse`, by the Decent
+ * Sync id the plugin keeps on the record, or by its Batch Code where the
+ * record has no id yet. `formatDay` writes a YYYY-MM-DD day in the page's
+ * language.
  */
-export function matchRows(matches, inUseCode, formatDay, t) {
-    const used = text(inUseCode).toLowerCase();
+export function matchRows(matches, inUse, formatDay, t) {
+    const usedId = text(inUse?.extras?.decentSyncId).toLowerCase();
+    const usedCode = batchCode(inUse).toLowerCase();
+    const isInUse = (match, code) => (usedId ? text(match.id).toLowerCase() === usedId : usedCode !== '' && code.toLowerCase() === usedCode);
     return (matches || []).map(match => {
         const day = /^\d{4}-\d{2}-\d{2}$/.test(match.roastDate || '') ? match.roastDate : null;
         const roasted = day ? t(BEAN_PHRASES.roasted, { date: formatDay(day) }) : t(BEAN_PHRASES.noRoastDate);
@@ -189,7 +193,7 @@ export function matchRows(matches, inUseCode, formatDay, t) {
             name: `${text(match.name) || t(BEAN_PHRASES.unnamed)} · ${roasted}`,
             details,
             detail: details.join(' · '),
-            inUse: used !== '' && code.toLowerCase() === used,
+            inUse: isInUse(match, code),
         };
     });
 }

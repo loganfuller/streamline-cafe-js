@@ -503,6 +503,10 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         await expect(title(page)).toHaveText('Scan a batch');
         await expect(page.locator('#cafe-scan-camera')).toBeVisible();
         await expect.poll(() => live(page), 'a camera open again').toEqual(['video live']);
+        await expect.poll(() => page.evaluate(() => document.getElementById('cafe-scan-video').readyState >= 2)).toBe(true);
+        await read(cafe);
+        expect(scans(fake), 'the label still in view, and not asked about again at once').toEqual([{ text: LABEL_TEXT }]);
+        await expect(title(page)).toHaveText('Scan a batch');
         await page.locator('#cafe-scan-cancel').click();
         await expect(scanPart(page)).toBeHidden();
         await expect(title(page)).toHaveText(TITLE);
@@ -623,6 +627,39 @@ test.describe('a scan that fails', { tag: '@scan' }, () => {
         await cafe.settle();
         expect(scans(fake)).toEqual([{ text: LABEL_TEXT }, { text: LABEL_TEXT }]);
         expect(fake.decentSync.batches().map(batch => batch.at), 'nothing was brought').toEqual(['one', 'none']);
+    });
+
+    test('a refusal that says the Machine is no longer served asks the status again, and the next open has no QR button', async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
+        fake.decentSync.setSharing(false);
+        await scanOpen(cafe);
+        await read(cafe);
+        expect(scans(fake)).toEqual([{ text: LABEL_TEXT }]);
+        await expect(page.locator('#cafe-scan-panel')).toBeVisible();
+        await page.locator('#cafe-scan-cancel').click();
+        await expect(scanPart(page)).toBeHidden();
+        await page.locator(CLOSE).click();
+        await expect(pickClosed(page)).toBeAttached();
+        await cafe.settle();
+        await tapAt(page, DOSE);
+        await expect(pickDialog(page)).toBeVisible();
+        await cafe.settle();
+        await expect(scanButton(page)).toBeHidden();
+    });
+
+    test('a match whose lists could not be read again says so, and "Back to the list" reads them again, with the batch that came', async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
+        await scanOpen(cafe);
+        const allow = fake.refuse({ method: 'GET', path: /^\/api\/v1\/beans\?/, status: 500 });
+        await read(cafe);
+        await expect(page.locator('#cafe-scan-panel')).toBeVisible();
+        expect(fake.decentSync.batches()[0].at, 'the batch came').toBe('here');
+        allow();
+        await page.locator('#cafe-scan-cancel').click();
+        await expect(scanPart(page)).toBeHidden();
+        await cafe.settle();
+        const blend = page.locator('#cafe-pick-side .cafe-pick-row').filter({ hasText: 'Sample Blend' });
+        await expect(blend.locator('.cafe-pick-row-detail'), 'the lists read again').toHaveText('Sample Roasters · 3 batches');
     });
 
     test('no answer in time says the batch may have come all the same, and the lists are read again', async ({ cafe, fake }) => {

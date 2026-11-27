@@ -28,12 +28,12 @@ export const SCREENSHOTS = join(ROOT, 'test', 'real', 'out', 'screenshots');
 export const STREAMLINE_ORIGIN = 'http://127.0.0.1:24801';
 export const DYE2 = 'dye2.reaplugin';
 
-// No transition or animation runs, as in the page tests: a dialog drawn closing
-// would still be on a screenshot, and nothing in src/ waits for one to end.
 // What a tablet's camera shows, where a journey gives it one: the page tests' label.
 const LABEL_PICTURE = join(ROOT, 'test', 'page', 'camera', 'batch-label.y4m');
 const PAGE_ICON = 'http://fast.decentespresso.com/favicon-32x32.png';
 
+// No transition or animation runs, as in the page tests: a dialog drawn closing
+// would still be on a screenshot, and nothing in src/ waits for one to end.
 const NO_MOTION = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
 
 /** The only fixed wait a journey holds: for proving that nothing arrives in `ms`, `why` naming the wait. */

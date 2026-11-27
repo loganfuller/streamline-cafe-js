@@ -158,6 +158,7 @@ const MAX_LOAD_AHEAD_MS = 60_000;
 const MAX_SCANNED_TEXT_LENGTH = 2048;
 const MAX_BATCH_MATCHES = 20;
 const BATCH_CODE_KEY = 'decentSyncBatchCode';
+const GLOBAL_ID_KEY = 'decentSyncId';
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export const REFUSALS = {
@@ -472,8 +473,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         return live.filter(batch => namesBean(text, batch));
     }
     // The tablet's records as the server writes them when a batch comes: its
-    // bean where Decaid has none, and the batch, not archived, with its code
-    // and what was moved with it.
+    // bean where Decaid has none, and the batch, not archived, with its code,
+    // the server's id for it, and what was moved with it.
     function bring(batch) {
         const outcome = batch.at === 'here' ? 'alreadyThere' : batch.at === 'one' ? 'moved' : 'added';
         if (outcome !== 'alreadyThere') {
@@ -487,7 +488,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 ...(held || { id: batch.batchId, beanId: batch.beanId, frozen: false, createdAt: at }),
                 ...(batch.roastDate ? { roastDate: `${batch.roastDate}T00:00:00.000Z` } : {}),
                 archived: false,
-                extras: { ...(held?.extras || {}), ...(batch.batchCode ? { [BATCH_CODE_KEY]: batch.batchCode } : {}) },
+                extras: { ...(held?.extras || {}), [GLOBAL_ID_KEY]: batch.id, ...(batch.batchCode ? { [BATCH_CODE_KEY]: batch.batchCode } : {}) },
                 updatedAt: at,
             };
             if (outcome === 'moved' && typeof batch.weight === 'number') record.weightRemaining = batch.weight;

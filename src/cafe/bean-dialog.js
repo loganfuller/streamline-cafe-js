@@ -24,7 +24,7 @@ import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
-import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle, batchCode } from './bean-model.js';
+import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle } from './bean-model.js';
 import { SCAN_PHRASES } from './scan-model.js';
 import { startScan } from './scan-view.js';
 import { writesRecord } from './bean-change.js';
@@ -150,7 +150,7 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved, scan = () 
             // A batch's QR code scanned, the plugin asked, and the lists read again.
             scan: ask ? {
                 name: SCAN_PHRASES.open,
-                open: stage => startScan(stage, { ask, reread, inUseCode: () => batchCode(read.batches.find(batch => sameId(batch?.id, context.beanBatchId))) }),
+                open: stage => startScan(stage, { ask, reread, inUse: () => read.batches.find(batch => sameId(batch?.id, context.beanBatchId)) || null }),
             } : null,
         });
         if (!row) return; // closed

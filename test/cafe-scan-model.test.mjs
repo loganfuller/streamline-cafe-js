@@ -126,14 +126,26 @@ test('a match\'s row: the Bean and roast date over the roaster and Batch Code, e
         { id: 'a', roaster: 'Sample Roasters', name: 'Sample Blend', roastDate: '2026-11-12', batchCode: 'SR-0412' },
         { id: 'b', roaster: null, name: 'Sample Blend', roastDate: null, batchCode: null },
         { id: 'c', roaster: ' Sample Roasters ', name: '', roastDate: 'yesterday', batchCode: ' sr-0398 ' },
-    ], 'SR-0398', day, t);
+    ], { extras: { decentSyncBatchCode: 'SR-0398' } }, day, t);
     assert.deepEqual(rows, [
         { id: 'a', name: 'Sample Blend · Roasted day 2026-11-12', details: ['Sample Roasters', 'SR-0412'], detail: 'Sample Roasters · SR-0412', inUse: false },
         { id: 'b', name: 'Sample Blend · No roast date', details: [], detail: '', inUse: false },
         { id: 'c', name: 'Unnamed · No roast date', details: ['Sample Roasters', 'sr-0398'], detail: 'Sample Roasters · sr-0398', inUse: true },
     ]);
-    assert.equal(matchRows([{ id: 'a', batchCode: null }], '', day, t)[0].inUse, false, 'no code is no batch in use');
-    assert.deepEqual(matchRows(null, '', day, t), []);
+    assert.equal(matchRows([{ id: 'a', batchCode: null }], null, day, t)[0].inUse, false, 'no code is no batch in use');
+    assert.deepEqual(matchRows(null, null, day, t), []);
+});
+
+test('among matches sharing a Batch Code, only the batch in use is marked, by the Decent Sync id on its record', () => {
+    const inUse = { extras: { decentSyncBatchCode: 'SR-0412', decentSyncId: '019B7C1E-52AA-7C41-8E0D-3F5A6B7C8D91' } };
+    const rows = matchRows([
+        { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d90', name: 'Sample Blend', roastDate: '2026-11-12', batchCode: 'SR-0412' },
+        { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d91', name: 'Sample Blend', roastDate: '2026-11-02', batchCode: 'sr-0412' },
+        { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d92', name: 'Sample Blend', roastDate: null, batchCode: null },
+    ], inUse, day, t);
+    assert.deepEqual(rows.map(row => row.inUse), [false, true, false]);
+    const coded = matchRows([{ id: 'x', batchCode: 'SR-0412' }, { id: 'y', batchCode: 'SR-0412' }], { extras: { decentSyncBatchCode: 'SR-0412' } }, day, t);
+    assert.deepEqual(coded.map(row => row.inUse), [true, true], 'a record with no id yet is told by its code');
 });
 
 test('the camera opens facing the barista unless the other was chosen, and the choice flips', () => {

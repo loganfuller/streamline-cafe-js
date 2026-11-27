@@ -82,11 +82,11 @@ function matchButton(row, onPick) {
  * - `reread(match)`: reads the lists again from Decaid and answers the `next`
  *   to go back with, `match`'s batch highlighted where one is given, or null
  *   where they could not be read or do not hold it.
- * - `inUseCode()`: the Batch Code of the batch in use, or ''.
+ * - `inUse()`: Decaid's record of the batch in use, or null.
  *
  * Answers `leave`, which stops the camera and puts the part back as it was.
  */
-export function startScan(stage, { ask, reread, inUseCode }) {
+export function startScan(stage, { ask, reread, inUse }) {
     const parts = scanParts();
     if (!parts) {
         stage.back();
@@ -194,13 +194,17 @@ export function startScan(stage, { ask, reread, inUseCode }) {
         const next = await reread(match);
         if (over()) return;
         if (next) stage.back(next);
-        else panel('unread');
+        else {
+            asked = true;
+            panel('unread');
+        }
     }
 
     function several(result, scanned) {
         closeCamera();
         setBusy(false);
-        const rows = matchRows(result.matches, inUseCode(), formatRoastDay, cafeText);
+        last = { text: scanned, at: Date.now() };
+        const rows = matchRows(result.matches, inUse(), formatRoastDay, cafeText);
         stage.title(SCAN_PHRASES.matchesTitle);
         stage.under(matchesLine(rows.length, result.more));
         setText(parts.read, shownText(scanned));
