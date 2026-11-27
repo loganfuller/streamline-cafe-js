@@ -42,12 +42,14 @@ test('the navigation names it in the page\'s language, from the fork\'s table', 
 
 test('the page\'s Save writes a changed setting, from the shell and from the legacy module, and leaving drops it', async () => {
     const shell = read('src/settings/settings-shell.js');
-    assert.match(shell, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
-    assert.match(shell, /if \(getSnapshot\(\)\.dirty\) return;\n\s*await saveCafeSettings\(\);\n\s*ui\.showToast\('Settings updated'/);
+    assert.match(shell, /\/\/ Streamline Cafe: [^\n]*\nimport \{ cafeSettingsVisit, saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
+    assert.match(shell, /if \(legacyMounted\) return;\n\s*\/\/ Streamline Cafe: [^\n]*\n\s*const cafeVisit = cafeSettingsVisit\(\);\n\s*try \{\n\s*await saveSettingsData\(\);/);
+    assert.match(shell, /if \(getSnapshot\(\)\.dirty\) return;\n\s*if \(!await saveCafeSettings\(cafeVisit\) \|\| getSnapshot\(\)\.dirty \|\| legacyMounted\) return;\n\s*ui\.showToast\('Settings updated'/);
     const legacy = read('src/settings/settings.js');
-    assert.match(legacy, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
-    assert.match(legacy, /await flushPendingChanges\(\);\n\s*await saveCafeSettings\(\);\n\s*\} catch \(error\) \{/);
-    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{ container = null; \}\);/);
+    assert.match(legacy, /\/\/ Streamline Cafe: [^\n]*\nimport \{ cafeSettingsVisit, saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
+    assert.match(legacy, /saveBtn\.addEventListener\('click', async \(\) => \{\n\s*\/\/ Streamline Cafe: [^\n]*\n\s*const cafeVisit = cafeSettingsVisit\(\);\n\s*try \{\n\s*await flushPendingChanges\(\);\n\s*if \(!await saveCafeSettings\(cafeVisit\) \|\| hasPendingChanges\(\)\) return;\n\s*\} catch \(error\) \{/);
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /export function saveCafeSettings\(from\) \{\n\s*if \(from !== visit\) return Promise\.resolve\(false\);/);
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{\n\s*visit \+= 1;\n\s*container = null;\n\s*written = null;\n\s*\}\);/);
 });
 
 test('the category\'s module keeps the setting through the fork\'s one store module, and off the main page\'s first load', () => {
