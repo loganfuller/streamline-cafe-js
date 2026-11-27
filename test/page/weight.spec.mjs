@@ -683,6 +683,8 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
 
         // The same after the page reloads.
         await page.reload();
+        await page.locator('#cafe-strip .cafe-card').first().waitFor();
+        await expect.poll(() => cafe.routes.sockets.has('/ws/v1/machine/snapshot')).toBe(true);
         await cafe.settle();
         await openCafeSettings(cafe);
         await expect(setting(page)).toHaveValue('20000');
