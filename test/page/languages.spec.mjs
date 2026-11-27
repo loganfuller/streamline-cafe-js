@@ -23,6 +23,8 @@ import { loadedId, recordOf } from './support/fake-reads.mjs';
 import { RECIPES } from './support/sample-data.mjs';
 
 const [, single] = RECIPES;
+test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
+
 const SETTINGS = 'streamlineSettings';
 const PAGE_WIDTH = 1920;
 /** A slot the sample data leaves empty, shown on the strip. */

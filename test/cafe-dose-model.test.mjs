@@ -52,15 +52,15 @@ test('a Workflow that names nothing gives an empty line', () => {
 
 test('only the bean\'s name shrinks, and each " · " goes with the code or the days, never with the name', () => {
     assert.deepEqual(line(batch({ ...coded, ...roasted('2026-11-02') })), [
-        { text: 'SB-0211', before: '', after: ' · ', shrinks: false },
-        { text: 'Sample Blend', before: '', after: '', shrinks: true },
-        { text: '16 d since roast', before: ' · ', after: '', shrinks: false },
+        { kind: 'code', text: 'SB-0211', before: '', after: ' · ', shrinks: false },
+        { kind: 'bean', text: 'Sample Blend', before: '', after: '', shrinks: true },
+        { kind: 'days', text: '16 d since roast', before: ' · ', after: '', shrinks: false },
     ]);
     assert.deepEqual(doseLine({ code: 'SB-0211', bean: '', days: 16 }, t), [
-        { text: 'SB-0211', before: '', after: ' · ', shrinks: false },
-        { text: '16 d since roast', before: '', after: '', shrinks: false },
+        { kind: 'code', text: 'SB-0211', before: '', after: ' · ', shrinks: false },
+        { kind: 'days', text: '16 d since roast', before: '', after: '', shrinks: false },
     ], 'with no name, one " · " between the code and the days');
-    assert.deepEqual(doseLine({ code: '', bean: 'Sample Blend', days: null }, t), [{ text: 'Sample Blend', before: '', after: '', shrinks: true }]);
+    assert.deepEqual(doseLine({ code: '', bean: 'Sample Blend', days: null }, t), [{ kind: 'bean', text: 'Sample Blend', before: '', after: '', shrinks: true }]);
 });
 
 test('the days are said with one phrase, translated, whatever their number', () => {

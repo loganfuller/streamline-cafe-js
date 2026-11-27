@@ -292,34 +292,37 @@ test.describe('the strip', { tag: '@strip' }, () => {
         expect(fake.selection()).toEqual({ kind: 'recipe', id: third.id, modified: false });
     });
 
-    test('a tap loads a recipe: the Workflow, DYE2\'s selection and every row are its record\'s', async ({ cafe, fake }) => {
-        matchMachine(fake, single.name);
-        ownLiveSettings(fake, single.name);
-        setStripMode(fake, 'R');
-        const page = await cafe.open();
-        const machine = fake.workflow();
-        const before = records(fake);
-        const record = recordOf(fake, single.name);
-        const mark = fake.log.length;
+    test.describe('with the zone pinned', () => {
+        test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
+        test('a tap loads a recipe: the Workflow, DYE2\'s selection and every row are its record\'s', async ({ cafe, fake }) => {
+            matchMachine(fake, single.name);
+            ownLiveSettings(fake, single.name);
+            setStripMode(fake, 'R');
+            const page = await cafe.open();
+            const machine = fake.workflow();
+            const before = records(fake);
+            const record = recordOf(fake, single.name);
+            const mark = fake.log.length;
 
-        await card(page, single.slot).click();
-        await expect(title(page)).toHaveText(single.name);
-        await cafe.advance(3000);
+            await card(page, single.slot).click();
+            await expect(title(page)).toHaveText(single.name);
+            await cafe.advance(3000);
 
-        await expect(card(page, single.slot), 'its card is filled').toHaveAttribute('aria-pressed', 'true');
-        await expect(pressed(page), 'and no other').toHaveCount(1);
-        // The sample data's batch of Sample Single Origin was roasted on 28 October, and has no Batch Code.
-        expect(await shown(page), 'the heading and each row, read off the record').toEqual(showing(record, '21 d since roast'));
-        expect(fake.workflow(), 'the Workflow is the record\'s').toEqual(workflowOf(record, machine));
-        const { context } = fake.workflow();
-        const dv = record.dashboardVariables;
-        expect({ dose: context.targetDoseWeight, yield: context.targetYield, grind: Number(context.grinderSetting), basket: context.extras.basketName, grinder: context.grinderModel, bean: context.coffeeName },
-            'and agrees with the record\'s dial-in').toEqual({ dose: dv.dose, yield: dv.drink, grind: dv.grind, basket: dv.basketName, grinder: dv.grinderModel, bean: record.beanName });
-        expect(fake.selection(), 'DYE2 names the recipe, unchanged').toEqual({ kind: 'recipe', id: record.id, modified: false });
-        expect(loadsWritten(cafe.since(mark)), 'one load, no record written').toEqual({ workflow: [record.id], selection: [record.id], records: 0 });
-        expect(records(fake), 'DYE2\'s records are as they were').toEqual(before);
-        expect(await stripModeLocal(page), 'Streamline\'s strip mode is as it was').toBe('R');
-        expect(cafe.since(mark, isStripModeWrite), 'and never written').toEqual([]);
-        await cafe.screenshot('page-recipe-light');
+            await expect(card(page, single.slot), 'its card is filled').toHaveAttribute('aria-pressed', 'true');
+            await expect(pressed(page), 'and no other').toHaveCount(1);
+            // The sample data's batch of Sample Single Origin was roasted on 28 October, and has no Batch Code.
+            expect(await shown(page), 'the heading and each row, read off the record').toEqual(showing(record, '21 d since roast'));
+            expect(fake.workflow(), 'the Workflow is the record\'s').toEqual(workflowOf(record, machine));
+            const { context } = fake.workflow();
+            const dv = record.dashboardVariables;
+            expect({ dose: context.targetDoseWeight, yield: context.targetYield, grind: Number(context.grinderSetting), basket: context.extras.basketName, grinder: context.grinderModel, bean: context.coffeeName },
+                'and agrees with the record\'s dial-in').toEqual({ dose: dv.dose, yield: dv.drink, grind: dv.grind, basket: dv.basketName, grinder: dv.grinderModel, bean: record.beanName });
+            expect(fake.selection(), 'DYE2 names the recipe, unchanged').toEqual({ kind: 'recipe', id: record.id, modified: false });
+            expect(loadsWritten(cafe.since(mark)), 'one load, no record written').toEqual({ workflow: [record.id], selection: [record.id], records: 0 });
+            expect(records(fake), 'DYE2\'s records are as they were').toEqual(before);
+            expect(await stripModeLocal(page), 'Streamline\'s strip mode is as it was').toBe('R');
+            expect(cafe.since(mark, isStripModeWrite), 'and never written').toEqual([]);
+            await cafe.screenshot('page-recipe-light');
+        });
     });
 });

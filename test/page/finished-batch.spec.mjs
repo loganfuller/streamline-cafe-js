@@ -70,6 +70,7 @@ async function lookAgain(cafe, event = 'streamline:mainpagevisible') {
 }
 
 test.describe('a finished batch', { tag: '@finished' }, () => {
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
     test('a card whose recipe names an archived batch is red, loaded and not, and the others are as they were', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         const { bean, ...look } = await cardLook(page, house.slot);
@@ -389,6 +390,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
 // itself with `fake.decentSync.push(frame)`.
 test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '@finished' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     const BATCH_READ = /^GET \/api\/v1\/bean-batches\//;
     const batchReadsSince = (cafe, mark) => cafe.since(mark).map(entry => `${entry.method} ${entry.path}`).filter(line => BATCH_READ.test(line));

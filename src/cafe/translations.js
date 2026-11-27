@@ -2293,7 +2293,7 @@ export const CAFE_TRANSLATIONS = {
         da: "{days} d. siden ristning",
         sv: "{days} d sedan rostning",
         no: "{days} d siden brenning",
-        it: "{days} g dalla tostatura",
+        it: "{days} gg dalla tostatura",
         nl: "{days} d sinds het branden",
     },
     "No roast date": {

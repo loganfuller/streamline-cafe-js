@@ -32,13 +32,13 @@ export function doseNames(workflow, batch, today) {
  * words ("16 d since roast"), with " · " between them. Each separator, in
  * `before` or `after`, goes with the code or the days, never with the bean's
  * name, which is the part shortened to fit, so neither is cut off with it.
- * `shrinks` marks the bean's name.
+ * `shrinks` marks the bean's name, and `kind` says which part each is.
  */
 export function doseLine({ code, bean, days }, t) {
     const parts = [
-        { text: code, shrinks: false },
-        { text: bean, shrinks: true },
-        { text: sinceRoastText(days, t), shrinks: false },
+        { kind: 'code', text: code, shrinks: false },
+        { kind: 'bean', text: bean, shrinks: true },
+        { kind: 'days', text: sinceRoastText(days, t), shrinks: false },
     ].filter(part => part.text);
     return parts.map((part, index) => {
         const whole = !part.shrinks;

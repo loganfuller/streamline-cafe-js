@@ -131,10 +131,16 @@ function renderDose() {
             span.textContent = part.text;
             return span;
         }
-        span.className = 'cafe-dose-whole';
+        span.className = `cafe-dose-whole cafe-dose-${part.kind}`;
         const words = document.createElement('bdi');
         words.textContent = part.text;
-        span.append(...[part.before, words, part.after].filter(Boolean));
+        span.append(...[part.before, words, part.after].filter(Boolean).map(piece => {
+            if (typeof piece !== 'string') return piece;
+            const separator = document.createElement('span');
+            separator.className = 'cafe-dose-separator';
+            separator.textContent = piece;
+            return separator;
+        }));
         return span;
     }));
     line.classList.toggle('cafe-batch-finished', finished);

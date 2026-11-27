@@ -105,6 +105,7 @@ async function useBatch(cafe, bean, n) {
 }
 
 test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' }, () => {
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
     test('Dose and Yield name the bean and the basket, and their values still open the numpad', async ({ cafe }) => {
         const page = await openPage(cafe);
         await load(cafe, house);
@@ -538,6 +539,42 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
             expect(parts.parts.map(part => part.top), 'all on the line').toEqual([0, 0, 0]);
             expect(parts.parts[2].right, 'the days end inside the line').toBeLessThanOrEqual(parts.line.right);
             await cafe.screenshot('dose-long-bean-1340-light');
+        });
+
+        test('a Batch Code too long for Dose\'s line is shortened too, past a third of it, and never pushes the name out', async ({ cafe, fake }) => {
+            const code = 'BR-2026-1102\nETHIOPIA-GUJI-LOT-04-ROAST-4471';
+            const batch = blendNew(fake);
+            batch.extras = { ...batch.extras, decentSyncBatchCode: code };
+            fake.store.set('streamlineSettings', 'language', 'de');
+            const { context } = fake.workflow();
+            fake.given({ workflow: { ...fake.workflow(), context: { ...context, beanBatchId: batch.id } } });
+            const page = await openPage(cafe);
+            await expect(dose(page)).toHaveText(`${code} · Sample Single Origin · 16 Tg. seit der Röstung`);
+            const parts = await dose(page).evaluate(line => {
+                const box = line.getBoundingClientRect();
+                const measure = element => {
+                    const rect = element.getBoundingClientRect();
+                    return { cut: element.scrollWidth > element.clientWidth, width: Math.round(rect.width), right: Math.round(rect.right), top: Math.round(rect.top - box.top), height: Math.round(rect.height) };
+                };
+                const [codePart, name, days] = line.children;
+                return {
+                    line: { width: Math.round(box.width), right: Math.round(box.right) },
+                    code: { ...measure(codePart.querySelector('bdi')), whole: measure(codePart), ellipsis: getComputedStyle(codePart.querySelector('bdi')).textOverflow },
+                    separators: [...line.querySelectorAll('.cafe-dose-separator')].map(separator => ({ text: separator.textContent, ...measure(separator) })),
+                    name: measure(name),
+                    days: measure(days),
+                };
+            });
+            expect(parts.code.cut, 'the code is shortened').toBe(true);
+            expect(parts.code.ellipsis, 'ending in an ellipsis').toBe('ellipsis');
+            expect(parts.code.whole.width, 'to at most about a third of the line').toBeLessThanOrEqual(Math.ceil(parts.line.width * 0.35));
+            expect(parts.code.height, 'its line break kept on the one line').toBeLessThanOrEqual(22);
+            expect(parts.separators.map(({ text, width }) => ({ text, shown: width > 0 })), 'both " · " shown').toEqual([{ text: ' · ', shown: true }, { text: ' · ', shown: true }]);
+            expect(parts.name.width, 'the bean\'s name still shows').toBeGreaterThanOrEqual(30);
+            expect(parts.days.cut, 'the days whole').toBe(false);
+            expect(parts.days.right, 'and inside the line').toBeLessThanOrEqual(parts.line.right);
+            expect([parts.code.top, parts.name.top, parts.days.top], 'all on the line').toEqual([0, 0, 0]);
+            await cafe.screenshot('dose-long-code-1340-de-light');
         });
 
         // With a batch highlighted, "Use this batch" and the note beside it fit

@@ -264,6 +264,7 @@ test.describe('the QR button', { tag: '@scan' }, () => {
 
 test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     test('the decoder loads when the scan first opens, and the camera is asked for video alone', async ({ cafe, fake }) => {
         const page = await dialogOpen(cafe, [arriving(fake, 'one')]);

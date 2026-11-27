@@ -97,6 +97,7 @@ async function openDialog(cafe, on) {
 
 test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     test('the grinder dialog says the choice is saved to the recipe, and a choice is one Workflow write, which the plugin saves into the record', async ({ cafe, fake }) => {
         const record = await houseLoaded(cafe);
