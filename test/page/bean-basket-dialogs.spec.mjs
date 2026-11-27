@@ -519,9 +519,10 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                     line: { wraps: line.scrollHeight > line.clientHeight, right: Math.round(box.right) },
                     parts: [...line.children].map(part => {
                         const style = getComputedStyle(part);
+                        const words = part.querySelector('bdi') ?? part;
                         return {
                             text: part.textContent,
-                            cut: part.scrollWidth > part.clientWidth,
+                            cut: words.scrollWidth > words.clientWidth,
                             ellipsis: style.textOverflow,
                             right: Math.round(part.getBoundingClientRect().right),
                             top: Math.round(part.getBoundingClientRect().top - box.top),
@@ -554,27 +555,41 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
                 const box = line.getBoundingClientRect();
                 const measure = element => {
                     const rect = element.getBoundingClientRect();
-                    return { cut: element.scrollWidth > element.clientWidth, width: Math.round(rect.width), right: Math.round(rect.right), top: Math.round(rect.top - box.top), height: Math.round(rect.height) };
+                    return { cut: element.scrollWidth > element.clientWidth, width: Math.round(rect.width), client: element.clientWidth, right: Math.round(rect.right), top: Math.round(rect.top - box.top), height: Math.round(rect.height) };
                 };
                 const [codePart, name, days] = line.children;
                 return {
                     line: { width: Math.round(box.width), right: Math.round(box.right) },
+                    row: line.parentElement.clientWidth,
                     code: { ...measure(codePart.querySelector('bdi')), whole: measure(codePart), ellipsis: getComputedStyle(codePart.querySelector('bdi')).textOverflow },
                     separators: [...line.querySelectorAll('.cafe-dose-separator')].map(separator => ({ text: separator.textContent, ...measure(separator) })),
                     name: measure(name),
-                    days: measure(days),
+                    days: measure(days.querySelector('bdi')),
                 };
             });
             expect(parts.code.cut, 'the code is shortened').toBe(true);
             expect(parts.code.ellipsis, 'ending in an ellipsis').toBe('ellipsis');
-            expect(parts.code.whole.width, 'to at most about a third of the line').toBeLessThanOrEqual(Math.ceil(parts.line.width * 0.35));
+            expect(parts.code.whole.client, 'to at most about a third of the row').toBeLessThanOrEqual(Math.ceil(parts.row * 0.35));
             expect(parts.code.height, 'its line break kept on the one line').toBeLessThanOrEqual(22);
             expect(parts.separators.map(({ text, width }) => ({ text, shown: width > 0 })), 'both " · " shown').toEqual([{ text: ' · ', shown: true }, { text: ' · ', shown: true }]);
-            expect(parts.name.width, 'the bean\'s name still shows').toBeGreaterThanOrEqual(30);
+            expect(parts.name.client, 'the bean\'s name keeps its first letters, 2em of them').toBeGreaterThanOrEqual(31);
             expect(parts.days.cut, 'the days whole').toBe(false);
             expect(parts.days.right, 'and inside the line').toBeLessThanOrEqual(parts.line.right);
             expect([parts.code.top, parts.name.top, parts.days.top], 'all on the line').toEqual([0, 0, 0]);
             await cafe.screenshot('dose-long-code-1340-de-light');
+        });
+
+        test('a Batch Code shorter than a third of the row shows whole, however short the line', async ({ cafe, fake }) => {
+            const code = 'SB-0211';
+            const batch = blendNew(fake);
+            batch.extras = { ...batch.extras, decentSyncBatchCode: code };
+            batch.roastDate = null;
+            const { context } = fake.workflow();
+            fake.given({ workflow: { ...fake.workflow(), context: { ...context, coffeeName: 'Decaf', beanBatchId: batch.id } } });
+            const page = await openPage(cafe);
+            await expect(dose(page)).toHaveText(`${code} · Decaf`);
+            const cut = await dose(page).evaluate(line => [...line.querySelectorAll('bdi, .cafe-dose-shrinks')].map(part => part.scrollWidth > part.clientWidth));
+            expect(cut, 'neither the code nor the name is cut').toEqual([false, false]);
         });
 
         // With a batch highlighted, "Use this batch" and the note beside it fit

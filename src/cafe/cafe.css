@@ -454,8 +454,12 @@ button.cafe-card {
 
 /* Dose's line is one line, of which the bean's name is the part shortened to
    fit: the Batch Code and the days since the roast, each with its " · ", show
-   whole. Only a code longer than a third of the line is shortened too, ending
-   in an ellipsis, so a long one never pushes the name out. */
+   whole. Only a code longer than about a third of the row is shortened too,
+   ending in an ellipsis, so a long one never pushes the name out. */
+#dose-label .cafe-row-desc-line {
+    container-type: inline-size;
+}
+
 #cafe-dose-desc {
     display: flex;
 }
@@ -467,7 +471,7 @@ button.cafe-card {
 }
 
 .cafe-dose-code {
-    max-width: 35%;
+    max-width: 35cqi;
 }
 
 .cafe-dose-whole bdi {
