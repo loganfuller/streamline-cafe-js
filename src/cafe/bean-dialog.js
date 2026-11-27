@@ -122,14 +122,19 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved, scan = () 
         });
         // The lists read again from Decaid, with the scanned batch's bean shown
         // and the batch highlighted where one matched. Null where they can't
-        // be read, or do not hold that batch.
+        // be read, do not hold that batch, or a later read was asked for.
+        let reading = 0;
         const reread = async match => {
+            const mine = reading += 1;
+            let fresh;
             try {
-                take(...await Promise.all([readBeans(loaded), getWorkflow()]));
+                fresh = await Promise.all([readBeans(loaded), getWorkflow()]);
             } catch (error) {
                 logger.warn('Cafe: could not read the beans again after a scan', error);
                 return null;
             }
+            if (mine !== reading) return null;
+            take(...fresh);
             if (!match) return lists(openingBean(list, context, read.batches));
             const next = lists(match.beanId);
             return next.rows.some(shown => shown.id === String(match.batchId)) ? { ...next, held: match.batchId } : null;

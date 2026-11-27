@@ -209,7 +209,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     }
 
     async function send(asking, scanned) {
-        if (busy) return;
+        if (busy || over()) return;
         setBusy(true);
         if (asking.match === undefined) say(scanMessage('asking', scanned));
         else for (const button of parts.list.children) button.disabled = true;
@@ -247,6 +247,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     async function cancel() {
         ending = true;
         closeCamera();
+        for (const button of parts.list.children) button.disabled = true;
         parts.cancel.disabled = true;
         const next = asked || busy ? await reread(null) : null;
         if (alive) stage.back(next || undefined);

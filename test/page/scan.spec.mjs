@@ -372,6 +372,39 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         expect(recordOf(fake, house.name)).toMatchObject({ beanId: single.id, beanBatchId: ARRIVING });
     });
 
+    test('"Cancel scan" while a match\'s lists are read keeps the lists Cancel read, not the older read answered after them', async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
+        await scanOpen(cafe);
+        const blend = beanNamed(fake, 'Sample Blend');
+        // The match's read of Sample Blend's batches is answered as they are now, but only once the test lets it.
+        let answered;
+        let letGo;
+        const reached = new Promise(resolve => { answered = resolve; });
+        const released = new Promise(resolve => { letGo = resolve; });
+        let taken = false;
+        const stop = cafe.routes.intercept(request => !taken && request.method === 'GET' && request.path.endsWith(`/beans/${blend.id}/batches`), async ({ forward }) => {
+            taken = true;
+            stop();
+            const answer = forward();
+            answered();
+            await released;
+            return answer;
+        });
+        await page.clock.runFor(500);
+        await reached;
+        // A batch of Sample Blend is finished meanwhile: the read Cancel makes no longer lists it.
+        const finished = batchOf(fake, 'Sample Blend', '2026-11-02');
+        finished.archived = true;
+        await page.locator('#cafe-scan-cancel').click();
+        await expect(scanPart(page)).toBeHidden();
+        letGo();
+        await cafe.settle();
+        await page.locator('#cafe-pick-side .cafe-pick-row').filter({ hasText: 'Sample Blend' }).click();
+        const rows = await page.locator('#cafe-pick-list .cafe-pick-row .cafe-pick-row-name').allTextContents();
+        expect(rows, 'the finished batch is not offered').not.toContain('Roasted Nov 2');
+        expect(rows).toContain('Roasted Nov 12');
+    });
+
     test('closing the dialog after a scan leaves the batch at the Location and writes nothing', async ({ cafe, fake }) => {
         const page = await scanned(cafe, [arriving(fake, 'one')]);
         const workflow = JSON.stringify(fake.workflow());
@@ -550,6 +583,26 @@ test.describe('a scan that fails', { tag: '@scan' }, () => {
         await read(cafe);
         await expect(scanPart(page)).toBeHidden();
         expect((await heldBatch(page)).map(row => row.name)).toEqual(['Roasted Nov 12']);
+    });
+
+    test('"Cancel scan" over several matches, after a failure, leaves no match to tap while the lists are read again', async ({ cafe, fake }) => {
+        const batches = [arriving(fake, 'one'), arriving(fake, 'none', { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d93', roastDate: '2026-11-05', batchId: '6e0d8b17-1a2f-4c3d-9e5f-7a8b9c0d1e2f' })];
+        const page = await scanOutOfReach(cafe, batches);
+        expect(await message(page)).toEqual(MESSAGES.unreachable);
+        fake.decentSync.startServer();
+        await page.locator('#cafe-scan-again').click();
+        await expect.poll(() => page.evaluate(() => document.getElementById('cafe-scan-video').readyState >= 2)).toBe(true);
+        await read(cafe);
+        await expect(title(page)).toHaveText('Which batch is it?');
+        const lists = hold(cafe, { method: 'GET', path: /\/api\/v1\/beans\?/ });
+        await page.locator('#cafe-scan-cancel').click();
+        await lists.reached;
+        await expect(page.locator('#cafe-scan-match-list .cafe-pick-row').first()).toBeDisabled();
+        lists.release();
+        await expect(scanPart(page)).toBeHidden();
+        await cafe.settle();
+        expect(scans(fake)).toEqual([{ text: LABEL_TEXT }, { text: LABEL_TEXT }]);
+        expect(fake.decentSync.batches().map(batch => batch.at), 'nothing was brought').toEqual(['one', 'none']);
     });
 
     test('no answer in time says the batch may have come all the same, and the lists are read again', async ({ cafe, fake }) => {
