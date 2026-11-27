@@ -4,8 +4,10 @@
 // a batch's QR code").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
-import { SCAN_PHRASES, SAME_TEXT_MS, MAX_SCANNED_TEXT, SAMPLE_SIDE, holdsText, askable, askedJustNow, shownText, scanAnswer, scanRefusal, cameraFailure, scanMessage, matchesLine, matchRows, facingOf, otherFacing, cameraCount, facingLabel, mirrored, sampleSize } from '../src/cafe/scan-model.js';
+import { SCAN_PHRASES, SAME_TEXT_MS, MAX_SCANNED_TEXT, SAMPLE_SIDE, holdsText, askable, askedJustNow, shownText, scanAnswer, scanRefusal, cameraFailure, scanMessage, matchesLine, matchRows, facingOf, otherFacing, cameraCount, facingLabel, mirrored, sampleSize, readText } from '../src/cafe/scan-model.js';
 import { scanOffered } from '../src/cafe/sync-status.js';
 
 const t = (key, vars) => key.replace(/\{(\w+)\}/g, (whole, name) => (vars && vars[name] !== undefined ? String(vars[name]) : whole));
@@ -179,4 +181,44 @@ test('a frame is read at a reduced size, never enlarged, and not before the pict
     assert.deepEqual(sampleSize(320, 240), { width: 320, height: 240 });
     assert.equal(sampleSize(0, 0), null);
     assert.equal(sampleSize(640, undefined), null);
+});
+
+const vendored = (file, name) => vm.runInNewContext(`${readFileSync(new URL(`../src/vendor/${file}`, import.meta.url), 'utf8')}; ${name}`, {});
+const jsQR = vendored('jsQR.js', 'jsQR');
+const { QrCode } = vendored('qrcodegen.js', 'qrcodegen');
+
+/** A QR code holding `text`, as RGBA pixels: its modules in `dark`, the rest and a four-module border in `light`. */
+function picture(text, { dark, light }) {
+    const code = QrCode.encodeText(text, QrCode.Ecc.MEDIUM);
+    const scale = 6;
+    const side = (code.size + 8) * scale;
+    const pixels = new Uint8ClampedArray(side * side * 4);
+    for (let y = 0; y < side; y++) {
+        for (let x = 0; x < side; x++) {
+            const module = [Math.floor(x / scale) - 4, Math.floor(y / scale) - 4];
+            const inside = module.every(at => at >= 0 && at < code.size);
+            pixels.fill(inside && code.getModule(...module) ? dark : light, (y * side + x) * 4, (y * side + x) * 4 + 3);
+            pixels[(y * side + x) * 4 + 3] = 255;
+        }
+    }
+    return { pixels, side };
+}
+
+test('a code is read dark on light, as a printed label shows it, and light on dark, as a sticker or a phone may', () => {
+    for (const [colours, why] of [[{ dark: 16, light: 235 }, 'dark on light'], [{ dark: 235, light: 16 }, 'light on dark']]) {
+        const { pixels, side } = picture('SR-0412', colours);
+        assert.equal(readText(jsQR, pixels, side, side), 'SR-0412', why);
+    }
+    const { pixels, side } = picture('SR-0412', { dark: 128, light: 128 });
+    assert.equal(readText(jsQR, pixels, side, side), null, 'a frame with no code in it');
+});
+
+test('a frame the decoder fails on, or answers without text, is a frame with no code', () => {
+    const pixels = new Uint8ClampedArray(16);
+    assert.equal(readText(() => { throw new TypeError("Cannot read properties of undefined (reading 'height')"); }, pixels, 2, 2), null);
+    assert.equal(readText(() => null, pixels, 2, 2), null);
+    assert.equal(readText(() => ({ data: 42 }), pixels, 2, 2), null);
+    let asked = null;
+    readText((...args) => { asked = args[3]; return null; }, pixels, 2, 2);
+    assert.deepEqual(asked, { inversionAttempts: 'attemptBoth' }, 'both ways round, in one call');
 });

@@ -3,7 +3,8 @@
 //
 // The camera is Chromium's fake one, playing one picture for ever: a label
 // whose QR code holds the made-up Batch Code SR-0412 (camera/make-label.mjs,
-// playwright.config.mjs). A test allows its own context the camera, and what
+// playwright.config.mjs), dark on light, or light on dark in the tests tagged
+// @light-on-dark. A test allows its own context the camera, and what
 // the label matches is what the test gives the fake plugin's server
 // (`fake.decentSync.canScan`). The picture comes in real time and the page
 // reads it on its own clock, so a test pauses that clock once the dialog is
@@ -326,6 +327,16 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
             if (outcome === 'moved') await cafe.screenshot('scan-matched-light');
         });
     }
+
+    test('a label light on dark, as a sticker or a phone may show it, is read as one dark on light is', { tag: '@light-on-dark' }, async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
+        await scanOpen(cafe);
+        await read(cafe);
+        await expect(scanPart(page)).toBeHidden();
+        expect(scans(fake), 'the text as it was read, once').toEqual([{ text: LABEL_TEXT }]);
+        expect(await highlightedBean(page), 'its Bean shown').toEqual(['Sample Blend']);
+        expect(await tracks(page), 'the camera stopped').toEqual(['video ended']);
+    });
 
     test('a batch already at the Location changes nothing and is highlighted the same way', async ({ cafe, fake }) => {
         const batch = batchOf(fake, 'Sample Blend', '2026-11-02');

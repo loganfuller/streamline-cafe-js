@@ -11,8 +11,15 @@ import { join } from 'node:path';
 import { defineConfig } from 'playwright/test';
 
 // What the page's camera shows: a batch's label, one frame for ever
-// (test/page/camera/make-label.mjs).
+// (test/page/camera/make-label.mjs), dark on light, and light on dark for the
+// tests tagged @light-on-dark.
 const LABEL = join(import.meta.dirname, 'test', 'page', 'camera', 'batch-label.y4m');
+const LABEL_LIGHT_ON_DARK = join(import.meta.dirname, 'test', 'page', 'camera', 'batch-label-light-on-dark.y4m');
+const LIGHT_ON_DARK = /@light-on-dark/;
+const camera = label => ({
+    channel: 'chromium',
+    launchOptions: { args: [LOCAL_NETWORK, '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${label}`] },
+});
 const LOCAL_NETWORK = '--disable-features=LocalNetworkAccessChecks';
 const CAMERA_SPEC = 'scan.spec.mjs';
 
@@ -48,13 +55,7 @@ export default defineConfig({
     // allowed the camera. A test allows it for its own context.
     projects: [
         { name: 'page', testIgnore: CAMERA_SPEC },
-        {
-            name: 'camera',
-            testMatch: CAMERA_SPEC,
-            use: {
-                channel: 'chromium',
-                launchOptions: { args: [LOCAL_NETWORK, '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${LABEL}`] },
-            },
-        },
+        { name: 'camera', testMatch: CAMERA_SPEC, grepInvert: LIGHT_ON_DARK, use: camera(LABEL) },
+        { name: 'camera-light-on-dark', testMatch: CAMERA_SPEC, grep: LIGHT_ON_DARK, use: camera(LABEL_LIGHT_ON_DARK) },
     ],
 });
