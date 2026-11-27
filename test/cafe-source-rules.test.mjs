@@ -345,12 +345,12 @@ test('the bean dialog alone enters a batch\'s weight, which writes no Workflow o
     for (const name of ['grinder-dialog.js', 'basket-dialog.js', 'barista-dialog.js', 'profile-dialog.js']) {
         assert.doesNotMatch(SOURCES.find(source => source.name === name).text, /\bweigh\b/, `${name} has no weight to enter`);
     }
-    for (const name of ['weight-view.js', 'weight-model.js', 'batch-writer.js', 'cafe-settings.js']) {
+    for (const name of ['weight-view.js', 'weight-model.js', 'batch-writer.js', 'cafe-settings.js', 'cafe-settings-draft.js']) {
         const { text } = SOURCES.find(source => source.name === name);
         assert.doesNotMatch(text, /\b(updateWorkflow|putWorkflow|changeBean|setRecipeFields|callPluginEndpoint|putPluginEndpointHere)\b|from '\.\/(decent-sync|sync-status|recipe-writer)\.js'/, name);
     }
     // The container's weight is the skin's own, kept through its one store module.
-    assert.deepEqual(filesWith(/\bCONTAINER_KEY\b/), ['bean-dialog.js', 'cafe-settings.js', 'cafe-store.js']);
+    assert.deepEqual(filesWith(/\bCONTAINER_KEY\b/), ['bean-dialog.js', 'cafe-settings-draft.js', 'cafe-settings.js', 'cafe-store.js']);
     assert.match(SOURCES.find(({ name }) => name === 'cafe-store.js').text, /export const CONTAINER_KEY = 'batchContainerWeight';/);
 });
 

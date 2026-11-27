@@ -5,15 +5,16 @@
 // categories, through the hooks listed in docs/cafe/UPSTREAM_EDITS.md.
 //
 // The setting is kept for the tablet in the skin's own namespace of Decaid's
-// store (cafe-store.js), written as soon as it is changed: the page's Save and
-// Cancel are for Decaid's own settings. On a tablet a tap on the field opens
-// Streamline's numpad, as the page's other number fields do.
+// store (cafe-store.js). A change waits for the page's Save, which writes it,
+// and Cancel drops it (cafe-settings-draft.js). On a tablet a tap on the field
+// opens Streamline's numpad, as the page's other number fields do.
 import { logger } from '../modules/logger.js';
 import { showToast } from '../modules/ui.js';
 import { shouldUseNumpad } from '../modules/numpad-policy.js';
 import { openModal as openNumpad, initializeNumpadModal } from '../modules/numpad-modal.js';
 import { WEIGHT_PHRASES, MAX_CONTAINER, containerWeight } from './weight-model.js';
-import { readCafe, writeCafe, CONTAINER_KEY } from './cafe-store.js';
+import { readCafe, CONTAINER_KEY } from './cafe-store.js';
+import { draftContainer, stageContainer } from './cafe-settings-draft.js';
 import { cafeText, setText } from './text.js';
 
 const NUMPAD_FIELD = 'cafe-container-weight';
@@ -47,21 +48,11 @@ export async function mountSettingsCategory({ container }) {
     const numpad = shouldUseNumpad();
     let alive = true;
     let kept = 0;
-    let writing = Promise.resolve();
 
     const keep = value => {
         const grams = containerWeight(String(value).replace(/[^\d.]/g, ''));
         field.value = String(grams);
-        if (grams === kept) return;
-        const before = kept;
-        kept = grams;
-        writing = writing.then(() => writeCafe(CONTAINER_KEY, grams)).catch(error => {
-            logger.warn('Cafe: could not keep the batch container\'s weight', error);
-            showToast(cafeText('Could not save the container\'s weight'), 4000, 'error');
-            if (kept !== grams) return;
-            kept = before;
-            if (alive) field.value = String(before);
-        });
+        stageContainer(grams, kept);
     };
 
     field.addEventListener('change', () => keep(field.value));
@@ -78,9 +69,8 @@ export async function mountSettingsCategory({ container }) {
     });
 
     try {
-        const read = containerWeight(await readCafe(CONTAINER_KEY));
-        kept = read;
-        field.value = String(read);
+        kept = containerWeight(await readCafe(CONTAINER_KEY));
+        field.value = String(draftContainer() ?? kept);
         field.disabled = false;
         if (numpad) {
             initializeNumpadModal();

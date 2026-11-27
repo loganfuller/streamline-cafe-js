@@ -611,19 +611,48 @@ for (const size of [{ width: 1340, height: 800 }, { width: 1280, height: 800 }])
 
 test.describe('the Cafe setting', { tag: '@weight' }, () => {
     const setting = page => page.locator('#cafe-container-weight');
+    const kept = fake => { const value = fake.store.get('streamlineCafe', 'batchContainerWeight'); return value === null ? null : Number(value); };
+    const containerWrites = (cafe, mark) => cafe.since(mark, entry => isWrite(entry) && entry.path === CONTAINER_STORE).map(entry => entry.body);
 
-    async function openCafeSettings(cafe) {
+    async function openSettings(cafe) {
         const { page } = cafe;
         await page.evaluate(() => document.getElementById('settings-btn').click());
         await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
         await cafe.settle();
+    }
+
+    async function openCategory(cafe) {
+        const { page } = cafe;
         await page.locator('#cafe-btn').click();
         await expect(setting(page)).toBeVisible();
         await cafe.settle();
         await expect(setting(page)).toBeEnabled();
     }
 
-    test('Settings has a Cafe category with Batch container weight: 0 by default, kept between 0 and 20 000, and the same after a reload', async ({ cafe, fake }) => {
+    async function openCafeSettings(cafe) {
+        await openSettings(cafe);
+        await openCategory(cafe);
+    }
+
+    /** A weight entered on the setting's numpad, as on a tablet. */
+    async function set(cafe, grams) {
+        const { page } = cafe;
+        await setting(page).click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
+        for (const digit of String(grams)) await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
+        await page.locator('#numpad-confirm').click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+        await cafe.settle();
+    }
+
+    /** The page's Save or Cancel, and the main page back. */
+    async function leaveBy(cafe, button) {
+        await cafe.page.locator(button).click();
+        await expect(cafe.page.locator('#subpage-host #settings-content-area')).toHaveCount(0);
+        await cafe.settle();
+    }
+
+    test('Settings has a Cafe category with Batch container weight: 0 by default, kept between 0 and 20 000, written by Save, and the same after a reload', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         await openCafeSettings(cafe);
         await expect(page.locator('#cafe-btn')).toHaveText('10. Cafe');
@@ -631,37 +660,80 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         await expect(page.locator('#settings-content-area label[for="cafe-container-weight"]')).toHaveText('Batch container weight');
         await expect(page.locator('#settings-content-area .cafe-setting-help')).toHaveText(WEIGHT_PHRASES.settingHelp);
         await expect(setting(page), '0 by default').toHaveValue('0');
-        expect(fake.store.get('streamlineCafe', 'batchContainerWeight'), 'nothing kept yet').toBeNull();
+        expect(kept(fake), 'nothing kept yet').toBeNull();
         await cafe.screenshot('cafe-setting-default-light');
 
         // On a tablet the field opens the numpad, as the page's other number fields do.
         const mark = fake.log.length;
-        await setting(page).click();
-        await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
-        for (const digit of '350') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
-        await page.locator('#numpad-confirm').click();
-        await cafe.settle();
+        await set(cafe, 350);
         await expect(setting(page)).toHaveValue('350');
-        expect(cafe.since(mark, entry => isWrite(entry) && entry.path === CONTAINER_STORE).map(entry => entry.body), 'kept in the skin\'s own namespace').toEqual([350]);
-        expect(Number(fake.store.get('streamlineCafe', 'batchContainerWeight'))).toBe(350);
+        expect(containerWrites(cafe, mark), 'nothing is written until Save').toEqual([]);
         await cafe.screenshot('cafe-setting-light');
         await paint(page, 'dark');
         await cafe.screenshot('cafe-setting-dark');
         await paint(page, 'light');
 
         // Above the most: kept at 20 000.
-        await setting(page).click();
-        for (const digit of '99999') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
-        await page.locator('#numpad-confirm').click();
-        await cafe.settle();
+        await set(cafe, 99999);
         await expect(setting(page)).toHaveValue('20000');
-        expect(Number(fake.store.get('streamlineCafe', 'batchContainerWeight'))).toBe(20_000);
+        expect(containerWrites(cafe, mark)).toEqual([]);
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(containerWrites(cafe, mark), 'Save writes it once, in the skin\'s own namespace').toEqual([20_000]);
+        expect(kept(fake)).toBe(20_000);
 
         // The same after the page reloads.
         await page.reload();
         await cafe.settle();
         await openCafeSettings(cafe);
         await expect(setting(page)).toHaveValue('20000');
+    });
+
+    test('Cancel drops a changed weight, and it is not there when Settings is opened again', async ({ cafe, fake }) => {
+        setContainer(fake, 350);
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await expect(setting(page)).toHaveValue('350');
+        const mark = fake.log.length;
+        await set(cafe, 425);
+        await expect(setting(page)).toHaveValue('425');
+        await leaveBy(cafe, '#cancel-settings-btn');
+        expect(containerWrites(cafe, mark), 'nothing is written').toEqual([]);
+        expect(kept(fake)).toBe(350);
+        await openCafeSettings(cafe);
+        await expect(setting(page), 'the weight kept, not the one cancelled').toHaveValue('350');
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(containerWrites(cafe, mark), 'a Save with nothing changed writes nothing').toEqual([]);
+    });
+
+    test('a changed weight outlasts a look at another category, and Save writes it from there', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        await page.locator('#quickadjustments-btn').click();
+        await expect(setting(page)).toHaveCount(0);
+        await cafe.settle();
+        await openCategory(cafe);
+        await expect(setting(page), 'still as changed').toHaveValue('350');
+        await page.locator('#quickadjustments-btn').click();
+        await expect(setting(page)).toHaveCount(0);
+        await cafe.settle();
+        expect(kept(fake)).toBeNull();
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(350);
+    });
+
+    test('a Save Decaid refuses stays on Settings and says so, the weight still as changed, and can be tried again', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        fake.refuse({ method: 'POST', path: /\/store\/streamlineCafe\/batchContainerWeight/, status: 500, times: 1 });
+        await page.locator('#save-settings-btn').click();
+        await cafe.settle();
+        await expect(page.getByText(/Failed to save settings/)).toBeVisible();
+        await expect(setting(page), 'Settings stays, the weight as changed').toHaveValue('350');
+        expect(kept(fake)).toBeNull();
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(350);
     });
 
     test('where the numpad is not used the setting is typed, and what is no weight is kept as 0', async ({ cafe, fake }) => {
@@ -672,26 +744,22 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         await expect(setting(page)).toHaveValue('350');
         await setting(page).fill('425');
         await setting(page).press('Tab');
-        await cafe.settle();
-        expect(Number(fake.store.get('streamlineCafe', 'batchContainerWeight'))).toBe(425);
+        await expect(setting(page)).toHaveValue('425');
         await setting(page).fill('abc');
         await setting(page).press('Tab');
-        await cafe.settle();
         await expect(setting(page)).toHaveValue('0');
-        expect(Number(fake.store.get('streamlineCafe', 'batchContainerWeight'))).toBe(0);
+        expect(kept(fake), 'not yet saved').toBe(350);
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(0);
     });
 
-    test('the weight view takes the setting off what is typed', async ({ cafe, fake }) => {
+    test('the weight view takes the saved setting off what is typed', async ({ cafe, fake }) => {
         Object.assign(blendNew(fake), { weightRemaining: 2412 });
         const page = await openPage(cafe);
         await openCafeSettings(cafe);
-        await setting(page).click();
-        for (const digit of '350') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
-        await page.locator('#numpad-confirm').click();
-        await cafe.settle();
-        await page.evaluate(() => window.app.router ? window.app.router.loadPage('main') : history.back());
+        await set(cafe, 350);
+        await leaveBy(cafe, '#save-settings-btn');
         await expect(page.locator('#main-page')).toBeVisible();
-        await cafe.settle();
         await openView(cafe);
         expect(await facts(page)).toEqual([['Left now', '2412 g'], ['Container', '350 g']]);
         await enter(cafe, 3240);
@@ -700,24 +768,28 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         expect(blendNew(fake).weightRemaining).toBe(2890);
     });
 
-    test('after one of Streamline\'s own pages, which its legacy module draws, the category still opens and keeps a weight', async ({ cafe, fake }) => {
+    test('after one of Streamline\'s own pages, which its legacy module draws, the category still opens, and that module\'s Save and Cancel act on it', async ({ cafe, fake }) => {
         // The legacy module asks which skin is the default, which the fake does not keep.
         fake.refuse({ method: 'GET', path: /\/webui\/skins\/default/, status: 404 });
         const page = await openPage(cafe);
-        await openCafeSettings(cafe);
+        await openSettings(cafe);
         await page.locator('#language-btn').click();
-        await expect(setting(page), 'the category is left').toHaveCount(0);
         await cafe.settle();
-        await page.locator('#cafe-btn').click();
-        await expect(setting(page)).toBeVisible();
-        await cafe.settle();
-        await expect(setting(page)).toBeEnabled();
+        await openCategory(cafe);
         await expect(page.locator('#sub-categories-panel .settings-subnav-btn')).toHaveText(['1. Batches']);
-        await setting(page).click();
-        for (const digit of '275') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
-        await page.locator('#numpad-confirm').click();
+        await set(cafe, 275);
+        expect(kept(fake)).toBeNull();
+        await leaveBy(cafe, '#cancel-settings-btn');
+        expect(kept(fake), 'Cancel drops it').toBeNull();
+
+        await openSettings(cafe);
+        await page.locator('#language-btn').click();
         await cafe.settle();
-        expect(Number(fake.store.get('streamlineCafe', 'batchContainerWeight'))).toBe(275);
+        await openCategory(cafe);
+        await expect(setting(page)).toHaveValue('0');
+        await set(cafe, 275);
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake), 'Save writes it').toBe(275);
     });
 
     test('the category and its page are named in the page\'s language', async ({ cafe, fake }) => {

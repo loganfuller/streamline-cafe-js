@@ -41,7 +41,6 @@ export const WEIGHT_PHRASES = {
     settingHeading: 'Weighing a batch',
     setting: 'Batch container weight',
     settingHelp: 'The weight of the empty container a batch is kept in. It is taken off each weight entered for a batch in the bean and batch dialog. At 0 nothing is taken off.',
-    settingUnsaved: 'Could not save the container\'s weight',
 };
 
 /** The most a scale's reading may be, in grams. */

@@ -4040,26 +4040,6 @@ export const CAFE_TRANSLATIONS = {
         it: "Il peso del contenitore vuoto in cui è conservato un lotto. Viene sottratto da ogni peso inserito per un lotto nella finestra Caffè e lotto. A 0 non viene sottratto nulla.",
         nl: "Het gewicht van de lege bak waarin een partij wordt bewaard. Het wordt afgetrokken van elk gewicht dat voor een partij wordt ingevoerd in het venster Boon en partij. Bij 0 wordt niets afgetrokken.",
     },
-    "Could not save the container's weight": {
-        machine: true,
-        fr: "Impossible d'enregistrer le poids du récipient",
-        es: "No se pudo guardar el peso del recipiente",
-        de: "Behältergewicht konnte nicht gespeichert werden",
-        "de-ch": "S Bhältergwicht het nöd chönne gspiicheret werde",
-        "zh-hans": "无法保存容器重量",
-        "zh-hant": "無法儲存容器重量",
-        kr: "용기 무게를 저장하지 못했습니다",
-        pt: "Não foi possível guardar o peso do recipiente",
-        ar: "تعذر حفظ وزن الحاوية",
-        arb: "ﺔﻳﻭﺎﺤﻟﺍ ﻥﺯﻭ ﻆﻔﺣ ﺭﺬﻌﺗ",
-        he: "לא ניתן לשמור את משקל המכל",
-        heb: "לכמה לקשמ תא רומשל ןתינ אל",
-        da: "Beholderens vægt kunne ikke gemmes",
-        sv: "Det gick inte att spara behållarens vikt",
-        no: "Kunne ikke lagre beholderens vekt",
-        it: "Impossibile salvare il peso del contenitore",
-        nl: "Het gewicht van de bak kon niet worden opgeslagen",
-    },
 };
 
 /** `text` with each `{name}` replaced by `vars.name`. */

@@ -40,9 +40,21 @@ test('the navigation names it in the page\'s language, from the fork\'s table', 
     for (const key of ['Cafe', 'Batches', 'Batch container weight']) assert.ok(CAFE_TRANSLATIONS[key], `${key} is in the fork's table`);
 });
 
+test('the page\'s Save writes a changed setting, from the shell and from the legacy module, and leaving drops it', async () => {
+    const shell = read('src/settings/settings-shell.js');
+    assert.match(shell, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
+    assert.match(shell, /if \(getSnapshot\(\)\.dirty\) return;\n\s*await saveCafeSettings\(\);\n\s*ui\.showToast\('Settings updated'/);
+    const legacy = read('src/settings/settings.js');
+    assert.match(legacy, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
+    assert.match(legacy, /await flushPendingChanges\(\);\n\s*await saveCafeSettings\(\);\n\s*\} catch \(error\) \{/);
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{ container = null; \}\);/);
+});
+
 test('the category\'s module keeps the setting through the fork\'s one store module, and off the main page\'s first load', () => {
     const module = read('src/cafe/cafe-settings.js');
-    assert.match(module, /import \{ readCafe, writeCafe, CONTAINER_KEY \} from '\.\/cafe-store\.js';/);
+    assert.match(module, /import \{ readCafe, CONTAINER_KEY \} from '\.\/cafe-store\.js';/);
+    assert.doesNotMatch(module, /\bwriteCafe\b/, 'a change waits for the page\'s Save');
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /import \{ writeCafe, CONTAINER_KEY \} from '\.\/cafe-store\.js';/);
     assert.match(module, /export async function mountSettingsCategory\(\{ container \}\)/);
     assert.doesNotMatch(module, /data-i18n-key/);
     for (const path of ['index.html', 'src/cafe/start.js', 'src/cafe/page.js', 'src/cafe/bean-dialog.js']) {
