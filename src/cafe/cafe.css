@@ -1,0 +1,2694 @@
+/* Streamline Cafe's main page (docs/cafe/DESIGN.md), at Streamline's 1920 by 1200
+   design size. Loaded after main.css and dark-mode.css: it uses their colour
+   tokens, so light and dark follow Streamline's, and it adjusts the few layout
+   rules of theirs that assumed Streamline's own page. */
+
+/* ── Start-up ─────────────────────────────────────────────────────────────── */
+
+/* Nothing shows until the DYE2 check has answered (src/cafe/start.js). */
+#main-page.cafe-pending > * {
+    display: none !important;
+}
+
+/* While the "DYE2 is needed" screen shows, it is the page: nothing is drawn
+   behind it. */
+#main-page.cafe-gated > :not(#cafe-gate) {
+    display: none !important;
+}
+
+#cafe-gate {
+    display: none;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    background: var(--bgmain-color);
+}
+
+#main-page.cafe-gated > #cafe-gate {
+    display: flex;
+}
+
+.cafe-gate-card {
+    width: 760px;
+    box-sizing: border-box;
+    padding: 48px 56px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 22px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+#cafe-gate-title {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+#cafe-gate-line {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--status-red-color);
+}
+
+#cafe-gate-hint {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.35;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-gate-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+}
+
+.cafe-gate-actions .cafe-btn {
+    flex: 1 1 0;
+    height: 64px;
+    font-size: 22px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+/* Streamline's outlined button: Settings, Sleep and the gate's actions. */
+.cafe-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 56px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--mimoja-blue-v2);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    color: var(--mimoja-blue-v2);
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cafe-btn-primary {
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+/* Dark: Streamline's header buttons lose their outline and take the primary
+   text colour (dark-mode.css does this for Settings and Sleep by id). */
+[data-theme="dark"] .cafe-btn {
+    border-color: #101117;
+    background: #101117;
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .cafe-btn-primary {
+    border-color: var(--button-primary-bg);
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text);
+}
+
+/* The Shots button while a shot runs: shown, and takes no tap. */
+.cafe-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+
+/* A stub: an element a Streamline module needs and the page does not show. */
+.cafe-stub {
+    display: none !important;
+}
+
+.cafe-eyebrow {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-body {
+    flex: 1 1 0;
+    display: flex;
+}
+
+/* main.css reserves 242px under <main> for Streamline's footer cards, which
+   this page does not have: the graph takes that space. */
+#main-page main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+    background: var(--bgmain-color);
+}
+
+#main-row {
+    display: flex;
+}
+
+#cafe-main {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 22px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+}
+
+/* ── Recipes ──────────────────────────────────────────────────────────────── */
+
+#cafe-header {
+    height: 168px;
+    box-sizing: border-box;
+    padding: 34px 36px;
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--box-color);
+}
+
+#cafe-strip {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.cafe-card {
+    position: relative;
+    height: 100px;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
+}
+
+button.cafe-card {
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-card-name {
+    max-width: 100%;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.15;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.cafe-card-bean {
+    max-width: 100%;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.75;
+}
+
+.cafe-card-bean:empty {
+    display: none;
+}
+
+/* The loaded recipe: filled with the accent colour, as Streamline's strip
+   marks its selected cell. */
+.cafe-card[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+/* A recipe whose batch is archived on the tablet (finished-batch.js): the card
+   is red, in the one colour the fork keeps for it, with a value for each
+   theme. Not loaded, the border and the words are red on the card's own
+   background; loaded, the card is filled red and the words take the card's
+   background, so both draw the same pair of colours. The bean's line is not
+   faded, which would take it under the contrast the words need.
+   test/cafe-finished-colour.test.mjs holds the contrast. */
+:root {
+    --cafe-finished: #b3261e;
+}
+
+[data-theme="dark"] {
+    --cafe-finished: #ff8a80;
+}
+
+.cafe-card-finished {
+    border-color: var(--cafe-finished);
+    color: var(--cafe-finished);
+}
+
+.cafe-card-finished .cafe-card-bean {
+    opacity: 1;
+}
+
+.cafe-card-finished[aria-pressed="true"] {
+    border-color: var(--cafe-finished);
+    background: var(--cafe-finished);
+    color: var(--profile-button-background-color);
+}
+
+/* Words for a screen reader alone: what the red says. */
+.cafe-hidden-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* An empty slot is an outline: "Slot N", and under it "Hold to add". A tap
+   does nothing; holding it makes a recipe there. */
+.cafe-card-empty {
+    border-style: dashed;
+    border-color: var(--border-primary);
+    background: transparent;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-card-empty .cafe-card-name {
+    font-size: 16px;
+}
+
+/* The hint is a phrase, and long in some languages: it wraps where a bean's
+   name is cut short. */
+.cafe-card-empty .cafe-card-bean {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* ── Dial-in column ───────────────────────────────────────────────────────── */
+
+/* 440 wide: the widest label, "Steam flow", beside a stepper whose value box
+   holds the widest value, "255ml". */
+#shot-settings {
+    width: 440px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-primary);
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+#cafe-dial-label {
+    flex: none;
+    padding-bottom: 8px;
+}
+
+/* Every row has the same type and the same size buttons. A row that says what
+   it is dialled for is taller, for that line. Rows share the column's height:
+   at the design size they sit at 128 and 98, and give some back on a shorter
+   screen, where the canvas has fewer rows. */
+.cafe-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.cafe-row-tall {
+    flex: 0 1 128px;
+    min-height: 100px;
+}
+
+.cafe-row-short {
+    flex: 0 1 98px;
+    min-height: 78px;
+}
+
+.cafe-row-label {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cafe-row-name {
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+/* A name longer than the room beside the stepper, as a translation can be, is
+   shrunk to fit by Streamline's own text fitting (data-fit-text in index.html),
+   as its header buttons are. That fitting keeps 8px of the box clear, for a
+   button's rounded corners. A row's name has none, so its box is 8px wider
+   than its room, and "Steam flow" keeps the size of the other names. */
+.cafe-row-short .cafe-row-name {
+    margin-right: -8px;
+}
+
+/* A tall row is two lines: its name beside the stepper, and under both, across
+   the row's whole width, what it is dialled for: the batch's code, the bean
+   and its days since the roast, the basket, the grinder, the profile. */
+.cafe-row-tall .cafe-row-label {
+    gap: 8px;
+}
+
+/* The name's box ends where the stepper begins: 232 of stepper and 10 of gap,
+   less the 8 the fitting keeps clear. */
+.cafe-row-tall .cafe-row-name {
+    width: calc(100% - 234px);
+    height: 58px;
+    line-height: 58px;
+}
+
+.cafe-row-desc {
+    height: 22px;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--data-card-title-text-color);
+}
+
+/* The batch under Dose, archived on the tablet: red, as its recipe's card is. */
+.cafe-row-desc.cafe-batch-finished {
+    color: var(--cafe-finished);
+}
+
+/* A row whose name opens a dialog (the bean's, the basket's, the grinder's): the name and the line under
+   it are one button, as wide as the row. The stepper sits over its end. */
+.cafe-row-pick {
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cafe-row-pick .cafe-row-label {
+    width: 100%;
+}
+
+/* The line under the name, and the chevron that says it opens something. */
+.cafe-row-desc-line {
+    min-width: 0;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-row-desc-line .cafe-row-desc {
+    min-width: 0;
+}
+
+/* Dose's line is one line, of which the bean's name is the part shortened to
+   fit: the Batch Code and the days since the roast, each with its " · ", show
+   whole. Only a code longer than about a third of the row is shortened too,
+   ending in an ellipsis, so a long one never pushes the name out. */
+#dose-label .cafe-row-desc-line {
+    container-type: inline-size;
+}
+
+#cafe-dose-desc {
+    display: flex;
+}
+
+.cafe-dose-whole {
+    flex: none;
+    display: flex;
+    min-width: 0;
+}
+
+.cafe-dose-code {
+    max-width: 35cqi;
+}
+
+.cafe-dose-whole bdi {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-dose-separator {
+    flex: none;
+    white-space: pre;
+}
+
+.cafe-dose-shrinks {
+    min-width: 2em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-row-chevron {
+    flex: none;
+}
+
+/* The stepper sits on the name's line: 15px above the row's middle, which is
+   where that line's middle is. */
+.cafe-row-tall .cafe-stepper {
+    position: absolute;
+    right: 0;
+    top: calc(50% - 51px);
+}
+
+/* While a recipe loads, the rows take no taps: a step made then could be written
+   before or after the load. Everything inside a row too, and over an inline
+   style: a plugin's mode buttons set their own pointer-events. */
+#main-page.cafe-loading .cafe-row,
+#main-page.cafe-loading .cafe-row * {
+    pointer-events: none !important;
+}
+
+#main-page.cafe-loading .cafe-row {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+/* Streamline opens the profile list from #profile-name, by a tap or a hold,
+   and DYE2's grinder page from #grind-label, and colours the first by id.
+   Neither is a control here. Each sits inside the button that opens the page's
+   own dialog, the profile's and the grinder's: with no pointer events on it, a
+   tap lands on that button and never passes through, so Streamline's never fires. */
+#main-page #profile-name,
+#main-page #grind-label,
+#main-page #dose-label,
+#main-page #drink-label {
+    pointer-events: none;
+}
+
+[data-theme] #main-page #profile-name {
+    color: var(--data-card-title-text-color);
+}
+
+/* Flush, Steam flow and Hot water open their settings page, as on Streamline. */
+#flush-label,
+#steam-label,
+#hotwater-label {
+    cursor: pointer;
+}
+
+.cafe-mode-toggle {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    white-space: nowrap;
+    color: var(--low-contrast-white);
+    cursor: pointer;
+}
+
+/* 72px high, like Streamline's control row: a plugin's hint is placed against
+   that height (plugin-surfaces-ui.js). */
+.cafe-stepper {
+    position: relative;
+    flex: none;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cafe-stepper > button {
+    width: 58px;
+    height: 58px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: var(--button-grey);
+    color: var(--text-primary);
+    touch-action: manipulation;
+}
+
+.cafe-stepper > button > svg {
+    width: 34px;
+    height: 34px;
+}
+
+/* A value, with at most one smaller line under it. Streamline sets the size of
+   the steam and hot water values itself, and reverses this column to put the
+   one the buttons step on top. */
+.cafe-value {
+    width: 100px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-value > span:not(.cafe-value-sub) {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    border-radius: 8px;
+}
+
+/* The Grind value can be a preset grinder's name: it takes the value's whole
+   width, and page.js shrinks a name or a number wider than that. A name still
+   too wide at 8 px ends in an ellipsis rather than running under − and +;
+   page.js marks a name, as a number is never cut. The line's height is fixed
+   (30 px at 1.15), so a smaller size leaves the row and the box as they were. */
+#grind-value {
+    align-self: stretch;
+    line-height: 34.5px;
+}
+
+#grind-value.cafe-grind-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-value > .cafe-value-sub,
+.cafe-value > span.text-\[20px\]:not(#steam-flow-value) {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--data-card-title-text-color);
+}
+
+/* The steam row is the flow whatever mode Streamline's steam tile is in: the
+   tile shrinks the flow and reverses this column when its mode is not flow. */
+#steam-section .cafe-value {
+    flex-direction: column !important;
+}
+
+/* From Streamline v0.2.33 the tile also takes taps off the value its mode shows
+   small. The flow is the row's only number, so it keeps its numpad, and takes
+   the row's taps, which Streamline takes off the row while the machine is busy. */
+#steam-flow-value {
+    pointer-events: inherit !important;
+}
+
+/* Settings, Shots and Sleep: at the bottom of the column, side by side. */
+#shot-settings > #cafe-system {
+    margin-top: auto;
+    padding-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+/* ── Title, status and legend ─────────────────────────────────────────────── */
+
+.cafe-title-band {
+    flex: none;
+    height: 92px;
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+}
+
+.cafe-title-text {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#cafe-title {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#cafe-subtitle {
+    margin: 0;
+    min-height: 28px;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 28px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--data-card-title-text-color);
+}
+
+/* Streamline writes the machine's state here: "Ready", and during a shot the
+   stage and its seconds. */
+#machine-status {
+    flex: none;
+    padding-bottom: 4px;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 40px;
+}
+
+/* The barista at the machine, after the title. With a name it is quiet,
+   outlined as a dial-in pick's row is; with none it keeps the accent of the
+   page's other buttons, since it is the only prompt to pick one. A name too
+   long for it ends in "…". As tall as "Back to latest", on the same line. */
+.cafe-barista {
+    flex: none;
+    height: 52px;
+    max-width: 320px;
+    margin-bottom: 4px;
+    padding: 0 18px;
+    gap: 10px;
+    border-width: 2px;
+    touch-action: manipulation;
+}
+
+.cafe-barista svg {
+    flex: none;
+}
+
+#cafe-barista-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-barista:not(.cafe-barista-none) {
+    border-color: var(--profile-button-outline-color);
+    background: var(--profile-button-background-color);
+    color: var(--text-primary);
+}
+
+/* Dark: the page's buttons lose their outline there, so the accent is the
+   outline and a tint, with the text as the in-use mark's is. */
+[data-theme="dark"] .cafe-barista.cafe-barista-none {
+    border-color: var(--button-primary-bg);
+    background: var(--button-primary-tint);
+    color: var(--text-primary);
+}
+
+/* "Back to latest", beside the machine's status while a Shot opened from the
+   Shots list is in the graph. */
+#cafe-back {
+    flex: none;
+    height: 52px;
+    margin-bottom: 4px;
+}
+
+#cafe-live {
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+#cafe-live-weight {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-status-band {
+    flex: none;
+    height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+/* Streamline scales this row down when a long language overflows it, so it
+   sizes to its content, and stretches to the band so the scale sits right. */
+#telemetry-row {
+    flex: 1 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    font-size: 22px;
+    white-space: nowrap;
+}
+
+#telemetry-row p {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.cafe-tele-label {
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-tele-value {
+    font-family: 'NotoSansMono', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+#cupwarmer-info-container {
+    cursor: pointer;
+}
+
+#cupwarmer-info-container .cafe-tele-label,
+#cupwarmer-info-container .cafe-tele-value {
+    color: var(--mimoja-blue-v2);
+}
+
+/* app.js shows this with an empty or a "block" inline display. */
+#scale-info-container {
+    margin-left: auto;
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+}
+
+#scale-info-container[style*="none"] {
+    display: none !important;
+}
+
+/* Green while the scale is connected. app.js turns the label red while it is
+   away, and the dot follows the label. */
+.cafe-scale-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--status-green-color);
+}
+
+#weight-text.text-red-600 + .cafe-scale-dot {
+    background: var(--status-red-color);
+}
+
+#cafe-scale-battery:empty {
+    display: none;
+}
+
+/* The weight, which tares the scale on a tap. */
+.cafe-tare {
+    min-width: 96px;
+    height: 44px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-primary);
+    border-radius: 10px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'NotoSansMono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+#cafe-legend {
+    flex: none;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 18px;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* A Shot's row has no box of its own: its pieces lie in the legend's one row,
+   so what gives way in a narrow legend is chosen across both rows at once.
+   Each row ends with a little room before whatever follows it. */
+.cafe-legend-item {
+    display: contents;
+}
+
+.cafe-legend-item::after {
+    content: '';
+    flex: none;
+    width: 8px;
+}
+
+.cafe-legend-swatch {
+    flex: none;
+    width: 28px;
+}
+
+.cafe-legend-name {
+    font-weight: 600;
+}
+
+/* An opened Shot of another recipe is labelled with that recipe's name, which
+   gives way as the times do, and never takes the whole row. */
+.cafe-legend-name.cafe-legend-recipe {
+    flex: 0 1 auto;
+    min-width: 3em;
+    max-width: 16em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cafe-legend-target {
+    opacity: 0.6;
+}
+
+/* When a Shot was pulled, and by whom. The names are the first thing to give
+   way in a narrow legend: they take only the room the row has to spare,
+   shared between them, so both are cut short, then left out, before either
+   Shot's time loses a pixel. */
+.cafe-legend-when,
+.cafe-legend-who {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 17px;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-legend-when {
+    flex: 0 1 auto;
+}
+
+/* A name left out altogether takes no room: it gives back the gap that would
+   stand before it, and brings its own space when it shows. */
+.cafe-legend-who {
+    flex: 1 1 0;
+    max-width: max-content;
+    margin-left: -6px;
+    white-space: pre;
+}
+
+.cafe-legend-when:empty,
+.cafe-legend-who:empty {
+    display: none;
+}
+
+/* "Pick a recipe to compare", "No shot with this recipe on this machine yet". */
+.cafe-legend-line {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 17px;
+    color: var(--data-card-title-text-color);
+}
+
+/* Under the legend, on a line of its own, while Decent Sync can't be reached:
+   why the reference can't be changed, or can't be shown. The graph gives up
+   its height. */
+#cafe-legend-notice {
+    flex: none;
+    padding-bottom: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    text-align: left;
+    color: var(--data-card-title-text-color);
+}
+
+/* "Different profile", "This shot is the reference". */
+.cafe-legend-flag {
+    flex: none;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border-primary);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+/* Make reference, at the end of the Shot's row. */
+.cafe-legend-btn {
+    flex: none;
+    height: 34px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--mimoja-blue-v2);
+    border-radius: 10px;
+    background: var(--bgmain-color);
+    color: var(--mimoja-blue-v2);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+[data-theme="dark"] .cafe-legend-btn {
+    border-color: var(--button-primary-bg);
+    background: transparent;
+    color: var(--text-primary);
+}
+
+/* Make reference while Decent Sync can't be reached: shown, and takes no tap. */
+.cafe-legend-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* ── Rating and notes ─────────────────────────────────────────────────────── */
+
+#cafe-legend,
+#cafe-note-dialog,
+#cafe-shots-dialog {
+    --cafe-star: #b7791f;
+    --cafe-star-empty: #c9ced5;
+}
+
+[data-theme="dark"] #cafe-legend,
+[data-theme="dark"] #cafe-note-dialog,
+[data-theme="dark"] #cafe-shots-dialog {
+    --cafe-star: #e8b84a;
+    --cafe-star-empty: #4a505c;
+}
+
+/* The Shot's five stars. Each is filled from its left as far as the rating
+   reaches, so a rating between two stars is drawn part-filled. */
+#cafe-stars {
+    flex: none;
+    display: inline-flex;
+}
+
+.cafe-star {
+    width: 30px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: linear-gradient(90deg, var(--cafe-star) var(--cafe-star-fill, 0%), var(--cafe-star-empty) var(--cafe-star-fill, 0%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 26px;
+    line-height: 1;
+    text-align: center;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* Another Machine's Shot while Decent Sync can't be reached: its stars are
+   shown, and take no tap. So with its note icon where there is none to read. */
+#cafe-stars.cafe-locked,
+.cafe-legend-icon:disabled {
+    opacity: 0.45;
+}
+
+#cafe-stars.cafe-locked .cafe-star,
+.cafe-legend-icon:disabled {
+    cursor: default;
+}
+
+/* The reference's rating, "★ 4": read, never tapped. */
+.cafe-rating {
+    flex: none;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--cafe-star);
+}
+
+.cafe-rating:empty {
+    display: none;
+}
+
+/* A Shot's note: a page where it has one, a page with a plus where it has none. */
+.cafe-legend-icon {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-legend-icon .cafe-icon-add,
+.cafe-legend-icon.cafe-has-note .cafe-icon-add {
+    display: none;
+}
+
+#cafe-shot-note:not(.cafe-has-note) .cafe-icon-add {
+    display: block;
+}
+
+#cafe-shot-note:not(.cafe-has-note) .cafe-icon-note {
+    display: none;
+}
+
+/* The note's dialog. With the soft keyboard up it takes the height left above
+   it (src/cafe/note-dialog.js), and the text box gives up what the box lacks. */
+#cafe-note-dialog {
+    height: var(--cafe-note-visible, 100%);
+}
+
+#cafe-note-dialog .cafe-dialog {
+    width: 720px;
+    max-height: calc(100% - 32px);
+}
+
+#cafe-note-dialog h3 {
+    margin-bottom: 6px;
+}
+
+#cafe-note-meta {
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-note-label {
+    margin-bottom: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-note-text {
+    flex: 1 1 220px;
+    min-height: 72px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 20px;
+    line-height: 1.45;
+    resize: none;
+}
+
+/* The reference's note: plain text, with its line breaks. */
+#cafe-note-read {
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--border-primary);
+    border-radius: 14px;
+    font-size: 20px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Why a note could not be saved: the dialog stays open with its text. */
+#cafe-note-error {
+    margin: 12px 0 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--status-red-color);
+}
+
+/* Reference | Targets, at the right of the row. */
+#cafe-view {
+    flex: none;
+    margin-left: auto;
+    display: flex;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#cafe-view button {
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--data-card-title-text-color);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#cafe-view button[aria-pressed="true"] {
+    background: var(--mimoja-blue-v2);
+    color: var(--button-primary-text);
+}
+
+[data-theme="dark"] #cafe-view button[aria-pressed="true"] {
+    background: var(--button-primary-bg);
+}
+
+/* The dialog Make reference asks in before it replaces a reference. */
+#cafe-reference-dialog-recipe {
+    margin: 0 0 14px;
+    font-size: 20px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.cafe-reference-dialog-shots {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 20px;
+    font-size: 18px;
+}
+
+.cafe-reference-dialog-shots dt {
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-reference-dialog-shots dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.cafe-dialog .modal-action form {
+    display: flex;
+    gap: 12px;
+}
+
+/* ── Graph ────────────────────────────────────────────────────────────────── */
+
+/* The graph takes what the rows above leave, down to the bottom of the page. */
+#chart-wrap {
+    position: relative;
+}
+
+#main-page #plotly-chart {
+    width: 100%;
+    border-top: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
+}
+
+#expanded-chart {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+/* Full-screen chart: Streamline hides the dial-in column and the machine
+   buttons and gives the graph the width. The legend and the comparison row go
+   with them. */
+#main-page.chart-zoomed #cafe-legend,
+#main-page.chart-zoomed #cafe-legend-notice,
+#main-page.chart-zoomed #cafe-compare {
+    display: none;
+}
+
+/* ── Comparison row ───────────────────────────────────────────────────────── */
+
+/* Under the graph, which gives up this height: five cards at rest, six while a
+   shot runs. A card is a title, the Shot's number with its difference, and what
+   it is compared with. No colour says better or worse. */
+#cafe-compare {
+    flex: none;
+    height: 96px;
+    display: flex;
+    text-align: left;
+}
+
+.cafe-compare-card {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 12px;
+    border-left: 1px solid var(--border-primary);
+}
+
+.cafe-compare-card:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.cafe-compare-card p {
+    margin: 0;
+}
+
+.cafe-compare-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 18px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    overflow: hidden;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-compare-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+    line-height: 32px;
+}
+
+.cafe-compare-value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-compare-diff {
+    font-size: 17px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* "Ref 27.9 s", "No reference", "No target this step". Its height is kept when
+   it is empty, so the numbers above it do not move. */
+.cafe-compare-side {
+    height: 22px;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+    color: var(--data-card-title-text-color);
+}
+
+/* ── Machine buttons ──────────────────────────────────────────────────────── */
+
+/* Shown by ui.js with an inline display:flex, only when the machine has no
+   buttons of its own. Settings and Sleep sit at its top then. */
+#ghc-controls {
+    width: 168px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 20px 16px;
+    flex-direction: column;
+    gap: 10px;
+    border-left: 1px solid var(--border-primary);
+    background: var(--box-color);
+    font-family: 'Inter', sans-serif;
+}
+
+#ghc-controls > #cafe-system {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-ghc-rule {
+    flex: none;
+    height: 1px;
+    margin: 8px 0;
+    background: var(--border-primary);
+}
+
+#ghc-controls > button {
+    flex: 0 1 128px;
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    border: 2px solid var(--profile-button-outline-color);
+    color: var(--mimoja-blue-v2);
+    font-size: 22px;
+    font-weight: 600;
+}
+
+#ghc-controls > button > img {
+    width: 44px;
+    height: 44px;
+}
+
+#ghc-controls > #ghc-stop-btn {
+    margin-top: auto;
+    border-color: #da515e;
+    background: #da515e;
+    color: #fff;
+}
+
+/* dark-mode.css recolours every button in the column but Stop; Settings and
+   Sleep keep their own look there. */
+[data-theme="dark"] #ghc-controls #cafe-system > button {
+    background-color: #101117;
+}
+
+/* ── Streamline's own additions ───────────────────────────────────────────── */
+
+/* The "?" help button explains Streamline's page, part by part. It stays on the
+   settings and profile pages and is not shown over this one. */
+.cafe-main-shown #help-overlay-btn {
+    display: none !important;
+}
+
+/* ── The dialogs' canvas ──────────────────────────────────────────────────── */
+
+/* A dialog opened with showModal() draws in the top layer, outside
+   #scaled-content and its transform, so each cafe dialog carries its own
+   canvas, scaled as the page is (#39). Streamline's scaling.js writes the two
+   factors (they differ on a screen flatter than 1920:1010), and the canvas is
+   the screen's size in design px, so every size inside it, and every limit as
+   a percentage of it, is in design px as on the page. The dialog itself stays
+   the screen's size: the note's dialog takes the height above the soft
+   keyboard in screen px, and its canvas turns that into design px. */
+.cafe-dialog-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% / var(--streamline-scale-x, 1));
+    height: calc(100% / var(--streamline-scale-y, 1));
+    transform-origin: 0 0;
+    transform: scale(var(--streamline-scale-x, 1), var(--streamline-scale-y, 1));
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    justify-items: center;
+    align-items: center;
+}
+
+/* ── Choosing a recipe for a slot ─────────────────────────────────────────── */
+
+.cafe-dialog {
+    width: 640px;
+    max-width: calc(100% - 48px);
+    max-height: calc(100% - 96px);
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    border-radius: 20px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+.cafe-dialog h3 {
+    margin: 0 0 16px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+#cafe-recipe-dialog-empty {
+    margin: 8px 0;
+    font-size: 20px;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-recipe-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cafe-recipe-row {
+    flex: none;
+    min-height: 68px;
+    padding: 10px 16px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.cafe-recipe-row-name {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.75;
+    overflow-wrap: anywhere;
+}
+
+.cafe-recipe-row-detail:empty {
+    display: none;
+}
+
+.cafe-dialog .modal-action {
+    margin-top: 20px;
+}
+
+.cafe-dialog .modal-action .cafe-btn {
+    min-width: 160px;
+}
+
+/* ── Choosing what a dial-in row names ────────────────────────────────────── */
+
+/* With the soft keyboard up, for the barista's name, the dialog takes the
+   height left above it (src/cafe/pick-dialog.js). */
+#cafe-pick-dialog {
+    height: var(--cafe-pick-visible, 100%);
+}
+
+.cafe-dialog.cafe-pick-box {
+    width: 780px;
+    padding: 32px;
+    gap: 20px;
+}
+
+.cafe-pick-head {
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-pick-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-pick-head h3 {
+    margin: 0;
+    font-size: 32px;
+}
+
+/* Under the title: the recipe's name and whether a choice is saved to it. */
+#cafe-pick-under {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-head .cafe-btn {
+    flex: none;
+    min-width: 160px;
+}
+
+/* The bean dialog is wider: its beans on the left, their batches on the right. */
+.cafe-dialog.cafe-pick-box.cafe-pick-wide {
+    width: 1180px;
+}
+
+/* The profile dialog is wider still, its list a third of it, the description
+   in the rest. Its height is fixed, so the box does not jump as profiles with
+   longer or shorter notes are highlighted: the list and the notes scroll. */
+.cafe-dialog.cafe-pick-box.cafe-pick-described {
+    width: 1320px;
+    height: 900px;
+}
+
+.cafe-pick-described .cafe-pick-column.cafe-pick-side-column {
+    width: 440px;
+}
+
+.cafe-pick-lists {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 28px;
+}
+
+.cafe-pick-column {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-pick-column.cafe-pick-side-column {
+    flex: none;
+    width: 400px;
+}
+
+.cafe-pick-column[hidden],
+.cafe-pick-heading[hidden],
+.cafe-pick-lists[hidden],
+.cafe-pick-add[hidden],
+.cafe-pick-entry[hidden] {
+    display: none;
+}
+
+/* "Bean" and "Batches" over the two lists. */
+.cafe-pick-heading {
+    flex: none;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-rows {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* "No baskets", where a list has no rows. */
+.cafe-pick-empty {
+    margin: 0;
+    padding: 24px 0;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-row {
+    flex: none;
+    min-height: 84px;
+    padding: 10px 20px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--profile-button-text-color);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* The one in use: outlined in the accent colour, and marked "In use". */
+.cafe-pick-row[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+}
+
+.cafe-pick-row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-pick-row-name {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.cafe-pick-row-detail {
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.75;
+    overflow-wrap: anywhere;
+}
+
+.cafe-pick-row-detail:empty {
+    display: none;
+}
+
+.cafe-pick-in-use {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--mimoja-blue-v2);
+}
+
+/* "New barista": set apart under the names, dashed, in the accent colour. */
+.cafe-pick-row.cafe-pick-add {
+    margin-top: 6px;
+    border-style: dashed;
+    background: transparent;
+    color: var(--mimoja-blue-v2);
+    gap: 14px;
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.cafe-pick-add svg {
+    flex: none;
+}
+
+/* Dark: the rows' outline is almost the box's own colour, so the dashes take
+   the border colour the note's text box has. */
+[data-theme="dark"] .cafe-pick-row.cafe-pick-add {
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+/* A barista's name, typed in the list's place. */
+.cafe-pick-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#cafe-pick-entry-text {
+    box-sizing: border-box;
+    width: 100%;
+    height: 68px;
+    padding: 0 20px;
+    border: 1.5px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 24px;
+}
+
+.cafe-pick-entry-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.cafe-pick-entry-actions .cafe-btn {
+    min-width: 160px;
+    padding: 0 24px;
+}
+
+/* The profile's description, in place of a second list. */
+.cafe-pick-pane {
+    gap: 14px;
+}
+
+.cafe-pick-pane [hidden],
+.cafe-pick-confirm[hidden],
+.cafe-pick-confirm [hidden] {
+    display: none !important;
+}
+
+.cafe-pick-pane-titles {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#cafe-pick-pane-title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+#cafe-pick-pane-byline {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+    overflow-wrap: anywhere;
+}
+
+/* The notes as their author wrote them, with their line breaks, never as
+   markup; long ones scroll inside the box. */
+.cafe-pick-pane-text {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    overflow-y: auto;
+    padding: 20px 22px;
+    border: 1px solid var(--border-primary);
+    border-radius: 14px;
+    background: var(--bgmain-color);
+    font-size: 20px;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* "This profile has no description." */
+.cafe-pick-pane-text.cafe-pick-pane-none {
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-pick-pane-actions {
+    flex: none;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+}
+
+.cafe-pick-pane-actions .cafe-pick-in-use {
+    font-size: 18px;
+}
+
+#cafe-pick-pane-note,
+#cafe-pick-confirm-note {
+    min-width: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+/* The bean and its roast date beside "Use this batch": cut short, on one
+   line, where a long bean name meets a long translation. */
+#cafe-pick-confirm-note {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+#cafe-pick-pane-use,
+#cafe-pick-confirm-use {
+    flex: none;
+    min-width: 160px;
+    padding: 0 30px;
+}
+
+/* Under the batches, set off from the last row. */
+.cafe-pick-confirm {
+    padding-top: 6px;
+}
+
+/* The highlighted row in use: the mark takes the row's own text colour. */
+.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-in-use {
+    color: inherit;
+}
+
+/* The bean whose batches are shown, and the batch highlighted for "Use this
+   batch": filled in the accent colour. A batch in use, not highlighted, keeps
+   its "In use" mark and no outline. */
+.cafe-pick-side-row[aria-pressed="true"],
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] {
+    border-color: var(--mimoja-blue-v2);
+    background: var(--mimoja-blue-v2);
+    color: #fff;
+}
+
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] .cafe-pick-in-use {
+    color: inherit;
+}
+
+.cafe-pick-side-row[aria-pressed="true"] .cafe-pick-row-detail,
+.cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] .cafe-pick-row-detail {
+    opacity: 0.85;
+}
+
+[data-theme="dark"] .cafe-pick-row[aria-pressed="true"] {
+    border-color: var(--button-primary-bg);
+}
+
+[data-theme="dark"] .cafe-pick-side-row[aria-pressed="true"],
+[data-theme="dark"] .cafe-pick-confirming > .cafe-pick-row[aria-pressed="true"] {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-text, #fff);
+}
+
+[data-theme="dark"] .cafe-pick-in-use {
+    color: var(--text-primary);
+}
+
+/* ── Scanning a batch's QR code ───────────────────────────────────────────── */
+
+/* Text a screen reader says and the page does not show: an icon button's name. */
+.cafe-spoken {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.cafe-pick-head-actions {
+    flex: none;
+    display: flex;
+    gap: 12px;
+}
+
+/* The QR button, to the left of Close: Close's outline, around an icon. */
+.cafe-pick-scan-open,
+.cafe-scan-switch {
+    position: relative;
+    flex: none;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1.5px solid var(--mimoja-blue-v2);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    color: var(--mimoja-blue-v2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+[data-theme="dark"] .cafe-pick-scan-open {
+    border-color: #101117;
+    background: #101117;
+    color: var(--text-primary);
+}
+
+.cafe-pick-scan-open[hidden],
+.cafe-scan-switch[hidden],
+.cafe-pick-scan[hidden],
+.cafe-scan-camera[hidden],
+.cafe-scan-panel[hidden],
+.cafe-scan-matches[hidden],
+.cafe-scan-message[hidden],
+.cafe-scan-facing[hidden],
+.cafe-scan-note[hidden],
+.cafe-scan-actions .cafe-btn[hidden] {
+    display: none;
+}
+
+/* In the lists' place, and as tall as the dialog may be: the camera's picture
+   takes what the title and the buttons leave. */
+.cafe-pick-scan {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.cafe-scan-camera,
+.cafe-scan-panel,
+.cafe-scan-matches {
+    flex: 1 1 600px;
+    min-height: 0;
+}
+
+/* The picture's ground is dark in both themes, as a camera's is. */
+.cafe-scan-camera {
+    position: relative;
+    border-radius: 15px;
+    background: #14161b;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cafe-scan-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* The camera facing the barista, shown as a mirror shows it. */
+.cafe-scan-video.cafe-scan-mirrored {
+    transform: scaleX(-1);
+}
+
+/* Four corners marking where a label is held. */
+.cafe-scan-frame {
+    position: relative;
+    width: 360px;
+    max-width: 60%;
+    aspect-ratio: 1;
+    pointer-events: none;
+}
+
+.cafe-scan-frame span {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    border: 0 solid #ffffff;
+}
+
+.cafe-scan-frame span:nth-child(1) { left: 0; top: 0; border-left-width: 5px; border-top-width: 5px; border-top-left-radius: 18px; }
+.cafe-scan-frame span:nth-child(2) { right: 0; top: 0; border-right-width: 5px; border-top-width: 5px; border-top-right-radius: 18px; }
+.cafe-scan-frame span:nth-child(3) { left: 0; bottom: 0; border-left-width: 5px; border-bottom-width: 5px; border-bottom-left-radius: 18px; }
+.cafe-scan-frame span:nth-child(4) { right: 0; bottom: 0; border-right-width: 5px; border-bottom-width: 5px; border-bottom-right-radius: 18px; }
+
+/* "Front camera", over the picture's top left corner. */
+.cafe-scan-facing {
+    position: absolute;
+    left: 20px;
+    top: 20px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #262a33;
+    color: #e8eaef;
+    font-size: 17px;
+    font-weight: 500;
+}
+
+.cafe-scan-switch {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    border-color: #5d6577;
+    background: #262a33;
+    color: #ffffff;
+}
+
+/* What was read and what came of it, over the foot of the picture. */
+.cafe-scan-message {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    padding: 18px 22px;
+    border-radius: 15px;
+    background: var(--box-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cafe-scan-message-title {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.cafe-scan-message-body,
+.cafe-scan-note {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+    overflow-wrap: anywhere;
+}
+
+/* A message in the picture's place, the camera stopped. */
+.cafe-scan-panel {
+    box-sizing: border-box;
+    padding: 40px;
+    border: 2px solid var(--profile-button-outline-color);
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--mimoja-blue-v2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+}
+
+[data-theme="dark"] .cafe-scan-panel {
+    color: var(--text-primary);
+}
+
+.cafe-scan-panel-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.cafe-scan-panel-body {
+    max-width: 720px;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--data-card-title-text-color);
+}
+
+/* The batches a label matched, under the text that was read. */
+.cafe-scan-matches {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cafe-scan-read {
+    flex: none;
+    margin: 0 0 10px;
+    padding: 14px 20px;
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 14px;
+    font-size: 19px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* The note on the left, the buttons on the right. */
+.cafe-scan-actions .cafe-scan-note {
+    flex: 1;
+    min-width: 0;
+}
+
+.cafe-scan-actions .cafe-btn {
+    flex: none;
+    min-width: 160px;
+    padding: 0 30px;
+}
+
+/* The matches while the plugin is asked about the one tapped. */
+#cafe-scan-match-list .cafe-pick-row:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* ── A batch's weight, entered in the bean and batch dialog ──────────────── */
+
+/* "Enter weight", to the left of "Use this batch" and of "In use". */
+#cafe-pick-weigh {
+    flex: none;
+    min-width: 140px;
+    padding: 0 20px;
+    margin-right: -6px;
+}
+
+#cafe-pick-weigh[hidden],
+.cafe-pick-weight[hidden],
+.cafe-weight-working[hidden],
+.cafe-weight-working [hidden],
+.cafe-weight-message[hidden],
+#cafe-weight-code[hidden] {
+    display: none;
+}
+
+/* In the lists' place: the batch on the left, as wide as the beans were, and
+   the field on the right. */
+.cafe-pick-weight {
+    flex: 1;
+    min-height: 460px;
+    display: flex;
+    gap: 28px;
+}
+
+.cafe-weight-batch-column {
+    flex: none;
+    width: 400px;
+}
+
+.cafe-weight-batch {
+    flex: none;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-primary);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.cafe-weight-batch-names {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cafe-weight-facts {
+    margin: 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cafe-weight-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.cafe-weight-fact dt {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-weight-fact dd {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cafe-weight-entry {
+    flex: 1;
+    min-width: 0;
+}
+
+/* What the scale reads, large, with its unit beside it. */
+.cafe-weight-field {
+    flex: none;
+    height: 132px;
+    padding: 0 28px;
+    box-sizing: border-box;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 15px;
+    background: var(--bgmain-color);
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 14px;
+}
+
+/* Typed: the field is as wide as its digits, so the unit sits beside them. */
+.cafe-weight-field.cafe-weight-typed #cafe-weight-field {
+    flex: none;
+    max-width: 100%;
+}
+
+.cafe-weight-field:not(.cafe-weight-typed) .cafe-weight-unit {
+    display: none;
+}
+
+#cafe-weight-field {
+    flex: 1;
+    min-width: 0;
+    height: 128px;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 72px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+#cafe-weight-field[readonly] {
+    cursor: pointer;
+}
+
+#cafe-weight-field::placeholder {
+    color: var(--data-card-title-text-color);
+    font-size: 32px;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.cafe-weight-unit {
+    flex: none;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+/* "3240 g − 350 g container = 2890 g left". */
+.cafe-weight-working {
+    flex: none;
+    margin: 0;
+    padding: 18px 22px;
+    box-sizing: border-box;
+    border-radius: 15px;
+    background: var(--profile-button-background-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px 14px;
+    font-size: 22px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.cafe-weight-working-left {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+/* Nothing left, less than the container, a write that failed (`stop`), or
+   more than the batch was roasted at (`warn`). The red is the page's one
+   colour for a finished batch. */
+.cafe-weight-message {
+    --cafe-weight-tone: var(--cafe-finished);
+    flex: none;
+    padding: 18px 22px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--cafe-weight-tone);
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cafe-weight-message[data-tone="warn"] {
+    --cafe-weight-tone: #7a4a00;
+}
+
+[data-theme="dark"] .cafe-weight-message[data-tone="warn"] {
+    --cafe-weight-tone: #ffd27a;
+}
+
+.cafe-weight-message-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--cafe-weight-tone);
+}
+
+.cafe-weight-message-body {
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.cafe-weight-actions {
+    margin-top: auto;
+    padding-top: 6px;
+    gap: 12px;
+}
+
+.cafe-weight-actions .cafe-btn {
+    flex: none;
+    min-width: 160px;
+    padding: 0 30px;
+}
+
+/* "Finish batch": filled red, its words in the card's background, as a loaded
+   card that names a finished batch is. */
+.cafe-weight-actions .cafe-btn.cafe-weight-finish,
+[data-theme="dark"] .cafe-weight-actions .cafe-btn.cafe-weight-finish {
+    border-color: var(--cafe-finished);
+    background: var(--cafe-finished);
+    color: var(--profile-button-background-color);
+}
+
+/* ── The Cafe category of the Settings page ───────────────────────────────── */
+
+.cafe-setting {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    color: var(--text-primary);
+}
+
+.cafe-setting-heading {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--mimoja-blue-v2);
+}
+
+.cafe-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-setting-row label {
+    min-width: 0;
+    font-size: 24px;
+    line-height: 1.4;
+}
+
+.cafe-setting-value {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-container-weight {
+    width: 150px;
+    height: 62px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 12px;
+    background: var(--bgmain-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+#cafe-container-weight[readonly] {
+    cursor: pointer;
+}
+
+.cafe-setting-help {
+    margin: 0;
+    max-width: 760px;
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--data-card-title-text-color);
+}
+
+/* ── The Shots list ───────────────────────────────────────────────────────── */
+
+.cafe-dialog.cafe-shots-box {
+    width: 1560px;
+    height: calc(100% - 96px);
+    max-width: calc(100% - 48px);
+    padding: 28px 32px;
+    gap: 12px;
+}
+
+.cafe-shots-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cafe-shots-head h3 {
+    margin: 0;
+    font-size: 32px;
+}
+
+.cafe-shots-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Under the title: the Location's name, or "This machine only". */
+#cafe-shots-under {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+/* Why only this machine's Shots are listed. */
+#cafe-shots-line {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: var(--profile-button-background-color);
+    font-size: 18px;
+    font-weight: 500;
+}
+
+#cafe-shots-line svg {
+    flex: none;
+}
+
+.cafe-shots-head .cafe-btn {
+    min-width: 160px;
+}
+
+/* Pulled, Recipe, Dose → yield, Rating, Barista, Note. */
+.cafe-shots-columns,
+.cafe-shots-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) 190px 160px 150px 56px;
+    align-items: center;
+    gap: 16px;
+    padding: 0 16px;
+}
+
+/* The Location's list adds the Machine after Pulled, and Time, how long the
+   Shot ran, after Dose → yield. In the full 1560px box the Machine is 230px and
+   the Recipe takes the rest. Should the box be narrower, the Machine gives up
+   its width before the Recipe goes below 140px. At Streamline's default scaling
+   it never is: sizes here are design px, and the dialog's canvas is at least
+   1920 of them wide. A UI zoom above 1 can make it so. */
+.cafe-shots-location .cafe-shots-columns,
+.cafe-shots-location .cafe-shots-row {
+    grid-template-columns: 110px minmax(0, 230px) minmax(140px, 1fr) 190px 90px 160px 150px 56px;
+}
+
+#cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-machine,
+#cafe-shots-dialog:not(.cafe-shots-location) .cafe-shots-duration {
+    display: none;
+}
+
+.cafe-shots-machine {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cafe-shots-machine-name,
+.cafe-shots-this {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cafe-shots-machine-name {
+    font-weight: 600;
+}
+
+.cafe-shots-this {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-duration {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* In the rating's place, on a Shot in which nothing poured. */
+.cafe-shots-unfinished {
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: var(--profile-button-background-color);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-columns {
+    flex: none;
+    height: 40px;
+    border-bottom: 2px solid var(--border-primary);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-columns > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#cafe-shots-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.cafe-shots-day {
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 16px 8px;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--border-primary);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-row {
+    width: 100%;
+    height: 70px;
+    box-sizing: border-box;
+    border: 0;
+    border-bottom: 1px solid var(--border-primary);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* The row of the Shot in the graph. */
+.cafe-shots-row[aria-current="true"] {
+    background: var(--profile-button-background-color);
+}
+
+.cafe-shots-row > span {
+    min-width: 0;
+}
+
+.cafe-shots-time,
+.cafe-shots-weights {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cafe-shots-time {
+    font-weight: 600;
+}
+
+.cafe-shots-recipe {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cafe-shots-recipe-top {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cafe-shots-name,
+.cafe-shots-bean,
+.cafe-shots-barista {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cafe-shots-name {
+    font-weight: 600;
+}
+
+.cafe-shots-bean {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--data-card-title-text-color);
+}
+
+.cafe-shots-bean:empty {
+    display: none;
+}
+
+.cafe-shots-muted {
+    color: var(--data-card-title-text-color);
+}
+
+/* "Reference", on the row of a Shot that is its recipe's reference. */
+.cafe-shots-chip {
+    flex: none;
+    padding: 2px 8px;
+    border: 2px solid var(--mimoja-blue-v2);
+    border-radius: 8px;
+    color: var(--mimoja-blue-v2);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .cafe-shots-chip {
+    border-color: var(--button-primary-bg);
+    color: var(--text-primary);
+}
+
+.cafe-shots-rating .cafe-shots-muted {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.cafe-shots-stars {
+    display: inline-flex;
+    letter-spacing: 2px;
+}
+
+/* Filled from its left as far as the rating reaches, as the legend's stars are. */
+.cafe-shots-star {
+    background: linear-gradient(90deg, var(--cafe-star) var(--cafe-star-fill, 0%), var(--cafe-star-empty) var(--cafe-star-fill, 0%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.cafe-shots-note {
+    display: flex;
+    justify-content: center;
+    color: var(--data-card-title-text-color);
+}
+
+#cafe-shots-empty,
+#cafe-shots-end {
+    margin: 20px 16px;
+    font-size: 20px;
+    color: var(--data-card-title-text-color);
+}

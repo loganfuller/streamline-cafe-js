@@ -1,0 +1,162 @@
+// Soft-keyboard geometry. DOM-free so the arithmetic can be tested under node.
+//
+// Decaid's Android activity is `adjustResize` and its Scaffold does not opt out,
+// so the WebView really shrinks when the keyboard opens: innerHeight, or at
+// least visualViewport.height, drops. Two things then have to happen, and they
+// are not the same thing:
+//
+//  - An ordinary field inside the scaled canvas gets the canvas lifted under it
+//    (scaling.js), because #scaling-container is overflow:hidden and resets its
+//    scrollTop every pass, so scrolling cannot do it.
+//  - A full-screen overlay cannot be lifted into view: it is as tall as the
+//    design canvas, so lifting it only pushes its header off the top while its
+//    lower half stays under the keyboard. It has to be told how tall the screen
+//    is now and shrink to it -- visibleBand() -- which is what the notes modal
+//    (the feedback description editor, shot notes, profile notes) does.
+
+// Breathing room between the focused field and the keyboard's top edge. Enough
+// that the field does not sit flush against it: a field you can see only
+// because it is touching the keyboard reads as covered.
+export const KEYBOARD_GAP = 28;
+
+// How long a smaller window has to persist, with nothing ever having been typed
+// into it, before it counts as the window really being smaller.
+export const SHRINK_ADOPT_MS = 1500;
+
+// The canvas must never be re-scaled to fit a soft keyboard: the whole UI
+// shrinking -- text, buttons, chart -- is far worse than a field being covered,
+// and a covered field can be dealt with by moving the canvas instead.
+//
+// So the baseline is the window as it is with no keyboard. It follows the window
+// up at once. It follows the window down only when the smaller size cannot be a
+// keyboard:
+//
+//  - `force`, an orientation change, where the window really changed shape;
+//  - a change in width, which a keyboard never causes and a rotation or a
+//    split-screen resize does;
+//  - a shrink that was never typed into, held for SHRINK_ADOPT_MS -- a host
+//    resizing the WebView while the user is reading.
+//
+// A shrink that appeared while an editable had focus is a keyboard and stays
+// one, even after the field is blurred, until the window grows back or, with
+// nothing typed into, more than half the room it took comes back: on Android
+// the keyboard often stays up when focus moves to a button, and adopting then
+// is exactly the "the page shrank when I tapped the title" bug.
+//
+// Keyed off any shrink at all rather than a 15% one, so a floating or split
+// keyboard cannot fall through and re-scale the canvas.
+//
+// What the state says:
+//
+//  - `shrunk`: the screen has less room than the layout window. A full-screen
+//    overlay fits itself to visibleHeight while this holds.
+//  - `keyboardLike`: a shrink below the resting room appeared while something
+//    was being typed into. Only this lifts the canvas (scaling.js). A lift on
+//    `shrunk` alone moved a button out from under the finger between pointer
+//    down and pointer up on a WebView whose visualViewport sits a fraction of a
+//    pixel, or a system bar, short of the window, so the tap missed.
+//  - `baselineVisible`: the room the screen has with no keyboard, which is less
+//    than the layout window on such a WebView. A shrink is measured from it, so
+//    that gap never counts as a keyboard, and a keyboard that closes clears the
+//    mark even though the screen never gets back to the full window.
+//  - `pendingVisible`: while a shrink waits to be adopted, the room at the last
+//    pass. `keyboardVisible`: while a keyboard is up, the least room it left.
+export function trackBaseline(state, { rawHeight, rawWidth, visibleHeight, editing, now, force = false }) {
+    // The keyboard shows up as either of these, depending on the WebView, so the
+    // shorter one decides whether the screen lost room. Only the layout window
+    // (rawHeight) is ever adopted as the baseline: a visualViewport that shrank
+    // on its own is a keyboard or a pinch, never a smaller window.
+    const shortest = Math.min(rawHeight, visibleHeight ?? rawHeight);
+    const baseline = state?.baselineHeight || rawHeight;
+    const resting = Math.min(state?.baselineVisible ?? baseline, baseline);
+    const widthChanged = state?.baselineWidth !== undefined && rawWidth !== undefined
+        && rawWidth !== state.baselineWidth;
+    const adopt = () => ({
+        baselineHeight: rawHeight, baselineWidth: rawWidth, baselineVisible: shortest,
+        shrunkSince: 0, keyboardLike: false, shrunk: shortest < rawHeight,
+    });
+
+    if (force || widthChanged) return adopt();
+    // Back to the resting room, in a window no shorter than the baseline. A
+    // shorter window whose room still reaches the old resting room is a host
+    // resize, adopted below once it has held, not a grow.
+    if (shortest >= resting && rawHeight >= baseline) {
+        const baselineHeight = Math.max(rawHeight, baseline);
+        return {
+            baselineHeight, baselineWidth: rawWidth, baselineVisible: shortest,
+            shrunkSince: 0, keyboardLike: false, shrunk: shortest < baselineHeight,
+        };
+    }
+
+    // A keyboard has closed once it has given back more than half the room it
+    // took while nothing is typed into, even if the screen is still short of
+    // its resting room: Android may keep a navigation bar up after the
+    // keyboard, or report a fraction of a pixel less than before. That
+    // shortfall then waits to be adopted like any other shrink. Without this
+    // the mark, and the lift with it, stayed until a reload or a rotation.
+    // While a field still has focus a smaller room is a keyboard that changed
+    // size, so the mark holds until focus moves, which runs this again before
+    // anything is lifted. The price: a keyboard that gives back more than half
+    // its room while staying up, then loses focus to a button, reads as closed
+    // and is adopted as the window until it closes. Geometry alone can't tell
+    // that from a keyboard closed into a little less room.
+    const keyboardVisible = state?.keyboardVisible ?? shortest;
+    if (state?.keyboardLike && !editing && shortest - keyboardVisible > (resting - keyboardVisible) / 2) {
+        return {
+            baselineHeight: baseline, baselineWidth: state.baselineWidth ?? rawWidth,
+            baselineVisible: resting, pendingVisible: shortest,
+            shrunkSince: now, keyboardLike: false, shrunk: true,
+        };
+    }
+
+    // A shrink already waiting to be adopted, which nothing was typed into, is
+    // a keyboard only if the screen loses more room while something is typed
+    // into: a gap that appeared just before a field took focus would otherwise
+    // count as a keyboard until the screen got that room back, which a lasting
+    // gap never does. A keyboard opens after its field has focus, so its first
+    // shrink is seen while typing and never waits. "More" is over a pixel, so a
+    // gap whose fraction of a pixel wobbles as a field takes focus is no
+    // keyboard.
+    const waiting = !state?.keyboardLike && state?.shrunkSince > 0;
+    const floor = waiting ? state.pendingVisible ?? Infinity : Infinity;
+    const keyboardLike = !!state?.keyboardLike || (editing && shortest < floor - 1);
+    const shrunkSince = state?.shrunkSince || now;
+    if (!keyboardLike && now - shrunkSince >= SHRINK_ADOPT_MS) return adopt();
+    return {
+        baselineHeight: baseline, baselineWidth: state?.baselineWidth ?? rawWidth,
+        baselineVisible: resting, shrunkSince, keyboardLike, shrunk: true,
+        ...(keyboardLike
+            ? { keyboardVisible: Math.min(state?.keyboardLike ? keyboardVisible : shortest, shortest) }
+            : { pendingVisible: shortest }),
+    };
+}
+
+// The total lift the canvas needs so `rect` (the focused field, in screen
+// coordinates) clears the keyboard. `applied` is the lift already in the
+// transform, which rect therefore already includes, so the answer is absolute
+// and one pass settles it: measuring against the last answer instead converged
+// over three or four passes, and each pass wrote the transform and fired
+// streamline:scaleupdate at every listener.
+//
+// Never lifts a field's own top off the screen: seeing the end of what you
+// typed is worth less than seeing the field.
+export function keyboardLift(rect, visibleHeight, applied = 0, gap = KEYBOARD_GAP) {
+    if (!rect) return 0;
+    const top = rect.top + applied;
+    const bottom = rect.bottom + applied;
+    const overlap = bottom + gap - visibleHeight;
+    if (overlap <= 0) return 0;
+    return Math.min(overlap, Math.max(0, top - gap));
+}
+
+// Where the visible screen is, in the design-space coordinates of a `position:
+// fixed` child of #scaled-content. A transform makes that element the
+// containing block, so its own `top: 0; height: 100%` is the canvas, not the
+// screen -- which is why a full-screen overlay runs on under the keyboard.
+//
+// screen_y = offsetY + design_y * scale, so the visible band starts at
+// -offsetY / scale and is visibleHeight / scale tall.
+export function visibleBand(visibleHeight, scale, offsetY = 0) {
+    if (!(scale > 0) || !(visibleHeight > 0)) return null;
+    return { top: -offsetY / scale, height: visibleHeight / scale };
+}

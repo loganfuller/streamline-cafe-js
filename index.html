@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=overlays-content">
+    <title>Streamline Cafe</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "src/": "./src/"
+        }
+    }
+    </script>
+    <script>
+        (function() {
+            // Paint only — never write the fallback back to localStorage. A stock
+            // 'light' recorded here is indistinguishable from a deliberate choice,
+            // and settingsSync.hydrate() would seed it into Decaid's KV, where it
+            // then wins over the dark theme the user really picked.
+            //
+            // 'theme' is the user's own choice and outranks everything.
+            // 'theme-decaid' is the paint cache for Decaid's themeMode, which
+            // ui.js only learns a REST round-trip later — without it a Decaid
+            // set to dark flashes light on every boot. See theme-policy.js.
+            document.documentElement.setAttribute(
+                'data-theme',
+                localStorage.getItem('theme')
+                    || localStorage.getItem('theme-decaid')
+                    || 'light');
+        })();
+    </script>
+    <script>
+        (function() {
+            // Webview detection has to run before first paint: the fullscreen
+            // button is in the markup, so adding this class after the router and
+            // main page have loaded lets it flash on the dashboard (#185).
+            //
+            // A root class, not an inline style on the one button that exists
+            // right now: index.html, profile_selector.html and settings.html each
+            // carry their own #fullscreen-toggle-btn, and the router injects the
+            // sub-page ones later -- CSS on <html> covers every page, present and
+            // future. The host OS owns fullscreen in a webview, so the button is
+            // never useful there. See main.css; help-overlay.css deliberately
+            // overrides this on the main page to keep the slot laid out for the
+            // help button. app.js reads this class; it is the single source of truth.
+            var ua = navigator.userAgent;
+            var isIOS = /iPhone|iPad|iPod/i.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+            var isStandalone = window.navigator.standalone === true;
+            var isAndroidWebView = /Android/.test(ua) && /wv/.test(ua);
+            var isIOSWebView = isIOS && !isStandalone && !/Safari\//.test(ua);
+            var isDecentWebView = ua.includes('Decent');
+            // Canonical signal: the reaprime/Decent host injects window.__DECENT_HOST__
+            // into the tablet webview. It's the most reliable tablet/kiosk indicator
+            // (the UA sniffing misses hosts that don't brand their UA), and it's
+            // absent in a normal desktop browser, so this only ever hides the
+            // fullscreen control on-device. Ceiling: a host that neither brands its
+            // UA nor injects the global is treated as a browser (button is harmless).
+            var isDecentHost = !!window.__DECENT_HOST__;
+            if (isAndroidWebView || isIOSWebView || isDecentWebView || isDecentHost) {
+                document.documentElement.classList.add('is-webview');
+            }
+        })();
+    </script>
+    <link rel="icon" type="image/png" href="//fast.decentespresso.com/favicon-32x32.png" sizes="32x32">
+    <link href="src/css/app.css" rel="stylesheet" type="text/css" />
+    <link href="src/css/dark-mode.css" rel="stylesheet" type="text/css" />
+    <link href="src/css/main.css" rel="stylesheet" type="text/css" />
+    <!-- The cafe page's own styles, after Streamline's so they can adjust its layout rules. -->
+    <link href="src/cafe/cafe.css" rel="stylesheet" type="text/css" />
+    <script src="src/modules/reconnecting-websocket.js" defer></script>
+    <!-- The boot module graph is 82 files but only 4 levels deep, so the big
+         second-level modules are not even requested until app.js has been
+         fetched and parsed. These eight are the largest of them (~583K of the
+         ~935K below the entry points); preloading starts them in the first wave
+         instead of the second, which matters on the tablet's WebView far more
+         than on a desktop against localhost.
+         ponytail: the biggest eight only. The other ~74 average under 5K each,
+         so a line apiece would buy little and rot as imports move. These are
+         core modules that are not going anywhere. -->
+    <link rel="modulepreload" href="src/modules/ui.js">
+    <link rel="modulepreload" href="src/modules/api.js">
+    <link rel="modulepreload" href="src/modules/profileManager.js">
+    <link rel="modulepreload" href="src/modules/chart.js">
+    <link rel="modulepreload" href="src/modules/plugin-surfaces.js">
+    <link rel="modulepreload" href="src/modules/history.js">
+    <link rel="modulepreload" href="src/modules/idb.js">
+    <link rel="modulepreload" href="src/modules/scaling.js">
+    <!-- First module in: installs the localStorage→KV mirror and starts the
+         hydrate fetch before anything reads a preference. -->
+    <script src="src/modules/settingsSync.js" type="module"></script>
+    <script src="src/modules/app.js" type="module"></script>
+</head>
+<body class="bg-[var(--bgmain-color)] min-h-screen">
+    <div id="scaling-container" class=" text-clip">
+        <div id="scaled-content" class="">
+        <!-- Streamline Cafe's main page (docs/cafe/DESIGN.md). The ids Streamline's
+             modules drive are kept; what the layout drops and a module still needs is
+             a hidden stub at the end. Styled by src/cafe/cafe.css.
+             Text is keyed by data-cafe-text and translated by src/cafe/text.js;
+             data-fit-text is Streamline's, and shrinks a label a language makes too
+             long for its place. Only
+             the three elements a Streamline module re-labels itself keep
+             data-i18n-key: the machine status, Sleep and the cup warmer.
+             cafe-pending: nothing shows until src/cafe/start.js has checked for DYE2. -->
+        <div id="main-page" class="cafe-pending">
+
+    <!-- The "DYE2 is needed" screen. src/cafe/gate-screen.js fills it in; while it
+         shows, nothing else on the page is displayed (cafe.css, .cafe-gated). -->
+    <section id="cafe-gate" aria-labelledby="cafe-gate-title">
+        <div class="cafe-gate-card">
+            <h1 id="cafe-gate-title" data-cafe-text="Streamline Cafe needs DYE2">Streamline Cafe needs DYE2</h1>
+            <p id="cafe-gate-line"></p>
+            <p id="cafe-gate-hint" data-cafe-text="Install or update DYE2 in Decaid, under Plugins.">Install or update DYE2 in Decaid, under Plugins.</p>
+            <div class="cafe-gate-actions">
+                <button id="cafe-gate-turn-on" type="button" class="cafe-btn cafe-btn-primary" data-fit-text data-cafe-text="Turn DYE2 on">Turn DYE2 on</button>
+                <button id="cafe-gate-reload" type="button" class="cafe-btn" data-fit-text data-cafe-text="Reload">Reload</button>
+                <button id="cafe-gate-settings" type="button" class="cafe-btn" data-fit-text data-cafe-text="Settings">Settings</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recipes: one card per Recipe Slot, drawn by src/cafe/strip.js. -->
+    <header id="cafe-header" role="banner">
+        <nav id="cafe-strip" aria-label="Recipes"></nav>
+    </header>
+
+    <div class="cafe-body">
+        <!-- Dial-in column. Each row keeps Streamline's section, label, stepper and
+             value ids, which its steppers, numpad and plugin surfaces look up. -->
+        <aside id="shot-settings" aria-label="Dial-in">
+            <p id="cafe-dial-label" class="cafe-eyebrow" data-fit-text data-cafe-text="Dial-in · not saved to a recipe">Dial-in · not saved to a recipe</p>
+
+            <!-- The row's name and the bean's under it are one button, which opens the
+                 bean and batch dialog (src/cafe/bean-dialog.js); Yield's opens the basket
+                 dialog (src/cafe/basket-dialog.js). The labels inside take no taps (cafe.css). -->
+            <div id="dose-section" class="cafe-row cafe-row-tall">
+                <button id="cafe-dose-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="dose-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Dose">Dose</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-dose-desc" class="cafe-row-desc"></span>
+                            <span id="cafe-dose-finished" class="cafe-hidden-text" data-cafe-text="Batch finished" hidden>Batch finished</span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
+                <div class="cafe-stepper">
+                    <button id="dose-in-minus" type="button" aria-label="Decrease Dose"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="dose-label">
+                        <span id="dose-in-value">g</span>
+                    </div>
+                    <button id="dose-in-plus" type="button" aria-label="Increase Dose"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <div id="drink-section" class="cafe-row cafe-row-tall">
+                <button id="cafe-yield-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="drink-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Yield">Yield</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-yield-desc" class="cafe-row-desc"></span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
+                <div class="cafe-stepper">
+                    <button id="drink-out-minus" type="button" aria-label="Decrease Yield"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="drink-label">
+                        <span id="drink-out-value">g</span>
+                        <span id="drink-ratio-value" class="cafe-value-sub">(1:--)</span>
+                    </div>
+                    <button id="drink-out-plus" type="button" aria-label="Increase Yield"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <!-- The row's name and the grinder's under it are one button, which opens the
+                 grinder dialog (src/cafe/grinder-dialog.js). #grind-label, inside it, opens
+                 DYE2's grinder page on Streamline (app.js); here it takes no taps (cafe.css),
+                 so a tap lands on the button and never on the label. -->
+            <div id="grind-section" class="cafe-row cafe-row-tall">
+                <button id="cafe-grind-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="grind-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Grind">Grind</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="cafe-grind-desc" class="cafe-row-desc"></span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
+                <div class="cafe-stepper">
+                    <button id="grind-minus" type="button" aria-label="Decrease Grind"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="grind-label">
+                        <span id="grind-value">—</span>
+                    </div>
+                    <button id="grind-plus" type="button" aria-label="Increase Grind"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <!-- The row's name and the profile's under it are one button, which opens the
+                 profile dialog (src/cafe/profile-dialog.js). #profile-name is where Streamline
+                 writes, and reads back, the active profile's name, into its first text node; on
+                 Streamline a tap or a hold on it opens the profile list. Here it takes no taps
+                 (cafe.css), so a tap lands on the button and never on the name. -->
+            <div id="brew-section" class="cafe-row cafe-row-tall">
+                <button id="cafe-brew-pick" type="button" class="cafe-row-pick" aria-haspopup="dialog">
+                    <span id="brew-label" class="cafe-row-label">
+                        <span class="cafe-row-name" data-fit-text data-cafe-text="Brew">Brew</span>
+                        <span class="cafe-row-desc-line">
+                            <span id="profile-name" class="cafe-row-desc" aria-live="polite"> </span>
+                            <svg class="cafe-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </span>
+                    </span>
+                </button>
+                <div class="cafe-stepper">
+                    <button id="temp-minus" type="button" aria-label="Decrease Brew Temperature"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="brew-label">
+                        <span id="temp-value">°c</span>
+                    </div>
+                    <button id="temp-plus" type="button" aria-label="Increase Brew Temperature"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <div id="flush-section" class="cafe-row cafe-row-short">
+                <div class="cafe-row-label">
+                    <span id="flush-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open flush settings" data-cafe-text="Flush">Flush</span>
+                </div>
+                <div class="cafe-stepper">
+                    <button id="flush-minus" type="button" aria-label="Decrease Flush Duration"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="flush-label">
+                        <span id="flush-value">s</span>
+                    </div>
+                    <button id="flush-plus" type="button" aria-label="Increase Flush Duration"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <!-- Steam flow only: the steam time and the milk modes are not on this page.
+                 Streamline's steam tile still needs its duration and mode elements to
+                 paint at all, so they are kept, hidden. Its own − and + step whichever
+                 of time, flow and milk stop the tile's mode names, so they are not
+                 here: these two are the page's, and step the flow (src/cafe/page.js). -->
+            <div id="steam-section" class="cafe-row cafe-row-short">
+                <div class="cafe-row-label">
+                    <span id="steam-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open steam settings" data-cafe-text="Steam flow">Steam flow</span>
+                </div>
+                <div class="cafe-stepper">
+                    <button id="cafe-steam-minus" type="button" aria-label="Decrease Steam Flow"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="steam-label">
+                        <span id="steam-flow-value">1.5</span>
+                        <span id="steam-duration-value" class="cafe-stub"></span>
+                        <span class="cafe-value-sub" aria-hidden="true">ml/s</span>
+                    </div>
+                    <button id="cafe-steam-plus" type="button" aria-label="Increase Steam Flow"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <span class="cafe-stub"><span id="steam-mode-time"></span><span id="steam-mode-flow"></span></span>
+            </div>
+
+            <!-- Hot water: Temp | Vol picks which of the two the buttons step; Streamline
+                 shows the other small under it. -->
+            <div id="hotwater-section" class="cafe-row cafe-row-short">
+                <div class="cafe-row-label">
+                    <span id="hotwater-label" class="cafe-row-name" data-fit-text role="button" tabindex="0" aria-label="Open hot water settings" data-cafe-text="Hot water">Hot water</span>
+                    <span id="hot-water-mode-toggle" class="cafe-mode-toggle" role="button" tabindex="0" aria-label="Toggle Hot Water Mode">
+                        <span id="hot-water-mode-temp" data-cafe-text="Temp">Temp</span> | <span id="hot-water-mode-vol" data-cafe-text="Vol">Vol</span>
+                    </span>
+                </div>
+                <div class="cafe-stepper">
+                    <button id="hot-water-vol-minus" type="button" aria-label="Decrease Hot Water"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.416 25H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <div class="cafe-value" aria-labelledby="hotwater-label">
+                        <span id="hot-water-vol-value">ml</span>
+                        <span id="hot-water-temp-value">°c</span>
+                    </div>
+                    <button id="hot-water-vol-plus" type="button" aria-label="Increase Hot Water"><svg aria-hidden="true" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24.9993 10.4165V39.5832M10.416 24.9998H39.5827" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+            </div>
+
+            <!-- Settings, Shots and Sleep. src/cafe/page.js moves this block to the top of the
+                 machine-button column when that column shows. -->
+            <div id="cafe-system">
+                <button id="settings-btn" type="button" class="cafe-btn" data-fit-text data-cafe-text="Settings">Settings</button>
+                <button id="cafe-shots-btn" type="button" class="cafe-btn" data-fit-text data-cafe-text="Shots">Shots</button>
+                <button id="sleep-button" type="button" class="cafe-btn" data-fit-text data-i18n-key="Sleep">Sleep</button>
+            </div>
+        </aside>
+
+        <main role="main">
+            <div id="main-row">
+                <!-- telemetry-row's grandparent is the band Streamline fits the row to
+                     (i18n.js fitTelemetry), so the row keeps its own wrapper. -->
+                <div id="cafe-main">
+                    <div class="cafe-title-band">
+                        <div class="cafe-title-text">
+                            <h1 id="cafe-title"></h1>
+                            <p id="cafe-subtitle"></p>
+                        </div>
+                        <!-- The barista at the machine, whom its next Shots name (src/cafe/page.js). -->
+                        <button id="cafe-barista" type="button" class="cafe-btn cafe-barista cafe-barista-none">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+                            <span id="cafe-barista-name" data-cafe-text="Barista">Barista</span>
+                        </button>
+                        <!-- While a Shot opened from the Shots list is in the graph (src/cafe/graph.js). -->
+                        <button id="cafe-back" type="button" class="cafe-btn" data-cafe-text="Back to latest" style="display:none">Back to latest</button>
+                        <div id="machine-status" data-i18n-key="Connecting" aria-live="assertive">Connecting</div>
+                        <!-- The weight against its target, while a shot runs (src/cafe/page.js). -->
+                        <div id="cafe-live" style="display:none">
+                            <span class="cafe-eyebrow" data-cafe-text="Weight">Weight</span>
+                            <span id="cafe-live-weight"></span>
+                        </div>
+                    </div>
+
+                    <!-- The dial-in line of the full-screen chart (zoom-dialin.js). -->
+                    <div id="zoom-dialin" aria-label="Dial-in settings"></div>
+
+                    <div class="cafe-status-band">
+                        <div id="telemetry-row" aria-label="Machine Telemetry">
+                            <p id="mix-info-container"><span class="cafe-tele-label" data-cafe-text="Mix">Mix</span><span id="data-mix-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Group">Group</span><span id="data-group-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Steam">Steam</span><span id="data-steam-temp" class="cafe-tele-value">°c</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Tank">Tank</span><span id="data-tank-vol" class="cafe-tele-value">ml</span></p>
+                            <p><span class="cafe-tele-label" data-cafe-text="Clock">Clock</span><span id="data-clock" class="cafe-tele-value">--:--</span></p>
+                            <!-- Bengle only, as on Streamline: the milk probe's reading, and the
+                                 cup warmer, which a tap switches on and off. -->
+                            <div id="milk-info-container" style="display: none;">
+                                <p><span class="cafe-tele-label" data-cafe-text="Milk">Milk</span><span id="data-milk-temp" class="cafe-tele-value">°c</span></p>
+                            </div>
+                            <div id="cupwarmer-info-container" style="display: none;" role="button" tabindex="0" aria-pressed="false" aria-label="Toggle Cup Warmer">
+                                <p><span id="cupwarmer-text" class="cafe-tele-label no-select" data-i18n-key="Cups">Cups</span><span id="data-cupwarmer-temp" class="cafe-tele-value no-select">--</span></p>
+                            </div>
+                            <!-- The scale: its state (#weight-text turns red while it is away), its
+                                 battery, and the weight, which tares on a tap. Hidden until a scale
+                                 is known, by app.js. -->
+                            <div id="scale-info-container" style="display: none;">
+                                <span id="weight-text" class="cafe-tele-label no-select" data-cafe-text="Scale">Scale</span>
+                                <span class="cafe-scale-dot" aria-hidden="true"></span>
+                                <span id="cafe-scale-battery" class="cafe-tele-value" aria-label="Scale battery"></span>
+                                <button id="data-weight" type="button" class="cafe-tare no-select" aria-label="Tare scale"> </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legend (src/cafe/graph.js): the Shot in the graph with its stars and its note,
+                         the recipe's reference with its rating and its note to read, and the
+                         Reference | Targets toggle. Streamline's history module still writes the
+                         four lines of its own panel, into the stub at the end. -->
+                    <div id="cafe-legend">
+                        <div id="cafe-legend-shot" class="cafe-legend-item" aria-live="polite" style="display:none">
+                            <svg class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                            <span id="cafe-shot-label" class="cafe-legend-name"></span>
+                            <span id="cafe-stars" role="group" aria-label="Rating" style="display:none"><button type="button" class="cafe-star" data-star="1" aria-label="1 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="2" aria-label="2 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="3" aria-label="3 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="4" aria-label="4 of 5 stars" aria-pressed="false">★</button><button type="button" class="cafe-star" data-star="5" aria-label="5 of 5 stars" aria-pressed="false">★</button></span>
+                            <span id="cafe-shot-when" class="cafe-legend-when"></span>
+                            <span id="cafe-shot-who" class="cafe-legend-who"></span>
+                            <button id="cafe-shot-note" type="button" class="cafe-legend-icon" aria-label="Note" style="display:none"><svg class="cafe-icon-note" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg><svg class="cafe-icon-add" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
+                            <button id="cafe-make-reference" type="button" class="cafe-legend-btn" data-cafe-text="Make reference" style="display:none">Make reference</button>
+                        </div>
+                        <div id="cafe-legend-reference" class="cafe-legend-item" style="display:none">
+                            <svg id="cafe-reference-swatch" class="cafe-legend-swatch" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="1" y1="5" x2="35" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                            <span class="cafe-legend-name" data-cafe-text="Reference">Reference</span>
+                            <span id="cafe-reference-rating" class="cafe-rating" style="display:none"></span>
+                            <span id="cafe-reference-when" class="cafe-legend-when"></span>
+                            <span id="cafe-reference-who" class="cafe-legend-who"></span>
+                            <span id="cafe-different-profile" class="cafe-legend-flag" data-cafe-text="Different profile" style="display:none">Different profile</span>
+                            <button id="cafe-reference-note" type="button" class="cafe-legend-icon" aria-label="Reference note" style="display:none"><svg class="cafe-icon-note" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg></button>
+                        </div>
+                        <span id="cafe-reference-badge" class="cafe-legend-flag" data-cafe-text="This shot is the reference" style="display:none">This shot is the reference</span>
+                        <span id="cafe-legend-line" class="cafe-legend-line" style="display:none"></span>
+                        <div id="cafe-legend-targets" class="cafe-legend-item" style="display:none">
+                            <svg class="cafe-legend-swatch cafe-legend-target" width="36" height="10" viewBox="0 0 36 10" aria-hidden="true"><line x1="2" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0.5 7"/></svg>
+                            <span class="cafe-legend-name" data-cafe-text="Profile target">Profile target</span>
+                        </div>
+                        <div id="cafe-view" role="group" aria-label="Graph view">
+                            <button type="button" data-view="reference" aria-pressed="true" data-cafe-text="Reference">Reference</button>
+                            <button type="button" data-view="targets" aria-pressed="false" data-cafe-text="Targets">Targets</button>
+                        </div>
+                        <div id="shot-history-info" class="cafe-stub" aria-live="polite"><span id="history-date"></span><span id="history-profile-name"></span><span id="history-dose-in"></span><span id="history-grind-size"></span></div>
+                    </div>
+
+                    <!-- Why Make reference is muted, while Decent Sync can't be reached
+                         (src/cafe/graph.js). A line of its own: the legend's row has no room for it. -->
+                    <div id="cafe-legend-notice" role="status" style="display:none"></div>
+
+                    <!-- Shot chart (tap to open the full-screen chart) -->
+                    <div id="chart-wrap">
+                        <div id="plotly-chart" role="img" aria-label="Shot extraction graph"></div>
+                        <!-- Full-screen chart: shown instead of #plotly-chart while #main-page has .chart-zoomed; tap it to leave -->
+                        <div id="expanded-chart" style="display:none" role="img" aria-label="Full-screen shot extraction graph"></div>
+                    </div>
+
+                    <!-- The comparison row (src/cafe/compare-row.js): the Shot in the graph beside
+                         its reference or its targets, and six live cards while a shot runs. -->
+                    <div id="cafe-compare" data-mode="rest" aria-label="Shot numbers"></div>
+                </div>
+
+                <!-- Machine buttons, shown by ui.js only when the machine has none of its
+                     own. Settings and Sleep sit above them then. -->
+                <aside id="ghc-controls" style="display:none" aria-label="Machine Controls">
+                    <div class="cafe-ghc-rule" role="separator"></div>
+                    <button id="ghc-coffee-btn" type="button" aria-label="Start Coffee">
+                        <img src="src/ui/icons/icon_coffee.svg" alt="" aria-hidden="true">
+                        <span data-cafe-text="Coffee">Coffee</span>
+                    </button>
+                    <button id="ghc-water-btn" type="button" aria-label="Dispense Hot Water">
+                        <img src="src/ui/icons/icon_water.svg" alt="" aria-hidden="true">
+                        <span data-cafe-text="Water">Water</span>
+                    </button>
+                    <button id="ghc-steam-btn" type="button" aria-label="Start Steam">
+                        <img src="src/ui/icons/icon_steam.svg" alt="" aria-hidden="true">
+                        <span data-cafe-text="Steam">Steam</span>
+                    </button>
+                    <button id="ghc-flush-btn" type="button" aria-label="Flush">
+                        <img src="src/ui/icons/icon_flush.svg" alt="" aria-hidden="true">
+                        <span data-cafe-text="Flush">Flush</span>
+                    </button>
+                    <button id="ghc-stop-btn" type="button" class="opacity-20" aria-label="Stop Machine">
+                        <img src="src/ui/icons/icon_stop.svg" alt="" aria-hidden="true">
+                        <span data-cafe-text="Stop">Stop</span>
+                    </button>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <!-- Stubs: elements the layout drops and a Streamline module still needs.
+         history.js sets handlers on the two arrows without checking they exist.
+         The fullscreen prompt on a phone or tablet browser clicks the toggle. -->
+    <div class="cafe-stub" aria-hidden="true">
+        <button id="history-prev-btn" type="button" tabindex="-1"></button>
+        <button id="history-next-btn" type="button" tabindex="-1"></button>
+        <button id="fullscreen-toggle-btn" type="button" tabindex="-1"></button>
+    </div>
+        </div><!-- #main-page -->
+        <div id="subpage-host" style="display:none;"></div>
+
+        </div>
+    </div>
+
+    <!-- The recipes in no slot, to choose one for a slot (src/cafe/recipe-dialog.js). -->
+    <dialog id="cafe-recipe-dialog" class="modal" aria-labelledby="cafe-recipe-dialog-title">
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-recipe-dialog-title"></h3>
+                <p id="cafe-recipe-dialog-empty" data-cafe-text="No recipes without a slot">No recipes without a slot</p>
+                <div id="cafe-recipe-list"></div>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="cafe-btn" data-cafe-text="Cancel">Cancel</button>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+        </div>
+    </dialog>
+
+    <!-- A choice of what a dial-in row names: the grinder, the bean and batch, the basket or the profile,
+         and of the barista at the machine (src/cafe/pick-dialog.js). It fits itself above the soft keyboard, which
+         only the barista's name field brings up, so Streamline does not lift the page behind it. -->
+    <dialog id="cafe-pick-dialog" class="modal" aria-labelledby="cafe-pick-title" data-keyboard-fit="1">
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog cafe-pick-box">
+                <div class="cafe-pick-head">
+                    <div class="cafe-pick-titles">
+                        <h3 id="cafe-pick-title"></h3>
+                        <!-- The recipe's name and whether a choice is saved to it. -->
+                        <p id="cafe-pick-under"></p>
+                    </div>
+                    <div class="cafe-pick-head-actions">
+                        <!-- The bean dialog's scan of a batch's QR code, on a Machine Decent Sync serves: it puts
+                             the camera's picture in the lists' place (src/cafe/scan-view.js). -->
+                        <button id="cafe-pick-scan-open" type="button" class="cafe-pick-scan-open" hidden>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M21 14v1"/><path d="M17.5 21H21v-3"/><path d="M14 20.5v.5"/></svg>
+                            <span id="cafe-pick-scan-name" class="cafe-spoken"></span>
+                        </button>
+                        <form method="dialog">
+                            <button class="cafe-btn" data-cafe-text="Close">Close</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="cafe-pick-lists">
+                    <!-- The bean dialog's beans: a tap shows that bean's batches on the right. The profile
+                         dialog's profiles: a tap shows that profile's description on the right. -->
+                    <div id="cafe-pick-side-column" class="cafe-pick-column cafe-pick-side-column" hidden>
+                        <p id="cafe-pick-side-heading" class="cafe-pick-heading"></p>
+                        <div id="cafe-pick-side" class="cafe-pick-rows" role="group" aria-labelledby="cafe-pick-side-heading"></div>
+                    </div>
+                    <div class="cafe-pick-column">
+                        <p id="cafe-pick-heading" class="cafe-pick-heading" hidden></p>
+                        <div id="cafe-pick-list" class="cafe-pick-rows" role="group"></div>
+                        <!-- The bean dialog's "Use this batch", under the batches: a tap on a batch highlights it,
+                             and this chooses it, with the bean and its roast date beside it, or "In use". To its
+                             left, "Enter weight" puts the highlighted batch's weight view in the lists' place. -->
+                        <div id="cafe-pick-confirm" class="cafe-pick-pane-actions cafe-pick-confirm" hidden>
+                            <span id="cafe-pick-confirm-note" hidden></span>
+                            <button id="cafe-pick-weigh" type="button" class="cafe-btn" hidden disabled></button>
+                            <span id="cafe-pick-confirm-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
+                            <button id="cafe-pick-confirm-use" type="button" class="cafe-btn cafe-btn-primary" disabled></button>
+                        </div>
+                        <!-- The barista dialog's "New barista", set apart under the names: it shows the field below. -->
+                        <button id="cafe-pick-add" type="button" class="cafe-pick-row cafe-pick-add" hidden>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                            <span id="cafe-pick-add-text"></span>
+                        </button>
+                    </div>
+                    <!-- The profile dialog's description of the profile highlighted on the left, in place of a
+                         second list: its notes as plain text, scrolling where they are long, and under them the
+                         button that chooses it, or "In use". -->
+                    <div id="cafe-pick-pane" class="cafe-pick-column cafe-pick-pane" hidden>
+                        <p id="cafe-pick-pane-heading" class="cafe-pick-heading"></p>
+                        <div class="cafe-pick-pane-titles">
+                            <h4 id="cafe-pick-pane-title"></h4>
+                            <p id="cafe-pick-pane-byline"></p>
+                        </div>
+                        <p id="cafe-pick-pane-text" class="cafe-pick-pane-text" tabindex="0"></p>
+                        <div class="cafe-pick-pane-actions">
+                            <span id="cafe-pick-pane-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
+                            <span id="cafe-pick-pane-note" hidden></span>
+                            <button id="cafe-pick-pane-use" type="button" class="cafe-btn cafe-btn-primary" hidden></button>
+                        </div>
+                    </div>
+                </div>
+                <!-- The scan of a batch's QR code, in the lists' place: the camera's picture, with what was read
+                     said over it; or a message in the picture's place; or the batches a label matched. -->
+                <div id="cafe-pick-scan" class="cafe-pick-scan" hidden>
+                    <div id="cafe-scan-camera" class="cafe-scan-camera">
+                        <video id="cafe-scan-video" class="cafe-scan-video" playsinline muted></video>
+                        <span class="cafe-scan-frame" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                        <span id="cafe-scan-facing" class="cafe-scan-facing" hidden></span>
+                        <button id="cafe-scan-switch" type="button" class="cafe-scan-switch" hidden>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14-3l2 2"/><path d="M20 4v4h-4"/><path d="M20 15a8 8 0 0 1-14 3l-2-2"/><path d="M4 20v-4h4"/></svg>
+                            <span class="cafe-spoken" data-cafe-text="Switch camera">Switch camera</span>
+                        </button>
+                        <div id="cafe-scan-message" class="cafe-scan-message" role="status" hidden>
+                            <span id="cafe-scan-message-title" class="cafe-scan-message-title"></span>
+                            <span id="cafe-scan-message-body" class="cafe-scan-message-body"></span>
+                        </div>
+                    </div>
+                    <div id="cafe-scan-panel" class="cafe-scan-panel" role="status" hidden>
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.2v.3"/></svg>
+                        <span id="cafe-scan-panel-title" class="cafe-scan-panel-title"></span>
+                        <span id="cafe-scan-panel-body" class="cafe-scan-panel-body"></span>
+                    </div>
+                    <div id="cafe-scan-matches" class="cafe-scan-matches" hidden>
+                        <p class="cafe-scan-read">
+                            <span class="cafe-pick-heading" data-cafe-text="Read from the label">Read from the label</span>
+                            <bdi id="cafe-scan-read"></bdi>
+                        </p>
+                        <p id="cafe-scan-match-heading" class="cafe-pick-heading" data-cafe-text="Batches">Batches</p>
+                        <div id="cafe-scan-match-list" class="cafe-pick-rows" role="group" aria-labelledby="cafe-scan-match-heading"></div>
+                    </div>
+                    <div class="cafe-pick-pane-actions cafe-scan-actions">
+                        <span id="cafe-scan-note" class="cafe-scan-note"></span>
+                        <button id="cafe-scan-again" type="button" class="cafe-btn" hidden></button>
+                        <button id="cafe-scan-cancel" type="button" class="cafe-btn"></button>
+                    </div>
+                </div>
+                <!-- A batch's weight entered, in the lists' place: the batch and what its record says, one field
+                     for what the scale reads, the working, a message, Back and Save (src/cafe/weight-view.js). -->
+                <div id="cafe-pick-weight" class="cafe-pick-weight" hidden>
+                    <div class="cafe-pick-column cafe-weight-batch-column">
+                        <p class="cafe-pick-heading" data-cafe-text="Batch">Batch</p>
+                        <div class="cafe-weight-batch">
+                            <div class="cafe-weight-batch-names">
+                                <span id="cafe-weight-name" class="cafe-pick-row-name"></span>
+                                <bdi id="cafe-weight-code" class="cafe-pick-row-detail"></bdi>
+                            </div>
+                            <dl id="cafe-weight-facts" class="cafe-weight-facts"></dl>
+                        </div>
+                    </div>
+                    <form id="cafe-weight-form" class="cafe-pick-column cafe-weight-entry">
+                        <label id="cafe-weight-label" for="cafe-weight-field" class="cafe-pick-heading"></label>
+                        <div class="cafe-weight-field">
+                            <input id="cafe-weight-field" type="text" inputmode="numeric" autocomplete="off" maxlength="6" enterkeyhint="done">
+                            <span class="cafe-weight-unit" aria-hidden="true">g</span>
+                        </div>
+                        <p id="cafe-weight-working" class="cafe-weight-working" hidden>
+                            <bdi id="cafe-weight-working-sum"></bdi>
+                            <span id="cafe-weight-working-equals" aria-hidden="true">=</span>
+                            <bdi id="cafe-weight-working-left" class="cafe-weight-working-left"></bdi>
+                        </p>
+                        <div id="cafe-weight-message" class="cafe-weight-message" role="status" hidden>
+                            <span id="cafe-weight-message-title" class="cafe-weight-message-title"></span>
+                            <span id="cafe-weight-message-body" class="cafe-weight-message-body"></span>
+                        </div>
+                        <div class="cafe-pick-pane-actions cafe-weight-actions">
+                            <button id="cafe-weight-back" type="button" class="cafe-btn" data-cafe-text="Back">Back</button>
+                            <button id="cafe-weight-save" type="submit" class="cafe-btn cafe-btn-primary" disabled></button>
+                        </div>
+                    </form>
+                </div>
+                <!-- A barista's name, typed: in the list's place once "New barista" is tapped. -->
+                <form id="cafe-pick-entry" class="cafe-pick-entry" hidden>
+                    <label id="cafe-pick-entry-label" for="cafe-pick-entry-text" class="cafe-pick-heading"></label>
+                    <input id="cafe-pick-entry-text" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
+                    <div class="cafe-pick-entry-actions">
+                        <button id="cafe-pick-entry-back" type="button" class="cafe-btn"></button>
+                        <button id="cafe-pick-entry-use" type="submit" class="cafe-btn cafe-btn-primary" disabled></button>
+                    </div>
+                </form>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+        </div>
+    </dialog>
+
+    <!-- The Shots list (src/cafe/shots-dialog.js). A row opens that Shot in the graph. -->
+    <dialog id="cafe-shots-dialog" class="modal" aria-labelledby="cafe-shots-title">
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog cafe-shots-box">
+                <div class="cafe-shots-head">
+                    <div class="cafe-shots-titles">
+                        <h3 id="cafe-shots-title" data-cafe-text="Shots">Shots</h3>
+                        <!-- The Location's name on a Machine Decent Sync serves, or "This machine only". -->
+                        <p id="cafe-shots-under" style="display:none"></p>
+                    </div>
+                    <form method="dialog">
+                        <button class="cafe-btn cafe-btn-primary" data-cafe-text="Close">Close</button>
+                    </form>
+                </div>
+                <!-- Why only this machine's Shots are listed. -->
+                <div id="cafe-shots-line" role="status" style="display:none">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                    <span id="cafe-shots-line-text"></span>
+                </div>
+                <div class="cafe-shots-columns" aria-hidden="true">
+                    <span data-cafe-text="Pulled">Pulled</span>
+                    <span class="cafe-shots-machine" data-cafe-text="Machine">Machine</span>
+                    <span data-cafe-text="Recipe">Recipe</span>
+                    <span data-cafe-text="Dose → yield">Dose → yield</span>
+                    <span class="cafe-shots-duration" data-cafe-text="Time">Time</span>
+                    <span data-cafe-text="Rating">Rating</span>
+                    <span data-cafe-text="Barista">Barista</span>
+                    <span class="cafe-shots-note" data-cafe-text="Note">Note</span>
+                </div>
+                <div id="cafe-shots-scroll">
+                    <div id="cafe-shots-list"></div>
+                    <p id="cafe-shots-empty" data-cafe-text="No shots yet" style="display:none">No shots yet</p>
+                    <p id="cafe-shots-end" role="status" style="display:none"></p>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+        </div>
+    </dialog>
+
+    <!-- Asked before Make reference replaces a recipe's reference (src/cafe/graph.js). -->
+    <dialog id="cafe-reference-dialog" class="modal" aria-labelledby="cafe-reference-dialog-title">
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-reference-dialog-title" data-cafe-text="Replace the reference?">Replace the reference?</h3>
+                <p id="cafe-reference-dialog-recipe"></p>
+                <dl class="cafe-reference-dialog-shots">
+                    <dt data-cafe-text="New reference">New reference</dt>
+                    <dd id="cafe-reference-dialog-new"></dd>
+                    <dt data-cafe-text="Current reference">Current reference</dt>
+                    <dd id="cafe-reference-dialog-old"></dd>
+                </dl>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                        <button id="cafe-reference-dialog-replace" class="cafe-btn cafe-btn-primary" value="replace" data-cafe-text="Replace">Replace</button>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button aria-label="Close"></button></form>
+        </div>
+    </dialog>
+
+    <!-- A Shot's note, to write, and the reference's, to read (src/cafe/note-dialog.js).
+         It fits itself above the soft keyboard, so Streamline does not lift the page behind it. -->
+    <dialog id="cafe-note-dialog" class="modal" aria-labelledby="cafe-note-title" data-keyboard-fit="1">
+        <div class="cafe-dialog-canvas">
+            <div class="modal-box cafe-dialog">
+                <h3 id="cafe-note-title"></h3>
+                <p id="cafe-note-meta"><span id="cafe-note-when"></span><span id="cafe-note-rating" class="cafe-rating"></span></p>
+                <label id="cafe-note-label" for="cafe-note-text" data-cafe-text="Note">Note</label>
+                <textarea id="cafe-note-text" maxlength="40000" autocomplete="off"></textarea>
+                <p id="cafe-note-read"></p>
+                <p id="cafe-note-error" role="alert" style="display:none"></p>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button id="cafe-note-cancel" class="cafe-btn" value="" data-cafe-text="Cancel">Cancel</button>
+                        <button id="cafe-note-save" type="button" class="cafe-btn cafe-btn-primary" data-cafe-text="Save note">Save note</button>
+                        <button id="cafe-note-close" class="cafe-btn cafe-btn-primary" value="" data-cafe-text="Close">Close</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="profile_modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg" data-i18n-key="Choose a Profile">Choose a Profile</h3>
+            <div id="profile-list-container" class="py-3 grid grid-cols-1 gap-1.5">
+                <!-- Profile list will be inserted here by JavaScript -->
+            </div>
+            <div class="modal-action">
+                <button id="upload-profile-btn" class="btn" data-i18n-key="Upload a Profile">Upload a Profile</button>
+                <input type="file" id="profile-upload-input" class="hidden" accept=".json">
+                <form method="dialog">
+                    <button class="btn" data-i18n-key="Close">Close</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    
+
+    <!-- Fullscreen Prompt Toast -->
+    <div id="fullscreen-toast-container" class="toast toast-center toast-middle" style="z-index: 10000; display: none;">
+        <div class="alert bg-base-100/60 backdrop-blur-md text-[var(--text-primary)] shadow-lg">
+            <div class="flex flex-col items-center gap-y-1.5 text-center">
+                <h3 class="font-bold" data-i18n-key="Fullscreen Recommended">Fullscreen Recommended</h3>
+                <div class="text-[9px]" data-i18n-key="For the best experience, please use fullscreen mode.">For the best experience, please use fullscreen mode.</div>
+                <div class="flex gap-2 self-center pt-1.5">
+                    <button id="toast-fullscreen-btn" class="btn btn-primary btn-sm text-white" data-i18n-key="Enter Fullscreen">Enter Fullscreen</button>
+                    <button id="toast-close-btn" class="btn btn-ghost btn-sm" data-i18n-key="Later">Later</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="app-toast" class="toast toast-buttom toast-center" style="z-index: 10001; display: none;">
+        <div class="alert alert-info">
+            <span id="app-toast-message" class="text-[22px] font-['Inter']"></span>
+        </div>
+    </div>
+
+</body>
+</html>
