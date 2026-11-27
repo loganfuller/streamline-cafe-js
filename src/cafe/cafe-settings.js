@@ -14,7 +14,7 @@ import { shouldUseNumpad } from '../modules/numpad-policy.js';
 import { openModal as openNumpad, initializeNumpadModal } from '../modules/numpad-modal.js';
 import { WEIGHT_PHRASES, MAX_CONTAINER, containerWeight } from './weight-model.js';
 import { readCafe, CONTAINER_KEY } from './cafe-store.js';
-import { draftContainer, stageContainer } from './cafe-settings-draft.js';
+import { draftContainer, stageContainer, savingCafeSettings, cafeSettingsSettled, watchCafeSaving } from './cafe-settings-draft.js';
 import { cafeText, setText } from './text.js';
 
 const NUMPAD_FIELD = 'cafe-container-weight';
@@ -47,9 +47,13 @@ export async function mountSettingsCategory({ container }) {
 
     const numpad = shouldUseNumpad();
     let alive = true;
+    let ready = false;
     let kept = 0;
+    const enable = () => { field.disabled = !ready || savingCafeSettings(); };
+    const unwatch = watchCafeSaving(enable);
 
     const keep = value => {
+        if (savingCafeSettings()) return;
         const grams = containerWeight(String(value).replace(/[^\d.]/g, ''));
         field.value = String(grams);
         stageContainer(grams, kept);
@@ -69,9 +73,11 @@ export async function mountSettingsCategory({ container }) {
     });
 
     try {
+        await cafeSettingsSettled();
         kept = containerWeight(await readCafe(CONTAINER_KEY));
         field.value = String(draftContainer() ?? kept);
-        field.disabled = false;
+        ready = true;
+        enable();
         if (numpad) {
             initializeNumpadModal();
             field.readOnly = true;
@@ -81,5 +87,8 @@ export async function mountSettingsCategory({ container }) {
         showToast(cafeText('Could not read the container\'s weight'), 4000, 'error');
     }
 
-    return () => { alive = false; };
+    return () => {
+        alive = false;
+        unwatch();
+    };
 }

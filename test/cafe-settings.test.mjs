@@ -43,11 +43,11 @@ test('the navigation names it in the page\'s language, from the fork\'s table', 
 test('the page\'s Save writes a changed setting, from the shell and from the legacy module, and leaving drops it', async () => {
     const shell = read('src/settings/settings-shell.js');
     assert.match(shell, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
-    assert.match(shell, /if \(getSnapshot\(\)\.dirty\) return;\n\s*if \(!await saveCafeSettings\(\)\) return;\n\s*ui\.showToast\('Settings updated'/);
+    assert.match(shell, /if \(getSnapshot\(\)\.dirty\) return;\n\s*if \(!await saveCafeSettings\(\) \|\| getSnapshot\(\)\.dirty\) return;\n\s*ui\.showToast\('Settings updated'/);
     const legacy = read('src/settings/settings.js');
     assert.match(legacy, /\/\/ Streamline Cafe: [^\n]*\nimport \{ saveCafeSettings \} from '\.\.\/cafe\/cafe-settings-draft\.js';/);
-    assert.match(legacy, /await flushPendingChanges\(\);\n\s*if \(!await saveCafeSettings\(\)\) return;\n\s*\} catch \(error\) \{/);
-    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{\n\s*container = null;\n\s*written = null;\n\s*\}\);/);
+    assert.match(legacy, /await flushPendingChanges\(\);\n\s*if \(!await saveCafeSettings\(\) \|\| hasPendingChanges\(\)\) return;\n\s*\} catch \(error\) \{/);
+    assert.match(read('src/cafe/cafe-settings-draft.js'), /document\.addEventListener\('streamline:mainpagevisible', \(\) => \{\n\s*visit \+= 1;\n\s*container = null;\n\s*written = null;\n\s*\}\);/);
 });
 
 test('the category\'s module keeps the setting through the fork\'s one store module, and off the main page\'s first load', () => {
