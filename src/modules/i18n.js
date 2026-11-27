@@ -362,6 +362,14 @@ export function fitTextToWidth(el) {
     el.style.fontSize = size + 'px';
 }
 
+// Streamline Cafe: a phrase this file has no row for is looked up in the fork's
+// own table, so the Settings page names the fork's category in the page's
+// language. src/cafe/text.js sets the lookup; with none set, nothing changes.
+let fallbackTranslation = null;
+export function setTranslationFallback(lookup) {
+    fallbackTranslation = lookup;
+}
+
 /**
  * Gets the translation for a given key in the current language.
  * @param {string} key The translation key.
@@ -378,7 +386,7 @@ export function getTranslation(key) {
         const val = table[canon];
         if (val) return val.toLowerCase() === key.toLowerCase() ? key : val;
     }
-    return key;
+    return fallbackTranslation?.(key, currentLanguage) || key;
 }
 
 /**

@@ -599,3 +599,131 @@ test.describe('a batch\'s QR code scanned with Decent Sync', { tag: '@real-sync-
         }
     });
 });
+
+// ── A batch's weight entered, and a batch finished (#118, loganfuller/decent-sync#702 and #705).
+
+const WEIGHED_BEAN = 'Sample Blend';
+const WEIGHED_CODE = 'SW-0118';
+const WEIGHED_ROASTED = '2026-11-14';
+const CONTAINER = 350;
+const CONTAINER_KEY = '/store/streamlineCafe/batchContainerWeight';
+
+/** The weight view of the batch with the code, on a tablet whose page is open. */
+async function weighBatch(page, code) {
+    await openPick(page, '#dose-section');
+    await page.locator('#cafe-pick-side .cafe-pick-row').filter({ hasText: WEIGHED_BEAN }).click();
+    const row = page.locator('#cafe-pick-list .cafe-pick-row').filter({ hasText: code });
+    await row.click();
+    await expect(row).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#cafe-pick-weigh').click();
+    await expect(page.locator('#cafe-pick-weight')).toBeVisible();
+    await expect(page.locator('#cafe-weight-field')).toBeEnabled();
+    return row;
+}
+
+/** What the scale reads, on the numpad where the page uses one and typed where it does not. */
+async function scaleReads(page, grams) {
+    const field = page.locator('#cafe-weight-field');
+    if (await field.getAttribute('readonly') === null) {
+        await field.fill(String(grams));
+        return;
+    }
+    await field.click();
+    await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
+    for (const digit of String(grams)) await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
+    await page.locator('#numpad-confirm').click();
+    await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+}
+
+test.describe('a batch\'s weight entered with Decent Sync', { tag: '@real-sync-weight' }, () => {
+    test('a weight entered on the tablet is the server\'s weight entered at the Machine\'s Location, and "Finish batch" finishes the batch there', async ({ stacks, tablet }) => {
+        const sync = stacks.sync;
+        const status = await maybe(() => sync.decaid('GET', PLUGIN_STATUS));
+        // A Location's remaining weight, which tablets hold and report, came with the release that matches scanned text.
+        test.skip(status?.scan !== true, 'this stack\'s Decent Sync keeps no remaining weight per Location (loganfuller/decent-sync#705 is in no release the pins reach)');
+        expect(status.served, 'the Machine is served').toBe(true);
+
+        // A bucket at the cafe, weighed there before, which both tablets hold.
+        const cafe = named((await sync.server('GET', '/locations')).locations, LOCATION);
+        const bean = named((await sync.server('GET', '/beans')).beans, WEIGHED_BEAN);
+        for (const left of (await sync.server('GET', `/bean-batches?batchCode=${encodeURIComponent(WEIGHED_CODE)}`)).batches.filter(row => !row.archived)) {
+            await sync.server('PUT', `/bean-batches/${left.id}/archived`, { archived: true });
+        }
+        const { batch } = await sync.server('POST', '/bean-batches', {
+            beanId: bean.id,
+            content: { roastDate: WEIGHED_ROASTED, batchCode: WEIGHED_CODE, weight: 6000 },
+            locations: [{ locationId: cafe.id, remainingWeight: 5000 }],
+        });
+        const onServer = async () => {
+            const now = (await sync.server('GET', `/bean-batches/${batch.id}`)).batch;
+            const here = now.locations.find(place => place.location.name === LOCATION) || null;
+            return { remaining: here?.remainingWeight ?? null, entered: here?.entered?.weight ?? null, by: here?.entered?.by ?? null, finished: now.finished.map(place => place.location.name) };
+        };
+        const anyOn = async side => {
+            const list = answer => (Array.isArray(answer) ? answer : answer?.items || []);
+            const tabletBean = list(await side.decaid('GET', '/beans')).find(row => row && row.name === WEIGHED_BEAN);
+            return list(await side.decaid('GET', `/beans/${tabletBean.id}/batches?includeArchived=true`)).find(row => batchCodeOf(row) === WEIGHED_CODE) || null;
+        };
+        await expect.poll(async () => (await anyOn(sync))?.weightRemaining ?? null, { timeout: 90_000, message: 'the tablet holds the batch with its weight' }).toBe(5000);
+        await expect.poll(async () => (await anyOn(sync.second))?.weightRemaining ?? null, { timeout: 90_000, message: 'and the second tablet' }).toBe(5000);
+        const record = await anyOn(sync);
+        const workflow = (await sync.decaid('GET', '/workflow')).context;
+        const kept = await maybe(() => sync.decaid('GET', CONTAINER_KEY));
+        await sync.decaid('POST', CONTAINER_KEY, CONTAINER);
+
+        try {
+            const page = await tablet(sync);
+            const row = await weighBatch(page, WEIGHED_CODE);
+            await expect(page.locator('#cafe-weight-facts')).toContainText('5000 g');
+            await expect(page.locator('#cafe-weight-facts')).toContainText('6000 g');
+            await expect(page.locator('#cafe-weight-label')).toHaveText('Weight with its container');
+            await scaleReads(page, 3240);
+            await expect(page.locator('#cafe-weight-working')).toContainText('2890 g');
+            await shoot(page, 'real-weight-view');
+            await page.locator('#cafe-weight-save').click();
+            await expect(page.locator('#cafe-pick-weight')).toBeHidden();
+            await expect(row, 'the lists back, the batch highlighted with its new weight').toHaveAttribute('aria-pressed', 'true');
+            await expect(row.locator('.cafe-pick-row-detail')).toContainText('2.9 kg');
+            await shoot(page, 'real-weight-saved');
+
+            // The tablet's record: the weight alone changed.
+            const weighed = await anyOn(sync);
+            const { weightRemaining, updatedAt, ...rest } = weighed;
+            const { weightRemaining: had, updatedAt: before, ...was } = record;
+            expect(weightRemaining).toBe(2890);
+            expect(rest, 'every other field, its extras with Decent Sync\'s id and Batch Code too').toEqual(was);
+            expect((await sync.decaid('GET', '/workflow')).context.beanBatchId, 'the Workflow is not written').toBe(workflow.beanBatchId);
+
+            // The server takes it at the plugin's next report as a weight entered at the Machine's Location.
+            await expect.poll(async () => (await onServer()).entered, { timeout: 120_000, message: 'the server holds the weight as one entered at the Location' }).toBe(2890);
+            const taken = await onServer();
+            expect(taken.remaining).toBe(2890);
+            expect(taken.finished).toEqual([]);
+            expect(JSON.stringify(taken.by), 'entered by the Machine').toContain(MACHINE);
+            const history = JSON.stringify(await sync.server('GET', `/bean-batches/${batch.id}/history`));
+            expect(history, 'its history names the Machine').toContain(MACHINE);
+            await expect.poll(async () => (await anyOn(sync.second))?.weightRemaining ?? null, { timeout: 120_000, message: 'the second tablet holds the weight entered' }).toBe(2890);
+
+            // Nothing left: the batch finished on the tablet is finished at the Location.
+            await page.locator('#cafe-pick-dialog form[method="dialog"] .cafe-btn').click();
+            await pickClosed(page);
+            await weighBatch(page, WEIGHED_CODE);
+            await scaleReads(page, CONTAINER);
+            await expect(page.locator('#cafe-weight-save')).toHaveText('Finish batch');
+            await shoot(page, 'real-weight-finish');
+            await page.locator('#cafe-weight-save').click();
+            await expect(page.locator('#cafe-pick-weight')).toBeHidden();
+            await expect(page.locator('#cafe-pick-list .cafe-pick-row').filter({ hasText: WEIGHED_CODE }), 'the row has left the list').toHaveCount(0);
+            await shoot(page, 'real-weight-finished');
+            const finished = await anyOn(sync);
+            expect(finished.archived, 'the tablet\'s record is archived').toBe(true);
+            expect(finished.weightRemaining, 'and no zero was written').toBe(2890);
+            await expect.poll(async () => (await onServer()).finished, { timeout: 120_000, message: 'the server holds the batch as finished at the Location' }).toEqual([LOCATION]);
+            expect(JSON.stringify(await sync.server('GET', `/bean-batches/${batch.id}/history`))).toContain(MACHINE);
+            await expect.poll(async () => (await anyOn(sync.second))?.archived ?? null, { timeout: 120_000, message: 'the second tablet\'s record is archived too' }).toBe(true);
+        } finally {
+            await sync.decaid('POST', CONTAINER_KEY, kept ?? 0);
+            await sync.server('PUT', `/bean-batches/${batch.id}/archived`, { archived: true });
+        }
+    });
+});

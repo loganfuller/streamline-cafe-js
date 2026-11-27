@@ -40,6 +40,8 @@ const CATEGORY_LOADERS = Object.freeze({
     language: () => import('./categories/legacy-category.js'),
     extensions: () => import('./categories/legacy-category.js'),
     miscellaneous: () => import('./categories/legacy-category.js'),
+    // Streamline Cafe: the fork's own category mounts from its own module.
+    cafe: () => import('../cafe/cafe-settings.js'),
     updates: () => import('./categories/legacy-category.js'),
     usermanual: () => import('./categories/legacy-category.js')
 });

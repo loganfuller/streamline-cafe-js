@@ -14,6 +14,8 @@ export const REFERENCES_KEY = 'references';
 export const VIEW_KEY = 'graphView';
 /** The camera a scan of a batch's QR code opens on: `user`, the front one, or `environment`. */
 export const CAMERA_KEY = 'scanCamera';
+/** The weight of the empty container a batch is kept in, in whole grams: the skin's one setting. */
+export const CONTAINER_KEY = 'batchContainerWeight';
 
 /**
  * A value the page kept, or null when it has kept none under that key, which is

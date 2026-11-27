@@ -484,10 +484,12 @@
                         <p id="cafe-pick-heading" class="cafe-pick-heading" hidden></p>
                         <div id="cafe-pick-list" class="cafe-pick-rows" role="group"></div>
                         <!-- The bean dialog's "Use this batch", under the batches: a tap on a batch highlights it,
-                             and this chooses it, with the bean and its roast date beside it, or "In use". -->
+                             and this chooses it, with the bean and its roast date beside it, or "In use". To its
+                             left, "Enter weight" puts the highlighted batch's weight view in the lists' place. -->
                         <div id="cafe-pick-confirm" class="cafe-pick-pane-actions cafe-pick-confirm" hidden>
-                            <span id="cafe-pick-confirm-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
                             <span id="cafe-pick-confirm-note" hidden></span>
+                            <button id="cafe-pick-weigh" type="button" class="cafe-btn" hidden disabled></button>
+                            <span id="cafe-pick-confirm-in-use" class="cafe-pick-in-use" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span data-cafe-text="In use">In use</span></span>
                             <button id="cafe-pick-confirm-use" type="button" class="cafe-btn cafe-btn-primary" disabled></button>
                         </div>
                         <!-- The barista dialog's "New barista", set apart under the names: it shows the field below. -->
@@ -547,6 +549,40 @@
                         <button id="cafe-scan-again" type="button" class="cafe-btn" hidden></button>
                         <button id="cafe-scan-cancel" type="button" class="cafe-btn"></button>
                     </div>
+                </div>
+                <!-- A batch's weight entered, in the lists' place: the batch and what its record says, one field
+                     for what the scale reads, the working, a message, Back and Save (src/cafe/weight-view.js). -->
+                <div id="cafe-pick-weight" class="cafe-pick-weight" hidden>
+                    <div class="cafe-pick-column cafe-weight-batch-column">
+                        <p class="cafe-pick-heading" data-cafe-text="Batch">Batch</p>
+                        <div class="cafe-weight-batch">
+                            <div class="cafe-weight-batch-names">
+                                <span id="cafe-weight-name" class="cafe-pick-row-name"></span>
+                                <bdi id="cafe-weight-code" class="cafe-pick-row-detail"></bdi>
+                            </div>
+                            <dl id="cafe-weight-facts" class="cafe-weight-facts"></dl>
+                        </div>
+                    </div>
+                    <form id="cafe-weight-form" class="cafe-pick-column cafe-weight-entry">
+                        <label id="cafe-weight-label" for="cafe-weight-field" class="cafe-pick-heading"></label>
+                        <div class="cafe-weight-field">
+                            <input id="cafe-weight-field" type="text" inputmode="numeric" autocomplete="off" maxlength="6" enterkeyhint="done">
+                            <span class="cafe-weight-unit" aria-hidden="true">g</span>
+                        </div>
+                        <p id="cafe-weight-working" class="cafe-weight-working" hidden>
+                            <bdi id="cafe-weight-working-sum"></bdi>
+                            <span id="cafe-weight-working-equals" aria-hidden="true">=</span>
+                            <bdi id="cafe-weight-working-left" class="cafe-weight-working-left"></bdi>
+                        </p>
+                        <div id="cafe-weight-message" class="cafe-weight-message" role="status" hidden>
+                            <span id="cafe-weight-message-title" class="cafe-weight-message-title"></span>
+                            <span id="cafe-weight-message-body" class="cafe-weight-message-body"></span>
+                        </div>
+                        <div class="cafe-pick-pane-actions cafe-weight-actions">
+                            <button id="cafe-weight-back" type="button" class="cafe-btn" data-cafe-text="Back">Back</button>
+                            <button id="cafe-weight-save" type="submit" class="cafe-btn cafe-btn-primary" disabled></button>
+                        </div>
+                    </form>
                 </div>
                 <!-- A barista's name, typed: in the list's place once "New barista" is tapped. -->
                 <form id="cafe-pick-entry" class="cafe-pick-entry" hidden>

@@ -10,8 +10,10 @@
 // fork's table back in English every time it ran. The three elements a
 // Streamline module re-labels itself (the machine status, Sleep and the cup
 // warmer) keep `data-i18n-key` and stay Streamline's.
-import { getTranslation, getCurrentLanguage, fitTextToWidth } from '../modules/i18n.js';
+import { getTranslation, getCurrentLanguage, fitTextToWidth, setTranslationFallback } from '../modules/i18n.js';
 import { cafeTranslation, dateLocale } from './translations.js';
+
+setTranslationFallback((key, language) => cafeTranslation(key, language, () => ''));
 
 const KEY = 'data-cafe-text';
 const VARS = 'data-cafe-vars';

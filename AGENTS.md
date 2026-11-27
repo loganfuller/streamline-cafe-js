@@ -64,6 +64,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 - Before changing which recipe is loaded any other way (DYE2's `save-recipe`, clearing its selection, or marking a recipe loaded again), call `forgetAppliedItem()`, the fork's one hook in `src/modules/dyeStrip.js`. Every request to DYE2's selection but a read is in `src/cafe/arrange.js`. Never open one of DYE2's pages from the cafe page.
 - Write DYE2's recipe records only through the fork's one writer module, `src/cafe/recipe-writer.js`. A choice in one of the page's dialogs writes no record: it writes the Workflow, through Streamline's `updateWorkflow` under a `cafe.*` writer declared in `src/modules/workflow-fields.js`. Two exceptions, each with a recipe loaded and each written into the record before the Workflow: the profile, only through `changeProfile` in `src/cafe/profile-changer.js`, and a batch of another bean than the recipe's own, only through `changeBean` in `src/cafe/bean-changer.js`.
 - Read Shots and the choice of reference, and set a Shot's rating and note, only through the Shot seam, `src/cafe/shot-seam.js`. Keep the page's own state in the `streamlineCafe` namespace, through `src/cafe/cafe-store.js`.
+- Write Decaid's record of a bean batch only through `src/cafe/batch-writer.js`, one field in a write (its remaining weight, or its archive). Never send the whole record back: its `extras` hold Decent Sync's id and Batch Code.
 - Speak to Decent Sync's plugin only through `src/cafe/decent-sync.js`. On a Machine it serves, never read or write the reference kept on the tablet.
 - Decide which Shot is in the graph, and when the Shots are read again, only in `src/cafe/graph-state.js`. `src/cafe/graph.js` tells it what happened and does what it answers.
 - Draw on the graph only through the fork's three hooks in `src/modules/chart.js`: the overlay, the Shot chooser and the live line labels. Lines added to the chart follow Streamline's own, and keep their count and their arrays through a shot. Text on a stage line goes through the fork's hook in `src/modules/echarts-renderer.js`.
@@ -80,6 +81,7 @@ Scout first: for a task spanning files, send one Explore subagent for a file-and
 
 Pick a DESIGN.md section by its heading. These areas sit under headings that do not name them:
 
+- A setting of the skin's own, or the Settings page's Cafe category: "Settings".
 - The layout, a control, the dial-in column, rating and notes, or the Shots list: "What the screen shows".
 - The "needs DYE2" screen, the long-press menu, or saving the dial-in: "Recipes and the strip".
 - What a change does with Decent Sync, without it, on a Capture-only Machine, or with its server out of reach: "Who it is for", then the area's own section.

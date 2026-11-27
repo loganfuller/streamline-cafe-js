@@ -518,7 +518,11 @@ let maintenanceSequence = 0;
 async function mountMaintenanceCategory(category, container) {
     const sequence = ++maintenanceSequence;
     try {
-        const module = category === 'ble_grinder'
+        // Streamline Cafe: the fork's own category mounts from its own module,
+        // here as from the shell, once this module owns the nav clicks.
+        const module = category === 'cafe_batches'
+            ? await import('../cafe/cafe-settings.js')
+            : category === 'ble_grinder'
             ? await import('./categories/connections.js')
             : await import('./categories/maintenance.js');
         // Guard a fast switch away: a late import must not paint over the page
@@ -641,7 +645,7 @@ function updateSettingsContentArea(category, nav = null) {
         if (category === 'ledstrip') {
             setTimeout(initLedPicker, 0);
         }
-        if (MAINTENANCE_CATEGORIES.has(category) || category === 'ble_grinder') {
+        if (MAINTENANCE_CATEGORIES.has(category) || category === 'ble_grinder' || category === 'cafe_batches') {
             mountMaintenanceCategory(category, contentArea);
         }
         if (category === 'calib_sensors') {
@@ -1017,6 +1021,7 @@ export function renderSettingsContent(category) {
         case 'maint_descaling':
         case 'maint_airpurge':
         case 'ble_grinder':
+        case 'cafe_batches':
             // Mounted by the extracted category module, not rendered here.
             return '';
         case 'theme':
