@@ -479,6 +479,29 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         await expect(scanPart(page)).toBeHidden();
         expect(await live(page)).toEqual([]);
     });
+
+    test('"Cancel scan" while a label is being looked up goes back to the lists, whatever the answer, without the camera opening again', async ({ cafe, fake }) => {
+        const page = await dialogOpen(cafe, []);
+        await scanOpen(cafe);
+        const lookup = hold(cafe, { method: 'PUT', path: /\/plugins\/decent-sync\.reaplugin\/scan$/ });
+        await page.clock.runFor(500);
+        await lookup.reached;
+        const lists = hold(cafe, { method: 'GET', path: /\/api\/v1\/beans\?/ });
+        await page.locator('#cafe-scan-cancel').click();
+        await lists.reached;
+        expect(await live(page)).toEqual([]);
+        // The label matches nothing, and that answer comes while the lists are read again.
+        lookup.release();
+        await expect.poll(() => page.evaluate(() => window.__cafeFetchesOpen().some(open => open.endsWith('/scan')))).toBe(false);
+        await page.evaluate(() => new Promise(resolve => queueMicrotask(resolve)));
+        lists.release();
+        await expect(scanPart(page)).toBeHidden();
+        await cafe.settle();
+        await cafe.advance(1000);
+        expect(await cameras(page), 'no camera opened again').toEqual([{ facing: 'user', audio: false, tracks: ['video ended'] }]);
+        expect(scans(fake)).toEqual([{ text: LABEL_TEXT }]);
+        await expect(title(page)).toHaveText(TITLE);
+    });
 });
 
 test.describe('a scan that fails', { tag: '@scan' }, () => {

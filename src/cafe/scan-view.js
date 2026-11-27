@@ -100,6 +100,9 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     let last = null;
     let facing = null;
     let asked = false;
+    let ending = false;
+
+    const over = () => !alive || ending;
 
     const setBusy = value => {
         busy = value;
@@ -154,6 +157,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     };
 
     async function begin(message = null) {
+        if (ending) return;
         closeCamera();
         const mine = opening;
         setBusy(false);
@@ -188,7 +192,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     async function found(match) {
         closeCamera();
         const next = await reread(match);
-        if (!alive) return;
+        if (over()) return;
         if (next) stage.back(next);
         else panel('unread');
     }
@@ -217,7 +221,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
             result = { kind };
             if (kind !== 'noMatch') asked = true;
         }
-        if (!alive) return;
+        if (over()) return;
         if (result.kind === 'match') return found(result);
         if (result.kind === 'several') return several(result, scanned);
         if (result.kind !== 'noMatch') return panel(result.kind);
@@ -241,6 +245,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     }
 
     async function cancel() {
+        ending = true;
         closeCamera();
         parts.cancel.disabled = true;
         const next = asked || busy ? await reread(null) : null;
