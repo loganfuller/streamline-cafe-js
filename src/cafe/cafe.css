@@ -2063,7 +2063,7 @@ button.cafe-card {
     padding: 0 30px;
 }
 
-.cafe-scan-match-list .cafe-pick-row:disabled,
+/* The matches while the plugin is asked about the one tapped. */
 #cafe-scan-match-list .cafe-pick-row:disabled {
     opacity: 0.6;
     cursor: default;

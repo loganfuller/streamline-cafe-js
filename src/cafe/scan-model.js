@@ -56,6 +56,7 @@ export const MAX_SCANNED_TEXT = 2048;
 const SHOWN_TEXT = 120;
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const id = value => (value == null || value === '' ? null : String(value));
 
 /** Did a code hold anything to ask about? One that held nothing, or only spaces, is no reading. */
@@ -69,7 +70,7 @@ export function holdsText(scanned) {
  * request, so they are no label of a batch, and nothing is asked.
  */
 export function askable(scanned) {
-    return typeof scanned === 'string' && scanned.length <= MAX_SCANNED_TEXT && !scanned.includes('\u0000') && scanned.isWellFormed();
+    return typeof scanned === 'string' && scanned.length <= MAX_SCANNED_TEXT && !scanned.includes('\u0000') && !LONE_SURROGATE.test(scanned);
 }
 
 /**
