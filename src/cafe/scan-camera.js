@@ -11,19 +11,22 @@ const media = () => (typeof navigator !== 'undefined' && navigator.mediaDevices)
 
 /**
  * Opens the camera on the side `facing` names (`user` or `environment`), or
- * on whichever the tablet has where it has none on that side, and shows its
- * picture in `video`. Resolves the stream. Rejects with the media API's own
- * error, or one named `NotFoundError` where the browser has no media API.
+ * on whichever the tablet has where it has none on that side. Resolves the
+ * stream, not yet shown. Rejects with the media API's own error, or one named
+ * `NotFoundError` where the browser has no media API.
  */
-export async function openCamera(video, facing) {
+export async function openCamera(facing) {
     const devices = media();
     if (!devices || typeof devices.getUserMedia !== 'function') {
         throw Object.assign(new Error('This browser has no camera API'), { name: 'NotFoundError' });
     }
-    const stream = await devices.getUserMedia({ audio: false, video: { facingMode: facing } });
+    return devices.getUserMedia({ audio: false, video: { facingMode: facing } });
+}
+
+/** Shows `stream`'s picture in `video`. */
+export function showCamera(video, stream) {
     video.srcObject = stream;
     video.play().catch(() => {});
-    return stream;
 }
 
 /** Stops every track of `stream` and takes its picture off `video`. */

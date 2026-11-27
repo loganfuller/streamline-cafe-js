@@ -14,7 +14,7 @@
 // the page is hidden: `leave`, which the dialog calls however the scan ends.
 import { logger } from '../modules/logger.js';
 import { SCAN_PHRASES, holdsText, askable, askedJustNow, shownText, scanAnswer, scanRefusal, cameraFailure, scanMessage, matchesLine, matchRows, facingOf, otherFacing, facingLabel, mirrored } from './scan-model.js';
-import { openCamera, stopCamera, reportedFacing, countCameras, readCodes } from './scan-camera.js';
+import { openCamera, showCamera, stopCamera, reportedFacing, countCameras, readCodes } from './scan-camera.js';
 import { readCafe, writeCafe, CAMERA_KEY } from './cafe-store.js';
 import { cafeText, formatRoastDay, setText } from './text.js';
 
@@ -101,6 +101,12 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     let facing = null;
     let asked = false;
 
+    const setBusy = value => {
+        busy = value;
+        parts.switcher.disabled = value;
+        parts.again.disabled = value;
+    };
+
     const closeCamera = () => {
         opening += 1;
         if (stopReading) stopReading();
@@ -132,7 +138,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
 
     const panel = kind => {
         closeCamera();
-        busy = false;
+        setBusy(false);
         const message = scanMessage(kind);
         setText(parts.panelTitle, message.title, { translate: true });
         setText(parts.panelBody, message.body.key, { translate: true, vars: message.body.vars });
@@ -150,7 +156,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     async function begin(message = null) {
         closeCamera();
         const mine = opening;
-        busy = false;
+        setBusy(false);
         show('camera');
         say(message);
         parts.facing.hidden = true;
@@ -158,12 +164,13 @@ export function startScan(stage, { ask, reread, inUseCode }) {
         try {
             if (facing === null) facing = facingOf(await readCafe(CAMERA_KEY).catch(() => null));
             if (!alive || mine !== opening) return;
-            const opened = await openCamera(parts.video, facing);
+            const opened = await openCamera(facing);
             if (!alive || mine !== opening) {
                 stopCamera(parts.video, opened);
                 return;
             }
             stream = opened;
+            showCamera(parts.video, stream);
         } catch (error) {
             if (!alive || mine !== opening) return;
             logger.warn('Cafe: the camera did not open', error);
@@ -188,7 +195,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
 
     function several(result, scanned) {
         closeCamera();
-        busy = false;
+        setBusy(false);
         const rows = matchRows(result.matches, inUseCode(), formatRoastDay, cafeText);
         stage.title(SCAN_PHRASES.matchesTitle);
         stage.under(matchesLine(rows.length, result.more));
@@ -199,7 +206,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
 
     async function send(asking, scanned) {
         if (busy) return;
-        busy = true;
+        setBusy(true);
         if (asking.match === undefined) say(scanMessage('asking', scanned));
         else for (const button of parts.list.children) button.disabled = true;
         let result;
@@ -216,7 +223,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
         if (result.kind !== 'noMatch') return panel(result.kind);
         last = { text: scanned, at: Date.now() };
         if (stream) {
-            busy = false;
+            setBusy(false);
             say(scanMessage('noMatch', scanned));
             return;
         }
@@ -236,7 +243,7 @@ export function startScan(stage, { ask, reread, inUseCode }) {
     async function cancel() {
         closeCamera();
         parts.cancel.disabled = true;
-        const next = asked ? await reread(null) : null;
+        const next = asked || busy ? await reread(null) : null;
         if (alive) stage.back(next || undefined);
     }
 
@@ -263,6 +270,8 @@ export function startScan(stage, { ask, reread, inUseCode }) {
         parts.cancel.disabled = false;
         parts.again.onclick = null;
         parts.switcher.onclick = null;
+        parts.again.disabled = false;
+        parts.switcher.disabled = false;
         parts.list.replaceChildren();
         say(null);
     };

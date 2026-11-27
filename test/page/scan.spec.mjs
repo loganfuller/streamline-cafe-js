@@ -78,6 +78,18 @@ const TWO_CAMERAS = () => {
     const list = media.enumerateDevices.bind(media);
     media.enumerateDevices = async () => [...await list(), { kind: 'videoinput', deviceId: 'rear', groupId: 'rear', label: 'Rear' }];
 };
+// A camera slow to open: the first one asked for is held until the test lets it open.
+const HOLD_FIRST_CAMERA = () => {
+    const media = navigator.mediaDevices;
+    const open = media.getUserMedia.bind(media);
+    let first = true;
+    media.getUserMedia = async constraints => {
+        if (!first) return open(constraints);
+        first = false;
+        await new Promise(resolve => { window.__openFirstCamera = resolve; });
+        return open(constraints);
+    };
+};
 // A tablet with no camera: the media API says it found none.
 const NO_CAMERA = () => {
     navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Requested device not found', 'NotFoundError'); };
@@ -409,6 +421,25 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         await expect(useButton(page)).toBeEnabled();
     });
 
+    test('while a tapped match is being asked about, "Scan again" can\'t be tapped', async ({ cafe, fake }) => {
+        const batches = [arriving(fake, 'one'), arriving(fake, 'none', { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d93', roastDate: '2026-11-05', batchId: '6e0d8b17-1a2f-4c3d-9e5f-7a8b9c0d1e2f' })];
+        const page = await dialogOpen(cafe, batches);
+        await scanOpen(cafe);
+        await read(cafe);
+        await expect(title(page)).toHaveText('Which batch is it?');
+        await expect(page.locator('#cafe-scan-again')).toBeEnabled();
+        const held = hold(cafe, { method: 'PUT', path: /\/plugins\/decent-sync\.reaplugin\/scan$/ });
+        await page.locator('#cafe-scan-match-list .cafe-pick-row').nth(1).click();
+        await held.reached;
+        await expect(page.locator('#cafe-scan-again')).toBeDisabled();
+        held.release();
+        await expect(scanPart(page)).toBeHidden();
+        await cafe.settle();
+        expect(scans(fake)).toEqual([{ text: LABEL_TEXT }, { match: batches[1].id }]);
+        expect(await live(page), 'no camera opened again').toEqual([]);
+        expect((await heldBatch(page)).map(row => row.name)).toEqual(['Roasted Nov 5']);
+    });
+
     test('"Scan again" over several matches returns to the camera, and "Cancel scan" to the lists', async ({ cafe, fake }) => {
         const batches = [arriving(fake, 'one'), arriving(fake, 'none', { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d93', roastDate: '2026-11-05', batchId: '6e0d8b17-1a2f-4c3d-9e5f-7a8b9c0d1e2f' })];
         const page = await dialogOpen(cafe, batches);
@@ -555,6 +586,39 @@ test.describe('the camera', { tag: '@scan' }, () => {
             expect(await page.evaluate(() => document.getElementById('cafe-scan-video').srcObject), 'and its picture taken off the page').toBeNull();
         });
     }
+
+    test('while a label is being looked up, the camera can\'t be switched, so only its answer comes back', async ({ cafe, fake }) => {
+        const before = `(${WATCH_CAMERAS})(); (${TWO_CAMERAS})();`;
+        const page = await dialogOpen(cafe, [arriving(fake, 'one')], { before });
+        await scanOpen(cafe);
+        await expect(page.locator('#cafe-scan-switch')).toBeEnabled();
+        const held = hold(cafe, { method: 'PUT', path: /\/plugins\/decent-sync\.reaplugin\/scan$/ });
+        await page.clock.runFor(500);
+        await held.reached;
+        await expect(page.locator('#cafe-scan-switch')).toBeDisabled();
+        held.release();
+        await expect(scanPart(page)).toBeHidden();
+        await cafe.settle();
+        expect(scans(fake)).toEqual([{ text: LABEL_TEXT }]);
+        expect(await cameras(page), 'one camera opened, and stopped').toEqual([{ facing: 'user', audio: false, tracks: ['video ended'] }]);
+        expect((await heldBatch(page)).map(row => row.name)).toEqual(['Roasted Nov 12']);
+    });
+
+    test('a camera that opens after its scan was left is stopped without taking the picture off a newer scan', async ({ cafe }) => {
+        const before = `(${HOLD_FIRST_CAMERA})(); (${WATCH_CAMERAS})();`;
+        const page = await dialogOpen(cafe, [], { before });
+        await scanButton(page).click();
+        await expect(scanPart(page)).toBeVisible();
+        await expect.poll(() => page.evaluate(() => typeof window.__openFirstCamera === 'function'), 'the first camera asked for').toBe(true);
+        await page.locator('#cafe-scan-cancel').click();
+        await expect(scanPart(page)).toBeHidden();
+        await scanOpen(cafe);
+        await page.evaluate(() => window.__openFirstCamera());
+        await expect.poll(() => tracks(page), 'the late one stopped').toEqual(['video ended', 'video live']);
+        expect(await page.evaluate(() => document.getElementById('cafe-scan-video').srcObject === window.__cameras[1].stream), 'the newer scan\'s picture still shown').toBe(true);
+        await page.locator('#cafe-scan-cancel').click();
+        await expect.poll(() => tracks(page)).toEqual(['video ended', 'video ended']);
+    });
 
     test('the switch appears with more than one camera, and the choice is remembered after the page reloads', async ({ cafe, fake }) => {
         const before = `(${WATCH_CAMERAS})(); (${TWO_CAMERAS})();`;
