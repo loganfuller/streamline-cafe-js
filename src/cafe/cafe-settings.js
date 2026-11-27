@@ -6,15 +6,18 @@
 //
 // The setting is kept for the tablet in the skin's own namespace of Decaid's
 // store (cafe-store.js). A change waits for the page's Save, which writes it,
-// and Cancel drops it (cafe-settings-draft.js). On a tablet a tap on the field
-// opens Streamline's numpad, as the page's other number fields do.
+// and Cancel drops it (cafe-settings-draft.js). The field shows the change
+// not saved yet, else the weight last written from this visit, else what was
+// read, so a read overtaken by a Save shows what the Save wrote. On a tablet a
+// tap on the field opens Streamline's numpad, as the page's other number
+// fields do.
 import { logger } from '../modules/logger.js';
 import { showToast } from '../modules/ui.js';
 import { shouldUseNumpad } from '../modules/numpad-policy.js';
 import { openModal as openNumpad, initializeNumpadModal } from '../modules/numpad-modal.js';
 import { WEIGHT_PHRASES, MAX_CONTAINER, containerWeight } from './weight-model.js';
 import { readCafe, CONTAINER_KEY } from './cafe-store.js';
-import { draftContainer, stageContainer, savingCafeSettings, cafeSettingsSettled, watchCafeSaving } from './cafe-settings-draft.js';
+import { draftContainer, writtenContainer, stageContainer, savingCafeSettings, cafeSettingsSettled, watchCafeSaving } from './cafe-settings-draft.js';
 import { cafeText, setText } from './text.js';
 
 const NUMPAD_FIELD = 'cafe-container-weight';
@@ -49,7 +52,11 @@ export async function mountSettingsCategory({ container }) {
     let alive = true;
     let ready = false;
     let kept = 0;
-    const enable = () => { field.disabled = !ready || savingCafeSettings(); };
+    const show = () => { field.value = String(draftContainer() ?? writtenContainer() ?? kept); };
+    const enable = () => {
+        field.disabled = !ready || savingCafeSettings();
+        if (!field.disabled) show();
+    };
     const unwatch = watchCafeSaving(enable);
 
     const keep = value => {
@@ -75,7 +82,6 @@ export async function mountSettingsCategory({ container }) {
     try {
         await cafeSettingsSettled();
         kept = containerWeight(await readCafe(CONTAINER_KEY));
-        field.value = String(draftContainer() ?? kept);
         ready = true;
         enable();
         if (numpad) {

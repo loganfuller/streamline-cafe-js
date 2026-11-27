@@ -52,6 +52,11 @@ export function watchCafeSaving(watcher) {
     return () => watchers.delete(watcher);
 }
 
+/** The weight last written from this visit to Settings, or null. */
+export function writtenContainer() {
+    return written;
+}
+
 /** The visit to Settings now open: a Save handler reads it when Save is tapped. */
 export function cafeSettingsVisit() {
     return visit;

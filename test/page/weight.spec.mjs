@@ -943,6 +943,62 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         await leaveBy(cafe, '#cancel-settings-btn');
     });
 
+    test('a read of the setting overtaken by a Save\'s write shows what the Save wrote', async ({ cafe, fake }) => {
+        // The legacy module asks which skin is the default, which the fake does not keep.
+        fake.refuse({ method: 'GET', path: /\/webui\/skins\/default/, status: 404 });
+        setContainer(fake, 350);
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 400);
+        await page.locator('#quickadjustments-btn').click();
+        const lookAhead = page.locator('[data-setting="weightFlowMultiplier"]');
+        await expect(lookAhead).toBeVisible();
+        await cafe.settle();
+        const after = String(Number((Number(await lookAhead.inputValue()) + 0.1).toFixed(1)));
+        await page.locator('[data-adjust="weightFlowMultiplier"][data-delta="0.1"]').click();
+        await expect(lookAhead).toHaveValue(after);
+
+        // Streamline's write of its own setting, which the fake has no answer for, held and answered as Decaid would.
+        let settingsArrived;
+        let answerSettings;
+        const settingsReached = new Promise(resolve => { settingsArrived = resolve; });
+        const settingsAnswered = new Promise(resolve => { answerSettings = resolve; });
+        const stopSettings = cafe.routes.intercept(request => request.method === 'POST' && request.path === '/api/v1/settings', async () => {
+            settingsArrived();
+            await settingsAnswered;
+            return { status: 200, body: {} };
+        });
+        await page.locator('#save-settings-btn').click();
+        await settingsReached;
+        stopSettings();
+
+        // A legacy page takes the page over, so the Save stays on Settings; then the Cafe page, whose read
+        // of the weight is answered as it stood, after the Save's write.
+        await page.locator('#sub-categories-panel .settings-subnav-btn[data-category="flush"]').click();
+        await expect(page.locator('#flushTempInput')).toBeVisible();
+        let readArrived;
+        let answerRead;
+        const readReached = new Promise(resolve => { readArrived = resolve; });
+        const readAnswered = new Promise(resolve => { answerRead = resolve; });
+        const stopRead = cafe.routes.intercept(request => request.method === 'GET' && request.path === CONTAINER_STORE, async ({ forward }) => {
+            const stale = forward();
+            readArrived();
+            await readAnswered;
+            return stale;
+        });
+        await page.locator('#cafe-btn').click();
+        await readReached;
+        stopRead();
+        answerSettings();
+        await expect.poll(() => kept(fake), { message: 'the Save writes the weight' }).toBe(400);
+        answerRead();
+        await expect(setting(page)).toBeEnabled();
+        await expect(setting(page), 'what the Save wrote, not the read it overtook').toHaveValue('400');
+        await cafe.settle();
+        await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
+        await leaveBy(cafe, '#cancel-settings-btn');
+    });
+
     test('where the numpad is not used the setting is typed, and what is no weight is kept as 0', async ({ cafe, fake }) => {
         setContainer(fake, 350);
         await cafe.open({ before: () => { window._forceNumpadMobile = false; } });
