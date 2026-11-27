@@ -763,6 +763,37 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         expect(kept(fake)).toBe(350);
     });
 
+    test('a weight confirmed on the numpad after its decimal key is that weight, not 0', async ({ cafe, fake }) => {
+        setContainer(fake, 200);
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await setting(page).click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
+        for (const digit of '350') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
+        await page.locator('.numpad-modal-numpad-btn[data-action="decimal"]').click();
+        await page.locator('#numpad-confirm').click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+        await expect(setting(page)).toHaveValue('350');
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(350);
+    });
+
+    test('where the setting can\'t be read, a change not yet saved is still shown', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        await page.locator('#quickadjustments-btn').click();
+        await expect(setting(page)).toHaveCount(0);
+        await cafe.settle();
+        fake.refuse({ method: 'GET', path: /\/store\/streamlineCafe\/batchContainerWeight/, status: 500, times: 1 });
+        await page.locator('#cafe-btn').click();
+        await expect(setting(page)).toBeVisible();
+        await cafe.settle();
+        await expect(page.getByText('Could not read the container\'s weight')).toBeVisible();
+        await expect(setting(page), 'what Save will write').toHaveValue('350');
+        await leaveBy(cafe, '#cancel-settings-btn');
+    });
+
     test('a Save Decaid refuses stays on Settings and says so, the weight still as changed, and can be tried again', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         await openCafeSettings(cafe);

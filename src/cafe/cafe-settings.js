@@ -89,6 +89,7 @@ export async function mountSettingsCategory({ container }) {
             field.readOnly = true;
         }
     } catch (error) {
+        if (draftContainer() != null || writtenContainer() != null) show();
         logger.warn('Cafe: could not read the batch container\'s weight', error);
         showToast(cafeText('Could not read the container\'s weight'), 4000, 'error');
     }

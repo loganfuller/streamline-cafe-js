@@ -49,7 +49,7 @@ export const MAX_TYPED = 100_000;
 export const MAX_CONTAINER = 20_000;
 
 const whole = (value, most) => {
-    const number = typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim()) ? Number(value) : value;
+    const number = typeof value === 'string' && /^\d+(\.\d*)?$/.test(value.trim()) ? Number(value) : value;
     if (typeof number !== 'number' || !Number.isFinite(number) || number < 0) return null;
     return Math.min(most, Math.round(number));
 };

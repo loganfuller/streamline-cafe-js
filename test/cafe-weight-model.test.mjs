@@ -17,6 +17,7 @@ test('the container\'s weight is whole grams from 0 to 20 000, and 0 for a table
     assert.equal(containerWeight(undefined), 0);
     assert.equal(containerWeight(350), 350);
     assert.equal(containerWeight('350'), 350, 'as typed into the setting');
+    assert.equal(containerWeight('350.'), 350, 'confirmed on the numpad after its decimal key');
     assert.equal(containerWeight(349.6), 350, 'whole grams');
     assert.equal(containerWeight(25_000), 20_000, 'kept at the most');
     assert.equal(containerWeight(-5), 0);
@@ -33,6 +34,8 @@ test('what is typed is whole grams up to 100 000, and nothing typed is no weight
     assert.equal(typedGrams('3240'), 3240);
     assert.equal(typedGrams('0'), 0, 'zero is typed, not empty');
     assert.equal(typedGrams('3240.6'), 3241, 'the numpad\'s decimal key: whole grams');
+    assert.equal(typedGrams('3240.'), 3240, 'the decimal key with nothing after it');
+    assert.equal(typedGrams('.'), null);
     assert.equal(typedGrams('100000'), 100_000);
     assert.equal(typedGrams('100001'), 100_000, 'nothing above the most');
     assert.equal(typedGrams('999999'), 100_000);
