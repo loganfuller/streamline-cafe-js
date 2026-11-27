@@ -70,6 +70,7 @@ async function lookAgain(cafe, event = 'streamline:mainpagevisible') {
 }
 
 test.describe('a finished batch', { tag: '@finished' }, () => {
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
     test('a card whose recipe names an archived batch is red, loaded and not, and the others are as they were', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         const { bean, ...look } = await cardLook(page, house.slot);
@@ -102,30 +103,30 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
     test('the batch under Dose is red while the Workflow names an archived batch, with no recipe loaded and with one', async ({ cafe, fake }) => {
         const page = await openPage(cafe);
         const plain = (await colours(dose(page))).text;
-        await expect(dose(page)).toHaveText('Sample Single Origin · roasted Oct 28');
+        await expect(dose(page)).toHaveText('Sample Single Origin · 21 d since roast');
         await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · roasted Oct 28');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · 21 d since roast');
 
         // The Workflow the page starts on names the single origin's batch.
         archive(fake, single.name);
         await lookAgain(cafe);
         expect(loadedId(fake), 'no recipe is loaded').toBe(null);
         await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
-        await expect(dose(page), 'still named').toHaveText('Sample Single Origin · roasted Oct 28');
+        await expect(dose(page), 'still named').toHaveText('Sample Single Origin · 21 d since roast');
         expect((await colours(dose(page))).text).toBe(await red(page));
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · roasted Oct 28 Batch finished');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · 21 d since roast Batch finished');
         await expect(page.locator('#cafe-dose-finished'), 'no new text is shown').toHaveCSS('width', '1px');
         await expect.poll(() => redSlots(page), 'and the cards of its recipes, in slots 2, 7 and 9').toEqual([single.slot, guest.slot, filter.slot]);
 
         await load(cafe, single);
         await expect(dose(page), 'with its recipe loaded').toHaveClass(/cafe-batch-finished/);
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · roasted Oct 28 Batch finished');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Single Origin · 21 d since roast Batch finished');
 
         await load(cafe, decaf);
-        await expect(dose(page)).toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page)).toHaveText('Example Decaf · 29 d since roast');
         await expect(dose(page), 'a batch that is not archived').not.toHaveClass(/cafe-batch-finished/);
         expect((await colours(dose(page))).text).toBe(plain);
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Example Decaf · roasted Oct 20');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose Example Decaf · 29 d since roast');
     });
 
     test('no batch, and a batch the tablet has no record of, are not red', async ({ cafe, fake }) => {
@@ -159,13 +160,13 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await lookAgain(cafe);
         await expect.poll(() => redSlots(page), 'back from a subpage').toEqual([house.slot, longBlack.slot]);
         await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
-        await expect(dose(page), 'the roast date stays').toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page), 'the roast date stays').toHaveText('SB-0211 · Sample Blend · 16 d since roast');
 
         archive(fake, house.name, false);
         await lookAgain(cafe, 'visibilitychange');
         await expect.poll(() => redSlots(page), 'back into view, the batch brought back').toEqual([]);
         await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Blend · roasted Nov 2');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose SB-0211 · Sample Blend · 16 d since roast');
     });
 
     test('a read of the batch that fails keeps the red', async ({ cafe, fake }) => {
@@ -178,7 +179,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await lookAgain(cafe);
         await expect.poll(() => redSlots(page)).toEqual([house.slot, longBlack.slot]);
         await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
         restore();
     });
 
@@ -257,7 +258,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await slow.reached;
         await expect(grinder, 'the grinder named while the batch is still read').toHaveText('Sample Burr Two');
         await expect(dose(page), 'the red stays meanwhile').toHaveClass(/cafe-batch-finished/);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
         slow.release();
         await cafe.advance(1000);
         await expect(dose(page)).toHaveClass(/cafe-batch-finished/);
@@ -279,7 +280,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await page.locator('#cafe-pick-confirm-use').click();
         await untilPickClosed(cafe);
         await expect(dose(page), 'at once').not.toHaveClass(/cafe-batch-finished/);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Oct 15');
+        await expect(dose(page)).toHaveText('Sample Blend · 34 d since roast');
         await cafe.advance(1500);
         await expect.poll(() => redSlots(page), 'the recipe\'s record still names the archived batch').toEqual([house.slot, longBlack.slot]);
 
@@ -293,7 +294,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
         await page.locator('#cafe-pick-confirm-use').click();
         await untilPickClosed(cafe);
         await cafe.advance(1500);
-        await expect(dose(page)).toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page)).toHaveText('Example Decaf · 29 d since roast');
         await expect(dose(page)).not.toHaveClass(/cafe-batch-finished/);
         await expect.poll(() => redSlots(page), 'the loaded recipe\'s card is no longer red; the other recipe\'s is').toEqual([longBlack.slot]);
         await expect(card(page, house.slot)).toHaveAttribute('aria-pressed', 'true');
@@ -389,6 +390,7 @@ test.describe('a finished batch', { tag: '@finished' }, () => {
 // itself with `fake.decentSync.push(frame)`.
 test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '@finished' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     const BATCH_READ = /^GET \/api\/v1\/bean-batches\//;
     const batchReadsSince = (cafe, mark) => cafe.since(mark).map(entry => `${entry.method} ${entry.path}`).filter(line => BATCH_READ.test(line));
@@ -412,7 +414,7 @@ test.describe('a batch Decent Sync\'s plugin archived or brought back', { tag: '
         await pushed(cafe, houseBatch);
         await expect.poll(() => redSlots(page), 'the cards of its two recipes').toEqual([house.slot, longBlack.slot]);
         await expect(dose(page), 'and the batch under Dose').toHaveClass(/cafe-batch-finished/);
-        await expect(dosePick(page)).toHaveAccessibleName('Dose Sample Blend · roasted Nov 2 Batch finished');
+        await expect(dosePick(page)).toHaveAccessibleName('Dose SB-0211 · Sample Blend · 16 d since roast Batch finished');
         expect(new Set(batchReadsSince(cafe, mark)), 'only that batch is read').toEqual(new Set([`GET /api/v1/bean-batches/${houseBatch}`]));
 
         archive(fake, house.name, false);

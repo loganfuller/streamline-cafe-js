@@ -320,7 +320,7 @@ test.describe('the picks with Decent Sync', { tag: '@real-sync-picks' }, () => {
                 const row = await recordFor(sync.second, id);
                 return { batch: recordBatch(row), name: row?.name };
             }, { message: 'and the second tablet\'s, by its own batch', timeout: 60_000 }).toEqual({ batch: String(decafThere.id), name: renamed });
-            await expect(second.locator('#cafe-dose-desc'), 'the second tablet names the new Bean under Dose, with no tap').toHaveText(/^Example Decaf · roasted/, { timeout: 90_000 });
+            await expect(second.locator('#cafe-dose-desc'), 'the second tablet names the new Bean under Dose, with no tap').toHaveText(/^(?:\S+ · )?Example Decaf · \d+ d since roast$/, { timeout: 90_000 });
             expect(await selectedOn(sync.second), 'the Recipe still loaded there').toBe(String(there.id));
             await shoot(first, 'real-sync-other-bean-first-tablet');
             await shoot(second, 'real-sync-other-bean-second-tablet');
@@ -590,7 +590,7 @@ test.describe('a batch\'s QR code scanned with Decent Sync', { tag: '@real-sync-
             await page.locator('#cafe-pick-confirm-use').click();
             await pickClosed(page);
             await expect.poll(async () => (await sync.decaid('GET', '/workflow')).context.beanBatchId).toBe(mine.id);
-            await expect(page.locator('#cafe-dose-desc')).toHaveText(`${SCANNED_BEAN} · roasted Nov 12`);
+            await expect(page.locator('#cafe-dose-desc')).toHaveText(new RegExp(`^${LABEL_TEXT} · ${SCANNED_BEAN} · \\d+ d since roast$`));
             await shoot(page, 'real-scan-used');
         } finally {
             await sync.decaid('PUT', '/workflow', { context: { beanBatchId: before.beanBatchId ?? null, coffeeName: before.coffeeName ?? null, coffeeRoaster: before.coffeeRoaster ?? null } });

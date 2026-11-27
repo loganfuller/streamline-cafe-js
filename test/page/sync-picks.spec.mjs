@@ -97,6 +97,7 @@ async function openDialog(cafe, on) {
 
 test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     test('the grinder dialog says the choice is saved to the recipe, and a choice is one Workflow write, which the plugin saves into the record', async ({ cafe, fake }) => {
         const record = await houseLoaded(cafe);
@@ -164,7 +165,7 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
         await expect(under(page), 'a batch highlighted leaves the line on the bean').toHaveText(SAVED);
         await page.locator('#cafe-pick-confirm-use').click();
         await untilPickClosed(cafe);
-        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · roasted Oct 15');
+        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · 34 d since roast');
         await cafe.advance(2000);
         expect(workflowWrites(cafe.since(chose)), 'one write of the Workflow').toEqual([
             { write: 'PUT /api/v1/workflow', body: { context: { beanBatchId: older.id, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } },

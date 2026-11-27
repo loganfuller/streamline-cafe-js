@@ -39,30 +39,16 @@ test('with no recipe loaded, the page says so and what to do', () => {
     });
 });
 
-test('Dose, Yield and Grind name the bean, the basket and the grinder from the Workflow', () => {
-    const workflow = {
-        context: {
-            coffeeName: ' Sample Blend ', beanBatchId: 'batch-1', grinderModel: 'Sample Grinder',
-            extras: { basketName: '18 g sample basket' },
-        },
-    };
-    assert.deepEqual(dialInNames(workflow, { id: 'batch-1', roastDate: '2026-02-28T00:00:00Z' }), {
-        bean: 'Sample Blend', roastDay: '2026-02-28', basket: '18 g sample basket', grinder: 'Sample Grinder',
-    });
+test('Yield and Grind name the basket and the grinder from the Workflow', () => {
+    const workflow = { context: { coffeeName: 'Sample Blend', grinderModel: ' Sample Grinder ', extras: { basketName: '18 g sample basket' } } };
+    assert.deepEqual(dialInNames(workflow), { basket: '18 g sample basket', grinder: 'Sample Grinder' });
 });
 
 test('a Workflow that names nothing gives empty names, not placeholders', () => {
-    const empty = { bean: '', roastDay: null, basket: '', grinder: '' };
-    assert.deepEqual(dialInNames(null, null), empty);
-    assert.deepEqual(dialInNames({}, null), empty);
-    assert.deepEqual(dialInNames({ context: { coffeeName: null, grinderModel: 42, extras: null } }, null), empty);
-});
-
-test('the roast date is shown only for the batch the Workflow points at', () => {
-    const workflow = { context: { coffeeName: 'Sample Blend', beanBatchId: 'batch-2' } };
-    const other = { id: 'batch-1', roastDate: '2026-02-28T00:00:00Z' };
-    assert.equal(dialInNames(workflow, other).roastDay, null);
-    assert.equal(dialInNames({ context: { coffeeName: 'Sample Blend' } }, other).roastDay, null);
+    const empty = { basket: '', grinder: '' };
+    assert.deepEqual(dialInNames(null), empty);
+    assert.deepEqual(dialInNames({}), empty);
+    assert.deepEqual(dialInNames({ context: { grinderModel: 42, extras: null } }), empty);
 });
 
 test('the roast day is the calendar day in the record, whatever the tablet\'s time zone', () => {

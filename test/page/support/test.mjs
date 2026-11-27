@@ -13,6 +13,7 @@ import { test as base, expect } from 'playwright/test';
 import { createFakeDecaid } from '../../../fake-decaid/index.js';
 import { attach, recording } from './adapter.mjs';
 import { servePage, PAGE_ORIGIN } from './page-files.mjs';
+import { BATCH_CODE } from './sample-data.mjs';
 
 export { expect };
 
@@ -254,6 +255,10 @@ export const test = base.extend({
             ...(decentSync ? { decentSync: recording('decent-sync') } : {}),
             now: start, timeZone: timezoneId ?? 'UTC',
         });
+        const { beans, batches } = fake.library.state;
+        const bean = beans.find(entry => entry.name === BATCH_CODE.bean);
+        const coded = batches.find(entry => entry.beanId === bean.id && entry.roastDate.startsWith(BATCH_CODE.roastDay));
+        coded.extras = { ...coded.extras, decentSyncBatchCode: BATCH_CODE.code };
         await use(fake);
     },
     cafe: async ({ page, context, fake, start }, use) => {

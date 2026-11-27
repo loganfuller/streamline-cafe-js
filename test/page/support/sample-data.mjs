@@ -8,6 +8,13 @@ export const BEANS = [
     { roaster: 'Example Coffee Co', name: 'Example Decaf', roastDate: '2026-10-20T00:00:00Z' },
 ];
 
+// The page tests' Batch Code, which Decent Sync's plugin writes into Decaid's
+// record of a batch (`extras.decentSyncBatchCode`): the page tests' fake lays
+// it over the recorded batch of Sample Blend roasted on 2 November, so Dose
+// names one batch by its code and the others, which have none, without. The
+// real stack holds no code but where Decent Sync's plugin writes one.
+export const BATCH_CODE = { bean: 'Sample Blend', roastDay: '2026-11-02', code: 'SB-0211' };
+
 export const GRINDER = { model: 'Sample Grinder 64' };
 
 // The bean and batch dialog's: Sample Blend has a second batch, roasted before

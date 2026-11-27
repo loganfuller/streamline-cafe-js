@@ -64,14 +64,14 @@ test('the left list: each bean\'s name over its roaster and how many batches it 
     assert.deepEqual([unnamed.name, unnamed.detail], ['Unnamed', '1 batch'], 'no name and no roaster');
 });
 
-test('the right list: "Roasted" and the date over the days off roast, the Workflow\'s batch in use', () => {
+test('the right list: "Roasted" and the date over the days since the roast, the Workflow\'s batch in use', () => {
     const rows = batchRows(LIST[0], { beanBatchId: 'b-house-old' }, TODAY, day, t);
     assert.deepEqual(rows.map(({ id, name, detail, inUse }) => ({ id, name, detail, inUse })), [
-        { id: 'b-house-new', name: 'Roasted day 2026-11-10', detail: '7 days off roast', inUse: false },
-        { id: 'b-house-old', name: 'Roasted day 2026-10-28', detail: '20 days off roast', inUse: true },
+        { id: 'b-house-new', name: 'Roasted day 2026-11-10', detail: '7 d since roast', inUse: false },
+        { id: 'b-house-old', name: 'Roasted day 2026-10-28', detail: '20 d since roast', inUse: true },
         { id: 'b-house-undated', name: 'No roast date', detail: '', inUse: false },
     ]);
-    assert.equal(batchRows(LIST[1], {}, TODAY, day, t)[0].detail, '1 day off roast');
+    assert.equal(batchRows(LIST[1], {}, TODAY, day, t)[0].detail, '1 d since roast');
     assert.deepEqual(batchRows(undefined, {}, TODAY, day, t), [], 'a bean not listed has no batches to show');
 });
 
@@ -87,22 +87,22 @@ test('a batch row says its Batch Code and what is left beside its roast date, an
     const [entry] = beanList([house], [coded, codeOnly, weightOnly, empty, plain, undatedCoded]);
     const rows = batchRows(entry, { beanBatchId: 'b-coded' }, TODAY, day, t);
     assert.deepEqual(rows.map(({ id, name, detail, inUse }) => ({ id, name, detail, inUse })), [
-        { id: 'b-coded', name: 'Roasted day 2026-11-10', detail: `SB-0211 · ${ltr('240 g')} left · 7 days off roast`, inUse: true },
-        { id: 'b-code-only', name: 'Roasted day 2026-11-05', detail: 'SB-0198 · 12 days off roast', inUse: false },
-        { id: 'b-weight-only', name: 'Roasted day 2026-11-01', detail: `${ltr('2.4 kg')} left · 16 days off roast`, inUse: false },
-        { id: 'b-empty', name: 'Roasted day 2026-10-28', detail: `${ltr('0 g')} left · 20 days off roast`, inUse: false },
-        { id: 'b-plain', name: 'Roasted day 2026-10-20', detail: '28 days off roast', inUse: false },
+        { id: 'b-coded', name: 'Roasted day 2026-11-10', detail: `SB-0211 · ${ltr('240 g')} left · 7 d since roast`, inUse: true },
+        { id: 'b-code-only', name: 'Roasted day 2026-11-05', detail: 'SB-0198 · 12 d since roast', inUse: false },
+        { id: 'b-weight-only', name: 'Roasted day 2026-11-01', detail: `${ltr('2.4 kg')} left · 16 d since roast`, inUse: false },
+        { id: 'b-empty', name: 'Roasted day 2026-10-28', detail: `${ltr('0 g')} left · 20 d since roast`, inUse: false },
+        { id: 'b-plain', name: 'Roasted day 2026-10-20', detail: '28 d since roast', inUse: false },
         { id: 'b-undated-coded', name: 'No roast date', detail: `SB-0150 · ${ltr('80 g')} left`, inUse: false },
     ]);
     assert.deepEqual(rows.map(row => row.details), [
-        ['SB-0211', `${ltr('240 g')} left`, '7 days off roast'], ['SB-0198', '12 days off roast'], [`${ltr('2.4 kg')} left`, '16 days off roast'],
-        [`${ltr('0 g')} left`, '20 days off roast'], ['28 days off roast'], ['SB-0150', `${ltr('80 g')} left`],
+        ['SB-0211', `${ltr('240 g')} left`, '7 d since roast'], ['SB-0198', '12 d since roast'], [`${ltr('2.4 kg')} left`, '16 d since roast'],
+        [`${ltr('0 g')} left`, '20 d since roast'], ['28 d since roast'], ['SB-0150', `${ltr('80 g')} left`],
     ], 'the parts of the second line, for the dialog to keep each to itself');
     assert.deepEqual(batchRows(beanList([house], [batch('b-bare', 'bean-house', null)])[0], {}, TODAY, day, t).map(row => [row.detail, row.details]), [['', []]],
         'no roast date, code or weight: no second line');
     assert.equal(batchUse(rows[1], null, null, t).note, 'Sample House Blend · Roasted day 2026-11-05', 'the note beside "Use this batch" keeps to the bean and the roast date');
     const translated = batchRows(entry, {}, TODAY, day, (phrase, vars) => `<${t(phrase, vars)}>`);
-    assert.equal(translated[0].detail, `SB-0211 · <${ltr('240 g')} left> · <7 days off roast>`, 'the weight goes through the phrase, and the code is not translated');
+    assert.equal(translated[0].detail, `SB-0211 · <${ltr('240 g')} left> · <7 d since roast>`, 'the weight goes through the phrase, and the code is not translated');
 });
 
 test('a Batch Code is the text under Decent Sync\'s key in the record\'s extras, and anything else is none', () => {
@@ -126,7 +126,7 @@ test('text kept left to right sits between the isolate marks, and none stays non
     assert.equal(leftToRight(''), '');
 });
 
-test('days off roast count calendar days, and a roast dated after today counts as none', () => {
+test('days since the roast count calendar days, and a roast dated after today counts as none', () => {
     assert.equal(daysOffRoast('2026-11-17', TODAY), 0);
     assert.equal(daysOffRoast('2026-10-31', TODAY), 17);
     assert.equal(daysOffRoast('2026-03-01', '2026-03-31'), 30, 'across a change of clocks, whole days');

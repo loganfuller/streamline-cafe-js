@@ -264,6 +264,7 @@ test.describe('the QR button', { tag: '@scan' }, () => {
 
 test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
     test.use({ decentSync: true });
+    test.use({ timezoneId: 'UTC' }); // the days since a roast are counted to the page's calendar day
 
     test('the decoder loads when the scan first opens, and the camera is asked for video alone', async ({ cafe, fake }) => {
         const page = await dialogOpen(cafe, [arriving(fake, 'one')]);
@@ -318,7 +319,7 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
             await expect(scanButton(page)).toBeVisible();
             expect(await highlightedBean(page), 'its Bean shown').toEqual(['Sample Blend']);
             const left = outcome === 'moved' ? ' · ⁦5.0 kg⁩ left' : '';
-            expect(await heldBatch(page), 'the lists read again, the batch highlighted').toEqual([{ name: 'Roasted Nov 12', detail: `${LABEL_TEXT}${left} · 6 days off roast` }]);
+            expect(await heldBatch(page), 'the lists read again, the batch highlighted').toEqual([{ name: 'Roasted Nov 12', detail: `${LABEL_TEXT}${left} · 6 d since roast` }]);
             await expect(useButton(page)).toBeEnabled();
             await expect(useButton(page)).toHaveText('Use this batch');
             await expect(page.locator('#cafe-pick-confirm-note')).toHaveText('Sample Blend · Roasted Nov 12');
@@ -365,7 +366,7 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         await cafe.advance(1000);
         expect(writes(cafe.since(mark))).toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { beanBatchId: ARRIVING, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } }]);
         expect(fake.workflow().context.beanBatchId).toBe(ARRIVING);
-        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · roasted Nov 12');
+        await expect(page.locator('#cafe-dose-desc')).toHaveText(`${LABEL_TEXT} · Sample Blend · 6 d since roast`);
     });
 
     test('"Use this batch" after a scan, with a recipe of another Bean loaded, saves the Bean onto the recipe and then writes the Workflow', async ({ cafe, fake }) => {
