@@ -100,12 +100,12 @@ async function pageText(page) {
 const LANGUAGES = {
     de: {
         text: { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', row: 'DAUER | ERSTER TROPFEN | ERTRAG | VERHÄLTNIS | SPITZENDRUCK' },
-        // Single origin's bean was roasted on 28 October.
-        roasted: /geröstet am 28\. Okt/,
+        // Single origin's batch was roasted on 28 October, 21 days before the page's today.
+        roasted: 'Sample Single Origin · 21 Tg. seit der Röstung',
     },
     ar: {
         text: { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', row: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' },
-        roasted: /حمص في/,
+        roasted: 'Sample Single Origin · 21 يوم منذ التحميص',
     },
 };
 
@@ -122,7 +122,7 @@ for (const [code, { text, roasted }] of Object.entries(LANGUAGES)) {
         const page = await openLoaded(cafe, fake, code);
         await expect(page.locator('#settings-btn')).toHaveText(text.settings);
         expect(await pageText(page)).toEqual(text);
-        await expect(page.locator('#cafe-dose-desc'), 'the roast date is in the language too').toHaveText(roasted);
+        await expect(page.locator('#cafe-dose-desc'), 'the days since the roast are in the language too').toHaveText(roasted);
         expect(await overflowing(page), 'no label overflows its place').toEqual([]);
         if (!SHRUNK_BELOW_14.has(code)) expect(await smallestLabel(page), 'no fitted label is shrunk below 14px').toBeGreaterThanOrEqual(14);
         expect(await page.evaluate(() => getComputedStyle(document.getElementById('main-page')).direction), 'the page is laid out left to right').toBe('ltr');

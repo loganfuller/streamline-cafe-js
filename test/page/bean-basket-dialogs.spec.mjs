@@ -59,6 +59,7 @@ const ltr = words => `\u2066${words}\u2069`;
 const batchRow = (page, n) => page.locator('#cafe-pick-list .cafe-pick-row').nth(n);
 const under = page => page.locator('#cafe-pick-under');
 const dose = page => page.locator('#cafe-dose-desc');
+const dosePick = page => page.locator('#cafe-dose-pick');
 const basket = page => page.locator('#cafe-yield-desc');
 // The button under the batches (#70): its words, whether it can be tapped, the
 // note beside it, "In use" in its place, and the batches highlighted.
@@ -108,7 +109,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         const page = await openPage(cafe);
         await load(cafe, house);
         const mark = cafe.fake.log.length;
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
         await expect(basket(page)).toHaveText(house.basket);
         for (const value of ['#dose-in-value', '#drink-out-value']) {
             await page.locator(value).click();
@@ -136,8 +137,8 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         expect(beans.map(b => `${b.name}: ${b.detail}`), 'the beans with a batch, by name, each over its roaster and its count of batches not archived')
             .toEqual(['Example Decaf: Example Coffee Co · 1 batch', 'Sample Blend: Sample Roasters · 2 batches', 'Sample Single Origin: Sample Roasters · 1 batch']);
         expect(beans.filter(b => b.highlighted).map(b => b.name), 'on the bean in use').toEqual(['Sample Blend']);
-        expect(await pickRows(page), 'that bean\'s batches not archived, newest roast first, each with its days off roast, the one in use marked').toEqual([
-            { name: 'Roasted Nov 2', detail: '16 days off roast', inUse: true },
+        expect(await pickRows(page), 'that bean\'s batches not archived, newest roast first, each with its Batch Code where it has one and its days off roast, the one in use marked').toEqual([
+            { name: 'Roasted Nov 2', detail: 'SB-0211 · 16 days off roast', inUse: true },
             { name: 'Roasted Oct 15', detail: '34 days off roast', inUse: false },
         ]);
         await expect(pickRow(page, 'Roasted Nov 2').locator('.cafe-pick-in-use')).toHaveText('In use');
@@ -245,7 +246,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await cafe.advance(3000);
         expect(cafe.since(mark, isWrite), 'nothing written, no record either').toEqual([]);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
     });
 
     test('a batch of the recipe\'s own bean is one write of the Workflow, and changes no record', async ({ cafe, fake }) => {
@@ -256,7 +257,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await openDialog(cafe, DOSE);
         await useBatch(cafe, null, 1);
-        await expect(dose(page), 'Dose names the bean with the new batch\'s roast date').toHaveText('Sample Blend · roasted Oct 15');
+        await expect(dose(page), 'Dose names the bean with the new batch\'s roast date').toHaveText('Sample Blend · 34 d since roast');
         await cafe.advance(2000);
         expect(writes(cafe.since(mark)), 'one write, of the bean\'s name, its roaster and the batch\'s id').toEqual([
             { write: 'PUT /api/v1/workflow', body: { context: { beanBatchId: old.id, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } },
@@ -277,7 +278,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await openDialog(cafe, DOSE);
         await useBatch(cafe, 'Example Decaf', 0);
-        await expect(dose(page)).toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page)).toHaveText('Example Decaf · 29 d since roast');
         await cafe.advance(1500);
 
         const context = { beanBatchId: decaf.id, coffeeName: 'Example Decaf', coffeeRoaster: 'Example Coffee Co' };
@@ -350,7 +351,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await openDialog(cafe, DOSE);
         await useBatch(cafe, 'Example Decaf', 0);
-        await expect(dose(page)).toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page)).toHaveText('Example Decaf · 29 d since roast');
         await cafe.advance(1500);
         await openDialog(cafe, YIELD);
         await pickRow(page, '20 g sample basket').click();
@@ -362,17 +363,17 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await page.evaluate(() => document.dispatchEvent(new Event('streamline:mainpagevisible')));
         await cafe.advance(1500);
-        await expect(dose(page), 'after the page looks again').toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page), 'after the page looks again').toHaveText('Example Decaf · 29 d since roast');
         await expect(basket(page)).toHaveText('20 g sample basket');
         const again = await cafe.another();
-        await expect(again.locator('#cafe-dose-desc'), 'on a page opened afresh').toHaveText('Example Decaf · roasted Oct 20');
+        await expect(again.locator('#cafe-dose-desc'), 'on a page opened afresh').toHaveText('Example Decaf · 29 d since roast');
         await expect(again.locator('#cafe-yield-desc')).toHaveText('20 g sample basket');
         await again.close();
 
         await load(cafe, decafRecipe);
         await load(cafe, house);
         expect(fake.workflow().context).toMatchObject({ beanBatchId: decaf.id, coffeeName: 'Example Decaf' });
-        await expect(dose(page)).toHaveText('Example Decaf · roasted Oct 20');
+        await expect(dose(page)).toHaveText('Example Decaf · 29 d since roast');
         await expect(basket(page), 'the recipe\'s own basket').toHaveText(house.basket);
     });
 
@@ -455,7 +456,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await cafe.advance(2000);
         const beanWrites = cafe.since(mark, entry => isRecordWrite(entry) || (entry.method === 'PUT' && entry.path === '/api/v1/workflow' && 'beanBatchId' in (entry.body?.context || {})));
         expect(beanWrites, 'no bean written, and no record').toEqual([]);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
     });
 
     // The sample data leaves the machine with no recipe loaded, on Sample
@@ -470,7 +471,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         await openDialog(cafe, DOSE);
         await expect(under(page)).toHaveText('No recipe loaded · changes this machine only');
         await useBatch(cafe, 'Sample Blend', 0);
-        await expect(dose(page)).toHaveText('Sample Blend · roasted Nov 2');
+        await expect(dose(page)).toHaveText('SB-0211 · Sample Blend · 16 d since roast');
         await openDialog(cafe, YIELD);
         await expect(under(page)).toHaveText('No recipe loaded · changes this machine only');
         await cafe.screenshot('basket-dialog-no-recipe-light');
@@ -500,6 +501,44 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
     test.describe('at 1340 by 800', () => {
         test.use({ viewport: { width: 1340, height: 800 } });
+
+        // Dose's line stays one line: a bean's name too long for the column is
+        // the part shortened, with an ellipsis, and the Batch Code and the days
+        // since the roast show whole.
+        test('a bean\'s name too long for Dose\'s line ends in an ellipsis, and the Batch Code and the days show whole', async ({ cafe, fake }) => {
+            const long = 'Sample Single Origin From A Farm With A Name Far Too Long For The Column';
+            const { context } = fake.workflow();
+            fake.given({ workflow: { ...fake.workflow(), context: { ...context, coffeeName: long, beanBatchId: blendNew(fake).id } } });
+            const page = await openPage(cafe);
+            await expect(dose(page)).toHaveText(`SB-0211 · ${long} · 16 d since roast`);
+            await expect(dosePick(page)).toHaveAccessibleName(`Dose SB-0211 · ${long} · 16 d since roast`);
+            const parts = await dose(page).evaluate(line => {
+                const box = line.getBoundingClientRect();
+                return {
+                    line: { wraps: line.scrollHeight > line.clientHeight, right: Math.round(box.right) },
+                    parts: [...line.children].map(part => {
+                        const style = getComputedStyle(part);
+                        return {
+                            text: part.textContent,
+                            cut: part.scrollWidth > part.clientWidth,
+                            ellipsis: style.textOverflow,
+                            right: Math.round(part.getBoundingClientRect().right),
+                            top: Math.round(part.getBoundingClientRect().top - box.top),
+                        };
+                    }),
+                };
+            });
+            expect(parts.line.wraps, 'one line').toBe(false);
+            expect(parts.parts.map(({ text, cut }) => ({ text, cut }))).toEqual([
+                { text: 'SB-0211 · ', cut: false },
+                { text: long, cut: true },
+                { text: ' · 16 d since roast', cut: false },
+            ]);
+            expect(parts.parts[1].ellipsis, 'the name ends in an ellipsis').toBe('ellipsis');
+            expect(parts.parts.map(part => part.top), 'all on the line').toEqual([0, 0, 0]);
+            expect(parts.parts[2].right, 'the days end inside the line').toBeLessThanOrEqual(parts.line.right);
+            await cafe.screenshot('dose-long-bean-1340-light');
+        });
 
         // With a batch highlighted, "Use this batch" and the note beside it fit
         // the dialog in English and every language Streamline has finished (#70).

@@ -365,7 +365,7 @@ test.describe('scanning a batch\'s QR code', { tag: '@scan' }, () => {
         await cafe.advance(1000);
         expect(writes(cafe.since(mark))).toEqual([{ write: `PUT ${WORKFLOW}`, body: { context: { beanBatchId: ARRIVING, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } }]);
         expect(fake.workflow().context.beanBatchId).toBe(ARRIVING);
-        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · roasted Nov 12');
+        await expect(page.locator('#cafe-dose-desc')).toHaveText(`${LABEL_TEXT} · Sample Blend · 6 d since roast`);
     });
 
     test('"Use this batch" after a scan, with a recipe of another Bean loaded, saves the Bean onto the recipe and then writes the Workflow', async ({ cafe, fake }) => {

@@ -60,17 +60,10 @@ export function roastDay(roastDate) {
     return match ? match[1] : null;
 }
 
-/**
- * What Dose, Yield and Grind name, from the Workflow: the bean and its roast
- * day, the basket and the grinder. `batch` is the Bean Batch the Workflow
- * points at, and is ignored when it is another batch's record.
- */
-export function dialInNames(workflow, batch) {
+/** What Yield and Grind name, from the Workflow: the basket and the grinder. */
+export function dialInNames(workflow) {
     const context = (workflow && workflow.context) || {};
-    const sameBatch = batch && context.beanBatchId && batch.id === context.beanBatchId;
     return {
-        bean: text(context.coffeeName),
-        roastDay: sameBatch ? roastDay(batch.roastDate) : null,
         basket: text(context.extras && context.extras.basketName),
         grinder: text(context.grinderModel),
     };

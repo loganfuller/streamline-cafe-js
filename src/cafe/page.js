@@ -13,11 +13,12 @@ import { isSubPage } from '../modules/router.js';
 import { logger } from '../modules/logger.js';
 import { grindNumber } from './grind-text.js';
 import { pageHeading, pickSubtitle, dialInNames, liveWeightText, stepSteamFlow } from './page-model.js';
+import { doseNames, doseLine } from './dose-model.js';
 import { workflowFinished } from './finished-batch.js';
 import { decentSyncSaves, scanOffered } from './sync-status.js';
 import { askStatus, onStatus, onBatchPush, reportPage, scanBatch } from './decent-sync.js';
 import { createPendingWrite } from './pending-write.js';
-import { cafeText, formatRoastDay, setText } from './text.js';
+import { cafeText, setText, todayHere } from './text.js';
 import { openGrinderDialog } from './grinder-dialog.js';
 import { openBeanDialog } from './bean-dialog.js';
 import { openBasketDialog } from './basket-dialog.js';
@@ -39,7 +40,8 @@ const SETTLE_MAX_MS = 3000; // the longest a recipe load waits for an earlier ed
 let recipe = null;
 let saved = false;      // Decent Sync saves this Machine's dial-in onto its loaded recipe
 let scans = false;      // Decent Sync's plugin can be asked which batch a scanned QR code is
-let names = { bean: '', roastDay: null, basket: '', grinder: '' };
+let dose = { code: '', bean: '', days: null };
+let names = { basket: '', grinder: '' };
 let barista = '';       // the Workflow's barista, as last read or written: '' for none
 let batch = null;       // the Bean Batch last read, kept while the Workflow still points at it
 let batchId = null;     // the batch the Workflow named, as last read
@@ -118,17 +120,27 @@ function showStatus(answer) {
 
 // ── What the dial-in rows name ───────────────────────────────────────────────
 
+function renderDose() {
+    const line = el('cafe-dose-desc');
+    if (!line) return;
+    line.replaceChildren(...doseLine(dose, cafeText).map(part => {
+        const span = document.createElement('span');
+        span.className = part.shrinks ? 'cafe-dose-shrinks' : 'cafe-dose-whole';
+        span.textContent = part.text;
+        return span;
+    }));
+    line.classList.toggle('cafe-batch-finished', finished);
+}
+
 function renderNames() {
-    const roasted = names.roastDay ? cafeText('roasted {date}', { date: formatRoastDay(names.roastDay) }) : '';
-    setText(el('cafe-dose-desc'), [names.bean, roasted].filter(Boolean).join(' · '));
-    el('cafe-dose-desc')?.classList.toggle('cafe-batch-finished', finished);
+    renderDose();
     const said = el('cafe-dose-finished');
     if (said) said.hidden = !finished;
     setText(el('cafe-yield-desc'), names.basket);
     setText(el('cafe-grind-desc'), names.grinder);
 }
 
-/** Read the Workflow again, and with it the barista, bean, roast date, basket and grinder. */
+/** Read the Workflow again, and with it the barista, bean, batch, basket and grinder. */
 export async function refreshNames() {
     const seq = ++namesSeq;
     const paintBarista = lookBarista();
@@ -149,7 +161,8 @@ export async function refreshNames() {
         // keeps the record of the same batch.
         if (batch && batch.id !== batchId) batch = null;
         finished = workflowFinished(workflow, batch);
-        names = dialInNames(workflow, batch);
+        dose = doseNames(workflow, batch, todayHere());
+        names = dialInNames(workflow);
         renderNames();
         let read = batch;
         try {
@@ -163,7 +176,8 @@ export async function refreshNames() {
         batch = read;
     }
     finished = workflowFinished(workflow, batch);
-    names = dialInNames(workflow, batch);
+    dose = doseNames(workflow, batch, todayHere());
+    names = dialInNames(workflow);
     renderNames();
 }
 

@@ -164,7 +164,7 @@ test.describe('the picks with Decent Sync serving', { tag: '@sync-picks' }, () =
         await expect(under(page), 'a batch highlighted leaves the line on the bean').toHaveText(SAVED);
         await page.locator('#cafe-pick-confirm-use').click();
         await untilPickClosed(cafe);
-        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · roasted Oct 15');
+        await expect(page.locator('#cafe-dose-desc')).toHaveText('Sample Blend · 34 d since roast');
         await cafe.advance(2000);
         expect(workflowWrites(cafe.since(chose)), 'one write of the Workflow').toEqual([
             { write: 'PUT /api/v1/workflow', body: { context: { beanBatchId: older.id, coffeeName: 'Sample Blend', coffeeRoaster: 'Sample Roasters' } } },

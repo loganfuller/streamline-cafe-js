@@ -76,7 +76,7 @@ const shown = page => page.evaluate(() => {
 });
 
 /** What the page should show of a record loaded, read off the record itself. */
-const showing = (record, roasted) => {
+const showing = (record, sinceRoast) => {
     const dv = record.dashboardVariables;
     return {
         title: record.name,
@@ -89,7 +89,7 @@ const showing = (record, roasted) => {
         flush: `${dv.flushS}s`,
         steamFlow: String(dv.steamFlowMls),
         hotWater: `${dv.hotWaterMl}ml`,
-        doseDesc: `${record.beanName} · roasted ${roasted}`,
+        doseDesc: `${record.beanName} · ${sinceRoast}`,
         yieldDesc: dv.basketName,
         grindDesc: dv.grinderModel,
         profile: record.profileTitle,
@@ -308,8 +308,8 @@ test.describe('the strip', { tag: '@strip' }, () => {
 
         await expect(card(page, single.slot), 'its card is filled').toHaveAttribute('aria-pressed', 'true');
         await expect(pressed(page), 'and no other').toHaveCount(1);
-        // The sample data's batch of Sample Single Origin was roasted on 28 October.
-        expect(await shown(page), 'the heading and each row, read off the record').toEqual(showing(record, 'Oct 28'));
+        // The sample data's batch of Sample Single Origin was roasted on 28 October, and has no Batch Code.
+        expect(await shown(page), 'the heading and each row, read off the record').toEqual(showing(record, '21 d since roast'));
         expect(fake.workflow(), 'the Workflow is the record\'s').toEqual(workflowOf(record, machine));
         const { context } = fake.workflow();
         const dv = record.dashboardVariables;

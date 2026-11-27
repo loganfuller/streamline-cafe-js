@@ -10,6 +10,7 @@ import { gateScreen, GATE_REASONS } from '../src/cafe/dye2-gate.js';
 import { pageHeading, pickSubtitle } from '../src/cafe/page-model.js';
 import { GRINDER_PHRASES } from '../src/cafe/grinder-model.js';
 import { BEAN_PHRASES } from '../src/cafe/bean-model.js';
+import { DOSE_PHRASES } from '../src/cafe/dose-model.js';
 import { SCAN_PHRASES } from '../src/cafe/scan-model.js';
 import { WEIGHT_PHRASES } from '../src/cafe/weight-model.js';
 import { BASKET_PHRASES } from '../src/cafe/basket-model.js';
@@ -120,6 +121,8 @@ function usedKeys() {
     for (const phrase of Object.values(GRINDER_PHRASES)) keys.add(phrase);
     // And what the bean and batch dialog's rows, and the basket dialog's, say.
     for (const phrase of Object.values(BEAN_PHRASES)) keys.add(phrase);
+    // And the line under Dose.
+    for (const phrase of Object.values(DOSE_PHRASES)) keys.add(phrase);
     // And the scan of a batch's QR code, in the bean and batch dialog.
     for (const phrase of Object.values(SCAN_PHRASES)) keys.add(phrase);
     // And a batch's weight entered there, with the Settings page's Cafe category.
