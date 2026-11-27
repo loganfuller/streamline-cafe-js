@@ -9,6 +9,7 @@ test('route-only vendors and pages are absent from the startup preload list', ()
     const index = read('index.html');
     assert.doesNotMatch(index, /rel="preload"/);
     assert.doesNotMatch(index, /<script[^>]+(?:easymde|iro\.min)/);
+    assert.doesNotMatch(index, /jsQR/, 'the QR decoder loads when a scan first opens');
     assert.doesNotMatch(index, /<link[^>]+easymde\.min\.css/);
     assert.doesNotMatch(index, /<link[^>]+easymde-icons\.css/);
     assert.doesNotMatch(index, /<script[^>]+plotly-basic/);

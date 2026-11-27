@@ -65,6 +65,25 @@ export function decentSyncSaves(previous, answer) {
     return statusUnknown(answer) ? !!previous : false;
 }
 
+/**
+ * May the bean and batch dialog offer to scan a batch's QR code? Only where
+ * the plugin says both that it serves this Machine, which is then at a
+ * Location, and that it can match scanned text now (`scan`).
+ *
+ * - `{ served: true, scan: true, location }`: it may.
+ * - `{ served: true }` with no `scan`, or `scan: false`: a plugin from before
+ *   the request, or one connected to a server from before it. It may not.
+ * - any refusal, `unreachable` among them, and `null` for no Decent Sync
+ *   plugin: it may not. A scan is made as the server is asked, or not at all.
+ * - Decaid itself not answering (`{}`), or a plugin still loading: nothing was
+ *   said either way, so the last answer stands.
+ */
+export function scanOffered(previous, answer) {
+    if (!answer) return false;
+    if (answer.served === true) return answer.scan === true && answer.location != null && answer.location.id != null;
+    return answer.code === undefined ? !!previous : false;
+}
+
 /** Where a recipe's reference is kept. `unknown` until the Status request has said. */
 export const SOURCES = ['unknown', 'plugin', 'tablet'];
 

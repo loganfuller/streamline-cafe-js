@@ -9,6 +9,12 @@
 // `changeBean`'s (bean-changer.js), which takes its turn among the dial-in's
 // other writes. It writes nothing itself.
 //
+// On a Machine Decent Sync serves, whose plugin can match scanned text, the
+// dialog has a button that scans a batch's QR code (scan-view.js, "Scanning a
+// batch's QR code"): the plugin brings the batch to the Machine's Location,
+// and the lists are read again from Decaid with that batch highlighted, as if
+// tapped. The scan writes nothing to the Workflow: "Use this batch" does.
+//
 // With a recipe loaded, a batch of another bean than the recipe's own becomes
 // the recipe's bean, on every tablet: its DYE2 record first, then the Workflow.
 // A batch of the recipe's own bean, and any batch with no recipe loaded, is
@@ -18,7 +24,9 @@ import { getBeans, getBeanBatches, getBeanBatch, getWorkflow } from '../modules/
 import { selectableBeans } from '../modules/bean-selection.js';
 import { showToast } from '../modules/ui.js';
 import { logger } from '../modules/logger.js';
-import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle } from './bean-model.js';
+import { BEAN_PHRASES, listOf, beanList, openingBean, recipeBeanId, sameRecipeBean, beanRows, batchRows, batchUse, batchPick, beanSubtitle, batchCode } from './bean-model.js';
+import { SCAN_PHRASES } from './scan-model.js';
+import { startScan } from './scan-view.js';
 import { writesRecord } from './bean-change.js';
 import { changeBean } from './bean-changer.js';
 import { choose } from './pick-dialog.js';
@@ -64,8 +72,11 @@ async function readBeans(recipe) {
  *   before a change describes the recipe before, so the dialog is not opened.
  * - `recipe()`: the loaded recipe's DYE2 record, or null.
  * - `saved()`: does Decent Sync save this Machine's dial-in onto it?
+ * - `scan()`: the function that asks Decent Sync's plugin which batch a
+ *   scanned QR code is, where the plugin can be asked, or null: the dialog
+ *   then has no scan button.
  */
-export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
+export async function openBeanDialog({ mayOpen, epoch, recipe, saved, scan = () => null }) {
     if (opening || !mayOpen()) return;
     opening = true;
     const at = epoch();
@@ -84,27 +95,58 @@ export async function openBeanDialog({ mayOpen, epoch, recipe, saved }) {
         // A shot may have started, or a recipe loaded, while they were read: the
         // batch in use read then may no longer be.
         if (!mayOpen() || epoch() !== at) return;
-        const context = workflow?.context || {};
-        const list = beanList(read.beans, read.batches) || [];
-        const own = recipeBeanId(loaded, read.batches, read.recipeBatch);
+        // What the lists are made from, read again after a scan.
+        let context;
+        let list;
+        let own;
+        const take = (beans, held) => {
+            read = beans;
+            context = held?.context || {};
+            list = beanList(read.beans, read.batches) || [];
+            own = recipeBeanId(loaded, read.batches, read.recipeBatch);
+        };
+        take(read, workflow);
         const isSaved = saved();
         const today = todayHere();
         const batchesOf = beanId => batchRows(list.find(entry => sameId(entry.bean.id, beanId)), context, today, formatRoastDay, cafeText);
-        const first = openingBean(list, context, read.batches);
-        const row = await choose({
-            title: BEAN_PHRASES.title,
-            subtitle: beanSubtitle(loaded, isSaved, first, own),
-            label: cafeText('Batches'),
+        // The two lists and the line under the title, with `beanId`'s batches on the right.
+        const lists = beanId => ({
+            subtitle: beanSubtitle(loaded, isSaved, beanId, own),
             heading: list.length ? BEAN_PHRASES.batchHeading : null,
-            rows: batchesOf(first),
-            empty: BEAN_PHRASES.empty,
+            rows: batchesOf(beanId),
             side: list.length ? {
                 heading: BEAN_PHRASES.beanHeading,
-                rows: beanRows(list, first, cafeText),
+                rows: beanRows(list, beanId, cafeText),
                 show: shown => ({ subtitle: beanSubtitle(loaded, isSaved, shown.id, own), rows: batchesOf(shown.id) }),
             } : null,
+        });
+        // The lists read again from Decaid, with the scanned batch's bean shown
+        // and the batch highlighted where one matched. Null where they can't
+        // be read, or do not hold that batch.
+        const reread = async match => {
+            try {
+                take(...await Promise.all([readBeans(loaded), getWorkflow()]));
+            } catch (error) {
+                logger.warn('Cafe: could not read the beans again after a scan', error);
+                return null;
+            }
+            if (!match) return lists(openingBean(list, context, read.batches));
+            const next = lists(match.beanId);
+            return next.rows.some(shown => shown.id === String(match.batchId)) ? { ...next, held: match.batchId } : null;
+        };
+        const ask = scan();
+        const row = await choose({
+            title: BEAN_PHRASES.title,
+            label: cafeText('Batches'),
+            empty: BEAN_PHRASES.empty,
+            ...lists(openingBean(list, context, read.batches)),
             // A tap on a batch highlights it; the button chooses it.
             confirm: { idle: cafeText('Use this batch'), use: batch => batchUse(batch, loaded, own, cafeText) },
+            // A batch's QR code scanned, the plugin asked, and the lists read again.
+            scan: ask ? {
+                name: SCAN_PHRASES.open,
+                open: stage => startScan(stage, { ask, reread, inUseCode: () => batchCode(read.batches.find(batch => sameId(batch?.id, context.beanBatchId))) }),
+            } : null,
         });
         if (!row) return; // closed
         // A recipe loaded, or its bean changed elsewhere, while the dialog was
