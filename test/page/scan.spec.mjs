@@ -640,7 +640,7 @@ test.describe('a scan that fails', { tag: '@scan' }, () => {
         await expect(scanPart(page)).toBeHidden();
         await page.locator(CLOSE).click();
         await expect(pickClosed(page)).toBeAttached();
-        await cafe.settle();
+        await cafe.advance(1000);
         await tapAt(page, DOSE);
         await expect(pickDialog(page)).toBeVisible();
         await cafe.settle();
