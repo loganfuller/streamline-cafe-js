@@ -7860,7 +7860,7 @@ export async function initializeSettings({ initialMainCategory = null, initialCa
         saveBtn.addEventListener('click', async () => {
             try {
                 await flushPendingChanges();
-                await saveCafeSettings();
+                if (!await saveCafeSettings()) return;
             } catch (error) {
                 console.error('Error saving settings:', error);
                 ui.showToast(`Failed to save settings: ${error.message}`, 5000, 'error');

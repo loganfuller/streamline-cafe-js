@@ -18,12 +18,18 @@ export function stageContainer(grams, kept) {
     container = grams === kept ? null : grams;
 }
 
-/** Write what was changed. Rejects where Decaid did not take it, and keeps the change. */
+/**
+ * Write what was changed. Answers whether nothing is left unsaved: false where
+ * the setting was changed again while it was being written, so Settings stays
+ * open with that change, as Streamline's Save does for its own. Rejects where
+ * Decaid did not take it, and keeps the change.
+ */
 export async function saveCafeSettings() {
-    if (container == null) return;
+    if (container == null) return true;
     const grams = container;
     await writeCafe(CONTAINER_KEY, grams);
     if (container === grams) container = null;
+    return container == null;
 }
 
 if (typeof document !== 'undefined') {

@@ -280,7 +280,7 @@ function bindShell(root) {
         try {
             await saveSettingsData();
             if (getSnapshot().dirty) return;
-            await saveCafeSettings();
+            if (!await saveCafeSettings()) return;
             ui.showToast('Settings updated', 3000, 'success');
             loadPage('index.html');
         } catch (error) {

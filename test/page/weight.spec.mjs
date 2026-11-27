@@ -17,6 +17,7 @@
 import { test, expect } from './support/test.mjs';
 import { pickDialog, pickClosed, pickRows, tapAt, isWrite, writes, paint, openPage, card, untilPickClosed } from './support/page-reads.mjs';
 import { recordOf } from './support/fake-reads.mjs';
+import { hold } from './support/faults.mjs';
 import { RECIPES } from './support/sample-data.mjs';
 import { SUPPORTED_LANGUAGES } from '../../src/modules/i18n-parser.js';
 import { CAFE_TRANSLATIONS } from '../../src/cafe/translations.js';
@@ -445,6 +446,38 @@ test.describe('Enter weight, the view', { tag: '@weight' }, () => {
         await expect(view(page)).toBeVisible();
     });
 
+    test('a weight saved after the dialog is closed mid-save and opened again is written after the first, and is the one kept', async ({ cafe, fake }) => {
+        Object.assign(blendNew(fake), { weight: 6000, weightRemaining: 3000 });
+        await cafe.open({ before: () => { window._forceNumpadMobile = false; } });
+        const { page } = cafe;
+        await openView(cafe);
+        await field(page).fill('1000');
+        const first = hold(cafe, { method: 'PUT', path: /^\/api\/v1\/bean-batches\// });
+        await save(page).click();
+        await first.reached;
+        await page.locator(CLOSE).click();
+        await expect(pickClosed(page)).toBeAttached();
+        // While the first write is held, the clock moves without waiting for its answer.
+        await page.clock.runFor(1000);
+        await tapAt(page, DOSE);
+        await expect(pickDialog(page)).toBeVisible();
+        await sideRow(page, 'Sample Blend').click();
+        await batchRow(page, 0).click();
+        await weigh(page).click();
+        await expect(field(page)).toBeEnabled();
+        await field(page).fill('2000');
+        const mark = fake.log.length;
+        await save(page).click();
+        await expect(save(page)).toBeDisabled();
+        const batchWritesOpen = () => page.evaluate(() => window.__cafeFetchesOpen().filter(open => open.startsWith('PUT ') && open.includes('/bean-batches/')).length);
+        expect(await batchWritesOpen(), 'the second write is not sent while the first is on its way').toBe(1);
+        expect(cafe.since(mark, entry => isWrite(entry) && /\/bean-batches\//.test(entry.path)), 'nor has Decaid had it').toEqual([]);
+        first.release();
+        await backOnLists(cafe);
+        expect(writes(cafe.since(mark)).filter(({ write }) => write.startsWith('PUT /api/v1/bean-batches/')).map(({ body }) => body)).toEqual([{ weightRemaining: 1000 }, { weightRemaining: 2000 }]);
+        expect(blendNew(fake).weightRemaining, 'the later weight is the one kept').toBe(2000);
+    });
+
     test('Back returns to the lists as they were, with nothing written', async ({ cafe, fake }) => {
         Object.assign(blendNew(fake), { weightRemaining: 2412 });
         const page = await openPage(cafe);
@@ -736,6 +769,28 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         expect(kept(fake)).toBeNull();
         await leaveBy(cafe, '#save-settings-btn');
         expect(kept(fake)).toBe(350);
+    });
+
+    test('a weight changed while Save is writing the last one stays on Settings with it, and the next Save writes it', async ({ cafe, fake }) => {
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        const writing = hold(cafe, { method: 'POST', path: /\/store\/streamlineCafe\/batchContainerWeight/ });
+        await page.locator('#save-settings-btn').click();
+        await writing.reached;
+        // Entered on the numpad while the write is held, without waiting for every answer.
+        await setting(page).click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeVisible();
+        for (const digit of '425') await page.locator(`.numpad-modal-numpad-btn[data-number="${digit}"]`).click();
+        await page.locator('#numpad-confirm').click();
+        await expect(page.locator('#numpad-modal-overlay')).toBeHidden();
+        writing.release();
+        await cafe.settle();
+        expect(kept(fake), 'the first Save wrote what it was given').toBe(350);
+        await expect(page.locator('#subpage-host #settings-content-area'), 'Settings stays').toBeVisible();
+        await expect(setting(page), 'with the later change').toHaveValue('425');
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(kept(fake)).toBe(425);
     });
 
     test('where the numpad is not used the setting is typed, and what is no weight is kept as 0', async ({ cafe, fake }) => {
