@@ -3,12 +3,7 @@
 // shows" and "The bean and batch dialog"). No browser global is touched: the
 // phrase goes through `t`, and the tablet's calendar day is handed in.
 import { roastDay } from './page-model.js';
-import { batchCode, daysOffRoast } from './bean-model.js';
-
-/** The phrases the line may say, for the translations test. */
-export const DOSE_PHRASES = {
-    days: '{days} d since roast',
-};
+import { batchCode, daysOffRoast, sinceRoastText } from './bean-model.js';
 
 const SEPARATOR = ' · ';
 
@@ -33,9 +28,8 @@ export function doseNames(workflow, batch, today) {
 
 /**
  * The line under Dose, in its parts, left out where empty: the Batch Code, the
- * bean's name and the days since the roast ("16 d since roast", which is
- * shorter than the bean and batch dialog's "16 days off roast" and needs no
- * singular), with " · " between them. Each separator
+ * bean's name and the days since the roast, in the bean and batch dialog's
+ * words ("16 d since roast"), with " · " between them. Each separator
  * goes with the code or the days, never with the bean's name, which is the
  * part shortened to fit, so neither is cut off with it. `shrinks` marks the
  * bean's name.
@@ -44,7 +38,7 @@ export function doseLine({ code, bean, days }, t) {
     const parts = [
         { text: code, shrinks: false },
         { text: bean, shrinks: true },
-        { text: days === null ? '' : t(DOSE_PHRASES.days, { days }), shrinks: false },
+        { text: sinceRoastText(days, t), shrinks: false },
     ].filter(part => part.text);
     return parts.map((part, index) => {
         if (part.shrinks) return part;

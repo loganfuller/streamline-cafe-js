@@ -386,7 +386,7 @@ button.cafe-card {
 
 /* A tall row is two lines: its name beside the stepper, and under both, across
    the row's whole width, what it is dialled for: the batch's code, the bean
-   and its days off roast, the basket, the grinder, the profile. */
+   and its days since the roast, the basket, the grinder, the profile. */
 .cafe-row-tall .cafe-row-label {
     gap: 8px;
 }
@@ -453,7 +453,7 @@ button.cafe-card {
 }
 
 /* Dose's line is one line, of which only the bean's name is shortened to fit:
-   the Batch Code and the days off roast, each with its " · ", show whole. */
+   the Batch Code and the days since the roast, each with its " · ", show whole. */
 #cafe-dose-desc {
     display: flex;
 }

@@ -16,7 +16,7 @@ const roasted = day => ({ roastDate: `${day}T00:00:00Z` });
 const line = (record, today = TODAY) => doseLine(doseNames(workflow, record, today), t);
 const said = (record, today) => line(record, today).map(part => part.text).join('');
 
-test('Dose names the Batch Code, the bean and the days off roast, with " · " between them', () => {
+test('Dose names the Batch Code, the bean and the days since the roast, with " · " between them', () => {
     assert.equal(said(batch({ ...coded, ...roasted('2026-11-02') })), 'SB-0211 · Sample Blend · 16 d since roast');
 });
 

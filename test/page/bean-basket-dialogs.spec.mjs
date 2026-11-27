@@ -137,9 +137,9 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         expect(beans.map(b => `${b.name}: ${b.detail}`), 'the beans with a batch, by name, each over its roaster and its count of batches not archived')
             .toEqual(['Example Decaf: Example Coffee Co · 1 batch', 'Sample Blend: Sample Roasters · 2 batches', 'Sample Single Origin: Sample Roasters · 1 batch']);
         expect(beans.filter(b => b.highlighted).map(b => b.name), 'on the bean in use').toEqual(['Sample Blend']);
-        expect(await pickRows(page), 'that bean\'s batches not archived, newest roast first, each with its Batch Code where it has one and its days off roast, the one in use marked').toEqual([
-            { name: 'Roasted Nov 2', detail: 'SB-0211 · 16 days off roast', inUse: true },
-            { name: 'Roasted Oct 15', detail: '34 days off roast', inUse: false },
+        expect(await pickRows(page), 'that bean\'s batches not archived, newest roast first, each with its Batch Code where it has one and its days since the roast, the one in use marked').toEqual([
+            { name: 'Roasted Nov 2', detail: 'SB-0211 · 16 d since roast', inUse: true },
+            { name: 'Roasted Oct 15', detail: '34 d since roast', inUse: false },
         ]);
         await expect(pickRow(page, 'Roasted Nov 2').locator('.cafe-pick-in-use')).toHaveText('In use');
         expect(await batchConfirm(page), 'the batch in use highlighted, and "In use" in the button\'s place').toEqual({
@@ -150,7 +150,7 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
         // A tap on another bean shows its batches, and chooses nothing.
         await sideRow(page, 'Sample Single Origin').click();
         await expect.poll(() => highlightedBean(page)).toEqual(['Sample Single Origin']);
-        expect(await pickRows(page)).toEqual([{ name: 'Roasted Oct 28', detail: '21 days off roast', inUse: false }]);
+        expect(await pickRows(page)).toEqual([{ name: 'Roasted Oct 28', detail: '21 d since roast', inUse: false }]);
         await expect(pickDialog(page)).toBeVisible();
         expect(await batchConfirm(page), 'no batch highlighted, and "Use this batch" shown but not to be tapped').toEqual({
             shown: true, use: 'Use this batch', enabled: false, note: null, inUse: false, held: [],
@@ -184,11 +184,11 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await openDialog(cafe, DOSE);
         expect(await pickRows(page), 'a code and a weight, both with the roast date; and a weight of zero').toEqual([
-            { name: 'Roasted Nov 2', detail: `SB-0211 · ${ltr('240 g')} left · 16 days off roast`, inUse: true },
-            { name: 'Roasted Oct 15', detail: `${ltr('0 g')} left · 34 days off roast`, inUse: false },
+            { name: 'Roasted Nov 2', detail: `SB-0211 · ${ltr('240 g')} left · 16 d since roast`, inUse: true },
+            { name: 'Roasted Oct 15', detail: `${ltr('0 g')} left · 34 d since roast`, inUse: false },
         ]);
         expect(await batchRow(page, 0).locator('.cafe-pick-row-detail bdi').allTextContents(), 'each part kept to itself, for Arabic and Hebrew')
-            .toEqual(['SB-0211', `${ltr('240 g')} left`, '16 days off roast']);
+            .toEqual(['SB-0211', `${ltr('240 g')} left`, '16 d since roast']);
         await cafe.screenshot('bean-dialog-code-weight-light');
 
         await batchRow(page, 1).click();
@@ -196,10 +196,10 @@ test.describe('the bean and batch dialog and the basket dialog', { tag: '@bean' 
 
         await sideRow(page, 'Sample Single Origin').click();
         await expect.poll(() => highlightedBean(page)).toEqual(['Sample Single Origin']);
-        expect(await pickRows(page), 'a code and no weight').toEqual([{ name: 'Roasted Oct 28', detail: 'SO-0042 · 21 days off roast', inUse: false }]);
+        expect(await pickRows(page), 'a code and no weight').toEqual([{ name: 'Roasted Oct 28', detail: 'SO-0042 · 21 d since roast', inUse: false }]);
         await sideRow(page, 'Example Decaf').click();
         await expect.poll(() => highlightedBean(page)).toEqual(['Example Decaf']);
-        expect(await pickRows(page), 'a weight in kilograms and no code').toEqual([{ name: 'Roasted Oct 20', detail: `${ltr('2.4 kg')} left · 29 days off roast`, inUse: false }]);
+        expect(await pickRows(page), 'a weight in kilograms and no code').toEqual([{ name: 'Roasted Oct 20', detail: `${ltr('2.4 kg')} left · 29 d since roast`, inUse: false }]);
         await cafe.screenshot('bean-dialog-kilograms-light');
 
         await page.locator(CLOSE).click();

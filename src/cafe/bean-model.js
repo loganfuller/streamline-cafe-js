@@ -30,8 +30,7 @@ export const BEAN_PHRASES = {
     oneBatch: '1 batch',
     batches: '{count} batches',
     roasted: 'Roasted {date}',
-    oneDay: '1 day off roast',
-    days: '{days} days off roast',
+    sinceRoast: '{days} d since roast',
     noRoastDate: 'No roast date',
     left: '{weight} left',
     unnamed: 'Unnamed',
@@ -157,6 +156,15 @@ export function daysOffRoast(day, today) {
 }
 
 /**
+ * Days since the roast (`daysOffRoast`) as a batch row and the line under Dose
+ * say them, "16 d since roast", the same for one day as for several, or ''
+ * for none.
+ */
+export function sinceRoastText(days, t) {
+    return days === null || days === undefined ? '' : t(BEAN_PHRASES.sinceRoast, { days });
+}
+
+/**
  * A batch's Batch Code, from Decaid's record of it, or '' where it has none:
  * the key absent, null, blank, or anything that is not text.
  */
@@ -188,7 +196,7 @@ export function leftToRight(words) {
 /**
  * The right list's rows, for one bean of `beanList`: "Roasted" and the date,
  * or "No roast date", over the batch's Batch Code, what is left of it and its
- * days off roast, each left out where the record has none, with the
+ * days since the roast, each left out where the record has none, with the
  * Workflow's own batch `inUse`. The weight goes into its phrase kept left to
  * right (`leftToRight`). The second line is `details`, its parts, and
  * `detail`, the same joined as the dialog shows them. `today` is the tablet's
@@ -201,8 +209,7 @@ export function batchRows(entry, context, today, formatDay, t) {
         const days = daysOffRoast(day, today);
         const weight = weightText(batch.weightRemaining);
         const left = weight ? t(BEAN_PHRASES.left, { weight: leftToRight(weight) }) : '';
-        const offRoast = days === null ? '' : days === 1 ? t(BEAN_PHRASES.oneDay) : t(BEAN_PHRASES.days, { days });
-        const details = [batchCode(batch), left, offRoast].filter(Boolean);
+        const details = [batchCode(batch), left, sinceRoastText(days, t)].filter(Boolean);
         return {
             id: String(batch.id),
             bean: entry.bean,
