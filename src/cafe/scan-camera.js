@@ -5,7 +5,7 @@
 // jsQR, on every platform, loaded when the scan first opens; the browser's
 // own detector is not used. What a reading means is scan-model.js's.
 import { loadQrDecoder } from '../modules/vendor-loader.js';
-import { SAMPLE_MS, sampleSize, cameraCount } from './scan-model.js';
+import { SAMPLE_MS, sampleSize, cameraCount, readText } from './scan-model.js';
 
 const media = () => (typeof navigator !== 'undefined' && navigator.mediaDevices) || null;
 
@@ -71,8 +71,8 @@ export function readCodes(video, onText, onError) {
         canvas.width = size.width;
         canvas.height = size.height;
         context.drawImage(video, 0, 0, size.width, size.height);
-        const code = decode(context.getImageData(0, 0, size.width, size.height).data, size.width, size.height, { inversionAttempts: 'dontInvert' });
-        if (code && typeof code.data === 'string') onText(code.data);
+        const text = readText(decode, context.getImageData(0, 0, size.width, size.height).data, size.width, size.height);
+        if (text !== null) onText(text);
     }, SAMPLE_MS);
     return () => {
         stopped = true;

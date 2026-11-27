@@ -243,3 +243,18 @@ export function sampleSize(width, height) {
     const scale = Math.min(1, SAMPLE_SIDE / Math.max(width, height));
     return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
+
+/**
+ * The text of the QR code in a frame's pixels, read by `decode` (jsQR's
+ * signature), or null where it finds none. A code is read dark on light or
+ * light on dark, as a sticker or a phone's screen may show it. A frame the
+ * decoder fails on, as jsQR does on some pictures, is a frame with no code.
+ */
+export function readText(decode, pixels, width, height) {
+    try {
+        const code = decode(pixels, width, height, { inversionAttempts: 'attemptBoth' });
+        return code && typeof code.data === 'string' ? code.data : null;
+    } catch (error) {
+        return null;
+    }
+}
