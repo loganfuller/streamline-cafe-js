@@ -1,5 +1,5 @@
 // Decent Sync's plugin, as a Skin reads it: its endpoints `status`,
-// `reference`, `shots`, `shot` and `page`, its `changes` socket, and the `skin`
+// `reference`, `shots`, `shot`, `page` and `scan`, its `changes` socket, and the `skin`
 // answer and `changed` socket Streamline reads of every plugin. Behind them,
 // as much of its server as those answers show: the Machine and its Location,
 // the Location's Recipes and their Reference Shots, and the Location's Shots,
@@ -59,6 +59,35 @@
 //   plugin keeps a report only from a `Host` of localhost, 127.0.0.1 or
 //   [::1]; the model keeps every one, as the page tests' page is at
 //   127.0.0.1.
+// - **scan:** a PUT `{ text }`, the text a scanned QR code held, or
+//   `{ match }`, the id of one batch an earlier answer listed, has the server
+//   find the Bean Batch and bring it to the Machine's Location. Read from
+//   loganfuller/decent-sync main at 55856c22 (plugin/src/skin-api.ts
+//   `answerScan` and `readScan`, server/src/library/batch-scans.service.ts,
+//   scanned-text.ts, #708), in no release yet, so no recording backs it. The
+//   pinned v1.11.1 has no such endpoint and says nothing of `scan` in its
+//   status, and so does the model until a test calls `canScan(batches)`, which
+//   makes it the later plugin, with those batches the server's. From then the
+//   status carries `scan`: true while the plugin is connected to a server
+//   that can be asked to, in every state, served or not. The request is
+//   `invalidRequest` (400) for a body with neither or both, text over 2,048
+//   characters or with a NUL or an unpaired surrogate, or a `match` that is no
+//   id; `unreachable` while not connected and `serverTooOld` while the server
+//   is from before the request, each before anything is asked; and the
+//   status's refusal for a Machine not served. Matching, among batches not
+//   Archived of Beans that are not, stops at the first step that finds any:
+//   the whole text is a Batch Code, ignoring case and the white space around
+//   it; or the text names a Bean, every word of the text in the Bean's roaster
+//   and name, or every word of the Bean's name in the text, which matches each
+//   of that Bean's batches. Text that is an Archived batch's code matches
+//   nothing. One match, or a `match`, answers `{ outcome, batchId, beanId }`
+//   with the tablet's own ids, once Decaid holds the batch un-archived:
+//   `alreadyThere` and nothing changed; `moved`, from the one other Location
+//   it was at, with its weight there; or `added`, from several or from none,
+//   with no weight. Several answer `{ outcome: 'several', matches, more }`,
+//   newest roast first, at most 20, each `{ id, roaster, name, roastDate,
+//   batchCode }`; none, or a `match` naming no such batch, `{ outcome:
+//   'noMatch' }`.
 // - **changes:** `{ what: 'connection', connected }` as the connection comes
 //   and goes, and `{ what: 'reference', recipe }` whenever the tablet's copy of
 //   a slotted Recipe's reference changes or comes: chosen, its Shot rated or
@@ -83,7 +112,8 @@
 //
 // What the test makes happen (`events`): the connection lost and found
 // (`stopServer`, `startServer`), sharing off and on (`setSharing`), any other
-// state (`setState`), the plugin never connected yet (`firstStart`), a Reference
+// state (`setState`), the plugin never connected yet (`firstStart`), the plugin
+// and server of the release that match scanned text (`canScan`), a Reference
 // Shot chosen or cleared on the server, a Recipe renamed there, a Shot rated
 // or noted there; and, as faults rather than rules, a frame of the test's own
 // on `changes` (`push`) and a Shot of the tablet's counted at the Location
@@ -105,6 +135,10 @@
 // from the server while a save is under way; DYE2 seen as away only after two
 // polls not loaded (the model: at once); the seconds DYE2 may take to read the
 // machine's settings before it writes (the model saves at the next flush).
+// Of a scan: text that is a URL or JSON holding a code, a date in the text
+// narrowing a Bean's batches, the history entry and its credit, the weight
+// leaving the other Location, and the seconds the tablet's record may take to
+// arrive (the model writes Decaid's records as it answers).
 // Nor, seen in the recording and not modelled yet: the server unloading the
 // Machine's Loaded Recipe as its sharing is turned off, which the plugin makes
 // by clearing the Workflow's recipe (a DYE2 push follows).
@@ -121,6 +155,9 @@ const MAX_SKIN_NOTE_LENGTH = 40_000;
 const MAX_ASKED_LENGTH = 2048;
 const MAX_SOFTWARE_NAME_LENGTH = 200;
 const MAX_LOAD_AHEAD_MS = 60_000;
+const MAX_SCANNED_TEXT_LENGTH = 2048;
+const MAX_BATCH_MATCHES = 20;
+const BATCH_CODE_KEY = 'decentSyncBatchCode';
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export const REFUSALS = {
@@ -148,6 +185,33 @@ const askable = value => typeof value === 'string' && value.length <= MAX_ASKED_
 const recordedText = value => (typeof value === 'number' && Number.isFinite(value) ? String(value) : typeof value === 'string' && value.trim() !== '' ? value : null);
 const numberOf = value => (typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)) ? Number(value) : null);
 const textOf = value => (typeof value === 'string' ? value : null);
+
+/** `readScan` (skin-api.ts): what a scan asks, `{ text }` or `{ batchId }`, or what is wrong with it. */
+export function readScan(body) {
+    const NOTHING_TO_MATCH = "Give the text the scanned code held as text, or the id of a batch from an earlier answer's matches as match, in a JSON body.";
+    if (!isObject(body)) return NOTHING_TO_MATCH;
+    const { text, match } = body;
+    if (text !== undefined && match !== undefined) return 'Give text or match, not both.';
+    if (match !== undefined) return typeof match === 'string' && GLOBAL_ID.test(match) ? { batchId: match.toLowerCase() } : "Give match as the id of a batch from an earlier answer's matches.";
+    if (text === undefined) return NOTHING_TO_MATCH;
+    if (!(typeof text === 'string' && !text.includes('\u0000') && text.isWellFormed() && text.length <= MAX_SCANNED_TEXT_LENGTH)) {
+        return `Give text as the text the scanned code held, of at most ${MAX_SCANNED_TEXT_LENGTH} characters, without a NUL or an unpaired surrogate.`;
+    }
+    return { text };
+}
+
+/** `wordsOf` (scanned-text.ts): the runs of letters and digits in some text, in lower case. */
+const wordsOf = text => String(text ?? '').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+
+/** `namesBean` (scanned-text.ts), with no date read out of the text: does the text name this Bean? */
+export function namesBean(text, bean) {
+    const words = wordsOf(text);
+    const nameWords = wordsOf(bean.name);
+    if (nameWords.length > 0 && nameWords.every(word => words.includes(word))) return true;
+    if (words.length === 0) return false;
+    const beanWords = new Set([...wordsOf(bean.roaster), ...nameWords]);
+    return words.every(word => beanWords.has(word));
+}
 
 /** `shotRatingAndNote` (protocol): a Shot's rating and note as an edit answers them. */
 export function ratingAndNote(record) {
@@ -230,7 +294,7 @@ function readCursor(text) {
 /**
  * @param {{
  *   recording: object,
- *   decaid: { store: object, shots: object, timeZone: string, now: () => number, putShot: (id: string, body: object) => { status: number, body: any } },
+ *   decaid: { store: object, shots: object, library: { beans: object[], batches: object[] }, timeZone: string, now: () => number, putShot: (id: string, body: object) => { status: number, body: any } },
  *   announce: (frame: object) => void,
  *   moved?: (record: object) => object,
  * }} options
@@ -282,6 +346,15 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         queuedSave = null;
     };
     decided();
+    /**
+     * The release that matches scanned text, once a test says so (`canScan`):
+     * whether its server can be asked to, and the server's batches, each
+     * `{ id, batchCode, roastDate, roaster, name, at, weight, archived,
+     * beanArchived, beanId, batchId }`, where `at` is `here`, `one` (one other
+     * Location), `several` or `none`, and `beanId` and `batchId` are the
+     * tablet's own ids for its records.
+     */
+    let scans = null;
     const servedNow = () => state === 'served' && sharing;
     const connected = () => state !== 'unreachable';
     const notServed = () => (state === 'served' ? (sharing ? null : 'captureOnly') : state);
@@ -373,6 +446,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         machine: state === 'unreachable' || state === 'hardwareMismatch' || state === 'serverTooOld' ? null : { id: machine.id, name: machine.name },
         // Sharing off, the Machine is still at its Location, and the server names it.
         location: state === 'served' ? { id: location.id, name: location.name } : null,
+        ...(scans ? { scan: connected() && scans.server } : {}),
     });
     const refused = () => {
         const code = notServed();
@@ -383,6 +457,66 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         if (method !== 'GET') return methodNotAllowed('GET');
         const code = notServed();
         return code ? refusal(code, statusBody()) : json(statusBody());
+    }
+
+    // ── A scan (`answerScan`, `BatchScansService`).
+    const newestRoastFirst = (a, b) => ((a.roastDate || '') < (b.roastDate || '') ? 1 : (a.roastDate || '') > (b.roastDate || '') ? -1 : a.id < b.id ? -1 : 1);
+    function matching(text) {
+        const asked = text.trim().toLowerCase();
+        if (asked === '') return [];
+        const live = scans.batches.filter(batch => !batch.archived && !batch.beanArchived);
+        const byCode = live.filter(batch => typeof batch.batchCode === 'string' && batch.batchCode.trim().toLowerCase() === asked);
+        if (byCode.length) return byCode;
+        // A label for a retired batch matches nothing, though it may name the Bean too.
+        if (scans.batches.some(batch => typeof batch.batchCode === 'string' && batch.batchCode.trim().toLowerCase() === asked)) return [];
+        return live.filter(batch => namesBean(text, batch));
+    }
+    // The tablet's records as the server writes them when a batch comes: its
+    // bean where Decaid has none, and the batch, not archived, with its code
+    // and what was moved with it.
+    function bring(batch) {
+        const outcome = batch.at === 'here' ? 'alreadyThere' : batch.at === 'one' ? 'moved' : 'added';
+        if (outcome !== 'alreadyThere') {
+            const at = localTime(decaid.now(), timeZone);
+            const { beans, batches } = decaid.library;
+            if (!beans.some(bean => bean.id === batch.beanId)) {
+                beans.push({ id: batch.beanId, roaster: batch.roaster, name: batch.name, decaf: false, archived: false, createdAt: at, updatedAt: at });
+            }
+            const held = batches.find(record => record.id === batch.batchId);
+            const record = {
+                ...(held || { id: batch.batchId, beanId: batch.beanId, frozen: false, createdAt: at }),
+                ...(batch.roastDate ? { roastDate: `${batch.roastDate}T00:00:00.000Z` } : {}),
+                archived: false,
+                extras: { ...(held?.extras || {}), ...(batch.batchCode ? { [BATCH_CODE_KEY]: batch.batchCode } : {}) },
+                updatedAt: at,
+            };
+            if (outcome === 'moved' && typeof batch.weight === 'number') record.weightRemaining = batch.weight;
+            else delete record.weightRemaining;
+            if (held) Object.assign(held, record);
+            else batches.push(record);
+            batch.at = 'here';
+        }
+        return json({ outcome, batchId: batch.batchId, beanId: batch.beanId });
+    }
+    function scan(method, body) {
+        if (!scans) return { status: 404, body: { error: 'Not found' } };
+        if (method !== 'PUT') return methodNotAllowed('PUT');
+        const asking = readScan(body);
+        if (typeof asking === 'string') return invalid(asking);
+        if (!connected()) return refusal('unreachable');
+        if (!scans.server) return refusal('serverTooOld');
+        const not = refused();
+        if (not) return not;
+        const live = batch => !batch.archived && !batch.beanArchived;
+        const found = asking.batchId !== undefined ? scans.batches.filter(batch => batch.id.toLowerCase() === asking.batchId && live(batch)) : matching(asking.text);
+        if (found.length === 0) return json({ outcome: 'noMatch' });
+        if (found.length === 1) return bring(found[0]);
+        const listed = [...found].sort(newestRoastFirst);
+        return json({
+            outcome: 'several',
+            matches: listed.slice(0, MAX_BATCH_MATCHES).map(batch => ({ id: batch.id, roaster: batch.roaster ?? null, name: batch.name ?? null, roastDate: batch.roastDate ?? null, batchCode: batch.batchCode ?? null })),
+            more: listed.length > MAX_BATCH_MATCHES,
+        });
     }
 
     let shownPage = null;
@@ -536,6 +670,7 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 case 'reference': return reference(method, query, body);
                 case 'skin': return method === 'GET' ? json(copy(recording.skin)) : null;
                 case 'page': return page(method, body);
+                case 'scan': return scan(method, body);
                 default: return null;
             }
         },
@@ -613,6 +748,20 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
                 captureOnly = false;
                 copies.clear();
             },
+            /**
+             * The plugin, and its server, of the release that matches scanned
+             * text (#708, after v1.14.0), with these the server's batches (see
+             * `scans`). `server: false` is that plugin connected to a server
+             * from before the request, as during an upgrade.
+             */
+            canScan(batches = [], { server = true } = {}) {
+                for (const batch of batches) {
+                    if (!GLOBAL_ID.test(batch.id ?? '')) throw new Error(`a batch's id is the server's, a global id: ${batch.id}`);
+                    if (!['here', 'one', 'several', 'none'].includes(batch.at)) throw new Error(`no such place for a batch: ${batch.at}`);
+                    if (!batch.beanId || !batch.batchId) throw new Error("a batch needs the tablet's ids for its records, beanId and batchId");
+                }
+                scans = { server, batches: batches.map(copy) };
+            },
             /** A Recipe's Reference Shot chosen on the server, or cleared with null, by its DYE2 record's id. */
             chooseReference(recordId, shotId) {
                 const recipe = recipeOfRecord(recordId);
@@ -657,6 +806,8 @@ export function createDecentSync({ recording, decaid, announce, moved = record =
         /** What the test reads: the Location's Recipes, by their DYE2 record's id, with their Reference Shot. */
         recipe: recordId => copy(recipeOfRecord(recordId)),
         state: () => ({ state, sharing }),
+        /** The server's batches as a scan reads them, each where it is now, or null for a plugin from before the request. */
+        batches: () => (scans ? scans.batches.map(copy) : null),
         page: () => copy(shownPage),
         others: () => [...others.values()].map(other => copy(other)),
         own: () => [...own.keys()],

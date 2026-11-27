@@ -53,12 +53,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-chromium-and-shell-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       # The runner's image carries Chrome's system libraries; a fresh download
-      # installs them too, in case the image ever stops.
+      # installs them too, in case the image ever stops. Both browsers: the
+      # headless shell for the page tests, and full Chromium for the one spec
+      # that needs a camera (docs/cafe/TESTING.md, "The camera").
       - name: Install Chromium
         if: steps.chromium.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps --only-shell chromium
+        run: npx playwright install --with-deps chromium
       - name: Page tests
         run: npx playwright test --shard=${{ matrix.shard }}/4
       - name: Keep the traces and screenshots of a failure

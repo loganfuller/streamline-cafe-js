@@ -541,6 +541,92 @@ test('Decent Sync: status served, then each state it may be in, with its refusal
     assert.equal(get(fake, `${PLUGIN}/shots`).status, 409, 'and every endpoint that asks the server is refused so');
 });
 
+// ── A scan (#708, in no release the pins reach: no recording backs it).
+const SCAN = `${PLUGIN}/scan`;
+const blend = fake => fake.library.state.beans.find(bean => bean.name === 'Sample Blend');
+const scanBatches = fake => [
+    { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d90', batchCode: 'SR-0412', roastDate: '2026-11-12', roaster: 'Sample Roasters', name: 'Sample Blend', at: 'one', weight: 5000, beanId: blend(fake).id, batchId: 'tablet-batch-1' },
+    { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d91', batchCode: 'SR-0398', roastDate: '2026-11-02', roaster: 'Sample Roasters', name: 'Sample Blend', at: 'several', weight: 900, beanId: blend(fake).id, batchId: 'tablet-batch-2' },
+    { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d92', batchCode: 'EX-0007', roastDate: '2026-10-30', roaster: 'Example Coffee Co', name: 'Example Guest Roast', at: 'none', beanId: 'tablet-bean-3', batchId: 'tablet-batch-3' },
+    { id: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d93', batchCode: 'SR-0001', roastDate: '2026-01-05', roaster: 'Sample Roasters', name: 'Sample Blend', at: 'one', archived: true, beanId: blend(fake).id, batchId: 'tablet-batch-4' },
+];
+const scan = (fake, body) => send(fake, 'PUT', SCAN, body);
+
+test('Decent Sync: the pinned plugin has no scan; the later one says in its status whether it can match scanned text', () => {
+    const fake = served();
+    assert.deepEqual(scan(fake, { text: 'SR-0412' }), { status: 404, body: { error: 'Not found' } });
+    assert.equal('scan' in get(fake, `${PLUGIN}/status`).body, false);
+    fake.decentSync.canScan(scanBatches(fake));
+    assert.deepEqual(get(fake, `${PLUGIN}/status`).body, { ...decentSync.status, scan: true });
+    fake.decentSync.setSharing(false);
+    assert.equal(get(fake, `${PLUGIN}/status`).body.scan, true, 'a Capture-only Machine\'s plugin can still ask: `served` says it is not served');
+    assert.equal(scan(fake, { text: 'SR-0412' }).body.code, 'captureOnly');
+    fake.decentSync.setSharing(true);
+    fake.decentSync.stopServer();
+    assert.equal(get(fake, `${PLUGIN}/status`).body.scan, false, 'not while it isn\'t connected');
+    assert.equal(scan(fake, { text: 'SR-0412' }).body.code, 'unreachable');
+    fake.decentSync.startServer();
+    fake.decentSync.canScan(scanBatches(fake), { server: false });
+    assert.equal(get(fake, `${PLUGIN}/status`).body.scan, false, 'nor connected to a server from before the request');
+    assert.deepEqual([scan(fake, { text: 'SR-0412' }).status, scan(fake, { text: 'SR-0412' }).body.code], [503, 'serverTooOld']);
+    assert.equal(fake.decentSync.batches()[0].at, 'one', 'and a scan refused brings nothing');
+});
+
+test('Decent Sync: a scan matching one batch brings it to the Machine\'s Location by where it was, and answers the tablet\'s ids once Decaid holds it', () => {
+    const fake = served();
+    fake.decentSync.canScan(scanBatches(fake));
+    const held = id => fake.library.state.batches.find(batch => batch.id === id);
+    assert.deepEqual(scan(fake, { text: '  sr-0412 ' }), { status: 200, body: { outcome: 'moved', batchId: 'tablet-batch-1', beanId: blend(fake).id } });
+    assert.deepEqual({ ...held('tablet-batch-1'), createdAt: 0, updatedAt: 0 }, { id: 'tablet-batch-1', beanId: blend(fake).id, frozen: false, createdAt: 0, roastDate: '2026-11-12T00:00:00.000Z', archived: false, extras: { decentSyncBatchCode: 'SR-0412' }, updatedAt: 0, weightRemaining: 5000 });
+    assert.deepEqual(scan(fake, { text: 'SR-0412' }).body, { outcome: 'alreadyThere', batchId: 'tablet-batch-1', beanId: blend(fake).id }, 'asked again, it is there already');
+    assert.equal(scan(fake, { text: 'SR-0398' }).body.outcome, 'added', 'at several other Locations');
+    assert.equal('weightRemaining' in held('tablet-batch-2'), false, 'no weight moves with a batch added');
+    assert.equal(scan(fake, { text: 'EX-0007' }).body.outcome, 'added', 'at none');
+    assert.deepEqual(fake.library.state.beans.find(bean => bean.id === 'tablet-bean-3').name, 'Example Guest Roast', 'its bean comes with it');
+    assert.deepEqual(get(fake, `/api/v1/beans/${blend(fake).id}/batches`).body.filter(batch => /^tablet-batch/.test(batch.id)).map(batch => batch.id).sort(), ['tablet-batch-1', 'tablet-batch-2'], 'Decaid lists them');
+    assert.deepEqual(fake.decentSync.batches().map(batch => batch.at), ['here', 'here', 'here', 'one']);
+});
+
+test('Decent Sync: a scan matching several lists them, newest roast first, and brings the one then named; none matches nothing', () => {
+    const fake = served();
+    const batches = scanBatches(fake);
+    fake.decentSync.canScan(batches);
+    const several = scan(fake, { text: 'Sample Roasters Sample Blend' }).body;
+    assert.deepEqual(several, {
+        outcome: 'several',
+        matches: [
+            { id: batches[0].id, roaster: 'Sample Roasters', name: 'Sample Blend', roastDate: '2026-11-12', batchCode: 'SR-0412' },
+            { id: batches[1].id, roaster: 'Sample Roasters', name: 'Sample Blend', roastDate: '2026-11-02', batchCode: 'SR-0398' },
+        ],
+        more: false,
+    });
+    assert.deepEqual(fake.decentSync.batches().map(batch => batch.at), ['one', 'several', 'none', 'one'], 'nothing changed');
+    assert.equal(scan(fake, { match: batches[1].id.toUpperCase() }).body.outcome, 'added');
+    assert.deepEqual(scan(fake, { text: 'Guest Roast' }).body.outcome, 'added', 'every word of the text in a Bean\'s roaster and name: its one batch');
+    for (const nothing of ['SR-0001', 'NO-0000', '', '   ', 'Reserve Lot']) {
+        assert.deepEqual(scan(fake, { text: nothing }), { status: 200, body: { outcome: 'noMatch' } }, JSON.stringify(nothing));
+    }
+    assert.deepEqual(scan(fake, { match: batches[3].id }).body, { outcome: 'noMatch' }, 'an Archived batch named');
+    assert.deepEqual(scan(fake, { match: '019b7c1e-52aa-7c41-8e0d-000000000000' }).body, { outcome: 'noMatch' }, 'no such batch');
+    const many = Array.from({ length: 23 }, (unused, index) => ({ ...batches[0], id: `019b7c1e-52aa-7c41-8e0d-0000000000${String(index).padStart(2, '0')}`, roastDate: `2026-10-${String(index + 1).padStart(2, '0')}`, batchId: `many-${index}` }));
+    fake.decentSync.canScan(many);
+    const capped = scan(fake, { text: 'SR-0412' }).body;
+    assert.deepEqual([capped.matches.length, capped.more, capped.matches[0].roastDate], [20, true, '2026-10-23']);
+});
+
+test('Decent Sync: a scan\'s body is text or a match, never both, and the text no longer than 2,048 characters', () => {
+    const fake = served();
+    fake.decentSync.canScan(scanBatches(fake));
+    for (const body of [undefined, {}, [], { text: 'SR-0412', match: '019b7c1e-52aa-7c41-8e0d-3f5a6b7c8d90' }, { match: 'SR-0412' }, { text: 7 }, { text: 'x'.repeat(2049) }, { text: 'a\u0000b' }, { text: 'a\ud800b' }]) {
+        const answer = scan(fake, body);
+        assert.deepEqual([answer.status, answer.body.code], [400, 'invalidRequest'], JSON.stringify(body)?.slice(0, 60));
+    }
+    assert.equal(scan(fake, { text: 'x'.repeat(2048) }).status, 200);
+    assert.equal(send(fake, 'GET', SCAN).status, 405);
+    assert.throws(() => fake.decentSync.canScan([{ id: 'not-a-global-id', at: 'one', beanId: 'a', batchId: 'b' }]), /global id/);
+    assert.throws(() => fake.decentSync.canScan([{ ...scanBatches(fake)[0], at: 'elsewhere' }]), /no such place/);
+});
+
 test('Decent Sync: the Location\'s Shots, newest first, paged by a cursor; the tablet\'s and another Machine\'s', () => {
     const fake = served();
     const all = get(fake, `${PLUGIN}/shots?limit=50`).body;

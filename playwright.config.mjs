@@ -7,7 +7,14 @@
 //   npx playwright test --grep @grinder
 //   CAFE_TZ=Asia/Tokyo npx playwright test   in another zone than UTC
 
+import { join } from 'node:path';
 import { defineConfig } from 'playwright/test';
+
+// What the page's camera shows: a batch's label, one frame for ever
+// (test/page/camera/make-label.mjs).
+const LABEL = join(import.meta.dirname, 'test', 'page', 'camera', 'batch-label.y4m');
+const LOCAL_NETWORK = '--disable-features=LocalNetworkAccessChecks';
+const CAMERA_SPEC = 'scan.spec.mjs';
 
 export default defineConfig({
     testDir: 'test/page',
@@ -32,7 +39,22 @@ export default defineConfig({
             // The page's files are answered by a route, so Chromium knows no
             // address for them and would treat the page as public, refusing
             // its requests to Decaid on the loopback address.
-            args: ['--disable-features=LocalNetworkAccessChecks'],
+            args: [LOCAL_NETWORK],
         },
     },
+    // The scan of a batch's QR code needs a camera, which Chromium's headless
+    // shell does not have: its tests run in full Chromium's own headless mode,
+    // with Chromium's fake camera playing the label's picture to a page
+    // allowed the camera. A test allows it for its own context.
+    projects: [
+        { name: 'page', testIgnore: CAMERA_SPEC },
+        {
+            name: 'camera',
+            testMatch: CAMERA_SPEC,
+            use: {
+                channel: 'chromium',
+                launchOptions: { args: [LOCAL_NETWORK, '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${LABEL}`] },
+            },
+        },
+    ],
 });
