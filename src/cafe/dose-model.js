@@ -29,10 +29,10 @@ export function doseNames(workflow, batch, today) {
 /**
  * The line under Dose, in its parts, left out where empty: the Batch Code, the
  * bean's name and the days since the roast, in the bean and batch dialog's
- * words ("16 d since roast"), with " · " between them. Each separator
- * goes with the code or the days, never with the bean's name, which is the
- * part shortened to fit, so neither is cut off with it. `shrinks` marks the
- * bean's name.
+ * words ("16 d since roast"), with " · " between them. Each separator, in
+ * `before` or `after`, goes with the code or the days, never with the bean's
+ * name, which is the part shortened to fit, so neither is cut off with it.
+ * `shrinks` marks the bean's name.
  */
 export function doseLine({ code, bean, days }, t) {
     const parts = [
@@ -41,9 +41,9 @@ export function doseLine({ code, bean, days }, t) {
         { text: sinceRoastText(days, t), shrinks: false },
     ].filter(part => part.text);
     return parts.map((part, index) => {
-        if (part.shrinks) return part;
-        const before = index > 0 && parts[index - 1].shrinks ? SEPARATOR : '';
-        const after = index < parts.length - 1 ? SEPARATOR : '';
-        return { ...part, text: `${before}${part.text}${after}` };
+        const whole = !part.shrinks;
+        const before = whole && index > 0 && parts[index - 1].shrinks ? SEPARATOR : '';
+        const after = whole && index < parts.length - 1 ? SEPARATOR : '';
+        return { ...part, before, after };
     });
 }

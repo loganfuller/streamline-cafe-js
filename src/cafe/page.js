@@ -125,8 +125,16 @@ function renderDose() {
     if (!line) return;
     line.replaceChildren(...doseLine(dose, cafeText).map(part => {
         const span = document.createElement('span');
-        span.className = part.shrinks ? 'cafe-dose-shrinks' : 'cafe-dose-whole';
-        span.textContent = part.text;
+        if (part.shrinks) {
+            span.className = 'cafe-dose-shrinks';
+            span.dir = 'auto';
+            span.textContent = part.text;
+            return span;
+        }
+        span.className = 'cafe-dose-whole';
+        const words = document.createElement('bdi');
+        words.textContent = part.text;
+        span.append(...[part.before, words, part.after].filter(Boolean));
         return span;
     }));
     line.classList.toggle('cafe-batch-finished', finished);

@@ -102,10 +102,12 @@ const LANGUAGES = {
         text: { hint: 'Halten zum Hinzufügen', slot: 'Platz 4', dial: 'Einstellung · nicht im Rezept gespeichert', dose: 'Dosis', yield: 'Ertrag', settings: 'Einstellungen', latest: 'Letzter', view: 'Referenz | Ziele', row: 'DAUER | ERSTER TROPFEN | ERTRAG | VERHÄLTNIS | SPITZENDRUCK' },
         // Single origin's batch was roasted on 28 October, 21 days before the page's today.
         roasted: 'Sample Single Origin · 21 Tg. seit der Röstung',
+        direction: 'ltr',
     },
     ar: {
         text: { hint: 'اضغط مطولا للإضافة', slot: 'الخانة 4', dial: 'الضبط · غير محفوظ في الوصفة', dose: 'الجرعة', yield: 'الناتج', settings: 'إعدادات', latest: 'الأحدث', view: 'المرجع | الأهداف', row: 'الوقت | أول قطرة | الناتج | نسبة | أقصى ضغط' },
         roasted: 'Sample Single Origin · 21 يوم منذ التحميص',
+        direction: 'rtl',
     },
 };
 
@@ -117,12 +119,13 @@ test('in English with a recipe loaded nothing overflows its place', { tag: '@lan
     expect(await overflowing(page)).toEqual([]);
 });
 
-for (const [code, { text, roasted }] of Object.entries(LANGUAGES)) {
+for (const [code, { text, roasted, direction }] of Object.entries(LANGUAGES)) {
     test(`in ${code} the page is translated, fits, and stays left to right`, { tag: '@languages' }, async ({ cafe, fake }) => {
         const page = await openLoaded(cafe, fake, code);
         await expect(page.locator('#settings-btn')).toHaveText(text.settings);
         expect(await pageText(page)).toEqual(text);
         await expect(page.locator('#cafe-dose-desc'), 'the days since the roast are in the language too').toHaveText(roasted);
+        expect(await page.locator('#cafe-dose-desc bdi').last().evaluate(el => getComputedStyle(el).direction), 'the days read in their own direction, as the dialog\'s rows do').toBe(direction);
         expect(await overflowing(page), 'no label overflows its place').toEqual([]);
         if (!SHRUNK_BELOW_14.has(code)) expect(await smallestLabel(page), 'no fitted label is shrunk below 14px').toBeGreaterThanOrEqual(14);
         expect(await page.evaluate(() => getComputedStyle(document.getElementById('main-page')).direction), 'the page is laid out left to right').toBe('ltr');

@@ -14,7 +14,7 @@ const batch = (fields = {}) => ({ id: 'batch-1', ...fields });
 const coded = { extras: { decentSyncBatchCode: 'SB-0211' } };
 const roasted = day => ({ roastDate: `${day}T00:00:00Z` });
 const line = (record, today = TODAY) => doseLine(doseNames(workflow, record, today), t);
-const said = (record, today) => line(record, today).map(part => part.text).join('');
+const said = (record, today) => line(record, today).map(part => `${part.before}${part.text}${part.after}`).join('');
 
 test('Dose names the Batch Code, the bean and the days since the roast, with " · " between them', () => {
     assert.equal(said(batch({ ...coded, ...roasted('2026-11-02') })), 'SB-0211 · Sample Blend · 16 d since roast');
@@ -52,15 +52,15 @@ test('a Workflow that names nothing gives an empty line', () => {
 
 test('only the bean\'s name shrinks, and each " · " goes with the code or the days, never with the name', () => {
     assert.deepEqual(line(batch({ ...coded, ...roasted('2026-11-02') })), [
-        { text: 'SB-0211 · ', shrinks: false },
-        { text: 'Sample Blend', shrinks: true },
-        { text: ' · 16 d since roast', shrinks: false },
+        { text: 'SB-0211', before: '', after: ' · ', shrinks: false },
+        { text: 'Sample Blend', before: '', after: '', shrinks: true },
+        { text: '16 d since roast', before: ' · ', after: '', shrinks: false },
     ]);
     assert.deepEqual(doseLine({ code: 'SB-0211', bean: '', days: 16 }, t), [
-        { text: 'SB-0211 · ', shrinks: false },
-        { text: '16 d since roast', shrinks: false },
+        { text: 'SB-0211', before: '', after: ' · ', shrinks: false },
+        { text: '16 d since roast', before: '', after: '', shrinks: false },
     ], 'with no name, one " · " between the code and the days');
-    assert.deepEqual(doseLine({ code: '', bean: 'Sample Blend', days: null }, t), [{ text: 'Sample Blend', shrinks: true }]);
+    assert.deepEqual(doseLine({ code: '', bean: 'Sample Blend', days: null }, t), [{ text: 'Sample Blend', before: '', after: '', shrinks: true }]);
 });
 
 test('the days are said with one phrase, translated, whatever their number', () => {
