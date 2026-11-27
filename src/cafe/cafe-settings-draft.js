@@ -8,7 +8,9 @@
 // One write at a time: while one is on its way the setting takes no change,
 // and a second Save waits for it and writes nothing. A visit to Settings ends
 // when the main page comes back; a write from a visit since ended changes
-// nothing in a later one, and its Save does not leave Settings.
+// nothing in a later one, and its Save does not leave Settings. A Save belongs
+// to the visit it was tapped in, which its handler reads before Streamline's
+// own write: one whose visit has ended by the fork's turn writes nothing.
 import { writeCafe, CONTAINER_KEY } from './cafe-store.js';
 
 let container = null;
@@ -50,6 +52,11 @@ export function watchCafeSaving(watcher) {
     return () => watchers.delete(watcher);
 }
 
+/** The visit to Settings now open: a Save handler reads it when Save is tapped. */
+export function cafeSettingsVisit() {
+    return visit;
+}
+
 async function write(grams, mine) {
     try {
         await writeCafe(CONTAINER_KEY, grams);
@@ -64,12 +71,14 @@ async function write(grams, mine) {
 }
 
 /**
- * Write what was changed. Answers whether this visit's Save may leave
- * Settings: false for a second Save while one is writing, and for a visit
- * that ended while it wrote. Rejects where Decaid did not take it, and keeps
- * the change.
+ * Write what was changed, for a Save tapped in the visit `from`
+ * (`cafeSettingsVisit()` then). Answers whether that Save may leave Settings:
+ * false, with nothing written, for a visit that has ended since, false for a
+ * second Save while one is writing, and for a visit that ended while it
+ * wrote. Rejects where Decaid did not take it, and keeps the change.
  */
-export function saveCafeSettings() {
+export function saveCafeSettings(from) {
+    if (from !== visit) return Promise.resolve(false);
     if (writing) return writing.then(() => false, () => false);
     if (container == null) return Promise.resolve(true);
     writing = write(container, visit);

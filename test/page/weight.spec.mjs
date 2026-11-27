@@ -848,6 +848,101 @@ test.describe('the Cafe setting', { tag: '@weight' }, () => {
         });
     }
 
+    test('a Save still on Streamline\'s own write when Cancel ends its visit writes nothing of the next visit\'s unsaved weight, and does not leave it', async ({ cafe, fake }) => {
+        setContainer(fake, 350);
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 400);
+        await page.locator('#quickadjustments-btn').click();
+        const lookAhead = page.locator('[data-setting="weightFlowMultiplier"]');
+        await expect(lookAhead).toBeVisible();
+        await cafe.settle();
+        const before = await lookAhead.inputValue();
+        const after = String(Number((Number(before) + 0.1).toFixed(1)));
+        await page.locator('[data-adjust="weightFlowMultiplier"][data-delta="0.1"]').click();
+        await expect(lookAhead).toHaveValue(after);
+
+        // Streamline's write of its own setting, which the fake has no answer
+        // for: the test holds it, and answers it as Decaid would.
+        let arrived;
+        let answer;
+        const reached = new Promise(resolve => { arrived = resolve; });
+        const answered = new Promise(resolve => { answer = resolve; });
+        const stop = cafe.routes.intercept(request => request.method === 'POST' && request.path === '/api/v1/settings', async () => {
+            arrived();
+            await answered;
+            return { status: 200, body: {} };
+        });
+        const mark = fake.log.length;
+        await page.locator('#save-settings-btn').click();
+        await reached;
+        stop();
+
+        // Cancel ends the visit, and the next one changes the weight without saving it.
+        await page.locator('#cancel-settings-btn').click();
+        await expect(page.locator('#subpage-host #settings-content-area')).toHaveCount(0);
+        await page.evaluate(() => document.getElementById('settings-btn').click());
+        await expect(page.locator('#subpage-host #settings-content-area')).toBeVisible();
+        await page.locator('#cafe-btn').click();
+        await expect(setting(page)).toBeEnabled();
+        await expect(setting(page), 'what Decaid holds, the first visit\'s change dropped').toHaveValue('350');
+        await enterSetting(page, 500);
+        await expect(setting(page)).toHaveValue('500');
+        await page.locator('#quickadjustments-btn').click();
+        await expect(lookAhead).toHaveValue(before);
+
+        // Streamline's write lands, which this page shows, and the first Save goes on from it.
+        answer();
+        await expect(lookAhead, 'the first Save\'s own write has landed').toHaveValue(after);
+        await cafe.settle();
+        expect(containerWrites(cafe, mark), 'the first Save writes nothing of the second visit\'s').toEqual([]);
+        expect(kept(fake)).toBe(350);
+        await expect(page.locator('#subpage-host #settings-content-area'), 'still on Settings').toBeVisible();
+        await openCategory(cafe);
+        await expect(setting(page), 'the second visit\'s change, still its own to save').toHaveValue('500');
+        await leaveBy(cafe, '#save-settings-btn');
+        expect(containerWrites(cafe, mark)).toEqual([500]);
+        expect(kept(fake)).toBe(500);
+    });
+
+    test('a setting changed on one of the legacy module\'s pages while the shell\'s Save writes the weight keeps Settings open with that change', async ({ cafe, fake }) => {
+        // The legacy module asks which skin is the default, which the fake does not keep.
+        fake.refuse({ method: 'GET', path: /\/webui\/skins\/default/, status: 404 });
+        const page = await openPage(cafe);
+        await openCafeSettings(cafe);
+        await set(cafe, 350);
+        const writing = hold(cafe, STORE_WRITE);
+        await page.locator('#save-settings-btn').click();
+        await writing.reached;
+
+        // Quick adjustments' Flush page is the legacy module's, which mounts for it and takes the page over.
+        const flushTemp = page.locator('#flushTempInput');
+        const openFlush = async () => {
+            await page.locator('#quickadjustments-btn').click();
+            await page.locator('#sub-categories-panel .settings-subnav-btn[data-category="flush"]').click();
+            await expect(flushTemp).toBeVisible();
+        };
+        await openFlush();
+        const after = String(Number(await flushTemp.inputValue()) + 5);
+        await page.locator('#flush-temp-plus').click();
+        await expect(flushTemp).toHaveValue(after);
+
+        const mark = fake.log.length;
+        writing.release();
+        await cafe.settle();
+        await expect(page.locator('#subpage-host #settings-content-area'), 'Settings stays').toBeVisible();
+        // The setting's field is ready again only once the write is done, and the shell's Save with it.
+        await openCategory(cafe);
+        await expect(setting(page), 'the weight was written').toHaveValue('350');
+        expect(kept(fake)).toBe(350);
+        await expect(page.getByText('Settings updated'), 'the shell\'s Save does not call the page saved').toHaveCount(0);
+        await openFlush();
+        await expect(flushTemp, 'with the legacy page\'s change, for the next Save').toHaveValue(after);
+        await cafe.settle();
+        expect(cafe.since(mark, entry => isWrite(entry) && entry.path === '/api/v1/machine/settings'), 'not written yet').toEqual([]);
+        await leaveBy(cafe, '#cancel-settings-btn');
+    });
+
     test('where the numpad is not used the setting is typed, and what is no weight is kept as 0', async ({ cafe, fake }) => {
         setContainer(fake, 350);
         await cafe.open({ before: () => { window._forceNumpadMobile = false; } });

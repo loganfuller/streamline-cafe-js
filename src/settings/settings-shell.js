@@ -15,7 +15,7 @@ import { observeSelects } from '../modules/custom-select.js';
 import { observeCelsiusLabels } from './celsius-label.js';
 import { getTempUnit } from '../modules/units.js';
 // Streamline Cafe: the page's Save also writes the fork's own settings.
-import { saveCafeSettings } from '../cafe/cafe-settings-draft.js';
+import { cafeSettingsVisit, saveCafeSettings } from '../cafe/cafe-settings-draft.js';
 
 // [name, category, bengleOnly?] tuples for the pre-legacy-load nav and search,
 // derived from the canonical tree (settings-tree.js) so the two can't drift —
@@ -277,10 +277,12 @@ function bindShell(root) {
 
     document.getElementById('save-settings-btn')?.addEventListener('click', async () => {
         if (legacyMounted) return;
+        // Streamline Cafe: the visit to Settings this Save was tapped in.
+        const cafeVisit = cafeSettingsVisit();
         try {
             await saveSettingsData();
             if (getSnapshot().dirty) return;
-            if (!await saveCafeSettings() || getSnapshot().dirty) return;
+            if (!await saveCafeSettings(cafeVisit) || getSnapshot().dirty || legacyMounted) return;
             ui.showToast('Settings updated', 3000, 'success');
             loadPage('index.html');
         } catch (error) {
