@@ -30,6 +30,10 @@ export const DYE2 = 'dye2.reaplugin';
 
 // No transition or animation runs, as in the page tests: a dialog drawn closing
 // would still be on a screenshot, and nothing in src/ waits for one to end.
+// What a tablet's camera shows, where a journey gives it one: the page tests' label.
+const LABEL_PICTURE = join(ROOT, 'test', 'page', 'camera', 'batch-label.y4m');
+const PAGE_ICON = 'http://fast.decentespresso.com/favicon-32x32.png';
+
 const NO_MOTION = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
 
 /** The only fixed wait a journey holds: for proving that nothing arrives in `ms`, `why` naming the wait. */
@@ -56,17 +60,25 @@ export const test = base.extend({
     }, { auto: true }],
 
     // One browser per Decaid, its 8080 mapped to that Decaid's port: a tablet
-    // of that Machine. Kept for the worker.
+    // of that Machine. Kept for the worker. One with a camera is a browser of
+    // its own: full Chromium, as its headless shell has no camera, with
+    // Chromium's fake one playing the page tests' label (docs/cafe/TESTING.md,
+    // "The camera").
     browsers: [async ({}, use) => {
         const open = new Map();
-        await use(async port => {
-            if (!open.has(port)) {
-                open.set(port, await chromium.launch({
+        await use(async (port, { camera = false } = {}) => {
+            const key = `${port}${camera ? ' camera' : ''}`;
+            if (!open.has(key)) {
+                open.set(key, await chromium.launch({
                     headless: !process.env.HEADED,
-                    args: [`--host-resolver-rules=MAP 127.0.0.1:8080 127.0.0.1:${port}`, '--disable-features=LocalNetworkAccessChecks'],
+                    ...(camera ? { channel: 'chromium' } : {}),
+                    args: [
+                        `--host-resolver-rules=MAP 127.0.0.1:8080 127.0.0.1:${port}`, '--disable-features=LocalNetworkAccessChecks',
+                        ...(camera ? ['--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${LABEL_PICTURE}`] : []),
+                    ],
                 }));
             }
-            return open.get(port);
+            return open.get(key);
         });
         for (const browser of open.values()) await browser.close();
     }, { scope: 'worker' }],
@@ -75,7 +87,8 @@ export const test = base.extend({
      * `tablet(side, options)`: a page of its own on `side`'s Decaid (`stacks.decaid`,
      * `stacks.sync` or `stacks.sync.second`), opened and drawn. `streamline: true`
      * opens official Streamline instead of the cafe page; `open: false` answers
-     * the page unopened, for a journey that opens it itself. The cafe page is
+     * the page unopened, for a journey that opens it itself; `camera: true` is a
+     * tablet whose camera shows the page tests' label, allowed to the page. The cafe page is
      * answered once its machine status reads `ready` (`Ready`, the machine
      * idle): a tap before then can land before the strip's handlers are set.
      * Its contexts are
@@ -84,10 +97,12 @@ export const test = base.extend({
     tablet: async ({ browsers }, use, testInfo) => {
         const contexts = [];
         const errors = [];
-        await use(async (side, { viewport = { width: 1920, height: 1200 }, streamline = false, open = true, ready = /^Ready$/ } = {}) => {
-            const browser = await browsers(side.port);
-            const context = await browser.newContext({ viewport, timezoneId: 'UTC', locale: 'en-US' });
+        await use(async (side, { viewport = { width: 1920, height: 1200 }, streamline = false, open = true, ready = /^Ready$/, camera = false } = {}) => {
+            const browser = await browsers(side.port, { camera });
+            const context = await browser.newContext({ viewport, timezoneId: 'UTC', locale: 'en-US', ...(camera ? { permissions: ['camera'] } : {}) });
             contexts.push(context);
+            // Full Chromium asks for the page's icon, on Streamline's own site: answered here, not there.
+            if (camera) await context.route(PAGE_ICON, route => route.fulfill({ status: 204 }));
             // A tap on a control that never takes one fails in 30 s, not at the
             // test's timeout, which would skip the journey's own `finally`.
             context.setDefaultTimeout(30_000);
