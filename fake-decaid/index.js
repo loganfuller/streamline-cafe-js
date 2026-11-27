@@ -123,7 +123,7 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
         plugins.push(copy(decentSync.plugin));
         for (const [key, value] of Object.entries(decentSync.store[DYE2_ID] || {})) store.set(DYE2_ID, key, value);
     }
-    const library = createLibrary(sampleData);
+    const library = createLibrary(sampleData, utcNow);
     const cannedBoot = createBoot(boot);
     const dye2Loaded = () => plugins.some(p => p.id === DYE2_ID && p.loaded);
     const loaded = id => plugins.some(p => p.id === id && p.loaded);
@@ -213,7 +213,7 @@ export function createFakeDecaid({ sampleData, boot, pour, decentSync = null, no
             if (!loaded(DECENT_SYNC_ID) || !decentSyncPlugin) return { status: 404, body: { error: `plugin with ${DECENT_SYNC_ID} not loaded` } };
             return decentSyncPlugin.answer(method, path.slice(`${API}/plugins/${DECENT_SYNC_ID}/`.length), query, body);
         }
-        if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query);
+        if (/^\/api\/v1\/(grinders|beans|bean-batches)(\/|$)/.test(path)) return library.answer(method, path.slice(API.length), query, body);
         if (/^\/api\/v1\/shots\/[^/]+$/.test(path) && method === 'PUT') return putShot(decodeURIComponent(path.slice(`${API}/shots/`.length)), body);
         if (/^\/api\/v1\/shots(\/|$)/.test(path)) return shots.answer(method, path.slice(`${API}/shots`.length), query, body);
         if (path === `${API}/machine/state` && method === 'GET') return { status: 200, body: machine.snapshot() };

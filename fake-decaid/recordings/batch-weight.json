@@ -1,0 +1,328 @@
+{
+ "recordedWith": {
+  "decaid": "0.9.2",
+  "dye2": "0.1.42",
+  "streamline": "0.2.34"
+ },
+ "rule": "fake-decaid/library.js",
+ "about": "A batch's remaining weight written alone: every other field of the record is kept, the answer is the record as stored, and a read gives it back; a weight that is no number is refused, a batch Decaid doesn't have is not found, and a null clears the weight.",
+ "given": {
+  "workflow": {
+   "id": "3958a609-22ea-44f1-a5a6-3b7ad7409daa",
+   "name": "Workflow",
+   "description": "Description",
+   "profile": {
+    "version": "2",
+    "title": "Default",
+    "notes": "This profile is gentle on the coffee puck and not too demanding on the barista.  Produces a very acceptable espresso in a wide variety of settings.",
+    "author": "Decent",
+    "beverage_type": "espresso",
+    "steps": [
+     {
+      "name": "preinfusion temp boost",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 2,
+      "weight": 0,
+      "temperature": 90,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "preinfusion",
+      "pump": "flow",
+      "transition": "fast",
+      "exit": {
+       "type": "pressure",
+       "condition": "over",
+       "value": 4
+      },
+      "volume": 0,
+      "seconds": 18,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "flow": 8,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "rise and hold",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 1,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "forced rise without limit",
+      "pump": "pressure",
+      "transition": "fast",
+      "exit": null,
+      "volume": 0,
+      "seconds": 3,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 8.6,
+      "limiter": null
+     },
+     {
+      "name": "decline",
+      "pump": "pressure",
+      "transition": "smooth",
+      "exit": null,
+      "volume": 0,
+      "seconds": 32,
+      "weight": 0,
+      "temperature": 88,
+      "sensor": "coffee",
+      "pressure": 6,
+      "limiter": null
+     }
+    ],
+    "target_volume": 36,
+    "target_weight": 36,
+    "target_volume_count_start": 2,
+    "tank_temperature": 0
+   },
+   "context": {
+    "targetDoseWeight": 18,
+    "targetYield": 36,
+    "grinderId": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
+    "grinderModel": "Sample Grinder 38",
+    "grinderSetting": "11.5",
+    "grinderRpm": 900,
+    "beanBatchId": "08a5aa8a-014c-439a-a1d9-bf4fe615d8b5",
+    "coffeeName": "Sample Single Origin",
+    "coffeeRoaster": "Sample Roasters",
+    "baristaName": "Sample Barista",
+    "extras": {
+     "dye": {
+      "selection": null,
+      "v": 1,
+      "recipeId": null
+     },
+     "basketId": null,
+     "basketName": null,
+     "rpm": 800,
+     "feedRate": null,
+     "sample": {
+      "nested": true
+     }
+    }
+   },
+   "steamSettings": {
+    "targetTemperature": 150,
+    "duration": 50,
+    "flow": 0.8,
+    "stopAtTemperature": 0
+   },
+   "hotWaterData": {
+    "targetTemperature": 75,
+    "duration": 30,
+    "volume": 50,
+    "flow": 10
+   },
+   "rinseData": {
+    "targetTemperature": 90,
+    "duration": 10,
+    "flow": 6
+   }
+  }
+ },
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:28:20.745171"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066",
+    "body": {
+     "weightRemaining": 2890
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "weightRemaining": 2890,
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:30:41.967971"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "weightRemaining": 2890,
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:30:41.967971"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/beans/c62659d5-e563-4fe8-b1bf-06cf7f7b649b/batches"
+   },
+   "answer": {
+    "status": 200,
+    "body": [
+     {
+      "id": "c2112265-b534-4a93-877e-8e09c8606066",
+      "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+      "roastDate": "2026-10-20T00:00:00.000Z",
+      "weightRemaining": 2890,
+      "frozen": false,
+      "archived": false,
+      "createdAt": "2026-11-27T01:28:20.745171",
+      "updatedAt": "2026-11-27T01:30:41.967971"
+     }
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066",
+    "body": {
+     "weightRemaining": "heavy"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "body": {
+     "error": "FormatException: Field \"weightRemaining\" must be a number or null"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/bean-batches/no-such-batch",
+    "body": {
+     "weightRemaining": 100
+    }
+   },
+   "answer": {
+    "status": 404,
+    "body": {
+     "error": "Batch not found"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "weightRemaining": 2890,
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:30:41.967971"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066",
+    "body": {
+     "weightRemaining": null
+    }
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:30:46.823856"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/bean-batches/c2112265-b534-4a93-877e-8e09c8606066"
+   },
+   "answer": {
+    "status": 200,
+    "body": {
+     "id": "c2112265-b534-4a93-877e-8e09c8606066",
+     "beanId": "c62659d5-e563-4fe8-b1bf-06cf7f7b649b",
+     "roastDate": "2026-10-20T00:00:00.000Z",
+     "frozen": false,
+     "archived": false,
+     "createdAt": "2026-11-27T01:28:20.745171",
+     "updatedAt": "2026-11-27T01:30:46.823856"
+    }
+   }
+  }
+ ]
+}

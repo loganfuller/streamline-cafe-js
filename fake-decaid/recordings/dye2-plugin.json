@@ -8,7 +8,7 @@
  "about": "DYE2 disabled in Decaid: listed as not loaded, its routes answered 404; enabled again: listed as loaded, its routes answered as before.",
  "given": {
   "workflow": {
-   "id": "ad6edda9-ca81-4d05-ad62-9a8eaa8762b1",
+   "id": "3958a609-22ea-44f1-a5a6-3b7ad7409daa",
    "name": "Workflow",
    "description": "Description",
    "profile": {
@@ -113,11 +113,11 @@
    "context": {
     "targetDoseWeight": 18,
     "targetYield": 36,
-    "grinderId": "ddf2ae7c-0255-41d8-b850-71638af6feed",
+    "grinderId": "a5d67665-ae05-4a27-94d8-6c7ccfa32240",
     "grinderModel": "Sample Grinder 38",
     "grinderSetting": "11.5",
     "grinderRpm": 900,
-    "beanBatchId": "31ab5170-4fc5-4270-868e-56539108c2f4",
+    "beanBatchId": "08a5aa8a-014c-439a-a1d9-bf4fe615d8b5",
     "coffeeName": "Sample Single Origin",
     "coffeeRoaster": "Sample Roasters",
     "baristaName": "Sample Barista",
@@ -2016,7 +2016,7 @@
     "status": 200,
     "body": {
      "kind": "favourite",
-     "id": "recent:6d0c052d-025b-46c5-aa91-65584a44ea6b",
+     "id": "recent:9d60c428-6edb-423c-b920-5de0b31953bf",
      "modified": false,
      "auto": true
     }

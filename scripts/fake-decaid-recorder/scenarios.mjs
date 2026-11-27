@@ -26,6 +26,10 @@ const DYE2 = '/plugins/dye2.reaplugin';
 const recipeNamed = (sample, name) => sample.recipes.find(row => row.name === name);
 const grinderNamed = (sample, model) => sample.grinders.find(row => row.model === model);
 const beanNamed = (sample, name) => sample.beans.find(row => row.name === name);
+// The one batch of a sample bean that has one, so a write to it reorders no list.
+const onlyBatch = (sample, name) => sample.batches[beanNamed(sample, name).id][0];
+const decafBatch = ({ sample }) => `/bean-batches/${onlyBatch(sample, 'Example Decaf').id}`;
+const decafBatches = query => ({ sample }) => `/beans/${beanNamed(sample, 'Example Decaf').id}/batches${query}`;
 // DYE2's records with one of them on another profile, as the page's profile
 // change writes it: the profile, in its snapshot and its stored Workflow.
 const withProfile = (sample, name, profile) => sample.recipes.map(row => (row.name === name
@@ -210,6 +214,36 @@ export const SCENARIOS = [
         ],
     },
     {
+        name: 'batch-weight',
+        rule: 'fake-decaid/library.js',
+        about: 'A batch\'s remaining weight written alone: every other field of the record is kept, the answer is the record as stored, and a read gives it back; a weight that is no number is refused, a batch Decaid doesn\'t have is not found, and a null clears the weight.',
+        steps: [
+            { method: 'GET', path: decafBatch },
+            { method: 'PUT', path: decafBatch, body: { weightRemaining: 2890 } },
+            { method: 'GET', path: decafBatch },
+            { method: 'GET', path: decafBatches('') },
+            { method: 'PUT', path: decafBatch, body: { weightRemaining: 'heavy' } },
+            { method: 'PUT', path: '/bean-batches/no-such-batch', body: { weightRemaining: 100 } },
+            { method: 'GET', path: decafBatch },
+            { method: 'PUT', path: decafBatch, body: { weightRemaining: null } },
+            { method: 'GET', path: decafBatch },
+        ],
+    },
+    {
+        name: 'batch-archive',
+        rule: 'fake-decaid/library.js',
+        about: 'A batch archived with a write of that field alone: every other field of the record is kept, a bean\'s batches leave it out unless the archived are asked for, and a read by its id still gives it; a null is refused; and it is brought back the same way.',
+        steps: [
+            { method: 'PUT', path: decafBatch, body: { archived: true } },
+            { method: 'GET', path: decafBatch },
+            { method: 'GET', path: decafBatches('') },
+            { method: 'GET', path: decafBatches('?includeArchived=true') },
+            { method: 'PUT', path: decafBatch, body: { archived: null } },
+            { method: 'PUT', path: decafBatch, body: { archived: false } },
+            { method: 'GET', path: decafBatches('') },
+        ],
+    },
+    {
         name: 'dye2-save-recipe',
         rule: 'fake-decaid/dye2.js',
         dye2: true,
@@ -323,6 +357,7 @@ export const SCENARIOS = [
 export async function recordScenarios({ decaid, raw, ws, write, sleep, opened, sample, only = null }) {
     const state = {
         beans: sample.beans,
+        batches: sample.batches,
         workflow: sample.workflow,
         recipes: sample.store['dye2.reaplugin'].recipes,
         grinders: sample.grinders,
